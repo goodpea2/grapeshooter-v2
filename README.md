@@ -1,6 +1,33 @@
 
 # Core Explorer - Game Documentation
 
+## 🚀 Deployment Instructions
+
+To get this game running on the web, follow these steps:
+
+### Option A: Vercel (Recommended - Easiest)
+1. Push your code to a GitHub repository.
+2. Go to [Vercel.com](https://vercel.com) and click **"Add New" -> "Project"**.
+3. Import your GitHub repository.
+4. Vercel will automatically detect **Vite**. 
+5. Click **Deploy**. Vercel handles the TypeScript compilation for you.
+
+### Option B: Netlify
+1. Push your code to GitHub.
+2. Go to [Netlify.com](https://netlify.com) and click **"Add a new site" -> "Import an existing project"**.
+3. Connect your GitHub and select the repo.
+4. Ensure the build command is `npm run build` and the publish directory is `dist`.
+5. Click **Deploy**.
+
+### Option C: Manual Local Build
+If you want to test the build locally:
+1. Install [Node.js](https://nodejs.org/).
+2. Run `npm install` in your project folder.
+3. Run `npm run build`.
+4. Your ready-to-host files will be in the `dist/` folder.
+
+---
+
 ## Core Mechanics (v3.0)
 - **Mining**: Player core has an auto-mining turret that targets the nearest block or enemy. Mining projectiles travel to blocks to deal damage.
 - **Base Expansion**: Turrets attach to the core using a hex-axial grid system. Base expansion is only available while stationary.
@@ -8,36 +35,23 @@
 
 ## Ingredient-Based Merging System
 - **T1 Base Turrets**: Peashooter, Mining Laser, Wallnut, Landmine, Iceberg.
-- **Recipe Containers**: Every turret (T1, T2, T3) acts as a container for its base T1 ingredients.
-- **Dynamic Merging**: Merging now calculates the combined ingredient pool of two turrets (or one placed turret and one source). 
-- **Recipe Matching**: The system scans `TURRET_RECIPES` to find a match where:
-  - All mandatory base ingredients are present.
-  - Remaining slots are filled by duplicates of the mandatory set.
-  - Total ingredient count matches the tier requirements (T2 = 2, T3 = 3).
-- **Flexible Merging Paths**: You can merge a T2 with a T1, or two T1s, as long as the total base ingredient count and types match a valid T3 recipe.
-
-## Modular Health Triggers
-- **Health Ratios**: Enemy behaviors (like summoning minions) are driven by health ratios. A trigger at `0` acts as a modular "on-death" effect.
+- **Dynamic Merging**: Merging now calculates the combined ingredient pool of two turrets. 
+- **Recipe Matching**: The system scans `TURRET_RECIPES` to find a match.
 
 ## Visual Polish & Rendering
-- **Outermost Silhouette**: Enemies use a **Two-Pass Rendering Strategy**. 
-  - *Pass 1*: All body components are rendered with a thick dark stroke to establish a collective silhouette. 
-  - *Pass 2*: Components are redrawn with no stroke using the body color, erasing internal overlap lines and creating a unified "sticker-like" appearance.
-- **Eye Rendering**: Eyes are rendered without outlines to maintain a clean, expressive look.
+- **Outermost Silhouette**: Enemies use a **Two-Pass Rendering Strategy** for a unified "sticker-like" appearance.
+- **Eye Rendering**: Eyes are rendered without outlines for expression.
 
 ## Structured Overlays (v2.9)
-- **Data-Driven Template**: Overlays (ores, TNT, structures) use the `overlayTypes` registry.
-- **Hostile Structures**: Objects like `Sniper Tower` are flagged as `isEnemy`. They feature high-precision laser math that calculates relative positioning from block centers to player centers.
-- **Loot Tables**: Destruction results (Sun, Turret Crates) are driven by `lootConfigOnDeath` keys.
-- **Dynamic Hinting**: Hidden blocks containing overlays provide visual hints via `concealedSparkleVfx` when exposed to the player's detection radius.
+- **Hostile Structures**: Objects like `Sniper Tower` are flagged as `isEnemy`. 
+- **Loot Tables**: Destruction results (Sun, Turret Crates) are driven by `lootConfigOnDeath`.
 
 ## Dynamic World Gen
-- **Multi-Pot Accumulator**: Exploring new chunks accumulates "pot" values (Sun, TNT, Crate, etc.) based on `ChunkLevel`.
-- **Probabilistic Spawning**: New chunks roll a chance to "spend" these pots.
-- **Legible Spawning**: The system uses `isLegibleSpot` to ensure enemies and loot only spawn on navigable ground or safe liquids, preventing entities from being trapped in obsidian or lava.
+- **Multi-Pot Accumulator**: Exploring new chunks accumulates "pot" values.
+- **Legible Spawning**: System ensures entities only spawn on navigable ground.
 
 ## Liquid Environments
 - **Water**: Standard movement.
-- **Ice**: High friction, leaves ice trails. Turrets become "Frosted" (Locked) if stationary for too long.
+- **Ice**: High friction, leaves ice trails. Turrets become "Frosted".
 - **Tar**: High viscosity. Reduces movement speed and fire rates.
 - **Lava**: Dangerous tick-damage and applied `c_burning`.
