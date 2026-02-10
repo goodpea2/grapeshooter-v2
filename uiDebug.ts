@@ -236,8 +236,8 @@ export function drawDebugPanel(spawnFromBudget: Function) {
       { l: "CLEAR TURRETS", a: () => { state.player.attachments = []; }},
       { l: "ADD LEVEL", a: () => {
         const count = state.exploredChunks.size;
-        let nextThreshold = LEVEL_THRESHOLDS.find(t => t > count);
-        if (!nextThreshold) nextThreshold = count + 50; 
+        // Fix: Added fallback to prevent math errors if find returns undefined
+        const nextThreshold = LEVEL_THRESHOLDS.find(t => t > count) ?? (count + 50);
         for(let i=0; i<(nextThreshold - count); i++) state.exploredChunks.add(`cheat_${count+i}`);
         state.world.updateLevel();
       }},

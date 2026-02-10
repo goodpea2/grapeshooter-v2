@@ -1,3 +1,4 @@
+
 import { state } from './state';
 import { 
   GRID_SIZE, CHUNK_SIZE, VISIBILITY_RADIUS, LEVEL_THRESHOLDS, LEVEL_BUDGET, WORLD_GEN_STATS, CHUNK_GEN_RADIUS
@@ -268,7 +269,8 @@ export class Block {
           }
         }
         if (oCfg.lootConfigOnDeath) {
-          spawnLootAt(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, this.overlay, oCfg.lootConfigOnDeath);
+          // Fix: Added non-null assertion since oCfg check guarantees this.overlay is present
+          spawnLootAt(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, this.overlay!, oCfg.lootConfigOnDeath);
         }
         if (oCfg.enemyToSpawnOnDeath) {
           const spawnCount = oCfg.rollCount || 1;
