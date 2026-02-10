@@ -59,6 +59,10 @@ declare const line: any;
 declare const textAlign: any;
 declare const textSize: any;
 declare const text: any;
+declare const image: any;
+declare const imageMode: any;
+declare const tint: any;
+declare const noTint: any;
 
 export function lerpAngle(start: number, end: number, amt: number) {
   let diff = end - start;
@@ -403,7 +407,6 @@ export class AttachedTurret {
         this.actionSteps.set(act, step + 1);
       } else if (act === 'laserBeam' && this.target && frameCount - lastTrigger > effectiveFireRate) {
         const tCenter = this.getTargetCenter(); if (!tCenter) return;
-        // Fixed: Corrected typo 'vPos.y' to 'wPos.x' in angle calculation
         this.angle = atan2(tCenter.y - wPos.y, tCenter.x - wPos.x); 
         const killed = this.target.takeDamage(config.beamDamage);
         if (killed && config.spawnBulletOnTargetDeath) {
@@ -418,13 +421,11 @@ export class AttachedTurret {
         this.actionTimers.set(act, frameCount);
         this.actionSteps.set(act, step + 1);
       } else if (act === 'spawnBulletAtRandom' && frameCount - lastTrigger > effectiveFireRate) {
-        // Special logic for trap turrets (like Mine Launcher)
         const isTrap = ['t_mine', 't_ice', 't2_minespawner', 't2_icebomb', 't2_stun'].includes(this.type);
         if (isTrap) {
           const pulseTimer = this.actionTimers.get('pulse') || -999999;
           const pulseCooldown = (this.config.actionConfig.pulseCooldown || 0) / this.fireRateMultiplier;
           const onPulseCooldown = (frameCount - pulseTimer) < pulseCooldown;
-          // If we are currently unarmed/reloading, we can't spawn our projectile
           if (onPulseCooldown) continue;
         }
 
@@ -853,9 +854,22 @@ export class Player {
   display() {
     push(); let grad = (window as any).drawingContext.createRadialGradient(this.pos.x, this.pos.y, 0, this.pos.x, this.pos.y, VISIBILITY_RADIUS * GRID_SIZE); grad.addColorStop(0, 'rgba(100, 150, 255, 0.15)'); grad.addColorStop(1, 'rgba(0, 0, 0, 0)'); (window as any).drawingContext.fillStyle = grad; noStroke(); ellipse(this.pos.x, this.pos.y, VISIBILITY_RADIUS * GRID_SIZE * 2.8);
     this.displayAttachments(false);
-    push(); translate(this.pos.x, this.pos.y); let c = [30, 40, 70]; if (this.flash > 0) { c = [255, 100, 100]; this.flash--; }
-    stroke(20, 20, 40); strokeWeight(4); fill(c[0], c[1], c[2]); ellipse(0, 0, this.size, this.size);
-    const coreP = 0.5 + 0.5 * sin(frameCount * 0.1); fill(50, 150, 255, 150 + coreP * 100); noStroke(); ellipse(0, 0, 18, 18); fill(255, 255, 255, 200); ellipse(0, 0, 8, 8);
+    
+    push(); translate(this.pos.x, this.pos.y); 
+
+    // Visual Override: Player Sprite
+    if (state.assets.player) {
+       if (this.flash > 0) tint(255, 100, 100);
+       imageMode(CENTER);
+       image(state.assets.player, 0, 0, this.size*2, this.size*2);
+       noTint();
+       if (this.flash > 0) this.flash--;
+    } else {
+       let c = [30, 40, 70]; if (this.flash > 0) { c = [255, 100, 100]; this.flash--; }
+       stroke(20, 20, 40); strokeWeight(4); fill(c[0], c[1], c[2]); ellipse(0, 0, this.size, this.size);
+       const coreP = 0.5 + 0.5 * sin(frameCount * 0.1); fill(50, 150, 255, 150 + coreP * 100); noStroke(); ellipse(0, 0, 18, 18); fill(255, 255, 255, 200); ellipse(0, 0, 8, 8);
+    }
+
     if (state.isStationary) { rotate(this.autoTurretAngle); stroke(20, 20, 40); strokeWeight(2); fill(50, 150, 255); rect(14 - (this.recoil || 0), -5, 14, 10, 3); noStroke(); fill(255, 150); rect(22 - (this.recoil || 0), -3, 4, 6, 1); } pop();
     pop();
   }

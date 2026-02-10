@@ -12,6 +12,7 @@ import { getTime, drawUI, drawTurretTooltip } from './ui';
 import { drawWorldGenPreview } from './uiDebug';
 import { updateGameSystems, spawnFromBudget } from './lvDemo';
 import { MergeVFX } from './vfx';
+import { ASSETS } from './assets';
 
 declare const p5: any;
 declare const createCanvas: any;
@@ -55,6 +56,7 @@ declare const textWidth: any;
 declare const color: any;
 declare const lerpColor: any;
 declare const rotate: any;
+declare const loadImage: any;
 
 function getHexAxial(x: number, y: number) {
   let q = (2/3 * x) / HEX_DIST; let r = (-1/3 * x + sqrt(3)/3 * y) / HEX_DIST;
@@ -118,6 +120,13 @@ function drawGlobalLighting() {
     pop(); 
   }
 }
+
+(window as any).preload = () => {
+  state.assets = {};
+  for (const [key, url] of Object.entries(ASSETS)) {
+    state.assets[key] = loadImage(url);
+  }
+};
 
 (window as any).setup = () => {
   createCanvas(windowWidth, windowHeight);

@@ -18,6 +18,9 @@ export const state: any = {
   frames: 6 * HOUR_FRAMES,
   deathVisualsBuffer: null,
   
+  // Loaded Assets
+  assets: {},
+
   // Budget system
   lastNightTriggered: 0,
   currentNightWaveBudget: 60,
@@ -27,17 +30,17 @@ export const state: any = {
   refundedBudget: 0,
 
   // Economy & World Generation Pots
-  sunSpawnedTotal: 0, // This tracks total SunLoot value spawned from environment/enemies
-  sunMissedTotal: 0,    // This tracks total SunLoot value despawned
+  sunSpawnedTotal: 0, 
+  sunMissedTotal: 0,    
   totalSunLootCollected: 0,
   accumulatedSunPot: 0,
   accumulatedTntPot: 0,
   accumulatedStrayPot: 0,
-  accumulatedSunflowerPot: 1.0, // Starts at 1
+  accumulatedSunflowerPot: 1.0, 
   accumulatedSniperPot: 0,
   accumulatedSpawnerPot: 0,
 
-  // Total spawned trackers for debug (Block features)
+  // Total spawned trackers for debug
   totalSunSpawned: 0,
   totalTntSpawned: 0,
   totalStraySpawned: 0,
@@ -50,9 +53,9 @@ export const state: any = {
 
   // UI & Interaction
   uiWidth: 100,
-  draggedTurretType: null, // For shop dragging
-  draggedTurretInstance: null, // For merging existing turrets
-  selectedTurretType: null, // For click-to-place mode
+  draggedTurretType: null, 
+  draggedTurretInstance: null, 
+  selectedTurretType: null, 
   isStationary: true,
   stationaryTimer: 0,
   showDebug: false,
@@ -61,10 +64,10 @@ export const state: any = {
   debugGizmosTurrets: false,
   debugGizmosEnemies: false,
   debugHP: false,
-  hoveredTurretInstance: null, // Track world-space turret hover
+  hoveredTurretInstance: null, 
 
   // Cooldowns
-  turretLastUsed: {}, // Maps turret type to frame count when last purchased
+  turretLastUsed: {}, 
   uiAlpha: 255,
 
   // Time Warp
