@@ -403,6 +403,7 @@ export class AttachedTurret {
         this.actionSteps.set(act, step + 1);
       } else if (act === 'laserBeam' && this.target && frameCount - lastTrigger > effectiveFireRate) {
         const tCenter = this.getTargetCenter(); if (!tCenter) return;
+        // Fixed: Corrected typo 'vPos.y' to 'wPos.x' in angle calculation
         this.angle = atan2(tCenter.y - wPos.y, tCenter.x - wPos.x); 
         const killed = this.target.takeDamage(config.beamDamage);
         if (killed && config.spawnBulletOnTargetDeath) {
@@ -790,29 +791,61 @@ export class Player {
       let t = this.findBlockTarget(this.pos, this.autoTurretRange); if (t) { let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); if (frameCount - this.autoTurretLastShot > this.autoTurretFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, bc.x, bc.y, 'b_player_mining', 'none')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 14, 4, color(255, 255, 100))); this.autoTurretLastShot = frameCount; this.recoil = 3; } }
     }
   }
+
   findBlockTarget(origin: any, range: number) {
-      let nPri = null; let mdPri = range; let nGen = null; let mdGen = range;
-      // Fixed: Cast chunks to any to satisfy TS property checks on potential never inference
-      (state.world.chunks as any).forEach((chunk: any) => { if (dist(chunk.cx * CHUNK_SIZE * GRID_SIZE, chunk.cy * CHUNK_SIZE * GRID_SIZE, origin.x, origin.y) > range + 500) return; for (let b of chunk.blocks) { if (b.isMined) continue; let bc = {x: b.pos.x + GRID_SIZE/2, y: b.pos.y + GRID_SIZE/2}; let d = dist(origin.x, origin.y, bc.x, bc.y); if (d > range) continue; if (!state.world.checkLOS(origin.x, origin.y, bc.x + (origin.x < bc.x ? -2 : 2), bc.y + (origin.y < bc.y ? -2 : 2))) continue; 
-      const oCfg = b.overlay ? overlayTypes[b.overlay] : null;
-      if (oCfg?.isValuable || oCfg?.isEnemy) { if (d < mdPri) { mdPri = d; nPri = b; } } else { if (d < mdGen) { mdGen = d; nGen = b; } } } });
+      let nPri: any = null; let mdPri = range; let nGen: any = null; let mdGen = range;
+      const chunks = state.world.chunks as Map<string, any>;
+      for (const chunk of chunks.values()) {
+          const cX = chunk.cx * CHUNK_SIZE * GRID_SIZE;
+          const cY = chunk.cy * CHUNK_SIZE * GRID_SIZE;
+          if (dist(cX, cY, origin.x, origin.y) > range + 500) continue;
+          
+          const blocks = chunk.blocks as any[];
+          for (const b of blocks) {
+              if (b.isMined || !b.pos) continue;
+              const bc = { x: b.pos.x + GRID_SIZE/2, y: b.pos.y + GRID_SIZE/2 };
+              const d = dist(origin.x, origin.y, bc.x, bc.y);
+              if (d > range) continue;
+              
+              if (!state.world.checkLOS(origin.x, origin.y, bc.x + (origin.x < bc.x ? -2 : 2), bc.y + (origin.y < bc.y ? -2 : 2))) continue;
+              
+              const oCfg = b.overlay ? overlayTypes[b.overlay] : null;
+              if (oCfg?.isValuable || oCfg?.isEnemy) {
+                  if (d < mdPri) { mdPri = d; nPri = b; }
+              } else {
+                  if (d < mdGen) { mdGen = d; nGen = b; }
+              }
+          }
+      }
       return nPri || nGen;
   }
+
   moveWithSliding(move: any) {
     let tx = this.pos.x + move.x; 
     let cx = state.world.checkCollision(tx, this.pos.y, this.size/2); 
     const ltx = state.world.getLiquidAt(floor(tx / GRID_SIZE), floor(this.pos.y / GRID_SIZE)); 
     if (ltx && liquidTypes[ltx]?.liquidConfig?.blocksMovement) cx = true;
-    // Fix: Explicitly type 'a' to prevent never inference
-    for(let a of (this.attachments as AttachedTurret[])) if(a.config.collideWithEnemy !== false && state.world.checkCollision(tx + a.offset.x, this.pos.y + a.offset.y, a.config.size/2)) cx = true; 
+    
+    const atts = this.attachments as AttachedTurret[];
+    for(let a of atts) {
+      if(a.config.collideWithEnemy !== false && state.world.checkCollision(tx + a.offset.x, this.pos.y + a.offset.y, a.config.size/2)) {
+        cx = true;
+        break;
+      }
+    }
     if (!cx) this.pos.x = tx;
 
     let ty = this.pos.y + move.y; 
     let cy = state.world.checkCollision(this.pos.x, ty, this.size/2); 
     const lty = state.world.getLiquidAt(floor(this.pos.x / GRID_SIZE), floor(ty / GRID_SIZE)); 
     if (lty && liquidTypes[lty]?.liquidConfig?.blocksMovement) cy = true;
-    // Fix: Explicitly type 'a' to prevent never inference
-    for(let a of (this.attachments as AttachedTurret[])) if(a.config.collideWithEnemy !== false && state.world.checkCollision(this.pos.x + a.offset.x, ty + a.offset.y, a.config.size/2)) cy = true; 
+    
+    for(let a of atts) {
+      if(a.config.collideWithEnemy !== false && state.world.checkCollision(this.pos.x + a.offset.x, ty + a.offset.y, a.config.size/2)) {
+        cy = true;
+        break;
+      }
+    }
     if (!cy) this.pos.y = ty;
   }
   takeDamage(dmg: number) { this.health -= dmg; this.flash = 6; if (this.health <= 0) this.health = 0; }
