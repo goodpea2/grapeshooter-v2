@@ -101,7 +101,8 @@ export const bulletTypes: any = {
     },
     damageTargets: ['enemy'],
     isStationaryVFX: true,
-    stopAtTarget: true
+    stopAtTarget: true,
+    idleAssetImg: 'img_t_mine_front'
   },
   b_laser_explosion: {
     bulletDamage: 40, bulletSpeed: 0, bulletColor: [255, 200, 100], bulletLifeTime: 1, bulletSize: 1, bulletLength: 1,

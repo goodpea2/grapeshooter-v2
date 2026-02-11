@@ -1,6 +1,5 @@
 
 import { state } from '../state';
-// Fixed: Removed TWO_PI from constants import
 import { HEX_DIST, GRID_SIZE, HOUR_FRAMES } from '../constants';
 import { turretTypes } from '../balanceTurrets';
 import { conditionTypes } from '../balanceConditions';
@@ -22,7 +21,6 @@ declare const random: any;
 declare const cos: any;
 declare const sin: any;
 declare const radians: any;
-// Fixed: Declared TWO_PI as a p5.js global constant
 declare const TWO_PI: any;
 
 export class AttachedTurret {
@@ -41,6 +39,15 @@ export class AttachedTurret {
     
     if (this.config.tier === 1) {
       this.baseIngredients = [type === 't_peashooter' ? 't_pea' : type];
+    }
+
+    // Initialize arming state if turret has an unarmed asset
+    if (this.config.actionConfig?.hasUnarmedAsset) {
+      for (const act of this.config.actionType || []) {
+        if (act === 'pulse' || act === 'shoot' || act === 'spawnBulletAtRandom') {
+          this.actionTimers.set(act, state.frames);
+        }
+      }
     }
   }
   
@@ -63,7 +70,7 @@ export class AttachedTurret {
     
     if (lData?.liquidConfig?.liquidDamageConfig?.turret) {
       const cfg = lData.liquidConfig.liquidDamageConfig.turret;
-      if (frameCount % cfg.damageInterval === 0) {
+      if (state.frames % cfg.damageInterval === 0) {
           const dmg = state.isStationary 
             ? (cfg.damageWhileStationary ?? 0) + this.maxHealth * (cfg.damageAsMaxHpWhileStationary ?? 0)
             : (cfg.damageWhileMoving ?? 0);
@@ -78,17 +85,17 @@ export class AttachedTurret {
 
     for (let [cKey, life] of this.conditions) {
       const cfg = conditionTypes[cKey];
-      if (cfg.damage && frameCount % cfg.damageInterval === 0) this.takeDamage(cfg.damage);
+      if (cfg.damage && state.frames % cfg.damageInterval === 0) this.takeDamage(cfg.damage);
       this.conditions.set(cKey, life - 1);
       if (life <= 0) this.conditions.delete(cKey);
     }
 
     if (this.config.actionType.includes('passiveSun')) {
       const lastTrigger = this.actionTimers.get('passiveSun') || 0;
-      if (frameCount - lastTrigger > this.config.actionConfig.sunCooldown) {
+      if (state.frames - lastTrigger > this.config.actionConfig.sunCooldown) {
         state.loot.push(new SunLoot(wPos.x, wPos.y, 1));
         state.sunSpawnedTotal += 1;
-        this.actionTimers.set('passiveSun', frameCount);
+        this.actionTimers.set('passiveSun', state.frames);
       }
     }
 
@@ -97,7 +104,7 @@ export class AttachedTurret {
     if (!isActive) return;
     this.findTarget();
     for (const act of this.config.actionType || []) {
-      const lastTrigger = this.actionTimers.get(act) || -9999; 
+      const lastTrigger = this.actionTimers.get(act) || -99999; 
       const config = this.config.actionConfig;
       
       const step = this.actionSteps.get(act) || 0;
@@ -105,14 +112,14 @@ export class AttachedTurret {
       const fr = Array.isArray(frValue) ? frValue[step % frValue.length] : frValue;
       const effectiveFireRate = fr / this.fireRateMultiplier;
 
-      if (act === 'shoot' && this.target && frameCount - lastTrigger > effectiveFireRate) {
+      if (act === 'shoot' && this.target && state.frames - lastTrigger > effectiveFireRate) {
         const tCenter = this.getTargetCenter(); if (!tCenter) return;
         this.angle = atan2(tCenter.y - wPos.y, tCenter.x - wPos.x); let sa = this.angle + (config.inaccuracy ? random(-radians(config.inaccuracy), radians(config.inaccuracy)) : 0);
         state.bullets.push(new Bullet(wPos.x, wPos.y, wPos.x + cos(sa)*500, wPos.y + sin(sa)*500, config.bulletTypeKey, 'enemy'));
         state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, sa)); this.recoil = 6; 
-        this.actionTimers.set(act, frameCount);
+        this.actionTimers.set(act, state.frames);
         this.actionSteps.set(act, step + 1);
-      } else if (act === 'laserBeam' && this.target && frameCount - lastTrigger > effectiveFireRate) {
+      } else if (act === 'laserBeam' && this.target && state.frames - lastTrigger > effectiveFireRate) {
         const tCenter = this.getTargetCenter(); if (!tCenter) return;
         this.angle = atan2(tCenter.y - wPos.y, tCenter.x - wPos.x); 
         const killed = this.target.takeDamage(config.beamDamage);
@@ -125,14 +132,14 @@ export class AttachedTurret {
         }
         if (config.appliedConditions && this.target.applyCondition) for (const cond of config.appliedConditions) this.target.applyCondition(cond.type, cond.duration);
         this.recoil = 2; 
-        this.actionTimers.set(act, frameCount);
+        this.actionTimers.set(act, state.frames);
         this.actionSteps.set(act, step + 1);
-      } else if (act === 'spawnBulletAtRandom' && frameCount - lastTrigger > effectiveFireRate) {
+      } else if (act === 'spawnBulletAtRandom' && state.frames - lastTrigger > effectiveFireRate) {
         const isTrap = ['t_mine', 't_ice', 't2_minespawner', 't2_icebomb', 't2_stun'].includes(this.type);
         if (isTrap) {
           const pulseTimer = this.actionTimers.get('pulse') || -999999;
           const pulseCooldown = (this.config.actionConfig.pulseCooldown || 0) / this.fireRateMultiplier;
-          const onPulseCooldown = (frameCount - pulseTimer) < pulseCooldown;
+          const onPulseCooldown = (state.frames - pulseTimer) < pulseCooldown;
           if (onPulseCooldown) continue;
         }
 
@@ -146,9 +153,9 @@ export class AttachedTurret {
         b.targetPos = createVector(tx, ty);
         state.bullets.push(b);
         this.recoil = 8;
-        this.actionTimers.set(act, frameCount);
+        this.actionTimers.set(act, state.frames);
         this.actionSteps.set(act, step + 1);
-      } else if (act === 'pulse' && frameCount - lastTrigger > effectiveFireRate) {
+      } else if (act === 'pulse' && state.frames - lastTrigger > effectiveFireRate) {
         const tCenter = this.getTargetCenter();
         let triggered = false;
         if (tCenter && dist(wPos.x, wPos.y, tCenter.x, tCenter.y) < config.pulseTriggerRadius) triggered = true;
@@ -159,7 +166,7 @@ export class AttachedTurret {
             const sy = config.pulseCenteredAtTriggerSource && tCenter ? tCenter.y : wPos.y;
             let b = new Bullet(sx, sy, sx, sy, config.pulseBulletTypeKey, 'none'); b.life = 0; state.bullets.push(b);
           }
-          this.actionTimers.set(act, frameCount);
+          this.actionTimers.set(act, state.frames);
           this.actionSteps.set(act, step + 1);
         }
       }

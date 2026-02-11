@@ -28,7 +28,10 @@ export class Player {
   pos: any; prevPos: any; size = 30; attachments: AttachedTurret[] = []; health = 100; maxHealth = 100; speed = 3.6; flash = 0; autoTurretAngle = 0; autoTurretLastShot = 0; autoTurretRange = GRID_SIZE * 6; autoTurretFireRate = 22; recoil = 0; target: any = null;
   constructor(x: number, y: number) { this.pos = createVector(x, y); this.prevPos = createVector(x, y); }
   update() {
-    this.prevPos.set(this.pos); this.recoil = (this.recoil || 0) * 0.85;
+    this.prevPos.set(this.pos); 
+    this.recoil = (this.recoil || 0) * 0.85;
+    if (this.flash > 0) this.flash--; // Fix: Added decrement to prevent stuck damaged effect
+
     const gx = floor(this.pos.x / GRID_SIZE); const gy = floor(this.pos.y / GRID_SIZE);
     const liquidType = state.world.getLiquidAt(gx, gy); const lData = liquidType ? liquidTypes[liquidType] : null;
     let lMult = lData?.liquidConfig?.playerMovementSpeedMultiplier ?? 1.0;
