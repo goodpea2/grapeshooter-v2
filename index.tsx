@@ -354,7 +354,44 @@ function executePlacement() {
       ? state.draggedTurretInstance.baseIngredients 
       : (activePlacementType ? [activePlacementType] : []);
     
-    // Find Nearest Valid Spot OR Merge Target
+    // --- GLOBAL MERGE PREVIEW PASS ---
+    // Show merge costs on ALL valid targets on the board
+    if (ghostLayer === 'normal') {
+      for (const att of state.player.attachments) {
+        if (att === state.draggedTurretInstance || att.isFrosted || (att.config.turretLayer || 'normal') !== 'normal') continue;
+        
+        const combinedPool = [...draggingIngredients, ...att.baseIngredients];
+        const resType = findMergeResult(combinedPool);
+        const resConfig = resType ? turretTypes[resType] : null;
+        const t3Disabled = resConfig && resConfig.tier >= 3 && !state.enableT3Turrets;
+
+        if (resType && resConfig && !t3Disabled) {
+          const wPos = att.getWorldPos();
+          const canAfford = state.sunCurrency >= resConfig.mergeCost;
+          
+          push();
+          translate(wPos.x, wPos.y);
+          
+          // Cost indicator styling
+          const pulse = 1.0 + 0.1 * sin(frameCount * 0.2);
+          rectMode(CENTER);
+          fill(20, 20, 40, 240); noStroke();
+          let tw = textWidth(`${resConfig.mergeCost}`) + 30;
+          rect(0, att.size/2 + 10, tw, 22, 6);
+          
+          imageMode(CENTER);
+          if (!canAfford) (window as any).tint(150, 100, 100);
+          image(state.assets['img_icon_sun'], -tw/2 + 10, att.size/2 + 10, 22 * pulse, 22 * pulse);
+          (window as any).noTint();
+          
+          fill(canAfford ? [255, 255, 150] : [255, 100, 100]); textAlign(LEFT, CENTER); textSize(12);
+          text(`${resConfig.mergeCost}`, -tw/2 + 20, att.size/2 + 10);
+          pop();
+        }
+      }
+    }
+
+    // Find Nearest Valid Spot OR Merge Target (Focusing on Mouse)
     let closestDist = Infinity;
     let bestSnap = null;
     let bestMergeTarget = null;
@@ -382,11 +419,15 @@ function executePlacement() {
               const t3Disabled = resConfig && resConfig.tier >= 3 && !state.enableT3Turrets;
 
               if (resType && resConfig && !t3Disabled && !occupantOnSameLayer.isFrosted) {
-                if (d < closestDist) {
-                  closestDist = d;
-                  bestSnap = wPos;
-                  bestMergeTarget = occupantOnSameLayer;
-                  bestMergeInfo = { resType, resConfig, combinedPool };
+                // Legibility requirement: Must afford the merge to snap/mark as a target
+                const canAfford = state.sunCurrency >= resConfig.mergeCost;
+                if (canAfford) {
+                  if (d < closestDist) {
+                    closestDist = d;
+                    bestSnap = wPos;
+                    bestMergeTarget = occupantOnSameLayer;
+                    bestMergeInfo = { resType, resConfig, combinedPool };
+                  }
                 }
               }
             }
@@ -413,7 +454,7 @@ function executePlacement() {
     if (bestSnap) {
       state.previewSnapPos = bestSnap;
       
-      // If we found a merge target, setup the preview
+      // If we found a merge target, setup the preview highlight
       if (bestMergeTarget && bestMergeInfo) {
         const { resType, resConfig, combinedPool } = bestMergeInfo;
         const isHovered = dist(mWorld.x, mWorld.y, bestSnap.x, bestSnap.y) < 25;
@@ -423,19 +464,11 @@ function executePlacement() {
         noStroke(); fill(255, 255, 100, isHovered ? 150 : (60 * pulse));
         ellipse(bestSnap.x, bestSnap.y, bestMergeTarget.size + 15);
         
-        rectMode(CENTER);
-        fill(20, 20, 40, 220); noStroke();
-        let tw = textWidth(`${resConfig.mergeCost}`) + 30;
-        rect(bestSnap.x, bestSnap.y, tw, 22, 6);
-        
-        imageMode(CENTER);
-        image(state.assets['img_icon_sun'], bestSnap.x - tw/2 + 10, bestSnap.y, 22, 22);
-        
-        fill(255, 255, 150); textAlign(LEFT, CENTER); textSize(12);
-        text(`${resConfig.mergeCost}`, bestSnap.x - tw/2 + 20, bestSnap.y);
-
-        const resRange = resConfig.actionConfig?.shootRange || resConfig.actionConfig?.beamMaxLength || resConfig.actionConfig?.pulseTriggerRadius || 0;
-        if (isHovered && resRange > 0) { push(); noFill(); stroke(255, 255, 0, 180); strokeWeight(3); ellipse(bestSnap.x, bestSnap.y, resRange * 2); pop(); }
+        // Detailed hover info for merge
+        if (isHovered) {
+          const resRange = resConfig.actionConfig?.shootRange || resConfig.actionConfig?.beamMaxLength || resConfig.actionConfig?.pulseTriggerRadius || 0;
+          if (resRange > 0) { push(); noFill(); stroke(255, 255, 0, 180); strokeWeight(3); ellipse(bestSnap.x, bestSnap.y, resRange * 2); pop(); }
+        }
         
         state.mergeTargetPreview = { uid: bestMergeTarget.uid, type: resType, pos: bestSnap, cost: resConfig.mergeCost, ingredients: combinedPool };
         pop();

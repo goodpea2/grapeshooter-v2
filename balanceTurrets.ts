@@ -9,7 +9,7 @@ export const turretTypes: any = {
   // --- TIER 1 ---
   t_pea: { 
     name: 'Peashooter', cost: 10, health: 50, color: [100, 255, 100], size: 18, tier: 1, cooldownHours: 1,
-    tooltip: "High damage vs enemies. No block damage.",
+    tooltip: "Shoots bullets at enemies",
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_pea', shootRange: GRID_SIZE * 8, shootFireRate: 60 },
     targetType: ['enemy'],
@@ -17,7 +17,7 @@ export const turretTypes: any = {
   },
   t_laser: { 
     name: 'Mining Laser', cost: 10, health: 50, color: [50, 200, 255], size: 18, tier: 1, cooldownHours: 1,
-    tooltip: "Rapid mining beam. High block priority.",
+    tooltip: "Fires laser to break obstacles",
     actionType: ['laserBeam'],
     actionConfig: { beamDamage: 5, beamDamageRate: 3, beamWidth: 4, beamDuration: 1, beamFireRate: 6, beamDamageAcrossLength: false, beamAutoLength: true, beamMaxLength: GRID_SIZE * 8 },
     targetType: ['obstacle'],
@@ -25,12 +25,12 @@ export const turretTypes: any = {
   },
   t_wall: { 
     name: 'Wallnut', cost: 5, health: 300, color: [200, 200, 220], size: 22, tier: 1, cooldownHours: 2,
-    tooltip: "Heavy defensive armor.",
+    tooltip: "Simple defensive wall",
     actionType: [], actionConfig: {}, targetType: [], targetConfig: {}
   },
   t_mine: {
     name: 'Landmine', cost: 5, health: 50, color: [255, 100, 20], size: 16, tier: 1, cooldownHours: 3,
-    tooltip: "Explosive trap. Arms every 2h.",
+    tooltip: "Mine explodes on contact, armed every 2h",
     actionType: ['pulse'],
     actionConfig: { 
       pulseBulletTypeKey: 'b_mine_explosion', 
@@ -46,7 +46,7 @@ export const turretTypes: any = {
   },
   t_ice: {
     name: 'Iceberg', cost: 5, health: 50, color: [150, 240, 255], size: 16, tier: 1, cooldownHours: 3,
-    tooltip: "Freeze trap. Arms every 1h.",
+    tooltip: "Freezes an enemy on contact for 2h, armed every 1h",
     actionType: ['pulse'],
     actionConfig: { 
       pulseBulletTypeKey: 'b_ice_explosion', 
@@ -64,14 +64,14 @@ export const turretTypes: any = {
   // --- SPECIAL / REWARD ONLY ---
   t_sunflower: {
     name: 'Sunflower', cost: 0, health: 50, color: [255, 230, 50], size: 20, tier: 1.5,
-    tooltip: "Passive Generator. Spawns 1 Sun every hour.",
+    tooltip: "Spawns 1 Sun every hour.",
     actionType: ['passiveSun'],
     actionConfig: { sunCooldown: HOUR_FRAMES },
     targetType: [], targetConfig: {}
   },
   t_seed: {
     name: 'Seed', cost: 0, health: 50, color: [200, 200, 200], size: 18, tier: 1.5,
-    tooltip: "Grows into a random Tier 1 turret over time. Water speeds growth.",
+    tooltip: "Grows into a random Tier 1 turret over time. Water speeds up growth.",
     actionType: ['growth'],
     actionConfig: { maxGrowth: 32, growthInterval: HOUR_FRAMES * 0.25 },
     targetType: [], targetConfig: {}
@@ -79,14 +79,14 @@ export const turretTypes: any = {
   t_lilypad: {
     name: 'Lilypad', cost: 5, costType: 'soil', isSpecial: true, health: 100, color: [50, 200, 50], size: 22, tier: 1.2,
     turretLayer: 'ground', randomRotation: true, randomFlip: true,
-    tooltip: "Enables turrets to work on water. Placed under units.",
+    tooltip: "Enables plants to work on water. Placed under units.",
     actionType: [], actionConfig: {}, targetType: [], targetConfig: {}
   },
 
   // --- TIER 2 ---
   t2_repeater: {
     name: 'Repeater', cost: 10, mergeCost: 5, health: 50, color: [0, 180, 80], size: 20, tier: 2,
-    tooltip: "Shoots bursts: 50f delay, then 10f burst.",
+    tooltip: "Shoots 2 bullets at once",
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_pea', shootRange: GRID_SIZE * 8, shootFireRate: [50, 10] },
     targetType: ['enemy'],
@@ -94,7 +94,7 @@ export const turretTypes: any = {
   },
   t2_firepea: {
     name: 'Firepea', cost: 20, mergeCost: 10, health: 50, color: [255, 60, 40], size: 20, tier: 2,
-    tooltip: "Shoots fire peas that leave a 1s damaging puddle. Targets obstacles.",
+    tooltip: "Shoots at both enemy and obstacles, leaves a flaming puddle",
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_firepea', shootRange: GRID_SIZE * 8, shootFireRate: 60 },
     targetType: ['enemy', 'obstacle'],
@@ -102,7 +102,7 @@ export const turretTypes: any = {
   },
   t2_laser2: {
     name: 'Laser MK2', cost: 20, mergeCost: 10, health: 50, color: [100, 100, 255], size: 20, tier: 2,
-    tooltip: "Twice as powerful mining laser with longer range.",
+    tooltip: "Laser breaks obstacles faster",
     actionType: ['laserBeam'],
     actionConfig: { beamDamage: 10, beamDamageRate: 3, beamWidth: 6, beamDuration: 1, beamFireRate: 6, beamDamageAcrossLength: false, beamAutoLength: true, beamMaxLength: GRID_SIZE * 10 },
     targetType: ['obstacle'],
@@ -110,7 +110,7 @@ export const turretTypes: any = {
   },
   t2_peanut: {
     name: 'Peanut', cost: 15, mergeCost: 10, health: 300, color: [220, 200, 150], size: 22, tier: 2,
-    tooltip: "Tough armored pea shooter. Has 30 degree inaccuracy.",
+    tooltip: "Wall that shoots with high inaccuracy",
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_pea', shootRange: GRID_SIZE * 10, shootFireRate: 15, inaccuracy: 30 },
     targetType: ['enemy'],
@@ -118,7 +118,7 @@ export const turretTypes: any = {
   },
   t2_puncher: {
     name: 'Puncher', cost: 15, mergeCost: 5, health: 300, color: [120, 120, 255], size: 22, tier: 2,
-    tooltip: "Short range heavy impact beam. Hits enemies and blocks.",
+    tooltip: "Fires close laser at both obstacles and enemies",
     actionType: ['laserBeam'],
     actionConfig: { beamDamage: 8, beamDamageRate: 6, beamWidth: 10, beamDuration: 1, beamFireRate: 15, beamDamageAcrossLength: false, beamAutoLength: true, beamMaxLength: GRID_SIZE * 2.5 },
     targetType: ['enemy', 'obstacle'],
@@ -126,12 +126,12 @@ export const turretTypes: any = {
   },
   t2_tall: {
     name: 'Tallnut', cost: 10, mergeCost: 5, health: 600, color: [140, 140, 150], size: 26, tier: 2,
-    tooltip: "Massive defense plate.",
+    tooltip: "Tough defensive wall",
     actionType: [], actionConfig: {}, targetType: [], targetConfig: {}
   },
   t2_mortar: {
     name: 'Mortar', cost: 15, mergeCost: 10, health: 50, color: [180, 100, 40], size: 22, tier: 2,
-    tooltip: "Fires AOE shells at enemies.",
+    tooltip: "Shoots at enemy, bullet explodes with splash damage",
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_mortar_shell', shootRange: GRID_SIZE * 12, shootFireRate: 120 },
     targetType: ['enemy'],
@@ -139,7 +139,7 @@ export const turretTypes: any = {
   },
   t2_pulse: {
     name: 'Pulser', cost: 20, mergeCost: 15, health: 50, color: [100, 255, 255], size: 22, tier: 2,
-    tooltip: "Fires close-range AOE pulse at enemies and blocks.",
+    tooltip: "Pulses surrounding damage waves at enemies",
     actionType: ['pulse'],
     actionConfig: { pulseBulletTypeKey: 'b_pulse_tier2', pulseTriggerRadius: GRID_SIZE * 1.5, pulseTriggerBy: ['enemy', 'obstacle'], pulseCooldown: 120, pulseCenteredAtTriggerSource: false },
     targetType: ['enemy', 'obstacle'],
@@ -147,7 +147,7 @@ export const turretTypes: any = {
   },
   t2_laserexplode: {
     name: 'Exploding Laser', cost: 15, mergeCost: 10, health: 50, color: [150, 40, 40], size: 18, tier: 2,
-    tooltip: "Mining laser. Destroyed blocks explode for 40 damage in 1.5 radius.",
+    tooltip: "Broken obstacle explodes, damaging nearby enemies and obstacles",
     actionType: ['laserBeam'],
     actionConfig: { 
         beamDamage: 5, beamDamageRate: 3, beamWidth: 4, beamDuration: 1, beamFireRate: 6, beamDamageAcrossLength: false, beamAutoLength: true, beamMaxLength: GRID_SIZE * 8,
@@ -158,7 +158,7 @@ export const turretTypes: any = {
   },
   t2_minespawner: {
     name: 'Mine Launcher', cost: 20, mergeCost: 15, health: 50, color: [255, 20, 20], size: 20, tier: 2,
-    tooltip: "Launches floating mines AND acts as a landmine itself.",
+    tooltip: "Launches a mine every 2h to a random direction",
     actionType: ['pulse', 'spawnBulletAtRandom'],
     actionConfig: { 
         pulseBulletTypeKey: 'b_mine_explosion',
@@ -179,7 +179,7 @@ export const turretTypes: any = {
   },
   t2_snowpea: {
     name: 'Snowpea', cost: 15, mergeCost: 5, health: 50, color: [200, 250, 255], size: 20, tier: 2,
-    tooltip: "Shoots freezing peas that slow enemies.",
+    tooltip: "Shoots snow at random enemies, slowing them down",
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_snowpea', shootRange: GRID_SIZE * 8, shootFireRate: 60 },
     targetType: ['enemy'],
@@ -187,7 +187,7 @@ export const turretTypes: any = {
   },
   t2_iceray: {
     name: 'Ice Laser', cost: 10, mergeCost: 0, health: 50, color: [150, 255, 255], size: 18, tier: 2,
-    tooltip: "Slows down enemies contacting the laser beam.",
+    tooltip: "Slows down enemies contacting the laser beam",
     actionType: ['laserBeam'],
     actionConfig: { 
         beamDamage: 5, 
@@ -205,17 +205,17 @@ export const turretTypes: any = {
   },
   t2_spike: {
     name: 'Spikerock', cost: 15, mergeCost: 10, health: 5, color: [220, 220, 240], size: 24, tier: 2,
-    tooltip: "Stay underground and damages enemies stepping over it.",
+    tooltip: "Stay underground and damages enemies stepping over it",
     collideWithEnemy: false,
     renderBehindEnemy: true,
     actionType: ['pulse'],
-    actionConfig: { pulseBulletTypeKey: 'b_pulse_tier2', pulseTriggerRadius: GRID_SIZE * 1, pulseTriggerBy: ['enemy'], pulseCooldown: 60, pulseCenteredAtTriggerSource: false },
+    actionConfig: { pulseBulletTypeKey: 'b_spike', pulseTriggerRadius: GRID_SIZE * 1, pulseTriggerBy: ['enemy'], pulseCooldown: 60, pulseCenteredAtTriggerSource: false },
     targetType: ['enemy'],
     targetConfig: { enemyPriority: 'closest' }
   },
   t2_icebomb: {
     name: 'Ice Bomb', cost: 10, mergeCost: 5, health: 50, color: [180, 240, 255], size: 18, tier: 2,
-    tooltip: "Explodes on contact, damaging and freezing enemies.",
+    tooltip: "Explodes on contact, damaging and freezing enemies for 1h, armed every 2h",
     actionType: ['pulse'],
     actionConfig: { 
       pulseBulletTypeKey: 'b_ice_bomb_explosion', 
@@ -231,7 +231,7 @@ export const turretTypes: any = {
   },
   t2_stun: {
     name: 'Stunner', cost: 10, mergeCost: 5, health: 50, color: [240, 240, 255], size: 18, tier: 2,
-    tooltip: "Emits a stun cloud on contact with enemies. Arms every 1h.",
+    tooltip: "Leaves a gas puddle on contact, stunning enemies that touches it, armed every 1h",
     actionType: ['pulse'],
     actionConfig: { 
       pulseBulletTypeKey: 'b_stun_gas_projectile', 

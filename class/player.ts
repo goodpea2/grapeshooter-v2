@@ -170,7 +170,7 @@ export class Player {
     
     const atts = this.attachments as AttachedTurret[];
     for(let a of atts) {
-      if(a.config.collideWithEnemy !== false && state.world.checkCollision(tx + a.offset.x, this.pos.y + a.offset.y, a.config.size/2)) {
+      if(state.world.checkCollision(tx + a.offset.x, this.pos.y + a.offset.y, a.config.size/2)) {
         cx = true;
         break;
       }
@@ -183,7 +183,7 @@ export class Player {
     if (lty && liquidTypes[lty]?.liquidConfig?.blocksMovement) cy = true;
     
     for(let a of atts) {
-      if(a.config.collideWithEnemy !== false && state.world.checkCollision(this.pos.x + a.offset.x, ty + a.offset.y, a.config.size/2)) {
+      if(state.world.checkCollision(this.pos.x + a.offset.x, ty + a.offset.y, a.config.size/2)) {
         cy = true;
         break;
       }

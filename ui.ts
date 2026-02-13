@@ -343,8 +343,9 @@ function drawStats(alpha: number) {
 
   fill(20, 15, 45, alpha * 0.4);
   rect(x + 30, y + 10, 115, 6, 3);
-  const hpRatio = (state.player?.health || 100) / (state.player?.maxHealth || 100);
-  fill(255, 60, 100, alpha);
+  // Fixed refilling bug by using ?? operator to ensure 0 health evaluates correctly
+  const hpRatio = (state.player?.health ?? 100) / (state.player?.maxHealth || 100);
+  fill(155, 255, 0, alpha);
   rect(x + 30, y + 10, 115 * hpRatio, 6, 3);
   
   // Currency Row
