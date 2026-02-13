@@ -221,6 +221,8 @@ export function drawDebugPanel(spawnFromBudget: Function) {
       { l: "HP Info", v: state.debugHP, a: () => state.debugHP = !state.debugHP, type: 'toggle' },
       { l: "Turret Gizmos", v: state.debugGizmosTurrets, a: () => state.debugGizmosTurrets = !state.debugGizmosTurrets, type: 'toggle' },
       { l: "Enemy Gizmos", v: state.debugGizmosEnemies, a: () => state.debugGizmosEnemies = !state.debugGizmosEnemies, type: 'toggle' },
+      { l: "INSTANT COOLDOWN", v: state.instantRechargeTurrets, a: () => state.instantRechargeTurrets = !state.instantRechargeTurrets, type: 'toggle' },
+      { l: "Enable T3 Merging", v: state.enableT3Turrets, a: () => state.enableT3Turrets = !state.enableT3Turrets, type: 'toggle' },
       { l: "WORLD PREVIEW", v: state.showWorldGenPreview, a: () => state.showWorldGenPreview = !state.showWorldGenPreview, type: 'toggle' },
       { l: "+1k SUN", a: () => state.sunCurrency += 1000 },
       { l: "CLEAR BLOCKS", a: () => {

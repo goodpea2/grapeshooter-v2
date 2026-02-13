@@ -3,6 +3,8 @@ import { state } from './state';
 import { HOUR_FRAMES, GRID_SIZE } from './constants';
 import { turretTypes } from './balanceTurrets';
 import { drawDebugPanel, drawWorldGenPreview } from './uiDebug';
+import { TYPE_MAP } from './assetTurret';
+import { getLightLevel, customDayLightConfig } from './lvDemo';
 
 declare const floor: any;
 declare const nf: any;
@@ -39,10 +41,14 @@ declare const cos: any;
 declare const rectMode: any;
 declare const line: any;
 declare const rotate: any;
-// Fixed: Added missing p5.js shape function declarations
+declare const image: any;
+declare const imageMode: any;
+declare const tint: any;
+declare const noTint: any;
 declare const beginShape: any;
 declare const vertex: any;
 declare const endShape: any;
+declare const scale: any;
 
 export function getTime() {
   let totalHours = (state.frames / HOUR_FRAMES);
@@ -50,7 +56,8 @@ export function getTime() {
   let hour = floor(totalHours % 24);
   let minutes = floor((state.frames % HOUR_FRAMES) / (HOUR_FRAMES / 60));
   let progress = (state.frames % (24 * HOUR_FRAMES)) / (24 * HOUR_FRAMES);
-  return { day, hour, minutes, totalHours, progress };
+  let lightLevel = getLightLevel(hour);
+  return { day, hour, minutes, totalHours, progress, lightLevel };
 }
 
 // Helper to get sky tint for UI synchronization
@@ -127,22 +134,28 @@ export function drawTurretTooltip(t: any, x: number, y: number, isPreview: boole
   if (isPreview) {
     const cost = config.mergeCost || 0;
     textAlign(RIGHT, TOP);
-    fill(255, 80, 80);
-    text(`Cost: $${cost}`, tx + boxW - 10, ty + 10);
+    fill(255, 230, 100);
+    imageMode(CENTER);
+    image(state.assets['img_icon_sun'], tx + boxW - 55, ty + 18, 22, 22);
+    text(`${cost}`, tx + boxW - 10, ty + 10);
   }
   pop();
 }
 
 function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha: number) {
   const size = 58;
-  const canAfford = state.sunCurrency >= tr.cost;
+  const costType = tr.costType || 'sun';
+  const currency = costType === 'soil' ? state.soilCurrency : state.sunCurrency;
+  const canAfford = currency >= tr.cost;
+  
   const lastUsed = state.turretLastUsed[key] || -99999;
   const cooldownFrames = (tr.cooldownHours || 0) * HOUR_FRAMES;
-  const onCooldown = state.frames - lastUsed < cooldownFrames;
+  const onCooldown = !state.instantRechargeTurrets && (state.frames - lastUsed < cooldownFrames);
   const cooldownProgress = onCooldown ? (state.frames - lastUsed) / cooldownFrames : 1;
   
   const hov = dist(mouseX, mouseY, x, y) < size / 2;
-  const isSelected = state.selectedTurretType === key || state.draggedTurretType === key;
+  const isDraggingThis = state.draggedTurretType === key;
+  const isSelected = state.selectedTurretType === key || isDraggingThis;
   
   push();
   translate(x, y);
@@ -154,23 +167,24 @@ function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha: numbe
   }
   
   noStroke();
-  let bgColor = [40, 80, 200]; 
-  if (!canAfford) bgColor = [40, 40, 40]; 
-  if (onCooldown) bgColor = [40, 40, 40]; 
+  let bgColor = tr.isSpecial ? [40, 200, 80] : [40, 80, 200]; 
+  if (!canAfford || onCooldown) bgColor = [40, 40, 40]; 
   
-  fill(bgColor[0], bgColor[1], bgColor[2], alpha * (hov ? 1.0 : 1.0));
+  fill(bgColor[0], bgColor[1], bgColor[2], alpha);
   ellipse(0, 0, size);
   
   fill(255, 255, 255, alpha * 0.1);
   ellipse(0, 0, size * 0.8);
 
-  push();
-  const visualScale = size / (tr.size * 2.8);
-  (window as any).scale(visualScale);
-  fill(tr.color[0], tr.color[1], tr.color[2], alpha);
-  noStroke();
-  ellipse(0, 0, tr.size, tr.size);
-  pop();
+  const baseAssetKey = TYPE_MAP[key];
+  const sprite = state.assets[`img_${baseAssetKey}_front`];
+  if (sprite) {
+    imageMode(CENTER);
+    if (!canAfford || onCooldown) tint(100, 100, 100, alpha);
+    else if (alpha < 255) tint(255, alpha);
+    image(sprite, 0, 0, 60, 60);
+    noTint();
+  }
 
   if (onCooldown) {
     fill(0, 0, 0, alpha * 0.5);
@@ -182,61 +196,69 @@ function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha: numbe
     arc(0, 0, size - 4, size - 4, -HALF_PI, endAngle);
   }
 
-  const priceW = 42;
+  // Cost Pill
+  const priceW = 46;
   const priceH = 20;
   const pY = size / 2;
   rectMode(CENTER);
-  fill(canAfford ? [40, 80, 200] : [40, 40, 40], alpha);
+  fill(canAfford ? [30, 60, 150] : [40, 40, 40], alpha);
   noStroke();
   rect(0, pY, priceW, priceH, 10);
+  
+  // Cost Icon and Text
+  imageMode(CENTER);
+  if (!canAfford) tint(100, 100, 100, alpha);
+  const iconKey = costType === 'soil' ? 'img_icon_soil' : 'img_icon_sun';
+  image(state.assets[iconKey], -12, pY, 22, 22);
+  noTint();
+  
   fill(255, alpha);
-  textAlign(CENTER, CENTER);
+  textAlign(LEFT, CENTER);
   textSize(12);
-  text(`${tr.cost}`, 0, pY - 1);
+  text(`${tr.cost}`, 0, pY + 1);
   pop();
 
   if (hov && mouseIsPressed && state.isStationary) {
-    if (!onCooldown && canAfford) {
-      if (state.selectedTurretType === key) {
-        state.selectedTurretType = null;
-      } else {
-        state.selectedTurretType = key;
-        state.draggedTurretType = key;
-      }
+    if (!onCooldown && canAfford && !state.draggedTurretType) {
+      state.draggedTurretType = key;
+      state.dragOrigin = { x: mouseX, y: mouseY };
+      state.isCurrentlyDragging = false;
     }
-    (window as any).mouseIsPressed = false;
   }
   if (hov) drawTurretTooltip(tr, mouseX, mouseY);
 }
 
 function drawClock(x: number, y: number, alpha: number) {
   const t = getTime();
-  const size = 88; // Reduced 20% from 110
+  const size = 88; 
   const mins = t.hour * 60 + t.minutes;
   const tint = getSkyTint(mins);
   
   push();
   translate(x, y);
   
-  // Main Dial
   noStroke();
   fill(30, 25, 60, alpha);
   ellipse(0, 0, size);
   
-  // Night Slice (Purple Danger Zone)
-  // Night is 21:00 to 04:00
-  fill(120, 60, 200, alpha * 0.4);
-  const startAng = (21/24) * TWO_PI - HALF_PI;
-  const endAng = (4/24) * TWO_PI - HALF_PI;
-  arc(0, 0, size - 6, size - 6, startAng, endAng);
+  // Highlighting transition zones in the clock
+  noFill();
+  stroke(120, 60, 200, alpha * 0.4);
+  strokeWeight(6);
+  for (let h = 0; h < 24; h++) {
+    const l = getLightLevel(h);
+    if (l === 0) { // Night
+        const startAng = (h/24) * TWO_PI - HALF_PI;
+        const endAng = ((h+1)/24) * TWO_PI - HALF_PI;
+        arc(0, 0, size - 6, size - 6, startAng, endAng);
+    }
+  }
   
-  // Outer Ring
   noFill();
   stroke(20, 15, 45, alpha * 0.5);
   strokeWeight(2);
   ellipse(0, 0, size - 4);
 
-  // Hour markers
   noStroke();
   fill(255, alpha * 0.15);
   for(let i=0; i<12; i++) {
@@ -244,12 +266,10 @@ function drawClock(x: number, y: number, alpha: number) {
     ellipse(cos(ang)*(size/2-8), sin(ang)*(size/2-8), 3);
   }
   
-  // Pointer Arrow
   push();
   rotate(TWO_PI * t.progress - HALF_PI);
   fill(255, alpha);
   noStroke();
-  // Diamond pointer
   beginShape();
   vertex(size/2 - 2, 0);
   vertex(size/2 - 12, -4);
@@ -258,19 +278,22 @@ function drawClock(x: number, y: number, alpha: number) {
   endShape((window as any).CLOSE);
   pop();
   
-  // Center Sun/Moon Icon
-  const isNight = (t.hour >= 21 || t.hour < 4);
+  const isNight = t.lightLevel === 0;
   if (isNight) {
     fill(200, 200, 255, alpha);
     ellipse(0, 0, 26);
     fill(30, 25, 60, alpha);
     ellipse(6, -3, 22);
-  } else {
-    // Slower rotating sun with sky tint
+  } else if (t.lightLevel === 1) { // Transition
+    fill(255, 150, 50, alpha);
+    ellipse(0, 0, 28);
+    fill(255, 255, 100, alpha * 0.5);
+    ellipse(0, 0, 34);
+  } else { // Day
     fill(tint[0], tint[1], tint[2], alpha);
     ellipse(0, 0, 28);
     push();
-    rotate(state.frames * 0.005); // Slower rotation
+    rotate(state.frames * 0.005); 
     for(let i=0; i<8; i++) {
       let a = i * PI/4;
       ellipse(cos(a)*20, sin(a)*20, 6, 6);
@@ -278,7 +301,6 @@ function drawClock(x: number, y: number, alpha: number) {
     pop();
   }
   
-  // Day Counter with Background
   const pillW = 50;
   const pillH = 24;
   rectMode(CENTER);
@@ -290,7 +312,6 @@ function drawClock(x: number, y: number, alpha: number) {
   textSize(12);
   text(`Day ${t.day}`, -size/2 + 12, -size/2 + 4);
   
-  // Digital Time
   textSize(11);
   textAlign(CENTER, TOP);
   fill(255, alpha * 0.8);
@@ -300,56 +321,142 @@ function drawClock(x: number, y: number, alpha: number) {
 }
 
 function drawStats(alpha: number) {
-  const x = 110; // Nudged left to fit smaller clock
+  const x = 110; 
   const y = 30;
   
+  // Lerp UI scales
+  state.uiSunScale = lerp(state.uiSunScale, 1.0, 0.1);
+  state.uiElixirScale = lerp(state.uiElixirScale, 1.0, 0.1);
+  state.uiSoilScale = lerp(state.uiSoilScale, 1.0, 0.1);
+
   push();
   noStroke();
   
-  // Health Bar (Always Visible)
+  // Health Bar
   const hpW = 160;
   const hpH = 26;
   fill(30, 25, 60, alpha);
   rect(x, y, hpW, hpH, 13);
-  fill(255, 60, 100, alpha);
-  ellipse(x + 13, y + 13, 18);
+  
+  imageMode(CENTER);
+  image(state.assets['img_icon_health'], x + 13, y + 13, 50, 50);
+
   fill(20, 15, 45, alpha * 0.4);
   rect(x + 30, y + 10, 115, 6, 3);
   const hpRatio = (state.player?.health || 100) / (state.player?.maxHealth || 100);
   fill(255, 60, 100, alpha);
   rect(x + 30, y + 10, 115 * hpRatio, 6, 3);
   
-  // Sun Bank (Always Visible)
-  const sunY = y + 36;
-  fill(30, 25, 60, alpha);
-  rect(x, sunY, 110, hpH, 13);
-  fill(255, 220, 50, alpha);
-  ellipse(x + 13, sunY + 13, 18);
-  textAlign(LEFT, CENTER);
-  textSize(16);
-  fill(255, 230, 50, alpha);
-  text(floor(state.sunCurrency), x + 30, sunY + 13);
+  // Currency Row
+  const curY = y + 36;
+  const pillW = 60;
+  const pillH = 26;
+  const spacing = 65;
+  let currentOffset = 0;
+
+  // 1. Sun Bank
+  if (state.sunCurrency > 0) {
+    push();
+    translate(x + currentOffset, curY);
+    fill(30, 25, 60, alpha);
+    rect(0, 0, pillW, pillH, 13);
+    push();
+    translate(13, 13);
+    scale(state.uiSunScale);
+    image(state.assets['img_icon_sun'], 0, 0, 50, 50);
+    pop();
+    textAlign(LEFT, CENTER);
+    textSize(16);
+    fill(255, 230, 50, alpha);
+    text(floor(state.sunCurrency), 30, 13);
+    pop();
+    currentOffset += spacing;
+  }
+
+  // 2. Elixir Bank
+  if (state.elixirCurrency > 0) {
+    push();
+    translate(x + currentOffset, curY);
+    fill(30, 25, 60, alpha);
+    rect(0, 0, pillW, pillH, 13);
+    push();
+    translate(13, 13);
+    scale(state.uiElixirScale);
+    image(state.assets['img_icon_elixir'], 0, 0, 50, 50);
+    pop();
+    textAlign(LEFT, CENTER);
+    textSize(16);
+    fill(200, 100, 255, alpha);
+    text(floor(state.elixirCurrency), 30, 13);
+    pop();
+    currentOffset += spacing;
+  }
+
+  // 3. Soil Bank
+  if (state.soilCurrency > 0) {
+    push();
+    translate(x + currentOffset, curY);
+    fill(30, 25, 60, alpha);
+    rect(0, 0, pillW, pillH, 13);
+    push();
+    translate(13, 13);
+    scale(state.uiSoilScale);
+    image(state.assets['img_icon_soil'], 0, 0, 50, 50);
+    pop();
+    textAlign(LEFT, CENTER);
+    textSize(16);
+    fill(220, 160, 100, alpha);
+    text(floor(state.soilCurrency), 30, 13);
+    pop();
+  }
+
   pop();
 }
 
 export function drawUI(spawnFromBudget: Function) {
-  // Main HUD is always visible
   drawClock(60, 60, 255);
   drawStats(255);
 
-  // Turret HUD still fades when moving
   state.uiAlpha = lerp(state.uiAlpha, state.isStationary ? 255 : 40, 0.3);
   const shopAlpha = state.uiAlpha;
 
+  const attachments = state.player.attachments;
+  const isNearWater = attachments.some((a: any) => {
+    const wPos = a.getWorldPos();
+    const gx = floor(wPos.x / GRID_SIZE);
+    const gy = floor(wPos.y / GRID_SIZE);
+    return state.world.getLiquidAt(gx, gy) === 'l_water';
+  });
+
+  const stdList: any[] = [];
+  const specList: any[] = [];
+  for (let key in turretTypes) {
+    let tr = turretTypes[key];
+    if (tr.tier > 1.2) continue;
+    if (tr.isSpecial) {
+      if (key === 't_lilypad' && !isNearWater) continue;
+      specList.push({key, tr});
+    } else {
+      stdList.push({key, tr});
+    }
+  }
+
   push();
   const hudXStart = 60;
-  let hudY = 160;
   const spacing = 75;
-  for (let key in turretTypes) {
-    let tr = turretTypes[key]; 
-    if (tr.tier > 1) continue; 
-    drawTurretIcon(tr, key, hudXStart, hudY, shopAlpha);
-    hudY += spacing;
+  
+  // Draw Standard Column
+  let curY = 160;
+  for (let item of stdList) {
+    drawTurretIcon(item.tr, item.key, hudXStart, curY, shopAlpha);
+    curY += spacing;
+  }
+
+  // Draw Special Column
+  curY = 160;
+  for (let item of specList) {
+    drawTurretIcon(item.tr, item.key, hudXStart + 75, curY, shopAlpha);
+    curY += spacing;
   }
   pop();
 

@@ -48,6 +48,8 @@ declare const HALF_PI: any;
 declare const PI: any;
 declare const TWO_PI: any;
 declare const atan2: any;
+declare const width: any;
+declare const height: any;
 
 export class Block {
   gx: number; gy: number; pos: any; type: string; config: any; overlay: string | null;
@@ -114,8 +116,10 @@ export class Block {
     const sCfg = oCfg.enemySpawnConfig;
     if (sCfg.spawnInterval <= 0) return;
 
-    const playerDist = dist(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, state.player.pos.x, state.player.pos.y);
-    if (playerDist < sCfg.spawnTriggerRadius) {
+    const dx = this.pos.x + GRID_SIZE/2 - state.player.pos.x;
+    const dy = this.pos.y + GRID_SIZE/2 - state.player.pos.y;
+    const dSq = dx*dx + dy*dy;
+    if (dSq < sCfg.spawnTriggerRadius * sCfg.spawnTriggerRadius) {
       if (frameCount - this.lastSpawnTime >= sCfg.spawnInterval) {
         const eKey = sCfg.enemyTypeKey[floor(random(sCfg.enemyTypeKey.length))];
         const eCfg = enemyTypes[eKey];
@@ -220,22 +224,24 @@ export class Block {
         
         if (oCfg.obstacleOverlayVfx === 'v_sniper_tower') {
           const eCfg = oCfg.enemyTurretConfig;
-          const wPos = createVector(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2);
-          const pDist = dist(wPos.x, wPos.y, state.player.pos.x, state.player.pos.y);
-          const canSee = eCfg.seeThroughObstacles || state.world.checkLOS(wPos.x, wPos.y, state.player.pos.x, state.player.pos.y);
+          const bcx = this.pos.x + GRID_SIZE/2;
+          const bcy = this.pos.y + GRID_SIZE/2;
+          const dx = bcx - state.player.pos.x;
+          const dy = bcy - state.player.pos.y;
+          const dSq = dx*dx + dy*dy;
+          const canSee = eCfg.seeThroughObstacles || state.world.checkLOS(bcx, bcy, state.player.pos.x, state.player.pos.y);
           
-          if (pDist < eCfg.shootRange && canSee) {
+          if (dSq < eCfg.shootRange*eCfg.shootRange && canSee) {
              const timeSinceLast = frameCount - this.lastSniperShot;
              const inCharge = timeSinceLast > (eCfg.shootFireRate - 45);
              if (timeSinceLast >= eCfg.shootFireRate) {
-               state.enemyBullets.push(new Bullet(wPos.x, wPos.y, state.player.pos.x, state.player.pos.y, eCfg.bulletTypeKey, 'core'));
-               state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, atan2(state.player.pos.y - wPos.y, state.player.pos.x - wPos.x), 30, 8, color(255, 50, 50)));
+               state.enemyBullets.push(new Bullet(bcx, bcy, state.player.pos.x, state.player.pos.y, eCfg.bulletTypeKey, 'core'));
+               state.vfx.push(new MuzzleFlash(bcx, bcy, atan2(state.player.pos.y - bcy, state.player.pos.x - bcx), 30, 8, color(255, 50, 50)));
                this.lastSniperShot = frameCount;
              }
              const laserAlpha = inCharge ? 180 + 75 * sin(frameCount * 0.5) : 50;
              const laserWeight = inCharge ? 2 : 1;
              stroke(255, 0, 0, laserAlpha * (opacity / 255)); strokeWeight(laserWeight); 
-             // Draw laser from block center to player position in local space
              line(GRID_SIZE/2, GRID_SIZE/2, state.player.pos.x - this.pos.x, state.player.pos.y - this.pos.y);
           }
         }
@@ -256,10 +262,11 @@ export class Block {
     this.health -= dmg; this.damageGlow = 180;
     if (this.health <= 0) {
       this.isMined = true;
-      // Fixed: Using imported BlockDebris instead of 'require'
       state.vfx.push(new BlockDebris(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, this.config.color));
       
       const oCfg = this.overlay ? overlayTypes[this.overlay] : null;
+      spawnLootAt(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, this.type, this.config.lootConfigOnDeath);
+
       if (oCfg) {
         if (oCfg.bulletToSpawnOnDeath) {
           const wPos = createVector(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2);
@@ -269,7 +276,6 @@ export class Block {
           }
         }
         if (oCfg.lootConfigOnDeath) {
-          // Fix: Added non-null assertion since oCfg check guarantees this.overlay is present
           spawnLootAt(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, this.overlay!, oCfg.lootConfigOnDeath);
         }
         if (oCfg.enemyToSpawnOnDeath) {
@@ -422,6 +428,19 @@ export class Chunk {
   }
 
   display(playerPos: any) {
+    const margin = 200; // Increased margin to prevent edge-popping
+    const left = state.cameraPos.x - width/2 - margin;
+    const right = state.cameraPos.x + width/2 + margin;
+    const top = state.cameraPos.y - height/2 - margin;
+    const bottom = state.cameraPos.y + height/2 + margin;
+
+    const chunkW = CHUNK_SIZE * GRID_SIZE;
+    const chunkX = this.cx * chunkW;
+    const chunkY = this.cy * chunkW;
+
+    // Robust AABB check for chunk visibility
+    if (chunkX + chunkW < left || chunkX > right || chunkY + chunkW < top || chunkY > bottom) return;
+
     for (let b of this.blocks) {
       b.update();
       b.display(dist(b.pos.x + GRID_SIZE/2, b.pos.y + GRID_SIZE/2, playerPos.x, playerPos.y) / GRID_SIZE);
@@ -457,8 +476,9 @@ export class WorldManager {
   }
   update(playerPos: any) {
     let pcx = floor(playerPos.x / (GRID_SIZE * CHUNK_SIZE)); let pcy = floor(playerPos.y / (GRID_SIZE * CHUNK_SIZE));
-    if (!state.exploredChunks.has(`${pcx},${pcy}`)) { 
-      state.exploredChunks.add(`${pcx},${pcy}`); 
+    const exploredKey = `${pcx},${pcy}`;
+    if (!state.exploredChunks.has(exploredKey)) { 
+      state.exploredChunks.add(exploredKey); 
       const lv = floor(constrain(state.currentChunkLevel, 0, 10)); 
       
       state.accumulatedSunPot += WORLD_GEN_STATS.sun[lv].value;
@@ -470,7 +490,11 @@ export class WorldManager {
       
       this.updateLevel(); 
     }
-    for (let x = -CHUNK_GEN_RADIUS; x <= CHUNK_GEN_RADIUS; x++) for (let y = -CHUNK_GEN_RADIUS; y <= CHUNK_GEN_RADIUS; y++) this.getChunk(pcx + x, pcy + y);
+    for (let x = -CHUNK_GEN_RADIUS; x <= CHUNK_GEN_RADIUS; x++) {
+      for (let y = -CHUNK_GEN_RADIUS; y <= CHUNK_GEN_RADIUS; y++) {
+        this.getChunk(pcx + x, pcy + y);
+      }
+    }
   }
   updateLevel() {
     let count = state.exploredChunks.size; state.currentChunkLevel = 0;
@@ -478,17 +502,37 @@ export class WorldManager {
     const lv = floor(constrain(state.currentChunkLevel, 0, 10)); state.currentNightWaveBudget = Math.max(state.currentNightWaveBudget, LEVEL_BUDGET[lv]);
   }
   checkLOS(x1: number, y1: number, x2: number, y2: number) {
-    let d = dist(x1, y1, x2, y2); let steps = floor(d / (GRID_SIZE * 0.5));
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+    let dSq = dx*dx + dy*dy;
+    let steps = floor(Math.sqrt(dSq) / (GRID_SIZE * 0.5));
     for (let i = 1; i < steps; i++) {
       let px = lerp(x1, x2, i / steps); let py = lerp(y1, y2, i / steps); if (this.isBlockAt(px, py)) return false;
     }
     return true;
   }
   getNearestBlock(pos: any, range: number) {
-    let nearest = null; let minDist = range;
+    let nearest = null; let minDistSq = range*range;
+    const viewportMargin = range + 200;
     this.chunks.forEach(chunk => {
-      if (dist(chunk.cx * CHUNK_SIZE * GRID_SIZE, chunk.cy * CHUNK_SIZE * GRID_SIZE, pos.x, pos.y) > 1200) return;
-      for (let b of chunk.blocks) { if (b.isMined) continue; let bX = b.pos.x + GRID_SIZE/2; let bY = b.pos.y + GRID_SIZE/2; let d = dist(pos.x, pos.y, bX, bY); if (d < minDist && this.checkLOS(pos.x, pos.y, bX, bY)) { minDist = d; nearest = b; } }
+      const chunkW = CHUNK_SIZE * GRID_SIZE;
+      const cX = chunk.cx * chunkW;
+      const cY = chunk.cy * chunkW;
+      
+      // Early exit if the chunk itself is way too far
+      const dx = (cX + chunkW/2) - pos.x;
+      const dy = (cY + chunkW/2) - pos.y;
+      if (dx*dx + dy*dy > (viewportMargin + chunkW)**2) return;
+      
+      for (let b of chunk.blocks) { 
+        if (b.isMined) continue; 
+        let bX = b.pos.x + GRID_SIZE/2; 
+        let bY = b.pos.y + GRID_SIZE/2; 
+        let dSq = (pos.x - bX)**2 + (pos.y - bY)**2;
+        if (dSq < minDistSq && this.checkLOS(pos.x, pos.y, bX, bY)) { 
+          minDistSq = dSq; nearest = b; 
+        } 
+      }
     });
     return nearest;
   }
@@ -503,15 +547,33 @@ export class WorldManager {
     const b = chunk.blockMap.get(`${gx},${gy}`); return b ? b.liquidType : null;
   }
   display(playerPos: any) {
-    this.chunks.forEach(chunk => { if (dist(chunk.cx * CHUNK_SIZE * GRID_SIZE, chunk.cy * CHUNK_SIZE * GRID_SIZE, playerPos.x, playerPos.y) < 1400) chunk.display(playerPos); });
+    // Generous range for initial selection, but actual chunk culling is handled in chunk.display()
+    const rangeSq = (width + height + 600)**2;
+    this.chunks.forEach(chunk => { 
+      const chunkW = CHUNK_SIZE * GRID_SIZE;
+      const cX = chunk.cx * chunkW + chunkW/2;
+      const cY = chunk.cy * chunkW + chunkW/2;
+      const dx = cX - playerPos.x;
+      const dy = cY - playerPos.y;
+      if (dx*dx + dy*dy < rangeSq) chunk.display(playerPos); 
+    });
   }
   checkCollision(x: number, y: number, radius: number) {
     let gx = floor(x / GRID_SIZE); let gy = floor(y / GRID_SIZE);
     const searchRange = radius > GRID_SIZE ? 2 : 1;
-    for (let i = gx - searchRange; i <= gx + searchRange; i++) for (let j = gy - searchRange; j <= gy + searchRange; j++) {
-      let cx = floor(i / CHUNK_SIZE); let cy = floor(j / CHUNK_SIZE);
-      let chunk = this.chunks.get(`${cx},${cy}`);
-      if (chunk) { const b = chunk.blockMap.get(`${i},${j}`); if (b && !b.isMined) { let cX = constrain(x, b.pos.x, b.pos.x + GRID_SIZE); let cY = constrain(y, b.pos.y, b.pos.y + GRID_SIZE); if (dist(x, y, cX, cY) < radius) return true; } }
+    for (let i = gx - searchRange; i <= gx + searchRange; i++) {
+      for (let j = gy - searchRange; j <= gy + searchRange; j++) {
+        let cx = floor(i / CHUNK_SIZE); let cy = floor(j / CHUNK_SIZE);
+        let chunk = this.chunks.get(`${cx},${cy}`);
+        if (chunk) { 
+          const b = chunk.blockMap.get(`${i},${j}`); 
+          if (b && !b.isMined) { 
+            let cX = constrain(x, b.pos.x, b.pos.x + GRID_SIZE); 
+            let cY = constrain(y, b.pos.y, b.pos.y + GRID_SIZE); 
+            if ((x - cX)**2 + (y - cY)**2 < radius*radius) return true; 
+          } 
+        }
+      }
     }
     return false;
   }

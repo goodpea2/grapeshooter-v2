@@ -1,18 +1,18 @@
 
 import { state } from './state';
-import { GRID_SIZE, HOUR_FRAMES } from './constants';
-import { SunLoot, TurretLoot } from './entities';
+import { HOUR_FRAMES } from './constants';
+import { LootEntity } from './entities';
+import { lootTypes, lootTableTypes, lootConfigs, LootTableEntry, ExternalLootConfigEntry } from './balanceLootTable';
 
 declare const random: any;
-declare const cos: any;
-declare const sin: any;
+declare const floor: any;
 
 export const ECONOMY_CONFIG = {
   startingSun: 10,
   sunLootLifetime: HOUR_FRAMES*6,
   sunLootAttractionRange: 180,
   sunLootCollectionRange: 22,
-  sunSpawnInterval: HOUR_FRAMES*0.25,
+  sunSpawnInterval: HOUR_FRAMES*0.5,
   sunSpawnMinDist: 5,
   sunSpawnMaxDist: 8,
   lootValues: {
@@ -23,32 +23,73 @@ export const ECONOMY_CONFIG = {
   }
 };
 
-export function spawnLootAt(x: number, y: number, overlayKey: string, lootConfig: any = null) {
-  if (overlayKey === 'strayTurret' || (lootConfig && lootConfig.lootTableTypeKey === 'lt_strayTurret')) {
-    const pool = ['t_pea', 't_laser', 't_wall', 't_mine', 't_ice'];
-    const chosen = pool[Math.floor(random(pool.length))];
-    state.loot.push(new TurretLoot(x, y, chosen));
-    return;
+/**
+ * Generic weighted picker
+ */
+function getWeightedResult<T extends { weight: number }>(list: T[]): T | null {
+  const totalWeight = list.reduce((sum, item) => sum + item.weight, 0);
+  if (totalWeight <= 0) return null;
+  
+  let r = random(totalWeight);
+  for (const item of list) {
+    if (r < item.weight) return item;
+    r -= item.weight;
   }
-  if (overlayKey === 'sunflowerTurret' || (lootConfig && lootConfig.lootTableTypeKey === 'lt_sunflowerTurret')) {
-    state.loot.push(new TurretLoot(x, y, 't_sunflower'));
-    return;
-  }
+  return null;
+}
 
-  // Handle structured loot config
-  if (lootConfig && lootConfig.lootTableTypeKey === 'lt_sun') {
-    const value = lootConfig.lootTableRollCount || 1;
-    state.sunSpawnedTotal += value;
-    for (let i = 0; i < value; i++) {
-      state.loot.push(new SunLoot(x + random(-10, 10), y + random(-10, 10), 1));
+export function spawnLootAt(x: number, y: number, key: string, configSource: any = null) {
+  // 1. Resolve the config array (weighted list of table rolls)
+  let config: ExternalLootConfigEntry[] = [];
+  if (Array.isArray(configSource)) {
+    config = configSource;
+  } else if (typeof configSource === 'string' && lootConfigs[configSource]) {
+    config = lootConfigs[configSource];
+  } else if (lootConfigs[key]) {
+    config = lootConfigs[key];
+  } else {
+    // Fallback for legacy direct value spawning if no config found (Sun nodes fallback)
+    const val = (ECONOMY_CONFIG.lootValues as any)[key] || 0;
+    if (val > 0) {
+      for(let i=0; i<val; i++) {
+         state.sunSpawnedTotal += 1;
+         state.loot.push(new LootEntity(x + random(-10, 10), y + random(-10, 10), 'sun'));
+      }
+      return;
     }
+    // If absolutely no config or values found, do nothing
     return;
   }
 
-  // Fallback for legacy calls
-  const value = (ECONOMY_CONFIG.lootValues as any)[overlayKey] || 1;
-  state.sunSpawnedTotal += value;
-  for (let i = 0; i < value; i++) {
-    state.loot.push(new SunLoot(x + random(-10, 10), y + random(-10, 10), 1));
+  // 2. Pick ONE outcome from the high-level config
+  const selectedConfig = getWeightedResult(config);
+  if (!selectedConfig || !selectedConfig.lootTableTypeKey) return;
+
+  const table = lootTableTypes[selectedConfig.lootTableTypeKey];
+  if (!table) return;
+
+  const rollCount = selectedConfig.lootTableRollCount || 1;
+
+  // 3. Roll the selected table N times
+  for (let i = 0; i < rollCount; i++) {
+    const entry = getWeightedResult(table);
+    if (!entry || !entry.lootTypeKey) continue;
+
+    // Pick random item and count from the provided lists
+    const typeKey = entry.lootTypeKey[floor(random(entry.lootTypeKey.length))];
+    const count = entry.itemCount ? entry.itemCount[floor(random(entry.itemCount.length))] : 1;
+
+    for (let c = 0; c < count; c++) {
+      const px = x + random(-15, 15);
+      const py = y + random(-15, 15);
+      
+      const loot = new LootEntity(px, py, typeKey);
+      state.loot.push(loot);
+      
+      // Track stats
+      if (loot.config.type === 'currency' && loot.config.item === 'sun') {
+        state.sunSpawnedTotal += (loot.config.itemValue || 1);
+      }
+    }
   }
 }

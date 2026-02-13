@@ -1,4 +1,3 @@
-
 import { state } from './state';
 import { GRID_SIZE } from './constants';
 import { hasTurretSprite, drawTurretSprite } from './assetTurret';
@@ -7,6 +6,8 @@ declare const push: any;
 declare const pop: any;
 declare const translate: any;
 declare const rotate: any;
+// Added missing scale declaration
+declare const scale: any;
 declare const fill: any;
 declare const noFill: any;
 declare const stroke: any;
@@ -20,6 +21,10 @@ declare const TWO_PI: any;
 declare const sin: any;
 declare const rectMode: any;
 declare const CENTER: any;
+// Added missing p5 constant declarations
+declare const LEFT: any;
+declare const BOTTOM: any;
+declare const CORNER: any;
 declare const rect: any;
 declare const random: any;
 declare const beginShape: any;
@@ -156,6 +161,31 @@ export function drawTurret(t: any) {
         line(0, 0, tc.x - wPos.x, tc.y - wPos.y);
       }
     }
+  }
+
+  // Seed Growth Bar
+  if (t.type === 't_seed' && t.growthProgress > 0) {
+    const maxG = t.config.actionConfig.maxGrowth || 32;
+    const gRatio = t.growthProgress / maxG;
+    const barW = t.size + 10;
+    const barH = 5;
+    
+    // effect when waterlogged
+    const glowAlpha = t.isWaterlogged ? 150 + 100 * sin(state.frames * 0.2) : 180;
+
+    push();
+    translate(0, -t.size/2 - 12);
+    scale(1.0);
+    
+    noStroke();
+    fill(20, 180);
+    rectMode(CENTER);
+    rect(0, 0, barW, barH, 2);
+    
+    fill(t.isWaterlogged ? [150, 255, 200, glowAlpha] : [100, 255, 100, 220]);
+    rectMode(CORNER);
+    rect(-barW/2, -barH/2, barW * gRatio, barH, 2);
+    pop();
   }
 
   if (t.frostLevel > 0 && !t.isFrosted) {

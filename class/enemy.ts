@@ -1,7 +1,6 @@
 
 import { state } from '../state';
-// Fixed: Removed TWO_PI from constants import as it is a p5 global
-import { GRID_SIZE, CHUNK_SIZE } from '../constants';
+import { GRID_SIZE, CHUNK_SIZE, EnemyCollideRadiusCheck } from '../constants';
 import { enemyTypes } from '../balanceEnemies';
 import { conditionTypes } from '../balanceConditions';
 import { liquidTypes } from '../balanceLiquids';
@@ -11,6 +10,7 @@ import { Bullet } from './bullet';
 import { lerpAngle } from './utils';
 import { drawEnemy } from '../visualEnemies';
 import { isLegibleSpot } from '../lvDemo';
+import { spawnLootAt } from '../economy';
 
 declare const p5: any;
 declare const createVector: any;
@@ -25,8 +25,9 @@ declare const color: any;
 declare const red: any;
 declare const green: any;
 declare const blue: any;
-// Fixed: Declared TWO_PI as a p5.js global constant
 declare const TWO_PI: any;
+declare const width: any;
+declare const height: any;
 
 export class Enemy {
   pos: any; type: string; config: any; health: number; maxHealth: number; speed: number; size: number; col: any; target: any = null; flash: number = 0; rot: number; actionType: string[]; actionConfig: any;
@@ -43,7 +44,8 @@ export class Enemy {
   applyCondition(cKey: string, duration: number) {
     const cfg = conditionTypes[cKey]; if (!cfg) return;
     if (cfg.conditionClashesConfig?.override) for (let ov of cfg.conditionClashesConfig.override) this.conditions.delete(ov);
-    this.conditions.set(cKey, (this.conditions.get(cKey) || 0) + duration);
+    // Use Math.max to refresh/cap duration rather than stacking infinitely
+    this.conditions.set(cKey, Math.max(this.conditions.get(cKey) || 0, duration));
     if (!state.vfx.some((v: any) => v instanceof ConditionVFX && v.target === this && v.type === cKey)) state.vfx.push(new ConditionVFX(this, cKey));
   }
 
@@ -51,7 +53,10 @@ export class Enemy {
     if (this.isDying) return;
     if (this.flash > 0) this.flash--;
     this.prevPos.set(this.pos);
-    if (dist(this.pos.x, this.pos.y, playerPos.x, playerPos.y) > GRID_SIZE * CHUNK_SIZE * 4) { 
+
+    const dSqToPlayer = (this.pos.x - playerPos.x)**2 + (this.pos.y - playerPos.y)**2;
+    const despawnRange = (GRID_SIZE * CHUNK_SIZE * 4)**2;
+    if (dSqToPlayer > despawnRange) { 
       this.markedForDespawn = true; 
       const refund = (enemyTypes[this.type].cost || 0);
       state.hourlyBudgetPool += refund; 
@@ -72,11 +77,11 @@ export class Enemy {
 
     const gx = floor(this.pos.x / GRID_SIZE); const gy = floor(this.pos.y / GRID_SIZE);
     const liquidType = state.world.getLiquidAt(gx, gy); const lData = liquidType ? liquidTypes[liquidType] : null;
-    let actualVel = dist(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
+    let actualVelSq = (this.pos.x - this.prevPos.x)**2 + (this.pos.y - this.prevPos.y)**2;
 
     if (lData) {
        speedMult *= lData.liquidConfig.enemyMovementSpeedMultiplier;
-       if (lData.trailVfxInterval && frameCount % floor(lData.trailVfxInterval / 2) === 0 && actualVel > 0.1) state.trails.push(new LiquidTrailVFX(this.pos.x, this.pos.y, lData.enemyTrailVfx, atan2(this.pos.y - this.prevPos.y, this.pos.x - this.prevPos.x)));
+       if (lData.trailVfxInterval && frameCount % floor(lData.trailVfxInterval / 2) === 0 && actualVelSq > 0.01) state.trails.push(new LiquidTrailVFX(this.pos.x, this.pos.y, lData.enemyTrailVfx, atan2(this.pos.y - this.prevPos.y, this.pos.x - this.prevPos.x)));
        
        if (lData.liquidConfig.liquidDamageConfig?.enemy) {
          const cfg = lData.liquidConfig.liquidDamageConfig.enemy;
@@ -89,20 +94,64 @@ export class Enemy {
     }
 
     if (this.conditions.has('c_stun')) return;
-    for (let other of state.enemies) if (other !== this && other.health > 0 && !other.isDying) { let d = dist(this.pos.x, this.pos.y, other.pos.x, other.pos.y); let md = (this.size + other.size)*0.55; if (d < md && d > 0) this.moveWithCollisions(p5.Vector.sub(this.pos, other.pos).normalize().mult(0.2)); }
+
+    // Use spatial hash for enemy avoidance
+    const cs = state.spatialHashCellSize;
+    const hgx = floor(this.pos.x / cs);
+    const hgy = floor(this.pos.y / cs);
+    const checkLimitSq = EnemyCollideRadiusCheck * EnemyCollideRadiusCheck;
     
-    let nearestT = null; let minDistT = 450;
-    for (let t of turrets) if (t.config.collideWithEnemy !== false) { let d = dist(this.pos.x, this.pos.y, t.getWorldPos().x, t.getWorldPos().y); if (d < minDistT && state.world.checkLOS(this.pos.x, this.pos.y, t.getWorldPos().x, t.getWorldPos().y)) { nearestT = t; minDistT = d; } }
+    for (let i = -1; i <= 1; i++) {
+      for (let j = -1; j <= 1; j++) {
+        const neighbors = state.spatialHash.get(`${hgx+i},${hgy+j}`);
+        if (neighbors) {
+          for (const other of neighbors) {
+            if (other === this || other.isDying) continue;
+            const dx = this.pos.x - other.pos.x;
+            const dy = this.pos.y - other.pos.y;
+            const distSq = dx*dx + dy*dy;
+            
+            // Only process if within the constant tuning radius
+            if (distSq > checkLimitSq) continue;
+            
+            const md = (this.size + other.size)*0.55;
+            if (distSq < md*md && distSq > 0) {
+              const d = Math.sqrt(distSq);
+              this.moveWithCollisions(createVector(dx/d * 0.2, dy/d * 0.2));
+            }
+          }
+        }
+      }
+    }
+    
+    let nearestT = null; let minDistTSq = 450*450;
+    if (state.isStationary) {
+      for (let t of turrets) if (t.config.collideWithEnemy !== false) { 
+        const twPos = t.getWorldPos();
+        const dSq = (this.pos.x - twPos.x)**2 + (this.pos.y - twPos.y)**2;
+        if (dSq < minDistTSq && state.world.checkLOS(this.pos.x, this.pos.y, twPos.x, twPos.y)) { 
+          nearestT = t; minDistTSq = dSq; 
+        } 
+      }
+    }
+    
     let tp = nearestT ? nearestT.getWorldPos() : playerPos; this.target = nearestT || state.player;
-    let d = dist(this.pos.x, this.pos.y, tp.x, tp.y); let dir = p5.Vector.sub(tp, this.pos).normalize(); this.rot = lerpAngle(this.rot, dir.heading(), 0.12);
+    const dx = tp.x - this.pos.x;
+    const dy = tp.y - this.pos.y;
+    const dSq = dx*dx + dy*dy;
+    const d = Math.sqrt(dSq);
+    const dirHeading = atan2(dy, dx);
+    this.rot = lerpAngle(this.rot, dirHeading, 0.12);
 
     if (this.actionType.includes('moveDefault') && this.meleeCooldown <= 0) {
       let rThresh = this.actionType.includes('shoot') ? this.actionConfig.shootRange * 0.75 : this.size * 0.6;
-      if (d > rThresh) this.moveWithCollisions(dir.copy().mult(this.speed * speedMult));
+      if (d > rThresh) {
+        this.moveWithCollisions(createVector(dx/d, dy/d).mult(this.speed * speedMult));
+      }
     }
     if (this.actionType.includes('meleeAttack') && d < (this.size + (this.target.size || 32))*0.5 + 10 && this.meleeCooldown <= 0) { this.target.takeDamage(this.actionConfig.damage); this.meleeCooldown = this.actionConfig.attackFireRate; if (frameCount % 5 === 0) state.vfx.push(new HitSpark(this.pos.x, this.pos.y, [255, 50, 50])); }
     if (this.meleeCooldown > 0) this.meleeCooldown--;
-    if (this.actionType.includes('shoot') && d < this.actionConfig.shootRange && this.shootCooldown <= 0 && state.world.checkLOS(this.pos.x, this.pos.y, tp.x, tp.y)) { state.enemyBullets.push(new Bullet(this.pos.x, this.pos.y, tp.x, tp.y, 'b_enemy_basic', 'core')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, dir.heading(), 22, 6, color(200, 100, 255))); this.shootCooldown = this.actionConfig.shootFireRate; }
+    if (this.actionType.includes('shoot') && d < this.actionConfig.shootRange && this.shootCooldown <= 0 && state.world.checkLOS(this.pos.x, this.pos.y, tp.x, tp.y)) { state.enemyBullets.push(new Bullet(this.pos.x, this.pos.y, tp.x, tp.y, 'b_enemy_basic', 'core')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, dirHeading, 22, 6, color(200, 100, 255))); this.shootCooldown = this.actionConfig.shootFireRate; }
     if (this.shootCooldown > 0) this.shootCooldown--;
     
     if (this.actionType.includes('spawnEnemy') && this.actionConfig.spawnTriggerOnHealthRatio) {
@@ -120,14 +169,20 @@ export class Enemy {
     const gx = floor(this.pos.x / GRID_SIZE);
     const gy = floor(this.pos.y / GRID_SIZE);
     const forceRange = GRID_SIZE * 0.9;
+    const forceRangeSq = forceRange * forceRange;
     for (let i = gx - 1; i <= gx + 1; i++) {
       for (let j = gy - 1; j <= gy + 1; j++) {
         if (state.world.isBlockAt(i * GRID_SIZE + 1, j * GRID_SIZE + 1)) {
-          const bCenter = createVector(i * GRID_SIZE + GRID_SIZE/2, j * GRID_SIZE + GRID_SIZE/2);
-          const d = dist(this.pos.x, this.pos.y, bCenter.x, bCenter.y);
-          if (d < forceRange) {
-            const pushDir = p5.Vector.sub(this.pos, bCenter).normalize().mult(4.0 * (1 - d/forceRange));
-            this.pos.add(pushDir);
+          const bx = i * GRID_SIZE + GRID_SIZE/2;
+          const by = j * GRID_SIZE + GRID_SIZE/2;
+          const dx = this.pos.x - bx;
+          const dy = this.pos.y - by;
+          const dSq = dx*dx + dy*dy;
+          if (dSq < forceRangeSq) {
+            const d = Math.sqrt(dSq);
+            const force = 4.0 * (1 - d/forceRange);
+            this.pos.x += dx/d * force;
+            this.pos.y += dy/d * force;
           }
         }
       }
@@ -138,7 +193,19 @@ export class Enemy {
     let nx = this.pos.x + move.x; if (!state.world.checkCollision(nx, this.pos.y, this.size/2.2) && !this.checkEntityCollisions(nx, this.pos.y)) this.pos.x = nx;
     let ny = this.pos.y + move.y; if (!state.world.checkCollision(this.pos.x, ny, this.size/2.2) && !this.checkEntityCollisions(this.pos.x, ny)) this.pos.y = ny;
   }
-  checkEntityCollisions(x: number, y: number) { if (dist(x, y, state.player.pos.x, state.player.pos.y) < (this.size + state.player.size)*0.5) return true; for (let t of state.player.attachments) if (t.config.collideWithEnemy !== false && dist(x, y, t.getWorldPos().x, t.getWorldPos().y) < (this.size + t.size)*0.5) return true; return false; }
+  checkEntityCollisions(x: number, y: number) { 
+    const dSqToPlayer = (x - state.player.pos.x)**2 + (y - state.player.pos.y)**2;
+    const minDSqToPlayer = ((this.size + state.player.size)*0.5)**2;
+    if (dSqToPlayer < minDSqToPlayer) return true; 
+    if (state.isStationary) {
+      for (let t of state.player.attachments) if (t.config.collideWithEnemy !== false) {
+        const twPos = t.getWorldPos();
+        const dSq = (x - twPos.x)**2 + (y - twPos.y)**2;
+        if (dSq < ((this.size + t.size)*0.5)**2) return true;
+      }
+    }
+    return false; 
+  }
   
   performSummon() {
     if (!this.actionConfig.enemyTypeToSpawn) return;
@@ -162,6 +229,15 @@ export class Enemy {
   }
 
   display() { 
+    // Frustum culling using reliable AABB check
+    const margin = 100;
+    const left = state.cameraPos.x - width/2 - margin;
+    const right = state.cameraPos.x + width/2 + margin;
+    const top = state.cameraPos.y - height/2 - margin;
+    const bottom = state.cameraPos.y + height/2 + margin;
+    
+    if (this.pos.x < left || this.pos.x > right || this.pos.y < top || this.pos.y > bottom) return;
+    
     drawEnemy(this);
   }
   takeDamage(dmg: number) { 
@@ -173,6 +249,9 @@ export class Enemy {
       this.isDying = true;
       state.totalEnemiesDead++;
       
+      // Spawn loot based on enemy type config
+      spawnLootAt(this.pos.x, this.pos.y, this.type, this.config.lootConfigOnDeath);
+
       if (this.actionType.includes('spawnEnemy') && this.actionConfig.spawnTriggerOnHealthRatio) {
         if (this.actionConfig.spawnTriggerOnHealthRatio.includes(0)) {
            this.performSummon();

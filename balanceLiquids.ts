@@ -71,7 +71,8 @@ export const liquidTypes: any = {
           conditionDuration: 60
         },
         enemy: {
-          damageInterval: 10,
+          damageInterval: 6,
+          damage: 1,
           condition: 'c_burning',
           conditionDuration: 60
         }

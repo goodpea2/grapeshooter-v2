@@ -1,5 +1,6 @@
 
 import { state } from './state';
+import { HEX_DIST } from './constants';
 
 declare const push: any;
 declare const pop: any;
@@ -17,12 +18,15 @@ declare const cos: any;
 declare const sin: any;
 
 // Map turret logic IDs to asset keys
-const TYPE_MAP: Record<string, string> = {
+export const TYPE_MAP: Record<string, string> = {
   't_pea': 't_pea',
   't_laser': 't_laser',
   't_wall': 't_wall',
   't_mine': 't_mine',
   't_ice': 't_ice',
+  't_sunflower': 't_sunflower',
+  't_seed': 'seed_stray_t1', // Map to the stray seed asset
+  't_lilypad': 't_lilypad',
   't2_repeater': 't_repeater',
   't2_firepea': 't_firepea',
   't2_laser2': 't_laser2',
@@ -41,7 +45,7 @@ const TYPE_MAP: Record<string, string> = {
 };
 
 // Units that do not have a back-facing asset
-const NO_BACK_UNITS = new Set(['t_wall', 't2_tall', 't2_pulse', 't2_spike']);
+const NO_BACK_UNITS = new Set(['t_wall', 't2_tall', 't2_pulse', 't2_spike', 't_sunflower', 't_seed', 't_lilypad']);
 
 export function hasTurretSprite(type: string): boolean {
   return !!TYPE_MAP[type];
@@ -53,7 +57,14 @@ export function drawTurretSprite(t: any) {
   if (!baseKey) return;
 
   push();
-  translate(wPos.x, wPos.y);
+  // Apply jump offset if it exists
+  const jx = t.jumpOffset ? t.jumpOffset.x : 0;
+  const jy = t.jumpOffset ? t.jumpOffset.y : 0;
+  
+  // Render offset for ground layer
+  const ly = (t.config.turretLayer === 'ground') ? HEX_DIST * 0.25 : 0;
+  
+  translate(wPos.x + jx, wPos.y + jy + ly);
 
   let isLeft = false;
   let isBack = false;
@@ -74,8 +85,8 @@ export function drawTurretSprite(t: any) {
         const cooldown = (actionConfig.pulseCooldown || 0) / (t.fireRateMultiplier || 1.0);
         if ((state.frames - pulseTimer) < cooldown) onCooldown = true;
     }
-    // Check shoot fire rate if not already on cooldown (for arming shooters if added later)
-    if (!onCooldown && config.actionType.includes('shoot')) {
+    // Check shoot fire rate if not already on cooldown (only for turrets that don't have a pulse action)
+    if (!onCooldown && config.actionType.includes('shoot') && !config.actionType.includes('pulse')) {
         const shootTimer = t.actionTimers.get('shoot') || -999999;
         const fr = Array.isArray(actionConfig.shootFireRate) ? actionConfig.shootFireRate[0] : actionConfig.shootFireRate;
         const cooldown = (fr || 0) / (t.fireRateMultiplier || 1.0);
@@ -90,13 +101,27 @@ export function drawTurretSprite(t: any) {
     spriteKey = `img_${baseKey}_back`;
   }
 
-  // Fallback to front if specific key doesn't exist
-  let sprite = state.assets[spriteKey] || state.assets[`img_${baseKey}_front`];
+  // Fallback chain: specific state -> front -> base key without suffix
+  let sprite = state.assets[spriteKey] || state.assets[`img_${baseKey}_front`] || state.assets[`img_${baseKey}`];
 
   if (sprite) {
     push();
-    if (isLeft) scale(-1, 1);
     
+    // Stable "random" rotation and flip based on UID
+    if (config.randomRotation) {
+        let hash = 0;
+        for(let i=0; i<t.uid.length; i++) hash += t.uid.charCodeAt(i);
+        rotate((hash % 360) * (Math.PI / 180));
+    } else {
+        if (isLeft) scale(-1, 1);
+    }
+    
+    if (config.randomFlip) {
+        let hash = 0;
+        for(let i=0; i<t.uid.length; i++) hash += t.uid.charCodeAt(i) * 1.5;
+        if (hash % 2 === 0) scale(-1, 1);
+    }
+
     const recoilDist = t.recoil || 0;
     const rx = -recoilDist * cos(isLeft ? ang - Math.PI : ang);
     const ry = -recoilDist * sin(isLeft ? ang - Math.PI : ang);

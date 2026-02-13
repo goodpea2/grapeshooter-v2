@@ -1,6 +1,5 @@
 
 import { state } from '../state';
-// Fixed: Removed TWO_PI from constants import as it is a p5 constant, not a world constant
 import { GRID_SIZE, CHUNK_SIZE } from '../constants';
 import { bulletTypes } from '../balanceBullets';
 import { Explosion, MuzzleFlash } from '../vfx';
@@ -14,8 +13,10 @@ declare const color: any;
 declare const random: any;
 declare const cos: any;
 declare const sin: any;
-// Fixed: Declared TWO_PI as a p5.js global constant
 declare const TWO_PI: any;
+declare const lerp: any;
+declare const width: any;
+declare const height: any;
 
 export class Bullet {
   pos: any; prevPos: any; vel: any; col: any; dmg: number; targetType: string; life: number; config: any; typeKey: string;
@@ -34,8 +35,9 @@ export class Bullet {
     this.prevPos.set(this.pos); this.pos.add(this.vel); this.life--;
     
     if (this.targetPos) {
-       let d = dist(this.pos.x, this.pos.y, this.targetPos.x, this.targetPos.y);
-       if (d < this.vel.mag() + 2) {
+       let dSq = (this.pos.x - this.targetPos.x)**2 + (this.pos.y - this.targetPos.y)**2;
+       let mag = this.vel.mag();
+       if (dSq < (mag + 2)**2) {
           this.pos.set(this.targetPos);
           this.vel.mult(0);
           this.targetPos = null;
@@ -48,11 +50,16 @@ export class Bullet {
     
     if (this.damageTargets.includes('icecube')) {
       for (let a of state.player.attachments) {
-        if (a.isFrosted && dist(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y) < a.size / 2 + 6) {
-           a.takeDamage(this.dmg);
-           if (this.config.aoeConfig?.isAoe) this.explode();
-           this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
-           this.life = 0; return;
+        if (a.isFrosted) {
+          const awPos = a.getWorldPos();
+          const dSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
+          const minDist = a.size / 2 + 6;
+          if (dSq < minDist*minDist) {
+            a.takeDamage(this.dmg);
+            if (this.config.aoeConfig?.isAoe) this.explode();
+            this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
+            this.life = 0; return;
+          }
         }
       }
     }
@@ -75,24 +82,53 @@ export class Bullet {
     }
 
     if (this.damageTargets.includes('enemy')) {
-      for (let e of state.enemies) if (e.health > 0 && dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y) < e.size/2) {
-        this.applyBulletConditions(e);
-        e.takeDamage(this.dmg); if (this.config.aoeConfig?.isAoe) this.explode();
-        this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
-        this.life = 0; return;
+      // Use spatial hash for bullet-enemy collision
+      const cs = state.spatialHashCellSize;
+      const hgx = floor(this.pos.x / cs);
+      const hgy = floor(this.pos.y / cs);
+      let hit = false;
+      
+      for (let i = -1; i <= 1 && !hit; i++) {
+        for (let j = -1; j <= 1 && !hit; j++) {
+          const targets = state.spatialHash.get(`${hgx+i},${hgy+j}`);
+          if (targets) {
+            for (const e of targets) {
+              if (e.health <= 0 || e.isDying) continue;
+              const dSq = (this.pos.x - e.pos.x)**2 + (this.pos.y - e.pos.y)**2;
+              const minDist = e.size / 2;
+              if (dSq < minDist*minDist) {
+                this.applyBulletConditions(e);
+                e.takeDamage(this.dmg); 
+                if (this.config.aoeConfig?.isAoe) this.explode();
+                this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
+                this.life = 0; hit = true; break;
+              }
+            }
+          }
+        }
       }
+      if (hit) return;
     }
 
     if (this.damageTargets.includes('turret')) {
-      for (let a of state.player.attachments) if (dist(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y) < a.size/2 + 4) {
-        a.takeDamage(this.dmg); if (this.config.aoeConfig?.isAoe) this.explode();
-        this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
-        this.life = 0; return;
+      if (state.isStationary) {
+        for (let a of state.player.attachments) {
+          const awPos = a.getWorldPos();
+          const dSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
+          const minDist = a.size / 2 + 4;
+          if (dSq < minDist*minDist) {
+            a.takeDamage(this.dmg); if (this.config.aoeConfig?.isAoe) this.explode();
+            this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
+            this.life = 0; return;
+          }
+        }
       }
     }
 
     if (this.damageTargets.includes('player')) {
-      if (dist(this.pos.x, this.pos.y, state.player.pos.x, state.player.pos.y) < state.player.size/2) {
+      const pdSq = (this.pos.x - state.player.pos.x)**2 + (this.pos.y - state.player.pos.y)**2;
+      const pMinDist = state.player.size / 2;
+      if (pdSq < pMinDist*pMinDist) {
         state.player.takeDamage(this.dmg); if (this.config.aoeConfig?.isAoe) this.explode();
         this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
         this.life = 0; return;
@@ -119,35 +155,83 @@ export class Bullet {
       state.groundFeatures.push(new GroundFeature(sx, sy, gfKey));
     }
   }
+
+  // Calculate damage based on distance using linear interpolation between gradient points
+  getLerpedAoeDamage(d: number, aoe: any) {
+    const radii = aoe.aoeRadiusGradient;
+    const damages = aoe.aoeDamageGradient;
+    const maxR = radii[radii.length - 1];
+    
+    if (d > maxR) return 0;
+    if (radii.length === 1) return d <= radii[0] ? damages[0] : 0;
+    
+    // Check if within first threshold
+    if (d <= radii[0]) return damages[0];
+
+    // Lerp between thresholds
+    for (let i = 0; i < radii.length - 1; i++) {
+      if (d >= radii[i] && d <= radii[i+1]) {
+        const factor = (d - radii[i]) / (radii[i+1] - radii[i]);
+        return lerp(damages[i], damages[i+1], factor);
+      }
+    }
+    return 0;
+  }
+
   explode() {
     const aoe = this.config.aoeConfig; if (!aoe) return;
-    const maxR = aoe.aoeRadiusGradient[aoe.aoeRadiusGradient.length - 1] || 10;
+    const radii = aoe.aoeRadiusGradient;
+    const maxR = radii[radii.length - 1] || 10;
     state.vfx.push(new Explosion(this.pos.x, this.pos.y, maxR*2, color(this.col)));
     
     if (this.damageTargets.includes('enemy')) {
       for (let e of state.enemies) {
-        let d = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y);
-        for (let i = 0; i < aoe.aoeRadiusGradient.length; i++) if (d <= aoe.aoeRadiusGradient[i]) {
-          this.applyBulletConditions(e);
-          e.takeDamage(aoe.aoeDamageGradient[i]); break;
+        let dSq = (this.pos.x - e.pos.x)**2 + (this.pos.y - e.pos.y)**2;
+        if (dSq < maxR*maxR) {
+          const d = Math.sqrt(dSq);
+          const lerpDmg = this.getLerpedAoeDamage(d, aoe);
+          if (lerpDmg > 0) {
+            this.applyBulletConditions(e);
+            e.takeDamage(lerpDmg);
+          }
         }
       }
     }
 
     if (this.damageTargets.includes('player')) {
-      let pDist = dist(this.pos.x, this.pos.y, state.player.pos.x, state.player.pos.y);
-      if (pDist <= maxR) state.player.takeDamage(aoe.aoeDamageGradient[0]);
+      let pdSq = (this.pos.x - state.player.pos.x)**2 + (this.pos.y - state.player.pos.y)**2;
+      if (pdSq < maxR*maxR) {
+        const d = Math.sqrt(pdSq);
+        const lerpDmg = this.getLerpedAoeDamage(d, aoe);
+        if (lerpDmg > 0) state.player.takeDamage(lerpDmg);
+      }
     }
 
     if (this.damageTargets.includes('turret')) {
-      for (let a of state.player.attachments) {
-        if (dist(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y) <= maxR) a.takeDamage(aoe.aoeDamageGradient[0]);
+      if (state.isStationary) {
+        for (let a of state.player.attachments) {
+          const awPos = a.getWorldPos();
+          let adSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
+          if (adSq < maxR*maxR) {
+            const d = Math.sqrt(adSq);
+            const lerpDmg = this.getLerpedAoeDamage(d, aoe);
+            if (lerpDmg > 0) a.takeDamage(lerpDmg);
+          }
+        }
       }
     }
 
     if (this.damageTargets.includes('icecube')) {
        for (let a of state.player.attachments) {
-        if (a.isFrosted && dist(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y) <= maxR) a.takeDamage(aoe.aoeDamageGradient[0]);
+        if (a.isFrosted) {
+          const awPos = a.getWorldPos();
+          let adSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
+          if (adSq < maxR*maxR) {
+            const d = Math.sqrt(adSq);
+            const lerpDmg = this.getLerpedAoeDamage(d, aoe);
+            if (lerpDmg > 0) a.takeDamage(lerpDmg);
+          }
+        }
       }
     }
     
@@ -157,12 +241,27 @@ export class Bullet {
       for(let gx=gxStart; gx<=gxEnd; gx++) for(let gy=gyStart; gy<=gyEnd; gy++) {
         let cx=floor(gx/CHUNK_SIZE); let cy=floor(gy/CHUNK_SIZE);
         let chunk = state.world.getChunk(cx, cy);
-        let block = chunk?.blocks.find((b: any) => !b.isMined && b.gx === gx && b.gy === gy);
-        if (block) { let d = dist(this.pos.x, this.pos.y, block.pos.x + GRID_SIZE/2, block.pos.y + GRID_SIZE/2); if (d <= maxR) block.takeDamage(aoe.aoeDamageGradient[0] * (aoe.aoeObstacleDamageMultiplier || 1)); }
+        let block = chunk?.blockMap.get(`${gx},${gy}`);
+        if (block && !block.isMined) { 
+          let bcx = block.pos.x + GRID_SIZE/2;
+          let bcy = block.pos.y + GRID_SIZE/2;
+          let dSq = (this.pos.x - bcx)**2 + (this.pos.y - bcy)**2;
+          if (dSq < maxR*maxR) {
+            const d = Math.sqrt(dSq);
+            const lerpDmg = this.getLerpedAoeDamage(d, aoe);
+            if (lerpDmg > 0) block.takeDamage(lerpDmg * (aoe.aoeObstacleDamageMultiplier || 1)); 
+          }
+        }
       }
     }
   }
   display() {
+    // Frustum culling
+    const margin = 50;
+    const screenX = this.pos.x - (state.cameraPos.x - width/2);
+    const screenY = this.pos.y - (state.cameraPos.y - height/2);
+    if (screenX < -margin || screenX > width + margin || screenY < -margin || screenY > height + margin) return;
+
     drawBullet(this);
   }
 }

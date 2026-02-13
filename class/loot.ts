@@ -1,7 +1,6 @@
-
 import { state } from '../state';
 import { ECONOMY_CONFIG } from '../economy';
-import { turretTypes } from '../balanceTurrets';
+import { lootTypes, LootType } from '../balanceLootTable';
 
 declare const p5: any;
 declare const createVector: any;
@@ -23,54 +22,98 @@ declare const textAlign: any;
 declare const textSize: any;
 declare const text: any;
 declare const random: any;
-// Fixed: Added missing p5.js rect declaration
 declare const rect: any;
+declare const image: any;
+declare const imageMode: any;
+declare const rotate: any;
+declare const tint: any;
+declare const noTint: any;
+declare const width: any;
+declare const height: any;
 
-export class SunLoot {
-  pos: any; vel: any; value: number; life: number; spawnFrame: number;
-  constructor(x: number, y: number, value: number) {
-    this.pos = createVector(x, y); this.vel = p5.Vector.random2D().mult(random(0.5, 1.2)); this.value = value; this.life = ECONOMY_CONFIG.sunLootLifetime;
+export class LootEntity {
+  pos: any; 
+  vel: any; 
+  life: number; 
+  spawnFrame: number; 
+  typeKey: string;
+  config: LootType;
+  renderSize: number;
+
+  constructor(x: number, y: number, typeKey: string) {
+    this.typeKey = typeKey;
+    this.config = lootTypes[typeKey];
+    this.pos = createVector(x, y); 
+    this.vel = p5.Vector.random2D().mult(random(0.5, 1.2)); 
+    this.life = ECONOMY_CONFIG.sunLootLifetime;
     this.spawnFrame = state.frames;
+    
+    // Pick random size from range
+    this.renderSize = random(this.config.idleAssetImgSize[0], this.config.idleAssetImgSize[1]);
   }
+
   update(playerPos: any): 'none' | 'collected' | 'missed' {
-    let d = dist(this.pos.x, this.pos.y, playerPos.x, playerPos.y);
+    // Optimization: Use squared distance to avoid sqrt during range check
+    const dx = this.pos.x - playerPos.x;
+    const dy = this.pos.y - playerPos.y;
+    const dSq = dx*dx + dy*dy;
+    
     const canBeAttracted = (state.frames - this.spawnFrame > 60);
-    if (canBeAttracted && d < ECONOMY_CONFIG.sunLootAttractionRange) {
+    const attractRangeSq = ECONOMY_CONFIG.sunLootAttractionRange * ECONOMY_CONFIG.sunLootAttractionRange;
+    
+    if (canBeAttracted && dSq < attractRangeSq) {
       this.vel.add(p5.Vector.sub(playerPos, this.pos).normalize().mult(0.8));
       this.vel.limit(8);
     }
-    this.pos.add(this.vel); this.vel.mult(0.94); this.life--;
-    if (d < ECONOMY_CONFIG.sunLootCollectionRange) return 'collected';
+    
+    this.pos.add(this.vel); 
+    this.vel.mult(0.94); 
+    this.life--;
+    
+    const collectionRangeSq = ECONOMY_CONFIG.sunLootCollectionRange * ECONOMY_CONFIG.sunLootCollectionRange;
+    if (dSq < collectionRangeSq) return 'collected';
     if (this.life <= 0) return 'missed';
     return 'none';
   }
+
   display() {
-    push(); translate(this.pos.x, this.pos.y);
-    const pulse = 1.0 + 0.2 * sin(frameCount * 0.15);
-    noStroke();
-    fill(255, 255, 150, map(this.life, 0, 100, 0, 150)); ellipse(0, 0, 16 * pulse);
-    fill(255, 230, 50, map(this.life, 0, 100, 0, 255)); ellipse(0, 0, 10);
-    fill(255, 255, 255, map(this.life, 0, 100, 0, 200)); ellipse(0, 0, 4);
+    // Optimization: Frustum Culling
+    // Do not draw if loot is significantly off-screen
+    const margin = 100;
+    const screenX = this.pos.x - (state.cameraPos.x - width/2);
+    const screenY = this.pos.y - (state.cameraPos.y - height/2);
+    
+    if (screenX < -margin || screenX > width + margin || screenY < -margin || screenY > height + margin) {
+      return;
+    }
+
+    push(); 
+    translate(this.pos.x, this.pos.y);
+    const pulse = 1.0 + 0.1 * sin(frameCount * 0.15);
+    const alpha = map(this.life, 0, 100, 0, 255);
+
+    const sprite = state.assets[this.config.idleAssetImg];
+    if (sprite) {
+      if (this.config.type === 'currency') rotate(state.frames * 0.02);
+      imageMode(CENTER);
+      tint(255, alpha);
+      image(sprite, 0, 0, this.renderSize * pulse, this.renderSize * pulse);
+      noTint();
+    } else {
+      // Fallback
+      fill(255, 230, 50, alpha); ellipse(0, 0, 10);
+    }
     pop();
   }
 }
 
-export class TurretLoot extends SunLoot {
-  turretType: string;
-  constructor(x: number, y: number, turretType: string) {
-    super(x, y, 0);
-    this.turretType = turretType;
-  }
-  display() {
-    push(); translate(this.pos.x, this.pos.y);
-    const pulse = 1.0 + 0.2 * sin(frameCount * 0.1);
-    const cfg = turretTypes[this.turretType];
-    stroke(255, 200); strokeWeight(1);
-    fill(cfg.color[0], cfg.color[1], cfg.color[2], 180);
-    rectMode(CENTER);
-    rect(0, 0, 22 * pulse, 22 * pulse, 4);
-    fill(255); noStroke(); textAlign(CENTER, CENTER); textSize(8);
-    text(cfg.name[0], 0, 0);
-    pop();
+// Added SunLoot class to satisfy imports in other files that expect a specialized sun loot class
+export class SunLoot extends LootEntity {
+  constructor(x: number, y: number, amount: number = 1) {
+    super(x, y, 'sun');
+    // Override the value if a different amount is passed to the constructor
+    if (this.config) {
+      this.config = { ...this.config, itemValue: amount };
+    }
   }
 }

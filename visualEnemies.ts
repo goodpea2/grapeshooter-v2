@@ -88,8 +88,7 @@ export function drawEnemy(e: any) {
   if (sprite) {
     if (e.flash > 0) tint(255, 100, 100);
     imageMode(CENTER);
-    // Draw sprite with consistent scaling (approx 2x size to let legs/bits breathe outside circular hitbox)
-    image(sprite, 0, 0, s * 2, s * 2);
+    image(sprite, 0, 0, 64, 64);
     noTint();
 
     // Swarm particles handled separately to stay on top of the center asset

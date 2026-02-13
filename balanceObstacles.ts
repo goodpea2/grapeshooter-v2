@@ -1,11 +1,11 @@
 import { GRID_SIZE, HOUR_FRAMES } from './constants';
 
 export const obstacleTypes: any = {
-  o_dirt: { name: 'Dirt', health: 100, color: [40, 180, 80], borderColor: [60, 220, 100], blocksLOS: true },
-  o_clay: { name: 'Clay', health: 200, color: [220, 120, 60], borderColor: [255, 160, 100], blocksLOS: true },
-  o_stone: { name: 'Stone', health: 400, color: [80, 60, 200], borderColor: [120, 100, 255], blocksLOS: true },
-  o_slate: { name: 'Slate', health: 800, color: [40, 30, 80], borderColor: [70, 60, 140], blocksLOS: true },
-  o_black: { name: 'Obsidian', health: 1500, color: [200, 20, 60], borderColor: [255, 60, 100], blocksLOS: true }
+  o_dirt: { name: 'Dirt', health: 100, color: [40, 180, 80], borderColor: [60, 220, 100], blocksLOS: true, lootConfigOnDeath: 'o_dirt' },
+  o_clay: { name: 'Clay', health: 200, color: [220, 120, 60], borderColor: [255, 160, 100], blocksLOS: true, lootConfigOnDeath: 'o_clay' },
+  o_stone: { name: 'Stone', health: 400, color: [80, 60, 200], borderColor: [120, 100, 255], blocksLOS: true, lootConfigOnDeath: 'o_stone' },
+  o_slate: { name: 'Slate', health: 800, color: [40, 30, 80], borderColor: [70, 60, 140], blocksLOS: true, lootConfigOnDeath: 'o_slate' },
+  o_black: { name: 'Obsidian', health: 1500, color: [200, 20, 60], borderColor: [255, 60, 100], blocksLOS: true, lootConfigOnDeath: 'o_black' }
 };
 
 export const overlayTypes: any = {
@@ -15,7 +15,8 @@ export const overlayTypes: any = {
     isValuable: true, 
     obstacleOverlayVfx: 'v_sun_tiny',
     isConcealedAlongWithObstacle: false,
-    lootConfigOnDeath: { lootTableTypeKey: 'lt_sun', lootTableRollCount: 1, lootTableChance: 1 }
+    lootConfigOnDeath: 'lc_sun_tiny',
+    assetImgConfig: { idleAssetImg: ['img_sun_1_a', 'img_sun_1_b'], randomRotation: true, randomFlip: true }
   },
   sunOre: { 
     name: 'Sun Ore', 
@@ -23,7 +24,8 @@ export const overlayTypes: any = {
     isValuable: true, 
     obstacleOverlayVfx: 'v_sun_ore',
     isConcealedAlongWithObstacle: false,
-    lootConfigOnDeath: { lootTableTypeKey: 'lt_sun', lootTableRollCount: 3, lootTableChance: 1 }
+    lootConfigOnDeath: 'lc_sun_ore',
+    assetImgConfig: { idleAssetImg: ['img_sun_3_a', 'img_sun_3_b'], randomRotation: true, randomFlip: true }
   },
   sunClump: { 
     name: 'Sun Clump', 
@@ -31,7 +33,8 @@ export const overlayTypes: any = {
     isValuable: true, 
     obstacleOverlayVfx: 'v_sun_clump',
     isConcealedAlongWithObstacle: false,
-    lootConfigOnDeath: { lootTableTypeKey: 'lt_sun', lootTableRollCount: 10, lootTableChance: 1 }
+    lootConfigOnDeath: 'lc_sun_clump',
+    assetImgConfig: { idleAssetImg: ['img_sun_10_a'], randomRotation: true, randomFlip: true }
   },
   o_tnt: { 
     name: 'TNT', 
@@ -40,7 +43,8 @@ export const overlayTypes: any = {
     obstacleOverlayVfx: 'v_tnt',
     isConcealedAlongWithObstacle: true,
     concealedSparkleVfx: 'v_sparkle_white',
-    bulletToSpawnOnDeath: ['b_tnt_explosion']
+    bulletToSpawnOnDeath: ['b_tnt_explosion'],
+    assetImgConfig: { idleAssetImg: ['img_tnt_a'], randomRotation: false, randomFlip: true }
   },
   o_sunflower: { 
     name: 'Wild Sunflower', 
@@ -48,7 +52,8 @@ export const overlayTypes: any = {
     isValuable: true, 
     obstacleOverlayVfx: 'v_sunflower',
     isConcealedAlongWithObstacle: false,
-    lootConfigOnDeath: { lootTableTypeKey: 'lt_sunflowerTurret', lootTableRollCount: 1, lootTableChance: 1 }
+    lootConfigOnDeath: 'lc_wild_sunflower',
+    assetImgConfig: { idleAssetImg: ['img_seed_sunflower'], randomRotation: false, randomFlip: false }
   },
   o_stray: { 
     name: 'Stray Crate', 
@@ -57,7 +62,8 @@ export const overlayTypes: any = {
     obstacleOverlayVfx: 'v_stray',
     isConcealedAlongWithObstacle: true,
     concealedSparkleVfx: 'v_sparkle_white',
-    lootConfigOnDeath: { lootTableTypeKey: 'lt_strayTurret', lootTableRollCount: 1, lootTableChance: 1 }
+    lootConfigOnDeath: 'lc_stray_crate',
+    assetImgConfig: { idleAssetImg: ['img_seed_stray_t1'], randomRotation: false, randomFlip: false }
   },
   sniperTower: { 
     name: 'Sniper Tower', 
@@ -79,56 +85,69 @@ export const overlayTypes: any = {
   // --- MONSTER SPAWNERS ---
   spawner_lv1_A: {
     name: 'Spawner Lv1', minHealth: 200, isEnemy: true, isEnemySpawner: true, danger: 1, obstacleOverlayVfx: 'v_spawner', isConcealedAlongWithObstacle: false,
-    enemySpawnConfig: { budget: 30, enemyTypeKey: ['e_basic', 'e_fast', 'e_armor1'], spawnRadius: 100, spawnTriggerRadius: 250, spawnInterval: -1, spawnIntervalConsumeBudget: true }
+    enemySpawnConfig: { budget: 30, enemyTypeKey: ['e_basic', 'e_fast', 'e_armor1'], spawnRadius: 100, spawnTriggerRadius: 250, spawnInterval: -1, spawnIntervalConsumeBudget: true },
+    assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: false, randomFlip: false }
   },
   spawner_lv2_A: {
     name: 'Spawner Lv2', minHealth: 300, isEnemy: true, isEnemySpawner: true, danger: 2, obstacleOverlayVfx: 'v_spawner', isConcealedAlongWithObstacle: false,
-    enemySpawnConfig: { budget: 60, enemyTypeKey: ['e_armor1', 'e_armor2', 'e_critter'], spawnRadius: 120, spawnTriggerRadius: 280, spawnInterval: -1, spawnIntervalConsumeBudget: true }
+    enemySpawnConfig: { budget: 60, enemyTypeKey: ['e_armor1', 'e_armor2', 'e_critter'], spawnRadius: 120, spawnTriggerRadius: 280, spawnInterval: -1, spawnIntervalConsumeBudget: true },
+    assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: false, randomFlip: false }
   },
   spawner_lv3_A: {
     name: 'Spawner Lv3', minHealth: 400, isEnemy: true, isEnemySpawner: true, danger: 3, obstacleOverlayVfx: 'v_spawner', isConcealedAlongWithObstacle: false,
-    enemySpawnConfig: { budget: 90, enemyTypeKey: ['e_shooting', 'e_swarm'], spawnRadius: 150, spawnTriggerRadius: 300, spawnInterval: -1, spawnIntervalConsumeBudget: true }
+    enemySpawnConfig: { budget: 90, enemyTypeKey: ['e_shooting', 'e_swarm'], spawnRadius: 150, spawnTriggerRadius: 300, spawnInterval: -1, spawnIntervalConsumeBudget: true },
+    assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: false, randomFlip: false }
   },
   spawner_lv4_A: {
     name: 'Spawner Lv4', minHealth: 600, isEnemy: true, isEnemySpawner: true, danger: 4, obstacleOverlayVfx: 'v_spawner', isConcealedAlongWithObstacle: false,
-    enemySpawnConfig: { budget: 120, enemyTypeKey: ['e_basic', 'e_armor3', 'e_giant'], spawnRadius: 150, spawnTriggerRadius: 350, spawnInterval: -1, spawnIntervalConsumeBudget: true }
+    enemySpawnConfig: { budget: 120, enemyTypeKey: ['e_basic', 'e_armor3', 'e_giant'], spawnRadius: 150, spawnTriggerRadius: 350, spawnInterval: -1, spawnIntervalConsumeBudget: true },
+    assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: false, randomFlip: false }
   },
   spawner_lv5_A: {
     name: 'Spawner Lv5', minHealth: 800, isEnemy: true, isEnemySpawner: true, danger: 5, obstacleOverlayVfx: 'v_spawner', isConcealedAlongWithObstacle: false,
-    enemySpawnConfig: { budget: 150, enemyTypeKey: ['e_shooting', 'e_giant'], spawnRadius: 180, spawnTriggerRadius: 400, spawnInterval: -1, spawnIntervalConsumeBudget: true }
+    enemySpawnConfig: { budget: 150, enemyTypeKey: ['e_shooting', 'e_giant'], spawnRadius: 180, spawnTriggerRadius: 400, spawnInterval: -1, spawnIntervalConsumeBudget: true },
+    assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: false, randomFlip: false }
   },
   spawner_lv6_A: {
     name: 'Spawner Lv6', minHealth: 1200, isEnemy: true, isEnemySpawner: true, danger: 6, obstacleOverlayVfx: 'v_spawner', isConcealedAlongWithObstacle: false,
-    enemySpawnConfig: { budget: 200, enemyTypeKey: ['e_giant'], spawnRadius: 200, spawnTriggerRadius: 450, spawnInterval: -1, spawnIntervalConsumeBudget: true }
+    enemySpawnConfig: { budget: 200, enemyTypeKey: ['e_giant'], spawnRadius: 200, spawnTriggerRadius: 450, spawnInterval: -1, spawnIntervalConsumeBudget: true },
+    assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: false, randomFlip: false }
   },
   // Interval variants
   spawner_lv3_30: {
     name: 'Fast Spawner Lv3', minHealth: 400, isEnemy: true, isEnemySpawner: true, danger: 3, obstacleOverlayVfx: 'v_spawner', isConcealedAlongWithObstacle: false,
-    enemySpawnConfig: { budget: 90, enemyTypeKey: ['e_fast'], spawnRadius: 120, spawnTriggerRadius: 300, spawnInterval: 30, spawnIntervalConsumeBudget: true }
+    enemySpawnConfig: { budget: 90, enemyTypeKey: ['e_fast'], spawnRadius: 120, spawnTriggerRadius: 300, spawnInterval: 30, spawnIntervalConsumeBudget: true },
+    assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: false, randomFlip: false }
   },
   spawner_lv4_30: {
     name: 'Elite Spawner Lv4', minHealth: 500, isEnemy: true, isEnemySpawner: true, danger: 4, obstacleOverlayVfx: 'v_spawner', isConcealedAlongWithObstacle: false,
-    enemySpawnConfig: { budget: 100, enemyTypeKey: ['e_armor1'], spawnRadius: 120, spawnTriggerRadius: 300, spawnInterval: 30, spawnIntervalConsumeBudget: true }
+    enemySpawnConfig: { budget: 100, enemyTypeKey: ['e_armor1'], spawnRadius: 120, spawnTriggerRadius: 300, spawnInterval: 30, spawnIntervalConsumeBudget: true },
+    assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: false, randomFlip: false }
   },
   spawner_lv5_30: {
     name: 'Swarm Spawner Lv5', minHealth: 600, isEnemy: true, isEnemySpawner: true, danger: 5, obstacleOverlayVfx: 'v_spawner', isConcealedAlongWithObstacle: false,
-    enemySpawnConfig: { budget: 150, enemyTypeKey: ['e_shooting', 'e_swarm'], spawnRadius: 150, spawnTriggerRadius: 350, spawnInterval: 30, spawnIntervalConsumeBudget: true }
+    enemySpawnConfig: { budget: 150, enemyTypeKey: ['e_shooting', 'e_swarm'], spawnRadius: 150, spawnTriggerRadius: 350, spawnInterval: 30, spawnIntervalConsumeBudget: true },
+    assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: false, randomFlip: false }
   },
   spawner_lv1_360: {
     name: 'Slow Spawner Lv1', minHealth: 150, isEnemy: true, isEnemySpawner: true, danger: 1, obstacleOverlayVfx: 'v_spawner', isConcealedAlongWithObstacle: false,
-    enemySpawnConfig: { budget: 30, enemyTypeKey: ['e_basic', 'e_fast'], spawnRadius: 100, spawnTriggerRadius: 200, spawnInterval: 360, spawnIntervalConsumeBudget: true }
+    enemySpawnConfig: { budget: 30, enemyTypeKey: ['e_basic', 'e_fast'], spawnRadius: 100, spawnTriggerRadius: 200, spawnInterval: 360, spawnIntervalConsumeBudget: true },
+    assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: false, randomFlip: false }
   },
   spawner_lv2_360: {
     name: 'Slow Spawner Lv2', minHealth: 250, isEnemy: true, isEnemySpawner: true, danger: 2, obstacleOverlayVfx: 'v_spawner', isConcealedAlongWithObstacle: false,
-    enemySpawnConfig: { budget: 60, enemyTypeKey: ['e_armor1', 'e_armor2'], spawnRadius: 100, spawnTriggerRadius: 200, spawnInterval: 360, spawnIntervalConsumeBudget: true }
+    enemySpawnConfig: { budget: 60, enemyTypeKey: ['e_armor1', 'e_armor2'], spawnRadius: 100, spawnTriggerRadius: 200, spawnInterval: 360, spawnIntervalConsumeBudget: true },
+    assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: false, randomFlip: false }
   },
   spawner_lv4_360: {
     name: 'Slow Spawner Lv4', minHealth: 400, isEnemy: true, isEnemySpawner: true, danger: 4, obstacleOverlayVfx: 'v_spawner', isConcealedAlongWithObstacle: false,
-    enemySpawnConfig: { budget: 120, enemyTypeKey: ['e_shooting', 'e_swarm'], spawnRadius: 120, spawnTriggerRadius: 250, spawnInterval: 360, spawnIntervalConsumeBudget: true }
+    enemySpawnConfig: { budget: 120, enemyTypeKey: ['e_shooting', 'e_swarm'], spawnRadius: 120, spawnTriggerRadius: 250, spawnInterval: 360, spawnIntervalConsumeBudget: true },
+    assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: false, randomFlip: false }
   },
   spawner_lv4_5: {
     name: 'Infest Spawner Lv4', minHealth: 300, isEnemy: true, isEnemySpawner: true, danger: 4, obstacleOverlayVfx: 'v_spawner', isConcealedAlongWithObstacle: false,
-    enemySpawnConfig: { budget: 80, enemyTypeKey: ['e_critter'], spawnRadius: 150, spawnTriggerRadius: 300, spawnInterval: 5, spawnIntervalConsumeBudget: true }
+    enemySpawnConfig: { budget: 80, enemyTypeKey: ['e_critter'], spawnRadius: 150, spawnTriggerRadius: 300, spawnInterval: 5, spawnIntervalConsumeBudget: true },
+    assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: false, randomFlip: false }
   }
 };
 

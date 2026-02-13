@@ -32,7 +32,15 @@ export const turretTypes: any = {
     name: 'Landmine', cost: 5, health: 50, color: [255, 100, 20], size: 16, tier: 1, cooldownHours: 3,
     tooltip: "Explosive trap. Arms every 2h.",
     actionType: ['pulse'],
-    actionConfig: { pulseBulletTypeKey: 'b_mine_explosion', pulseTriggerRadius: GRID_SIZE * 1.5, pulseTriggerBy: ['enemy'], pulseCooldown: HOUR_FRAMES * 2, pulseCenteredAtTriggerSource: false, hasUnarmedAsset: true },
+    actionConfig: { 
+      pulseBulletTypeKey: 'b_mine_explosion', 
+      pulseTriggerRadius: GRID_SIZE * 1, 
+      pulseTriggerBy: ['enemy'], 
+      pulseCooldown: HOUR_FRAMES * 2, 
+      pulseCenteredAtTriggerSource: false, 
+      hasUnarmedAsset: true,
+      PulseTurretJumpAtTriggerSource: true 
+    },
     targetType: ['enemy'],
     targetConfig: { enemyPriority: 'closest' }
   },
@@ -40,7 +48,15 @@ export const turretTypes: any = {
     name: 'Iceberg', cost: 5, health: 50, color: [150, 240, 255], size: 16, tier: 1, cooldownHours: 3,
     tooltip: "Freeze trap. Arms every 1h.",
     actionType: ['pulse'],
-    actionConfig: { pulseBulletTypeKey: 'b_ice_explosion', pulseTriggerRadius: GRID_SIZE * 1.5, pulseTriggerBy: ['enemy'], pulseCooldown: HOUR_FRAMES, pulseCenteredAtTriggerSource: false, hasUnarmedAsset: true },
+    actionConfig: { 
+      pulseBulletTypeKey: 'b_ice_explosion', 
+      pulseTriggerRadius: GRID_SIZE * 1, 
+      pulseTriggerBy: ['enemy'], 
+      pulseCooldown: HOUR_FRAMES, 
+      pulseCenteredAtTriggerSource: true, 
+      hasUnarmedAsset: true,
+      PulseTurretJumpAtTriggerSource: true 
+    },
     targetType: ['enemy'],
     targetConfig: { enemyPriority: 'closest' }
   },
@@ -52,6 +68,19 @@ export const turretTypes: any = {
     actionType: ['passiveSun'],
     actionConfig: { sunCooldown: HOUR_FRAMES },
     targetType: [], targetConfig: {}
+  },
+  t_seed: {
+    name: 'Seed', cost: 0, health: 50, color: [200, 200, 200], size: 18, tier: 1.5,
+    tooltip: "Grows into a random Tier 1 turret over time. Water speeds growth.",
+    actionType: ['growth'],
+    actionConfig: { maxGrowth: 32, growthInterval: HOUR_FRAMES * 0.25 },
+    targetType: [], targetConfig: {}
+  },
+  t_lilypad: {
+    name: 'Lilypad', cost: 5, costType: 'soil', isSpecial: true, health: 100, color: [50, 200, 50], size: 22, tier: 1.2,
+    turretLayer: 'ground', randomRotation: true, randomFlip: true,
+    tooltip: "Enables turrets to work on water. Placed under units.",
+    actionType: [], actionConfig: {}, targetType: [], targetConfig: {}
   },
 
   // --- TIER 2 ---
@@ -129,14 +158,16 @@ export const turretTypes: any = {
   },
   t2_minespawner: {
     name: 'Mine Launcher', cost: 20, mergeCost: 15, health: 50, color: [255, 20, 20], size: 20, tier: 2,
-    tooltip: "Launches a floating mine (6h life) 3 tiles away every 2h.",
+    tooltip: "Launches floating mines AND acts as a landmine itself.",
     actionType: ['pulse', 'spawnBulletAtRandom'],
     actionConfig: { 
-        pulseTriggerRadius: GRID_SIZE * 1.5, 
+        pulseBulletTypeKey: 'b_mine_explosion',
+        pulseTriggerRadius: GRID_SIZE * 1, 
         pulseTriggerBy: ['enemy'], 
         pulseCooldown: HOUR_FRAMES * 2, 
         pulseCenteredAtTriggerSource: false,
         hasUnarmedAsset: true,
+        PulseTurretJumpAtTriggerSource: true,
         spawnBulletAtRandom: { 
             cooldown: HOUR_FRAMES * 2, 
             distRange: [GRID_SIZE * 3, GRID_SIZE * 3], 
@@ -178,7 +209,7 @@ export const turretTypes: any = {
     collideWithEnemy: false,
     renderBehindEnemy: true,
     actionType: ['pulse'],
-    actionConfig: { pulseBulletTypeKey: 'b_pulse_tier2', pulseTriggerRadius: GRID_SIZE * 1.5, pulseTriggerBy: ['enemy'], pulseCooldown: 60, pulseCenteredAtTriggerSource: false },
+    actionConfig: { pulseBulletTypeKey: 'b_pulse_tier2', pulseTriggerRadius: GRID_SIZE * 1, pulseTriggerBy: ['enemy'], pulseCooldown: 60, pulseCenteredAtTriggerSource: false },
     targetType: ['enemy'],
     targetConfig: { enemyPriority: 'closest' }
   },
@@ -186,7 +217,15 @@ export const turretTypes: any = {
     name: 'Ice Bomb', cost: 10, mergeCost: 5, health: 50, color: [180, 240, 255], size: 18, tier: 2,
     tooltip: "Explodes on contact, damaging and freezing enemies.",
     actionType: ['pulse'],
-    actionConfig: { pulseBulletTypeKey: 'b_ice_bomb_explosion', pulseTriggerRadius: GRID_SIZE * 2.5, pulseTriggerBy: ['enemy'], pulseCooldown: HOUR_FRAMES * 1, pulseCenteredAtTriggerSource: false, hasUnarmedAsset: true },
+    actionConfig: { 
+      pulseBulletTypeKey: 'b_ice_bomb_explosion', 
+      pulseTriggerRadius: GRID_SIZE * 1.5, 
+      pulseTriggerBy: ['enemy'], 
+      pulseCooldown: HOUR_FRAMES * 1, 
+      pulseCenteredAtTriggerSource: false, 
+      hasUnarmedAsset: true,
+      PulseTurretJumpAtTriggerSource: true 
+    },
     targetType: ['enemy'],
     targetConfig: { enemyPriority: 'closest' }
   },
@@ -194,7 +233,15 @@ export const turretTypes: any = {
     name: 'Stunner', cost: 10, mergeCost: 5, health: 50, color: [240, 240, 255], size: 18, tier: 2,
     tooltip: "Emits a stun cloud on contact with enemies. Arms every 1h.",
     actionType: ['pulse'],
-    actionConfig: { pulseBulletTypeKey: 'b_stun_gas_projectile', pulseTriggerRadius: GRID_SIZE * 1.5, pulseTriggerBy: ['enemy'], pulseCooldown: HOUR_FRAMES * 1, pulseCenteredAtTriggerSource: false, hasUnarmedAsset: true },
+    actionConfig: { 
+      pulseBulletTypeKey: 'b_stun_gas_projectile', 
+      pulseTriggerRadius: GRID_SIZE * 1, 
+      pulseTriggerBy: ['enemy'], 
+      pulseCooldown: HOUR_FRAMES * 1, 
+      pulseCenteredAtTriggerSource: true, 
+      hasUnarmedAsset: true,
+      PulseTurretJumpAtTriggerSource: true 
+    },
     targetType: ['enemy'],
     targetConfig: { enemyPriority: 'closest' }
   },

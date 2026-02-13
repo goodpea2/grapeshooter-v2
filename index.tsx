@@ -10,9 +10,10 @@ import { WorldManager } from './world';
 import { Player, Enemy, AttachedTurret, SunLoot } from './entities';
 import { getTime, drawUI, drawTurretTooltip } from './ui';
 import { drawWorldGenPreview } from './uiDebug';
-import { updateGameSystems, spawnFromBudget } from './lvDemo';
+import { updateGameSystems, spawnFromBudget, getLightLevel, customDayLightConfig } from './lvDemo';
 import { MergeVFX } from './vfx';
 import { ASSETS } from './assets';
+import { drawTurretSprite } from './assetTurret';
 
 declare const p5: any;
 declare const createCanvas: any;
@@ -51,12 +52,16 @@ declare const textAlign: any;
 declare const textSize: any;
 declare const text: any;
 declare const CENTER: any;
+// Added LEFT constant declaration
+declare const LEFT: any;
 declare const rectMode: any;
 declare const textWidth: any;
 declare const color: any;
 declare const lerpColor: any;
 declare const rotate: any;
 declare const loadImage: any;
+declare const imageMode: any;
+declare const floor: any;
 
 function getHexAxial(x: number, y: number) {
   let q = (2/3 * x) / HEX_DIST; let r = (-1/3 * x + sqrt(3)/3 * y) / HEX_DIST;
@@ -71,33 +76,48 @@ function axialToWorld(q: number, r: number) {
   return createVector(HEX_DIST * (3/2 * q), HEX_DIST * (sqrt(3)/2 * q + sqrt(3) * r)); 
 }
 
-function isAdjacent(q: number, r: number) {
+function isAdjacent(q: number, r: number, exclude: any = null) {
   const neighbors = [[1,0], [-1,0], [0,1], [0,-1], [1,-1], [-1,1]];
   for (let [dq, dr] of neighbors) {
     let nq = q + dq;
     let nr = r + dr;
     if (nq === 0 && nr === 0) return true;
-    if (state.player.attachments.some((a: any) => a.hq === nq && a.hr === nr)) return true;
+    if (state.player.attachments.some((a: any) => a !== exclude && a.hq === nq && a.hr === nr)) return true;
   }
   return false;
+}
+
+function rebuildSpatialHash() {
+  state.spatialHash.clear();
+  const cs = state.spatialHashCellSize;
+  
+  // Only hash enemies and player attachments for now
+  for (const e of state.enemies) {
+    if (e.isDying) continue;
+    const gx = floor(e.pos.x / cs);
+    const gy = floor(e.pos.y / cs);
+    const key = `${gx},${gy}`;
+    if (!state.spatialHash.has(key)) state.spatialHash.set(key, []);
+    state.spatialHash.get(key).push(e);
+  }
 }
 
 function drawGlobalLighting() {
   let t = getTime();
   let mins = t.hour * 60 + t.minutes;
   
-  const keys = [
-    { m: 0,    c: [15, 10, 50, 128] },
-    { m: 300,  c: [15, 10, 50, 128] },
-    { m: 420,  c: [120, 40, 60, 64] },
-    { m: 540,  c: [0, 0, 0, 0] },
-    { m: 1020, c: [0, 0, 0, 0] },
-    { m: 1140, c: [180, 50, 20, 32] },
-    { m: 1200, c: [130, 35, 60, 64] },
-    { m: 1260, c: [80, 20, 100, 128] },
-    { m: 1380, c: [15, 10, 50, 128] },
-    { m: 1440, c: [15, 10, 50, 128] }
-  ];
+  // Deriving global lighting from customDayLightConfig zones
+  const keys: any[] = [];
+  for (let h = 0; h < 24; h++) {
+    const l = getLightLevel(h);
+    let c = [0, 0, 0, 0];
+    if (l === 0) c = [15, 10, 50, 140]; // Night
+    else if (l === 1) c = [180, 50, 20, 48]; // Dusk/Dawn
+    else c = [0, 0, 0, 0]; // Day
+    
+    keys.push({ m: h * 60, c });
+  }
+  keys.push({ m: 24 * 60, c: keys[0].c });
 
   let k1 = keys[0], k2 = keys[keys.length-1];
   for(let i=0; i<keys.length-1; i++) {
@@ -121,6 +141,69 @@ function drawGlobalLighting() {
   }
 }
 
+function executePlacement() {
+  if (!state.previewSnapPos) return;
+
+  const activePlacementType = state.isCurrentlyDragging ? state.draggedTurretType : state.selectedTurretType;
+  if (!activePlacementType && !state.draggedTurretInstance) return;
+
+  const snapAxial = getHexAxial(state.previewSnapPos.x - state.player.pos.x, state.previewSnapPos.y - state.player.pos.y);
+
+  if (activePlacementType) {
+    const config = turretTypes[activePlacementType];
+    const costType = config.costType || 'sun';
+    const currency = costType === 'soil' ? state.soilCurrency : state.sunCurrency;
+
+    if (state.mergeTargetPreview && state.sunCurrency >= state.mergeTargetPreview.cost) {
+      // Merging currently assumed to use Sun currency
+      const target = state.player.attachments.find((t: any) => t.uid === state.mergeTargetPreview.uid);
+      if (target && !target.isFrosted) {
+        state.sunCurrency -= state.mergeTargetPreview.cost;
+        const indexToReplace = state.player.attachments.indexOf(target);
+        const newTurret = new AttachedTurret(state.mergeTargetPreview.type, state.player, target.hq, target.hr);
+        newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
+        state.player.attachments[indexToReplace] = newTurret;
+        state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y));
+        state.turretLastUsed[activePlacementType] = state.frames;
+      }
+    } else if (currency >= config.cost) {
+      const nt = new AttachedTurret(activePlacementType, state.player, snapAxial.q, snapAxial.r);
+      state.player.attachments.push(nt);
+      if (costType === 'soil') state.soilCurrency -= config.cost;
+      else state.sunCurrency -= config.cost;
+      state.turretLastUsed[activePlacementType] = state.frames;
+    }
+  }
+
+  if (state.draggedTurretInstance) {
+    if (state.mergeTargetPreview && state.sunCurrency >= state.mergeTargetPreview.cost) {
+      const target = state.player.attachments.find((t: any) => t.uid === state.mergeTargetPreview.uid);
+      if (target && !target.isFrosted) {
+        state.sunCurrency -= state.mergeTargetPreview.cost;
+        const indexToReplace = state.player.attachments.indexOf(target);
+        const indexToDelete = state.player.attachments.indexOf(state.draggedTurretInstance);
+        const newTurret = new AttachedTurret(state.mergeTargetPreview.type, state.player, target.hq, target.hr);
+        newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
+        state.player.attachments[indexToReplace] = newTurret;
+        state.player.attachments.splice(indexToDelete, 1);
+        state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y));
+      }
+    } else {
+      state.draggedTurretInstance.hq = snapAxial.q;
+      state.draggedTurretInstance.hr = snapAxial.r;
+      state.draggedTurretInstance.offset = axialToWorld(snapAxial.q, snapAxial.r);
+      state.vfx.push(new MergeVFX(state.previewSnapPos.x, state.previewSnapPos.y));
+    }
+  }
+
+  state.draggedTurretInstance = null;
+  state.draggedTurretType = null;
+  state.selectedTurretType = null;
+  state.isCurrentlyDragging = false;
+  state.mergeTargetPreview = null;
+  state.previewSnapPos = null;
+}
+
 (window as any).preload = () => {
   state.assets = {};
   for (const [key, url] of Object.entries(ASSETS)) {
@@ -141,6 +224,7 @@ function drawGlobalLighting() {
   background(10, 10, 25); 
   state.frames++;
   updateGameSystems();
+  rebuildSpatialHash();
 
   state.cameraPos.x = lerp(state.cameraPos.x, state.player.pos.x, 0.08); 
   state.cameraPos.y = lerp(state.cameraPos.y, state.player.pos.y, 0.08);
@@ -184,7 +268,24 @@ function drawGlobalLighting() {
   
   state.hoveredTurretInstance = null;
   if (mouseX > state.uiWidth || !state.isStationary) {
-    for (let t of state.player.attachments) {
+    // Picking Logic: Prefer Normal over Ground, then prefer visually "last-rendered" turrets (Lowest Y)
+    const sortedForSelection = [...state.player.attachments].sort((a, b) => {
+        const la = a.config.turretLayer || 'normal';
+        const lb = b.config.turretLayer || 'normal';
+        // Priority 1: Layer (Normal over Ground)
+        if (la !== lb) return la === 'normal' ? -1 : 1;
+        
+        const posA = a.getWorldPos();
+        const posB = b.getWorldPos();
+        // Priority 2: Y ascending (Visually front-most items are rendered last, thus should be picked first)
+        // Since we render from Higher Y to Lower Y, the Lowest Y is rendered last and is on top.
+        if (posA.y !== posB.y) return posA.y - posB.y;
+        
+        // Priority 3: X descending (inverse of rendering)
+        return posB.x - posA.x;
+    });
+    
+    for (let t of sortedForSelection) {
       if (dist(mWorld.x, mWorld.y, t.getWorldPos().x, t.getWorldPos().y) < t.size/2 + 5) {
         state.hoveredTurretInstance = t;
         break;
@@ -233,98 +334,151 @@ function drawGlobalLighting() {
     pop();
   }
 
-  const activePlacementType = state.draggedTurretType || state.selectedTurretType;
+  // Handle Dragging Transition for both shop icons and board turrets
+  if ((state.draggedTurretType || state.draggedTurretInstance) && !state.isCurrentlyDragging) {
+    if (dist(mouseX, mouseY, state.dragOrigin.x, state.dragOrigin.y) > 8) {
+      state.isCurrentlyDragging = true;
+    }
+  }
+
+  const activePlacementType = state.isCurrentlyDragging ? state.draggedTurretType : state.selectedTurretType;
   state.mergeTargetPreview = null;
+  state.previewSnapPos = null;
 
   if (state.isStationary && (activePlacementType || state.draggedTurretInstance)) {
+    const ghostType = state.draggedTurretInstance ? state.draggedTurretInstance.type : activePlacementType;
+    const ghostConfig = turretTypes[ghostType!];
+    const ghostLayer = ghostConfig.turretLayer || 'normal';
+
     const draggingIngredients = state.draggedTurretInstance 
       ? state.draggedTurretInstance.baseIngredients 
       : (activePlacementType ? [activePlacementType] : []);
     
-    if (activePlacementType && !state.draggedTurretInstance) {
-      let h = getHexAxial(mWorld.x - state.player.pos.x, mWorld.y - state.player.pos.y);
-      let snapped = axialToWorld(h.q, h.r).add(state.player.pos);
-      
-      let occ = (h.q === 0 && h.r === 0);
-      for(let a of state.player.attachments) if(a.hq === h.q && a.hr === h.r) occ = true;
-      let adj = isAdjacent(h.q, h.r);
-      if (state.world.isBlockAt(snapped.x, snapped.y)) adj = false;
+    // Find Nearest Valid Spot OR Merge Target
+    let closestDist = Infinity;
+    let bestSnap = null;
+    let bestMergeTarget = null;
+    let bestMergeInfo = null;
 
-      let valid = !occ && adj && dist(0, 0, h.q, h.r) < 8;
+    const rangeLimit = 8;
+    for (let q = -rangeLimit; q <= rangeLimit; q++) {
+      for (let r = -rangeLimit; r <= rangeLimit; r++) {
+        if (abs(q) + abs(r) + abs(-q-r) <= rangeLimit * 2) {
+          const wPos = axialToWorld(q, r).add(state.player.pos);
+          const d = dist(mWorld.x, mWorld.y, wPos.x, wPos.y);
 
-      const rangeLimit = 8;
-      for (let q = -rangeLimit; q <= rangeLimit; q++) {
-        for (let r = -rangeLimit; r <= rangeLimit; r++) {
-          if (abs(q) + abs(r) + abs(-q-r) <= rangeLimit * 2 && isAdjacent(q, r)) {
-            let p = axialToWorld(q, r).add(state.player.pos);
-            if (state.world.isBlockAt(p.x, p.y)) continue;
+          // 1. Check for Occupants on layers
+          let normalOccupant = state.player.attachments.find((a: any) => a.hq === q && a.hr === r && (a.config.turretLayer || 'normal') === 'normal');
+          let groundOccupant = state.player.attachments.find((a: any) => a.hq === q && a.hr === r && a.config.turretLayer === 'ground');
+          
+          let occupantOnSameLayer = ghostLayer === 'ground' ? groundOccupant : normalOccupant;
+          let coreOccupant = (q === 0 && r === 0);
 
-            let occupied = (q === 0 && r === 0);
-            for(let a of state.player.attachments) if(a.hq === q && a.hr === r) occupied = true;
-            if (!occupied) {
-              fill(100, 255, 150, 40); noStroke(); ellipse(p.x, p.y, 10, 10);
+          if (occupantOnSameLayer && occupantOnSameLayer !== state.draggedTurretInstance) {
+            if (ghostLayer === 'normal' && !coreOccupant) {
+              const combinedPool = [...draggingIngredients, ...occupantOnSameLayer.baseIngredients];
+              const resType = findMergeResult(combinedPool);
+              const resConfig = resType ? turretTypes[resType] : null;
+              const t3Disabled = resConfig && resConfig.tier >= 3 && !state.enableT3Turrets;
+
+              if (resType && resConfig && !t3Disabled && !occupantOnSameLayer.isFrosted) {
+                if (d < closestDist) {
+                  closestDist = d;
+                  bestSnap = wPos;
+                  bestMergeTarget = occupantOnSameLayer;
+                  bestMergeInfo = { resType, resConfig, combinedPool };
+                }
+              }
+            }
+          } 
+          // 2. Check for Legible Spot (Empty on target layer)
+          else if (!occupantOnSameLayer || occupantOnSameLayer === state.draggedTurretInstance) {
+            if (!coreOccupant && isAdjacent(q, r, state.draggedTurretInstance)) {
+              if (!state.world.isBlockAt(wPos.x, wPos.y)) {
+                if (d < closestDist) {
+                  closestDist = d;
+                  bestSnap = wPos;
+                  bestMergeTarget = null;
+                  bestMergeInfo = null;
+                }
+                // Visual helper for legible spots
+                fill(100, 255, 150, 40); noStroke(); ellipse(wPos.x, wPos.y, 10, 10);
+              }
             }
           }
         }
       }
-      
-      let tConfig = turretTypes[activePlacementType];
-      noFill(); stroke(255, 150); 
-      const range = tConfig.actionConfig?.shootRange || tConfig.actionConfig?.beamMaxLength || tConfig.actionConfig?.pulseTriggerRadius || 0;
-      if (range > 0) { strokeWeight(2); ellipse(snapped.x, snapped.y, range * 2); }
-
-      fill(valid ? [tConfig.color[0], tConfig.color[1], tConfig.color[2], 180] : [255, 50, 50, 150]); 
-      stroke(255, 100);
-      if (!state.world.isBlockAt(snapped.x, snapped.y)) {
-        ellipse(snapped.x, snapped.y, tConfig.size, tConfig.size);
-      }
     }
 
-    for (let t of state.player.attachments) {
-      if (state.draggedTurretInstance && t === state.draggedTurretInstance) continue;
+    if (bestSnap) {
+      state.previewSnapPos = bestSnap;
       
-      const combinedPool = [...draggingIngredients, ...t.baseIngredients];
-      const resType = findMergeResult(combinedPool);
-      
-      if (resType) {
-        const isHovered = dist(mWorld.x, mWorld.y, t.getWorldPos().x, t.getWorldPos().y) < t.size/2 + 12;
-        const resConfig = turretTypes[resType];
+      // If we found a merge target, setup the preview
+      if (bestMergeTarget && bestMergeInfo) {
+        const { resType, resConfig, combinedPool } = bestMergeInfo;
+        const isHovered = dist(mWorld.x, mWorld.y, bestSnap.x, bestSnap.y) < 25;
         
         push();
         const pulse = 0.8 + 0.2 * sin(frameCount * 0.2);
-        if (t.isFrosted) {
-          noStroke(); fill(100, 100, 150, 60);
-          ellipse(t.getWorldPos().x, t.getWorldPos().y, t.size + 15);
-          fill(255, 100, 100, 150); textAlign(CENTER, CENTER); textSize(10);
-          text("LOCKED", t.getWorldPos().x, t.getWorldPos().y + t.size/2 + 10);
-        } else {
-          noStroke(); fill(255, 255, 100, isHovered ? 150 : (60 * pulse));
-          ellipse(t.getWorldPos().x, t.getWorldPos().y, t.size + 15);
-          
-          rectMode(CENTER);
-          fill(20, 20, 40, 220); noStroke();
-          let tw = textWidth(`$${resConfig.mergeCost}`) + 16;
-          rect(t.getWorldPos().x, t.getWorldPos().y, tw, 22, 6);
-          fill(255, 255, 150); textAlign(CENTER, CENTER); textSize(12);
-          text(`$${resConfig.mergeCost}`, t.getWorldPos().x, t.getWorldPos().y);
+        noStroke(); fill(255, 255, 100, isHovered ? 150 : (60 * pulse));
+        ellipse(bestSnap.x, bestSnap.y, bestMergeTarget.size + 15);
+        
+        rectMode(CENTER);
+        fill(20, 20, 40, 220); noStroke();
+        let tw = textWidth(`${resConfig.mergeCost}`) + 30;
+        rect(bestSnap.x, bestSnap.y, tw, 22, 6);
+        
+        imageMode(CENTER);
+        image(state.assets['img_icon_sun'], bestSnap.x - tw/2 + 10, bestSnap.y, 22, 22);
+        
+        fill(255, 255, 150); textAlign(LEFT, CENTER); textSize(12);
+        text(`${resConfig.mergeCost}`, bestSnap.x - tw/2 + 20, bestSnap.y);
 
-          if (isHovered) {
-            const resRange = resConfig.actionConfig?.shootRange || resConfig.actionConfig?.beamMaxLength || resConfig.actionConfig?.pulseTriggerRadius || 0;
-            if (resRange > 0) { push(); noFill(); stroke(255, 255, 0, 180); strokeWeight(3); ellipse(t.getWorldPos().x, t.getWorldPos().y, resRange * 2); pop(); }
-            state.mergeTargetPreview = { uid: t.uid, type: resType, pos: t.getWorldPos(), cost: resConfig.mergeCost, ingredients: combinedPool };
+        const resRange = resConfig.actionConfig?.shootRange || resConfig.actionConfig?.beamMaxLength || resConfig.actionConfig?.pulseTriggerRadius || 0;
+        if (isHovered && resRange > 0) { push(); noFill(); stroke(255, 255, 0, 180); strokeWeight(3); ellipse(bestSnap.x, bestSnap.y, resRange * 2); pop(); }
+        
+        state.mergeTargetPreview = { uid: bestMergeTarget.uid, type: resType, pos: bestSnap, cost: resConfig.mergeCost, ingredients: combinedPool };
+        pop();
+      }
+
+      // RENDER GHOST TURRET
+      if (ghostType) {
+        const ghostAngle = state.draggedTurretInstance ? state.draggedTurretInstance.angle : 0;
+        
+        // Mock turret object for drawTurretSprite
+        const ghost = {
+          uid: 'ghost',
+          type: ghostType,
+          config: ghostConfig,
+          alpha: 127,
+          angle: ghostAngle,
+          recoil: 0,
+          fireRateMultiplier: 1.0,
+          actionTimers: new Map(),
+          getWorldPos: () => state.previewSnapPos,
+          jumpOffset: null
+        };
+        
+        drawTurretSprite(ghost);
+        
+        // Show range indicator for placement ghost
+        if (!bestMergeTarget) {
+          const range = ghostConfig.actionConfig?.shootRange || ghostConfig.actionConfig?.beamMaxLength || ghostConfig.actionConfig?.pulseTriggerRadius || 0;
+          if (range > 0) {
+            noFill(); stroke(255, 127); strokeWeight(2);
+            ellipse(bestSnap.x, bestSnap.y, range * 2);
           }
         }
-        pop();
       }
     }
   }
 
+  // Draw tether line if dragging an instance
   if (state.draggedTurretInstance && state.isStationary) {
     const dragging = state.draggedTurretInstance;
     const wPos = dragging.getWorldPos();
-    stroke(255, 180); strokeWeight(2); line(wPos.x, wPos.y, mWorld.x, mWorld.y);
-    fill(dragging.config.color[0], dragging.config.color[1], dragging.config.color[2], 150);
-    noStroke(); ellipse(mWorld.x, mWorld.y, dragging.size);
+    stroke(255, 127); strokeWeight(2); 
+    line(wPos.x, wPos.y, mWorld.x, mWorld.y);
   }
   pop(); 
 
@@ -341,11 +495,39 @@ function drawGlobalLighting() {
 
 (window as any).mousePressed = () => {
   if (mouseX > state.uiWidth && state.isStationary) {
-    if (state.selectedTurretType) return;
+    // If we are already carrying something (from a previous click), attempt placement
+    if (state.draggedTurretInstance || state.selectedTurretType) {
+      if (state.previewSnapPos) {
+        executePlacement();
+        return;
+      }
+    }
+
     const mWorld = createVector(mouseX - width/2 + state.cameraPos.x, mouseY - height/2 + state.cameraPos.y);
-    for (let t of state.player.attachments) {
+    
+    // Sort to pick up Top Layer/Visually front-most items first
+    const sortedForPicking = [...state.player.attachments].sort((a, b) => {
+        const la = a.config.turretLayer || 'normal';
+        const lb = b.config.turretLayer || 'normal';
+        if (la !== lb) return la === 'normal' ? -1 : 1;
+        
+        const posA = a.getWorldPos();
+        const posB = b.getWorldPos();
+        // Since rendering is Y descending (painter's), selection picks Lowest Y first
+        if (posA.y !== posB.y) return posA.y - posB.y;
+        return posB.x - posA.x;
+    });
+
+    for (let t of sortedForPicking) {
       if (!t.isFrosted && dist(mWorld.x, mWorld.y, t.getWorldPos().x, t.getWorldPos().y) < t.size/2 + 5) {
+        // Restriction: Lilypads cannot be moved if someone is on top
+        if (t.config.turretLayer === 'ground') {
+           const top = state.player.attachments.find(a => a.hq === t.hq && a.hr === t.hr && (a.config.turretLayer || 'normal') === 'normal');
+           if (top) continue; 
+        }
         state.draggedTurretInstance = t;
+        state.dragOrigin = { x: mouseX, y: mouseY };
+        state.isCurrentlyDragging = false;
         break;
       }
     }
@@ -353,64 +535,31 @@ function drawGlobalLighting() {
 };
 
 (window as any).mouseReleased = () => {
-  const mWorld = createVector(mouseX - width/2 + state.cameraPos.x, mouseY - height/2 + state.cameraPos.y);
-
-  if (state.draggedTurretType || state.selectedTurretType) {
-    const activeType = state.draggedTurretType || state.selectedTurretType;
-    
-    if (state.mergeTargetPreview && state.sunCurrency >= state.mergeTargetPreview.cost) {
-      const target = state.player.attachments.find((t: any) => t.uid === state.mergeTargetPreview.uid);
-      if (target && !target.isFrosted) {
-        state.sunCurrency -= state.mergeTargetPreview.cost;
-        const indexToReplace = state.player.attachments.indexOf(target);
-        const newTurret = new AttachedTurret(state.mergeTargetPreview.type, state.player, target.hq, target.hr);
-        newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
-        state.player.attachments[indexToReplace] = newTurret;
-        state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y));
-        state.turretLastUsed[activeType] = state.frames;
-        state.selectedTurretType = null;
-        state.draggedTurretType = null;
-      }
-    } else if (mouseX > state.uiWidth) {
-      let h = getHexAxial(mWorld.x - state.player.pos.x, mWorld.y - state.player.pos.y);
-      let snapped = axialToWorld(h.q, h.r).add(state.player.pos);
-      let occupied = (h.q === 0 && h.r === 0);
-      for(let a of state.player.attachments) if(a.hq === h.q && a.hr === h.r) occupied = true;
-      let adj = isAdjacent(h.q, h.r);
-      if (state.world.isBlockAt(snapped.x, snapped.y)) adj = false;
-
-      if (!occupied && adj && dist(0, 0, h.q, h.r) < 8) { 
-        const nt = new AttachedTurret(activeType, state.player, h.q, h.r);
-        state.player.attachments.push(nt);
-        state.sunCurrency -= turretTypes[activeType].cost;
-        state.turretLastUsed[activeType] = state.frames;
-        state.selectedTurretType = null;
-        state.draggedTurretType = null;
-      } else if (state.draggedTurretType && !state.selectedTurretType) {
-        state.draggedTurretType = null;
-      }
+  // Handle UI Shop selection
+  if (state.draggedTurretType) {
+    if (state.isCurrentlyDragging) {
+      executePlacement();
     } else {
-        if (!state.selectedTurretType) state.draggedTurretType = null;
+      // Toggle selection for click-to-place
+      if (state.selectedTurretType === state.draggedTurretType) {
+        state.selectedTurretType = null;
+      } else {
+        state.selectedTurretType = state.draggedTurretType;
+      }
     }
-    state.mergeTargetPreview = null;
+    state.draggedTurretType = null;
+    state.isCurrentlyDragging = false;
+    return;
   }
 
+  // Handle Board Turret repositioning
   if (state.draggedTurretInstance) {
-    if (state.mergeTargetPreview && state.sunCurrency >= state.mergeTargetPreview.cost) {
-      const target = state.player.attachments.find((t: any) => t.uid === state.mergeTargetPreview.uid);
-      if (target && !target.isFrosted) {
-        state.sunCurrency -= state.mergeTargetPreview.cost;
-        const indexToReplace = state.player.attachments.indexOf(target);
-        const indexToDelete = state.player.attachments.indexOf(state.draggedTurretInstance);
-        const newTurret = new AttachedTurret(state.mergeTargetPreview.type, state.player, target.hq, target.hr);
-        newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
-        state.player.attachments[indexToReplace] = newTurret;
-        state.player.attachments.splice(indexToDelete, 1);
-        state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y));
-      }
+    if (state.isCurrentlyDragging) {
+      // It was a drag-to-place action, complete it now
+      executePlacement();
+    } else {
+      // It was a simple click, keep it as the picked-up instance
     }
-    state.draggedTurretInstance = null;
-    state.mergeTargetPreview = null;
   }
 };
 

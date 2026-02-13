@@ -35,6 +35,25 @@ export const ASSETS = {
   img_t_repeater_back: "https://i.ibb.co/9HVk6j7f/t-repeater-back-right.png",
   img_t_snowpea_front: "https://i.ibb.co/LdXZHJmY/t-snowpea-front-right.png",
   img_t_snowpea_back: "https://i.ibb.co/LzxCPC3D/t-snowpea-back-right.png",
+  img_t_sunflower_front: "https://i.ibb.co/m5ycbXKr/t-sunflower-front-right.png",
+  img_t_lilypad_front: "https://i.ibb.co/LXsjh9Q0/t-lilypad.png",
+
+  // Block Overlays
+  img_spawner_a: "https://i.ibb.co/Wv5XyQdp/blockoverlay-spawner-a.png",
+  img_sun_1_a: "https://i.ibb.co/whxrPcXC/blockoverlay-sun-1-a.png",
+  img_sun_1_b: "https://i.ibb.co/VYdYgK3J/blockoverlay-sun-1-b.png",
+  img_sun_3_a: "https://i.ibb.co/7x2FwgLh/blockoverlay-sun-3-a.png",
+  img_sun_3_b: "https://i.ibb.co/W4QvWxDW/blockoverlay-sun-3-b.png",
+  img_sun_10_a: "https://i.ibb.co/G49n0S5c/blockoverlay-sun-10-a.png",
+  img_tnt_a: "https://i.ibb.co/RRd6FZG/blockoverlay-tnt-a.png",
+  img_seed_stray_t1: "https://i.ibb.co/NnSKj477/seed-stray-t1.png",
+  img_seed_sunflower: "https://i.ibb.co/qF4r2s5Q/seed-sunflower.png",
+
+  // UI Icons
+  img_icon_elixir: "https://i.ibb.co/yB7nHpR4/icon-elixir.png",
+  img_icon_health: "https://i.ibb.co/bt6k3Z5/icon-health.png",
+  img_icon_soil: "https://i.ibb.co/TBj66xWX/icon-soil.png",
+  img_icon_sun: "https://i.ibb.co/vx8rqK71/icon-sun.png",
 
   // New Batch
   img_t_spike_front: "https://i.ibb.co/6JLPggt9/t-spike-front-right.png",
@@ -49,5 +68,6 @@ export const ASSETS = {
   img_t_mine_unarmed: "https://i.ibb.co/SXhVjQSD/t-mine-unarmed.png",
   img_t_minespawner_front: "https://i.ibb.co/Ndx7mb38/t-minespawner-front-right.png",
   img_t_minespawner_unarmed: "https://i.ibb.co/jPW6vVL9/t-minespawner-unarmed.png",
-  img_t_pulse_front: "https://i.ibb.co/LhhTZDQm/t-pulse-front-right.png"
+  img_t_pulse_front: "https://i.ibb.co/LhhTZDQm/t-pulse-front-right.png",
+  img_t_stun_unarmed: "https://i.ibb.co/ccTtHHLc/t-stun-unarmed.png"
 };

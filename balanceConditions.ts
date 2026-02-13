@@ -12,7 +12,7 @@ export const conditionTypes: any = {
     name: 'Burning',
     conditionVfx: 'condition_burn',
     enemyMovementSpeedMultiplier: 1.0,
-    damage: 2,
+    damage: 0, // Set to 0 to avoid unintended stacking with puddle damage
     damageInterval: 6,
     conditionClashesConfig: {
       override: ['c_chilled']

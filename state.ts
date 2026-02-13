@@ -1,5 +1,6 @@
 
-import { HOUR_FRAMES } from './constants';
+import { HOUR_FRAMES, SPATIAL_HASH_CELL_SIZE } from './constants';
+import { customStartingHour } from './lvDemo';
 
 export const state: any = {
   player: null,
@@ -12,12 +13,18 @@ export const state: any = {
   enemies: [],
   enemyBullets: [],
   sunCurrency: 10,
+  elixirCurrency: 0,
+  soilCurrency: 0,
   cameraPos: { x: 0, y: 0 },
   exploredChunks: new Set(),
   currentChunkLevel: 0,
-  frames: 6 * HOUR_FRAMES,
+  frames: customStartingHour * HOUR_FRAMES,
   deathVisualsBuffer: null,
   
+  // Spatial Partitioning
+  spatialHash: new Map(),
+  spatialHashCellSize: SPATIAL_HASH_CELL_SIZE,
+
   // Loaded Assets
   assets: {},
 
@@ -55,6 +62,8 @@ export const state: any = {
   uiWidth: 100,
   draggedTurretType: null, 
   draggedTurretInstance: null, 
+  dragOrigin: { x: 0, y: 0 },
+  isCurrentlyDragging: false,
   selectedTurretType: null, 
   isStationary: true,
   stationaryTimer: 0,
@@ -65,6 +74,16 @@ export const state: any = {
   debugGizmosEnemies: false,
   debugHP: false,
   hoveredTurretInstance: null, 
+  previewSnapPos: null,
+
+  // UI Animation State
+  uiSunScale: 1.0,
+  uiElixirScale: 1.0,
+  uiSoilScale: 1.0,
+
+  // Cheats
+  instantRechargeTurrets: false,
+  enableT3Turrets: false,
 
   // Cooldowns
   turretLastUsed: {}, 

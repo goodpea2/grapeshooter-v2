@@ -13,6 +13,15 @@ declare const sin: any;
 declare const frameCount: any;
 declare const floor: any;
 
+export const customBudgetPerNight = [100, 250, 500, 1000, 1800, 3200, 5600, 8000, 11000, 12500];
+export const customDayLightConfig = '000011222222222222110000'; // 0: Night, 1: Transition, 2: Day
+export const customStartingHour = 6;
+
+export function getLightLevel(hour: number): number {
+  const h = floor(hour) % 24;
+  return parseInt(customDayLightConfig[h]);
+}
+
 export const worldGenConfig = {
   liquidNoiseScale: 0.015,
   riverNoiseScale: 0.04,
@@ -46,7 +55,7 @@ const ENEMY_KEYS = ['e_basic', 'e_armor1', 'e_armor2', 'e_armor3', 'e_shooting',
 
 function getWeightsForCurrentTime() {
   const t = getTime();
-  const isNight = (t.hour >= 21 || t.hour < 4);
+  const isNight = getLightLevel(t.hour) === 0;
   const dayKey = Math.min(t.day, 5);
   const key = `${dayKey}_${isNight ? 'night' : 'day'}`;
   return SPAWN_WEIGHTS[key] || SPAWN_WEIGHTS["5_night"];
@@ -112,7 +121,8 @@ export function updateGameSystems() {
   }
 
   const t = getTime();
-  const isNight = (t.hour >= 21 || t.hour < 4);
+  const lightLevel = getLightLevel(t.hour);
+  const isNight = lightLevel === 0;
 
   if (!isNight && state.frames % ECONOMY_CONFIG.sunSpawnInterval === 0) {
     const ang = random(Math.PI * 2);
@@ -126,10 +136,21 @@ export function updateGameSystems() {
     }
   }
 
-  if (t.hour === 21 && state.lastNightTriggered !== t.day) {
+  // Detect transition into night state (light level changes from non-zero to zero)
+  const prevHour = (t.totalHours * HOUR_FRAMES - 1) / HOUR_FRAMES;
+  const prevLightLevel = getLightLevel(floor(prevHour));
+  
+  if (isNight && prevLightLevel !== 0 && state.lastNightTriggered !== t.day) {
     state.lastNightTriggered = t.day;
-    spawnFromBudget(state.currentNightWaveBudget);
-    state.currentNightWaveBudget = state.currentNightWaveBudget * 1.5 + 60;
+    const nightIdx = Math.min(t.day - 1, customBudgetPerNight.length - 1);
+    const budget = customBudgetPerNight[nightIdx];
+    state.currentNightWaveBudget = budget;
+    spawnFromBudget(budget);
+    
+    // Log future scaling if not using the next step of the override
+    if (t.day > customBudgetPerNight.length) {
+       state.currentNightWaveBudget = state.currentNightWaveBudget * 1.2 + 100;
+    }
   }
 
   const floorHour = floor(t.totalHours);

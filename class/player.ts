@@ -1,16 +1,14 @@
 
 import { state } from '../state';
-// Fixed: Removed TWO_PI from constants import and added VISIBILITY_RADIUS which is used below
 import { GRID_SIZE, CHUNK_SIZE, VISIBILITY_RADIUS } from '../constants';
 import { liquidTypes } from '../balanceLiquids';
 import { overlayTypes } from '../balanceObstacles';
 import { Explosion, LiquidTrailVFX, MuzzleFlash } from '../vfx';
 import { AttachedTurret } from './attachedTurret';
-import { SunLoot, TurretLoot } from './loot';
+import { LootEntity } from './loot';
 import { Bullet } from './bullet';
 import { drawPlayer } from '../visualPlayer';
 
-// Fixed: Added missing p5.js global declaration
 declare const p5: any;
 declare const createVector: any;
 declare const dist: any;
@@ -21,7 +19,6 @@ declare const random: any;
 declare const cos: any;
 declare const sin: any;
 declare const color: any;
-// Fixed: Declared TWO_PI as a p5.js global constant
 declare const TWO_PI: any;
 
 export class Player {
@@ -30,7 +27,7 @@ export class Player {
   update() {
     this.prevPos.set(this.pos); 
     this.recoil = (this.recoil || 0) * 0.85;
-    if (this.flash > 0) this.flash--; // Fix: Added decrement to prevent stuck damaged effect
+    if (this.flash > 0) this.flash--;
 
     const gx = floor(this.pos.x / GRID_SIZE); const gy = floor(this.pos.y / GRID_SIZE);
     const liquidType = state.world.getLiquidAt(gx, gy); const lData = liquidType ? liquidTypes[liquidType] : null;
@@ -47,18 +44,30 @@ export class Player {
     if (lData && lData.trailVfxInterval && frameCount % floor(lData.trailVfxInterval / 3) === 0 && vel > 0.5) state.trails.push(new LiquidTrailVFX(this.pos.x, this.pos.y, lData.playerTrailVfx, atan2(this.pos.y - this.prevPos.y, this.pos.x - this.prevPos.x)));
 
     for (let i = this.attachments.length - 1; i >= 0; i--) { const a = this.attachments[i]; a.update(); if (a.health <= 0) { state.vfx.push(new Explosion(a.getWorldPos().x, a.getWorldPos().y, a.size * 2, color(a.config.color))); this.attachments.splice(i, 1); } }
+    
     for (let i = state.loot.length - 1; i >= 0; i--) {
-      const res = state.loot[i].update(this.pos);
+      const loot = state.loot[i] as LootEntity;
+      const res = loot.update(this.pos);
       if (res === 'collected') {
-        if (state.loot[i] instanceof TurretLoot) {
-           this.addStrayTurret((state.loot[i] as TurretLoot).turretType);
+        if (loot.config.type === 'turret') {
+           this.addStrayTurret(loot.config.itemValue !== undefined ? String(loot.config.itemValue) : loot.config.item);
         } else {
-           state.sunCurrency += state.loot[i].value;
-           state.totalSunLootCollected += state.loot[i].value;
+           const val = loot.config.itemValue || 1;
+           if (loot.config.item === 'sun') {
+              state.sunCurrency += val;
+              state.totalSunLootCollected += val;
+              state.uiSunScale = 1.6;
+           } else if (loot.config.item === 'elixir') {
+              state.elixirCurrency += val;
+              state.uiElixirScale = 1.6;
+           } else if (loot.config.item === 'soil') {
+              state.soilCurrency += val;
+              state.uiSoilScale = 1.6;
+           }
         }
         state.loot.splice(i, 1);
       } else if (res === 'missed') { 
-        state.sunMissedTotal += state.loot[i].value; 
+        if (loot.config.type === 'currency' && loot.config.item === 'sun') state.sunMissedTotal += (loot.config.itemValue || 1); 
         state.loot.splice(i, 1); 
       }
     }
@@ -182,7 +191,27 @@ export class Player {
     if (!cy) this.pos.y = ty;
   }
   takeDamage(dmg: number) { this.health -= dmg; this.flash = 6; if (this.health <= 0) this.health = 0; }
-  displayAttachments(behind: boolean) { for (let a of this.attachments) if (behind === !!a.config.renderBehindEnemy) a.display(); }
+  
+  displayAttachments(behind: boolean) { 
+    // Filter by group (Ground/Spikes vs Normal)
+    const filtered = this.attachments.filter(a => {
+        const isGroundGroup = (a.config.turretLayer === 'ground' || !!a.config.renderBehindEnemy);
+        return behind ? isGroundGroup : !isGroundGroup;
+    });
+
+    // Sort by higher Y to lower Y, then lower X to higher X
+    filtered.sort((a, b) => {
+        const posA = a.getWorldPos();
+        const posB = b.getWorldPos();
+        // Higher Y values rendered first (painter's algorithm from bottom to top as requested)
+        if (posB.y !== posA.y) return posB.y - posA.y;
+        // Lower X values rendered first
+        return posA.x - posB.x;
+    });
+
+    for (let a of filtered) a.display();
+  }
+
   display() {
     drawPlayer(this);
   }
