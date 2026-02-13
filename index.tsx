@@ -522,7 +522,7 @@ function executePlacement() {
       if (!t.isFrosted && dist(mWorld.x, mWorld.y, t.getWorldPos().x, t.getWorldPos().y) < t.size/2 + 5) {
         // Restriction: Lilypads cannot be moved if someone is on top
         if (t.config.turretLayer === 'ground') {
-           const top = state.player.attachments.find(a => a.hq === t.hq && a.hr === t.hr && (a.config.turretLayer || 'normal') === 'normal');
+           const top = state.player.attachments.find((a: { hq: any; hr: any; config: { turretLayer: any; }; }) => a.hq === t.hq && a.hr === t.hr && (a.config.turretLayer || 'normal') === 'normal');
            if (top) continue; 
         }
         state.draggedTurretInstance = t;
