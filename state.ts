@@ -28,6 +28,10 @@ export const state: any = {
   // Loaded Assets
   assets: {},
 
+  // Systems
+  pendingSpawns: [], // { x, y, type, timer }
+  tickingExplosives: [], // { x, y, type, timer, maxTimer }
+
   // Budget system
   lastNightTriggered: 0,
   currentNightWaveBudget: 60,
@@ -69,6 +73,13 @@ export const state: any = {
   stationaryTimer: 0,
   showDebug: false,
   debugScrollY: 0,
+  debugScrollVelocity: 0,
+  debugSectionsCollapsed: {
+    core: false,
+    groundFeatures: true,
+    obstacles: true,
+    overlays: true
+  },
   showWorldGenPreview: false,
   debugGizmosTurrets: false,
   debugGizmosEnemies: false,

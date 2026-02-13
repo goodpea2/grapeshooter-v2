@@ -1,12 +1,14 @@
 
 // Added p5.js global variable declarations to avoid TS errors
 import { state } from './state';
-import { GRID_SIZE, LEVEL_THRESHOLDS, HOUR_FRAMES } from './constants';
-import { worldGenConfig } from './lvDemo';
+import { GRID_SIZE, LEVEL_THRESHOLDS, HOUR_FRAMES, CHUNK_SIZE } from './constants';
+import { worldGenConfig, requestSpawn } from './lvDemo';
 import { liquidTypes, LIQUID_KEYS, LIQUID_WEIGHTS } from './balanceLiquids';
 import { obstacleTypes, overlayTypes, BLOCK_WEIGHTS } from './balanceObstacles';
+import { groundFeatureTypes } from './balanceGroundFeatures';
 import { Explosion } from './vfx';
-import { Bullet } from './entities';
+import { Bullet, GroundFeature } from './entities';
+import { Block } from './world';
 
 // p5.js global variable declarations
 declare const floor: any;
@@ -209,95 +211,238 @@ export function drawDebugPanel(spawnFromBudget: Function) {
   push();
   fill(0, 180); noStroke(); rect(debugX, actionsPanelY, 270, actionsPanelH, 8);
   
-  // Set up clipping for the actions content
+  // Set up clipping
   const dc = (window as any).drawingContext;
   dc.save();
   dc.beginPath();
-  // We use standard coordinates for clip calculation, ignoring rectMode for the clip itself
   dc.rect(debugX, actionsPanelY, 270, actionsPanelH);
   dc.clip();
 
-  let allItems = [
-      { l: "HP Info", v: state.debugHP, a: () => state.debugHP = !state.debugHP, type: 'toggle' },
-      { l: "Turret Gizmos", v: state.debugGizmosTurrets, a: () => state.debugGizmosTurrets = !state.debugGizmosTurrets, type: 'toggle' },
-      { l: "Enemy Gizmos", v: state.debugGizmosEnemies, a: () => state.debugGizmosEnemies = !state.debugGizmosEnemies, type: 'toggle' },
-      { l: "INSTANT COOLDOWN", v: state.instantRechargeTurrets, a: () => state.instantRechargeTurrets = !state.instantRechargeTurrets, type: 'toggle' },
-      { l: "Enable T3 Merging", v: state.enableT3Turrets, a: () => state.enableT3Turrets = !state.enableT3Turrets, type: 'toggle' },
-      { l: "WORLD PREVIEW", v: state.showWorldGenPreview, a: () => state.showWorldGenPreview = !state.showWorldGenPreview, type: 'toggle' },
-      { l: "+1k SUN", a: () => state.sunCurrency += 1000 },
-      { l: "CLEAR BLOCKS", a: () => {
+  let allItems: any[] = [];
+
+  // Core Actions Header
+  allItems.push({ l: "CORE ACTIONS", type: 'header', section: 'core' });
+  if (!state.debugSectionsCollapsed.core) {
+    allItems.push(
+      { l: "HP Info", v: state.debugHP, a: () => state.debugHP = !state.debugHP, type: 'toggle', grid: true },
+      { l: "Turret Gizmo", v: state.debugGizmosTurrets, a: () => state.debugGizmosTurrets = !state.debugGizmosTurrets, type: 'toggle', grid: true },
+      { l: "Enemy Gizmo", v: state.debugGizmosEnemies, a: () => state.debugGizmosEnemies = !state.debugGizmosEnemies, type: 'toggle', grid: true },
+      { l: "INSTANT CD", v: state.instantRechargeTurrets, a: () => state.instantRechargeTurrets = !state.instantRechargeTurrets, type: 'toggle', grid: true },
+      { l: "T3 Merging", v: state.enableT3Turrets, a: () => state.enableT3Turrets = !state.enableT3Turrets, type: 'toggle', grid: true },
+      { l: "WORLD PREV", v: state.showWorldGenPreview, a: () => state.showWorldGenPreview = !state.showWorldGenPreview, type: 'toggle', grid: true },
+      { l: "+1k SUN", a: () => state.sunCurrency += 1000, grid: true },
+      { l: "WARP 12H", a: () => state.timeWarpRemaining = 60, grid: true },
+      { l: "CLEAR BLOCK", a: () => {
         const b = new Bullet(state.player.pos.x, state.player.pos.y, state.player.pos.x, state.player.pos.y, 'b_cheat_blocks', 'none');
-        b.life = 0; // Trigger AOE immediately
+        b.life = 0; 
         state.bullets.push(b);
-      }},
-      { l: "CLEAR ENEMIES", a: () => {
+      }, grid: true},
+      { l: "CLEAR ENEMY", a: () => {
         const b = new Bullet(state.player.pos.x, state.player.pos.y, state.player.pos.x, state.player.pos.y, 'b_cheat_enemies', 'none');
-        b.life = 0; // Trigger AOE immediately
+        b.life = 0; 
         state.bullets.push(b);
-      }},
-      { l: "CLEAR TURRETS", a: () => { state.player.attachments = []; }},
+      }, grid: true},
+      { l: "CLEAR TURRET", a: () => { state.player.attachments = []; }, grid: true},
+      { l: "SPAWN WAVE", a: () => spawnFromBudget(state.currentNightWaveBudget), grid: true },
       { l: "ADD LEVEL", a: () => {
         const count = state.exploredChunks.size;
-        // Fix: Added fallback to prevent math errors if find returns undefined
         const nextThreshold = LEVEL_THRESHOLDS.find(t => t > count) ?? (count + 50);
         for(let i=0; i<(nextThreshold - count); i++) state.exploredChunks.add(`cheat_${count+i}`);
         state.world.updateLevel();
-      }},
-      { l: "RESET LVL", a: () => { state.exploredChunks.clear(); state.world.updateLevel(); }},
-      { l: "SPAWN WAVE", a: () => spawnFromBudget(state.currentNightWaveBudget) },
-      { l: "WARP 12H (60x)", a: () => state.timeWarpRemaining = 60 }
-  ];
-
-  const totalContentH = allItems.length * btnSpacing;
-  const maxScroll = Math.min(0, actionsPanelH - totalContentH - 40);
-  
-  // Handle scrolling via mouse drag within panel
-  if (mouseIsPressed && mouseX > debugX && mouseX < debugX + 270 && mouseY > actionsPanelY && mouseY < actionsPanelY + actionsPanelH) {
-      const pmY = (window as any).pmouseY;
-      state.debugScrollY += (mouseY - pmY);
+      }, grid: true},
+      { l: "RESET LVL", a: () => { state.exploredChunks.clear(); state.world.updateLevel(); }, grid: true}
+    );
   }
+
+  const getSpawnGridCoords = () => {
+    const gx = floor(state.player.pos.x / GRID_SIZE) - 2;
+    const gy = floor(state.player.pos.y / GRID_SIZE);
+    return { gx, gy };
+  };
+
+  allItems.push({ l: "GROUND FEATURES", type: 'header', section: 'groundFeatures' });
+  if (!state.debugSectionsCollapsed.groundFeatures) {
+    for (let key in groundFeatureTypes) {
+      allItems.push({ l: key.slice(3), grid: true, a: () => {
+          const x = state.player.pos.x - GRID_SIZE * 2;
+          const y = state.player.pos.y;
+          state.groundFeatures.push(new GroundFeature(x, y, key));
+        }
+      });
+    }
+  }
+
+  allItems.push({ l: "OBSTACLES", type: 'header', section: 'obstacles' });
+  if (!state.debugSectionsCollapsed.obstacles) {
+    for (let key in obstacleTypes) {
+      allItems.push({ l: key.slice(2), grid: true, a: () => {
+          const { gx, gy } = getSpawnGridCoords();
+          const cx = floor(gx / CHUNK_SIZE);
+          const cy = floor(gy / CHUNK_SIZE);
+          const chunk = state.world.getChunk(cx, cy);
+          const existing = chunk.blocks.find(blk => blk.gx === gx && blk.gy === gy);
+          if (existing) { chunk.blocks.splice(chunk.blocks.indexOf(existing), 1); }
+          const newBlock = new Block(gx, gy, key);
+          chunk.blocks.push(newBlock);
+          chunk.blockMap.set(`${gx},${gy}`, newBlock);
+        }
+      });
+    }
+  }
+
+  allItems.push({ l: "OVERLAYS", type: 'header', section: 'overlays' });
+  if (!state.debugSectionsCollapsed.overlays) {
+    for (let key in overlayTypes) {
+      allItems.push({ l: key, grid: true, a: () => {
+          const { gx, gy } = getSpawnGridCoords();
+          const cx = floor(gx / CHUNK_SIZE);
+          const cy = floor(gy / CHUNK_SIZE);
+          const chunk = state.world.getChunk(cx, cy);
+          const existing = chunk.blocks.find(blk => blk.gx === gx && blk.gy === gy);
+          if (existing) { chunk.blocks.splice(chunk.blocks.indexOf(existing), 1); }
+          const b = new Block(gx, gy, 'o_dirt');
+          chunk.blocks.push(b);
+          chunk.blockMap.set(`${gx},${gy}`, b);
+          b.overlay = key;
+          b.isMined = false;
+          if (b.overlay.startsWith('sun')) b.initSunBits(b.overlay);
+          const oCfg = overlayTypes[key];
+          if (oCfg.minHealth > 0 && oCfg.minHealth > b.health) { b.health = oCfg.minHealth; b.maxHealth = b.health; }
+          if (oCfg.enemySpawnConfig) { b.spawnerBudget = oCfg.enemySpawnConfig.budget; }
+        }
+      });
+    }
+  }
+
+  // Calculate content height properly for scrolling
+  let calculatedH = 0;
+  let i_cnt = 0;
+  while(i_cnt < allItems.length) {
+    const it = allItems[i_cnt];
+    if (it.grid) {
+      let group = 1;
+      while(i_cnt + group < allItems.length && allItems[i_cnt + group].grid) { group++; if(group >= 2) break; }
+      i_cnt += group;
+    } else {
+      i_cnt++;
+    }
+    calculatedH += btnSpacing;
+  }
+  calculatedH += 40; // bottom padding
+
+  const maxScroll = Math.min(0, actionsPanelH - calculatedH);
   
+  // Smooth Scroll Logic
+  if (mouseIsPressed && mouseX > debugX && mouseX < debugX + 270 && mouseY > actionsPanelY && mouseY < actionsPanelY + actionsPanelH) {
+      state.debugScrollVelocity = (mouseY - (window as any).pmouseY);
+  } else {
+      state.debugScrollVelocity *= 0.9;
+  }
+  state.debugScrollY += state.debugScrollVelocity;
   state.debugScrollY = constrain(state.debugScrollY, maxScroll, 0);
 
+  // RENDERING LOOP
   let curY = actionsPanelY + 20 + state.debugScrollY;
-  for (let item of allItems) {
-    const isToggle = item.type === 'toggle';
-    const bx = debugX + 135;
-    let hov = mouseX > bx - 100 && mouseX < bx + 100 && mouseY > curY - 12 && mouseY < curY + 12;
-    
-    push();
-    rectMode(CENTER);
-    if (isToggle) {
-        fill(item.v ? [0, 150, 50] : 40); if(hov) fill(item.v ? [0, 200, 70] : 70);
-    } else {
-        fill(hov ? 70 : 40);
-    }
-    stroke(255, 50); strokeWeight(1); rect(bx, curY, 200, btnH, 4);
-    fill(220); textAlign(CENTER, CENTER); textSize(10); text(item.l, bx, curY);
-    pop();
+  const panelCenterX = debugX + 135;
+  const colW = 125;
 
-    if (hov && mouseIsPressed && Math.abs((window as any).pmouseY - mouseY) < 2) { 
-        item.a(); 
-        (window as any).mouseIsPressed = false; 
+  for (let i = 0; i < allItems.length; i++) {
+    const item = allItems[i];
+    const inBounds = curY > actionsPanelY - 50 && curY < actionsPanelY + actionsPanelH + 50;
+
+    if (item.type === 'header') {
+      const bx = panelCenterX;
+      const isCollapsed = state.debugSectionsCollapsed[item.section];
+      let hov = mouseX > bx - 130 && mouseX < bx + 130 && mouseY > curY - 12 && mouseY < curY + 12;
+      
+      if (inBounds) {
+        push();
+        rectMode(CENTER);
+        fill(isCollapsed ? 40 : 80, 150); if (hov) fill(100);
+        stroke(255, 50); strokeWeight(1);
+        rect(bx, curY, 250, btnH, 4);
+        fill(255); textAlign(CENTER, CENTER); textSize(11); 
+        text(`${isCollapsed ? '[+]' : '[-]'} ${item.l}`, bx, curY);
+        pop();
+      }
+
+      if (hov && mouseIsPressed && Math.abs(state.debugScrollVelocity) < 2) { 
+          state.debugSectionsCollapsed[item.section] = !isCollapsed;
+          (window as any).mouseIsPressed = false; 
+      }
+      curY += btnSpacing;
+    } 
+    else if (item.grid) {
+      let gridGroup = [item];
+      while (i + 1 < allItems.length && allItems[i+1].grid) {
+        gridGroup.push(allItems[i+1]);
+        i++;
+        if (gridGroup.length >= 2) break;
+      }
+
+      if (inBounds) {
+        gridGroup.forEach((gItem, idx) => {
+          const bx = panelCenterX + (idx === 0 ? -colW/2 : colW/2);
+          const bw = colW - 10;
+          let hov = mouseX > bx - bw/2 && mouseX < bx + bw/2 && mouseY > curY - 12 && mouseY < curY + 12;
+          const isToggle = gItem.type === 'toggle';
+          
+          push();
+          rectMode(CENTER);
+          if (isToggle) { fill(gItem.v ? [0, 150, 50] : 40); if(hov) fill(gItem.v ? [0, 200, 70] : 70); }
+          else { fill(hov ? 70 : 40); }
+          stroke(255, 30); strokeWeight(1);
+          rect(bx, curY, bw, btnH, 4);
+          fill(220); textAlign(CENTER, CENTER); textSize(9); 
+          text(gItem.l, bx, curY);
+          pop();
+
+          if (hov && mouseIsPressed && Math.abs(state.debugScrollVelocity) < 2) { 
+              gItem.a(); 
+              (window as any).mouseIsPressed = false; 
+          }
+        });
+      }
+      curY += btnSpacing;
     }
-    curY += btnSpacing;
+    else {
+      const bx = panelCenterX;
+      const bw = 250;
+      let hov = mouseX > bx - bw/2 && mouseX < bx + bw/2 && mouseY > curY - 12 && mouseY < curY + 12;
+      const isToggle = item.type === 'toggle';
+
+      if (inBounds) {
+        push();
+        rectMode(CENTER);
+        if (isToggle) { fill(item.v ? [0, 150, 50] : 40); if(hov) fill(item.v ? [0, 200, 70] : 70); }
+        else { fill(hov ? 70 : 40); }
+        stroke(255, 50); strokeWeight(1);
+        rect(bx, curY, bw, btnH, 4);
+        fill(220); textAlign(CENTER, CENTER); textSize(10); 
+        text(item.l, bx, curY);
+        pop();
+      }
+
+      if (hov && mouseIsPressed && Math.abs(state.debugScrollVelocity) < 2) { 
+          item.a(); 
+          (window as any).mouseIsPressed = false; 
+      }
+      curY += btnSpacing;
+    }
   }
 
   dc.restore();
 
-  // Draw scrollbar track and handle
-  if (totalContentH > actionsPanelH) {
+  if (calculatedH > actionsPanelH) {
       const sbW = 6;
       const sbX = debugX + 270 - sbW - 5;
       const sbH = actionsPanelH;
       fill(255, 20); noStroke();
       rect(sbX, actionsPanelY, sbW, sbH, 3);
-      
-      const handleH = (actionsPanelH / totalContentH) * actionsPanelH;
+      const handleH = (actionsPanelH / calculatedH) * actionsPanelH;
       const handleY = actionsPanelY + map(state.debugScrollY, 0, maxScroll, 0, actionsPanelH - handleH);
       fill(0, 255, 150, 150);
       rect(sbX, handleY, sbW, handleH, 3);
   }
-
   pop();
 }

@@ -1,3 +1,4 @@
+
 import { GRID_SIZE, HOUR_FRAMES } from './constants';
 
 export const obstacleTypes: any = {
@@ -5,7 +6,10 @@ export const obstacleTypes: any = {
   o_clay: { name: 'Clay', health: 200, color: [220, 120, 60], borderColor: [255, 160, 100], blocksLOS: true, lootConfigOnDeath: 'o_clay' },
   o_stone: { name: 'Stone', health: 400, color: [80, 60, 200], borderColor: [120, 100, 255], blocksLOS: true, lootConfigOnDeath: 'o_stone' },
   o_slate: { name: 'Slate', health: 800, color: [40, 30, 80], borderColor: [70, 60, 140], blocksLOS: true, lootConfigOnDeath: 'o_slate' },
-  o_black: { name: 'Obsidian', health: 1500, color: [200, 20, 60], borderColor: [255, 60, 100], blocksLOS: true, lootConfigOnDeath: 'o_black' }
+  o_black: { name: 'Obsidian', health: 1500, color: [200, 20, 60], borderColor: [255, 60, 100], blocksLOS: true, lootConfigOnDeath: 'o_black' },
+  // New Obstacles
+  o_crate: { name: 'Crate', health: 20, color: [160, 100, 60], borderColor: [200, 140, 80], blocksLOS: false, lootConfigOnDeath: 'lc_crate', connectToOtherBlock: false, canCarryOverlay: false, sizeMultiplier: 0.75 },
+  o_pot: { name: 'Pot', health: 50, color: [180, 80, 50], borderColor: [220, 120, 80], blocksLOS: false, lootConfigOnDeath: 'lc_pot', connectToOtherBlock: false, canCarryOverlay: false, sizeMultiplier: 0.75 }
 };
 
 export const overlayTypes: any = {
@@ -46,6 +50,7 @@ export const overlayTypes: any = {
     bulletToSpawnOnDeath: ['b_tnt_explosion'],
     assetImgConfig: { idleAssetImg: ['img_tnt_a'], randomRotation: false, randomFlip: true }
   },
+  // Fix: Removed duplicate o_sunflower entry
   o_sunflower: { 
     name: 'Wild Sunflower', 
     minHealth: -1, 

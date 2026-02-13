@@ -132,12 +132,20 @@ export function drawTurretTooltip(t: any, x: number, y: number, isPreview: boole
   text(desc, tx + 10, ty + infoYStart + 35, boxW - 20);
 
   if (isPreview) {
-    const cost = config.mergeCost || 0;
+    let totalCost = config.mergeCost || 0;
+    
+    // If dragging from shop, add purchase price to the total previewed cost
+    const activeShopType = state.draggedTurretType || state.selectedTurretType;
+    if (activeShopType) {
+      const shopConfig = turretTypes[activeShopType];
+      if (shopConfig) totalCost += shopConfig.cost;
+    }
+
     textAlign(RIGHT, TOP);
     fill(255, 230, 100);
     imageMode(CENTER);
     image(state.assets['img_icon_sun'], tx + boxW - 55, ty + 18, 22, 22);
-    text(`${cost}`, tx + boxW - 10, ty + 10);
+    text(`${totalCost}`, tx + boxW - 10, ty + 10);
   }
   pop();
 }

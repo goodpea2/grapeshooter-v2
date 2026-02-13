@@ -400,6 +400,32 @@ export class StunGasVFX {
   }
 }
 
+export class ForcefieldVFX {
+  pos: any; radius: number; life: number; duration: number;
+  constructor(x: number, y: number, radius: number, duration: number) {
+    this.pos = createVector(x, y); this.radius = radius; this.life = duration; this.duration = duration;
+  }
+  update() { this.life--; }
+  isDone() { return this.life <= 0; }
+  display() {
+    let alpha = map(this.life, 0, this.duration, 0, 100);
+    if (this.life < 30) alpha = map(this.life, 0, 30, 0, 100);
+    let pulse = 1.0 + 0.02 * sin(frameCount * 0.01);
+    
+    push(); translate(this.pos.x, this.pos.y);
+    noFill();
+    stroke(100, 200, 255, alpha * 2);
+    strokeWeight(2);
+    ellipse(0, 0, this.radius * 2 * pulse);
+    
+    fill(50, 150, 255, alpha);
+    noStroke();
+    ellipse(0, 0, this.radius * 2 * pulse);
+    
+    pop();
+  }
+}
+
 export class MergeVFX {
   pos: any; life: number = 30; duration: number = 30;
   constructor(x: number, y: number) { this.pos = createVector(x, y); }

@@ -31,6 +31,9 @@ declare const image: any;
 declare const imageMode: any;
 declare const tint: any;
 declare const noTint: any;
+declare const TWO_PI: any;
+declare const PI: any;
+declare const map: any;
 
 const OUTLINE_COLOR = [20, 20, 40];
 const OUTLINE_WEIGHT = 4;
@@ -57,6 +60,37 @@ function drawHighlight(x: number, y: number, w: number, h: number) {
   fill(255, 255, 255, 60);
   rotate(-0.4);
   ellipse(x, y, w, h);
+  pop();
+}
+
+export function drawPendingSpawn(s: any) {
+  const progress = 1 - (s.timer / 60);
+  push();
+  translate(s.x, s.y);
+  
+  // Swirling portal
+  noFill();
+  strokeWeight(4);
+  const baseSize = 40;
+  for (let i = 0; i < 3; i++) {
+    const ang = frameCount * 0.1 + (i * TWO_PI / 3);
+    const sz = baseSize * (1 - progress) * (1 + 0.2 * sin(frameCount * 0.2 + i));
+    stroke(150, 50, 255, 200 * (1 - progress));
+    ellipse(cos(ang) * 5, sin(ang) * 5, sz);
+  }
+  
+  // Central void
+  noStroke();
+  fill(20, 10, 30, 255 * (1 - progress));
+  ellipse(0, 0, baseSize * 0.6 * (1 - progress));
+  
+  // Particle sparks
+  for (let i = 0; i < 5; i++) {
+    const pAng = (frameCount * 0.2 + i * 1.5);
+    const pr = 10 + 20 * progress;
+    fill(200, 100, 255, 255 * (1 - progress));
+    ellipse(cos(pAng) * pr, sin(pAng) * pr, 3);
+  }
   pop();
 }
 

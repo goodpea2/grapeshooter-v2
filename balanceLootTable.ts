@@ -83,7 +83,14 @@ export const lootTableTypes: Record<string, LootTableEntry[]> = {
 
   // --- Special ---
   lt_stray_crate: [{ weight: 1, lootTypeKey: ['t_seed'], itemCount: [1] }],
-  lt_wild_sunflower: [{ weight: 1, lootTypeKey: ['t_sunflower'], itemCount: [1] }]
+  lt_wild_sunflower: [{ weight: 1, lootTypeKey: ['t_sunflower'], itemCount: [1] }],
+
+  // --- New: Crates and Pots ---
+  lt_crate_loot: [
+    { weight: 5, lootTypeKey: ['sun'], itemCount: [1, 2] },
+    { weight: 1, lootTypeKey: ['t_seed'], itemCount: [1] },
+    { weight: 14 } // Nothing
+  ]
 };
 
 // Config Triggers
@@ -94,6 +101,10 @@ export const lootConfigs: Record<string, ExternalLootConfigEntry[]> = {
   lc_sun_clump: [{ weight: 1, lootTableTypeKey: 'lt_sun_node', lootTableRollCount: 10 }],
   lc_stray_crate: [{ weight: 1, lootTableTypeKey: 'lt_stray_crate', lootTableRollCount: 1 }],
   lc_wild_sunflower: [{ weight: 1, lootTableTypeKey: 'lt_wild_sunflower', lootTableRollCount: 1 }],
+
+  // New: Crates and Pots
+  lc_crate: [{ weight: 1, lootTableTypeKey: 'lt_crate_loot', lootTableRollCount: 1 }],
+  lc_pot: [{ weight: 1, lootTableTypeKey: 'lt_crate_loot', lootTableRollCount: 2 }],
 
   // Enemies
   e_fast: [{ weight: 1, lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 1 }],

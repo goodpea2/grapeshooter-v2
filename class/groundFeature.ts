@@ -2,7 +2,7 @@
 import { state } from '../state';
 import { GRID_SIZE, CHUNK_SIZE } from '../constants';
 import { groundFeatureTypes } from '../balanceGroundFeatures';
-import { FirePuddleVFX, StunGasVFX } from '../vfx';
+import { FirePuddleVFX, StunGasVFX, ForcefieldVFX } from '../vfx';
 
 declare const createVector: any;
 declare const dist: any;
@@ -17,11 +17,27 @@ export class GroundFeature {
     this.life = this.config.life;
     if (this.config.vfxType === 'fire_puddle') this.vfx = new FirePuddleVFX(x, y, this.config.radius);
     if (this.config.vfxType === 'stun_gas') this.vfx = new StunGasVFX(x, y, this.config.radius, this.config.life);
+    if (this.config.vfxType === 'forcefield') this.vfx = new ForcefieldVFX(x, y, this.config.radius, this.config.life);
   }
   update() {
     this.life--;
     if (this.vfx) this.vfx.update();
-    if (this.life % this.config.tickRate === 0) {
+
+    // Specific Forcefield Repulsion Logic
+    if (this.typeKey === 'gf_forcefield') {
+       const dx = state.player.pos.x - this.pos.x;
+       const dy = state.player.pos.y - this.pos.y;
+       const dSq = dx*dx + dy*dy;
+       const rSum = state.player.size / 2 + this.config.radius;
+       if (dSq < rSum * rSum) {
+         const d = Math.sqrt(dSq);
+         const pushForce = (rSum - d) * 0.5;
+         state.player.pos.x += (dx / d) * pushForce;
+         state.player.pos.y += (dy / d) * pushForce;
+       }
+    }
+
+    if (this.config.tickRate && this.life % this.config.tickRate === 0) {
       for (let e of state.enemies) {
         if (e.health > 0 && dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y) < this.config.radius + e.size/2) {
           const cond = this.config.appliedCondition;
@@ -32,7 +48,7 @@ export class GroundFeature {
                for (const c of cond) e.applyCondition(c.type, c.duration);
              }
           }
-          e.takeDamage(this.config.damage);
+          if (this.config.damage > 0) e.takeDamage(this.config.damage);
         }
       }
       let gxStart = floor((this.pos.x - this.config.radius) / GRID_SIZE);
@@ -46,7 +62,9 @@ export class GroundFeature {
           let block = chunk?.blocks.find((b: any) => !b.isMined && b.gx === gx && b.gy === gy);
           if (block) {
             let bx = block.pos.x + GRID_SIZE/2; let by = block.pos.y + GRID_SIZE/2;
-            if (dist(this.pos.x, this.pos.y, bx, by) < this.config.radius + GRID_SIZE/2) block.takeDamage(this.config.damage);
+            if (dist(this.pos.x, this.pos.y, bx, by) < this.config.radius + GRID_SIZE/2) {
+              if (this.config.damage > 0) block.takeDamage(this.config.damage);
+            }
           }
         }
       }

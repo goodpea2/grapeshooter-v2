@@ -23,5 +23,14 @@ export const groundFeatureTypes: any = {
     color: [200, 200, 255],
     appliedCondition: 'c_stun',
     conditionDuration: 120
+  },
+  gf_forcefield: {
+    name: 'Forcefield',
+    life: 180,
+    radius: 51, // ~1.5 tiles (34 * 1.5)
+    damage: 0,
+    tickRate: 1,
+    vfxType: 'forcefield',
+    color: [50, 150, 255]
   }
 };

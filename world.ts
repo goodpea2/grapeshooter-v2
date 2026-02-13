@@ -5,11 +5,10 @@ import {
 } from './constants';
 import { obstacleTypes, overlayTypes, BLOCK_WEIGHTS } from './balanceObstacles';
 import { liquidTypes, LIQUID_WEIGHTS, LIQUID_KEYS } from './balanceLiquids';
-// Fixed: Added BlockDebris to imports to avoid using 'require'
 import { MuzzleFlash, BlockDebris } from './vfx';
 import { Enemy, Bullet } from './entities';
 import { spawnLootAt, ECONOMY_CONFIG } from './economy';
-import { worldGenConfig } from './lvDemo';
+import { worldGenConfig, requestSpawn } from './lvDemo';
 import { drawOverlay } from './visualObstacles';
 import { enemyTypes } from './balanceEnemies';
 import { drawDecoration } from './visualDecoration';
@@ -17,7 +16,6 @@ import { drawDecoration } from './visualDecoration';
 declare const createVector: any;
 declare const dist: any;
 declare const floor: any;
-// Fixed: Added missing declarations
 declare const lerp: any;
 declare const color: any;
 declare const noise: any;
@@ -130,7 +128,7 @@ export class Block {
           const sy = this.pos.y + GRID_SIZE/2 + sin(ang) * r;
           
           if (!state.world.checkCollision(sx, sy, eCfg.size/2.2)) {
-            state.enemies.push(new Enemy(sx, sy, eKey));
+            requestSpawn(sx, sy, eKey);
             if (sCfg.spawnIntervalConsumeBudget) this.spawnerBudget -= eCfg.cost;
             this.lastSpawnTime = frameCount;
           }
@@ -175,10 +173,10 @@ export class Block {
     }
 
     if (!this.isMined) {
-      const n = state.world.isBlockAt(this.pos.x, this.pos.y - GRID_SIZE);
-      const s = state.world.isBlockAt(this.pos.x, this.pos.y + GRID_SIZE);
-      const w = state.world.isBlockAt(this.pos.x - GRID_SIZE, this.pos.y);
-      const e = state.world.isBlockAt(this.pos.x + GRID_SIZE, this.pos.y);
+      const n = state.world.canConnectTo(this.pos.x, this.pos.y - GRID_SIZE, this.config);
+      const s = state.world.canConnectTo(this.pos.x, this.pos.y + GRID_SIZE, this.config);
+      const w = state.world.canConnectTo(this.pos.x - GRID_SIZE, this.pos.y, this.config);
+      const e = state.world.canConnectTo(this.pos.x + GRID_SIZE, this.pos.y, this.config);
       const isExposed = !n || !s || !w || !e;
       const rad = 8;
       
@@ -199,15 +197,22 @@ export class Block {
 
       let base = [...this.config.color];
       let bord = [...this.config.borderColor];
+      
+      const sizeMult = this.config.sizeMultiplier || 1.0;
+      const renderSize = GRID_SIZE * sizeMult;
+      const offset = (GRID_SIZE - renderSize) / 2;
+
+      push();
+      translate(offset, offset);
       if (!isExposed) fill(base[0] * 0.3, base[1] * 0.3, base[2] * 0.3, opacity); else fill(base[0], base[1], base[2], opacity);
       noStroke();
       const tl = (n || w) ? 0 : rad; const tr = (n || e) ? 0 : rad; const br = (s || e) ? 0 : rad; const bl = (s || w) ? 0 : rad;
-      rect(0, 0, GRID_SIZE, GRID_SIZE, tl, tr, br, bl);
+      rect(0, 0, renderSize, renderSize, tl, tr, br, bl);
 
       if (isExposed) {
         stroke(bord[0], bord[1], bord[2], opacity); strokeWeight(3); noFill();
-        if (!n) line(tl, 0, GRID_SIZE - tr, 0); if (!s) line(bl, GRID_SIZE, GRID_SIZE - br, GRID_SIZE); if (!w) line(0, tl, 0, GRID_SIZE - bl); if (!e) line(GRID_SIZE, tr, GRID_SIZE, GRID_SIZE - br);
-        if (!n && !w) arc(rad, rad, rad * 2, rad * 2, PI, PI + HALF_PI); if (!n && !e) arc(GRID_SIZE - rad, rad, rad * 2, rad * 2, PI + HALF_PI, TWO_PI); if (!s && !e) arc(GRID_SIZE - rad, GRID_SIZE - rad, rad * 2, rad * 2, 0, HALF_PI); if (!s && !w) arc(rad, GRID_SIZE - rad, rad * 2, rad * 2, HALF_PI, PI);
+        if (!n) line(tl, 0, renderSize - tr, 0); if (!s) line(bl, renderSize, renderSize - br, renderSize); if (!w) line(0, tl, 0, renderSize - bl); if (!e) line(renderSize, tr, renderSize, renderSize - br);
+        if (!n && !w) arc(rad, rad, rad * 2, rad * 2, PI, PI + HALF_PI); if (!n && !e) arc(renderSize - rad, rad, rad * 2, rad * 2, PI + HALF_PI, TWO_PI); if (!s && !e) arc(renderSize - rad, renderSize - rad, rad * 2, rad * 2, 0, HALF_PI); if (!s && !w) arc(rad, renderSize - rad, rad * 2, rad * 2, HALF_PI, PI);
       }
 
       if (this.feature && isExposed) {
@@ -215,9 +220,10 @@ export class Block {
       }
 
       if (this.damageGlow > 0) {
-        fill(255, 255, 255, this.damageGlow * opacity / 255); noStroke(); rect(0, 0, GRID_SIZE, GRID_SIZE, tl, tr, br, bl);
+        fill(255, 255, 255, this.damageGlow * opacity / 255); noStroke(); rect(0, 0, renderSize, renderSize, tl, tr, br, bl);
         this.damageGlow = lerp(this.damageGlow, 0, 0.12);
       }
+      pop();
 
       if (this.overlay && (isExposed || oCfg?.isConcealedAlongWithObstacle === false)) {
         drawOverlay(oCfg.obstacleOverlayVfx, this, opacity);
@@ -268,6 +274,42 @@ export class Block {
       spawnLootAt(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, this.type, this.config.lootConfigOnDeath);
 
       if (oCfg) {
+        // --- TNT Override ---
+        if (this.overlay === 'o_tnt') {
+            state.tickingExplosives.push({
+                x: this.pos.x + GRID_SIZE/2,
+                y: this.pos.y + GRID_SIZE/2,
+                type: 'o_tnt',
+                timer: 180,
+                maxTimer: 180
+            });
+            return true;
+        }
+
+        // --- Death Rattle for Spawners ---
+        if (oCfg.enemySpawnConfig && this.spawnerBudget > 0) {
+          const sCfg = oCfg.enemySpawnConfig;
+          let safety = 50; 
+          while (this.spawnerBudget > 0 && safety > 0) {
+            safety--;
+            const affordable = sCfg.enemyTypeKey.filter((k: string) => enemyTypes[k].cost <= this.spawnerBudget);
+            if (affordable.length === 0) break;
+            
+            const eKey = affordable[floor(random(affordable.length))];
+            const eCfg = enemyTypes[eKey];
+            const ang = random(TWO_PI);
+            const r = random(GRID_SIZE * 0.5, sCfg.spawnRadius * 1.2);
+            const sx = this.pos.x + GRID_SIZE/2 + cos(ang) * r;
+            const sy = this.pos.y + GRID_SIZE/2 + sin(ang) * r;
+            
+            if (!state.world.checkCollision(sx, sy, eCfg.size/2.2)) {
+              requestSpawn(sx, sy, eKey);
+              this.spawnerBudget -= eCfg.cost;
+              state.vfx.push(new MuzzleFlash(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, ang, 30, 10, color(180, 50, 255)));
+            }
+          }
+        }
+
         if (oCfg.bulletToSpawnOnDeath) {
           const wPos = createVector(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2);
           for (const bKey of oCfg.bulletToSpawnOnDeath) {
@@ -282,7 +324,7 @@ export class Block {
           const spawnCount = oCfg.rollCount || 1;
           for (let i = 0; i < spawnCount; i++) {
              const eType = oCfg.enemyToSpawnOnDeath[floor(random(oCfg.enemyToSpawnOnDeath.length))];
-             state.enemies.push(new Enemy(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, eType));
+             requestSpawn(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, eType);
           }
         }
       }
@@ -428,23 +470,16 @@ export class Chunk {
   }
 
   display(playerPos: any) {
-    const margin = 200; // Increased margin to prevent edge-popping
+    const margin = 200; 
     const left = state.cameraPos.x - width/2 - margin;
     const right = state.cameraPos.x + width/2 + margin;
     const top = state.cameraPos.y - height/2 - margin;
     const bottom = state.cameraPos.y + height/2 + margin;
-
     const chunkW = CHUNK_SIZE * GRID_SIZE;
     const chunkX = this.cx * chunkW;
     const chunkY = this.cy * chunkW;
-
-    // Robust AABB check for chunk visibility
     if (chunkX + chunkW < left || chunkX > right || chunkY + chunkW < top || chunkY > bottom) return;
-
-    for (let b of this.blocks) {
-      b.update();
-      b.display(dist(b.pos.x + GRID_SIZE/2, b.pos.y + GRID_SIZE/2, playerPos.x, playerPos.y) / GRID_SIZE);
-    }
+    for (let b of this.blocks) { b.update(); b.display(dist(b.pos.x + GRID_SIZE/2, b.pos.y + GRID_SIZE/2, playerPos.x, playerPos.y) / GRID_SIZE); }
   }
 }
 
@@ -456,7 +491,6 @@ export class WorldManager {
       const lv = floor(constrain(state.currentChunkLevel, 0, 10));
       const bonusData: any = {};
       const isStart = (cx === 0 && cy === 0);
-      
       const featureKeys = ['sun', 'tnt', 'stray', 'sunflower', 'sniper', 'spawner'];
       for (const fk of featureKeys) {
         const stats = WORLD_GEN_STATS[fk][lv];
@@ -465,11 +499,8 @@ export class WorldManager {
           const amount = floor(state[potKey]);
           bonusData[fk] = amount;
           state[potKey] -= amount;
-        } else {
-          bonusData[fk] = 0;
-        }
+        } else { bonusData[fk] = 0; }
       }
-      
       this.chunks.set(key, new Chunk(cx, cy, bonusData));
     }
     return this.chunks.get(key);
@@ -480,21 +511,15 @@ export class WorldManager {
     if (!state.exploredChunks.has(exploredKey)) { 
       state.exploredChunks.add(exploredKey); 
       const lv = floor(constrain(state.currentChunkLevel, 0, 10)); 
-      
       state.accumulatedSunPot += WORLD_GEN_STATS.sun[lv].value;
       state.accumulatedTntPot += WORLD_GEN_STATS.tnt[lv].value;
       state.accumulatedStrayPot += WORLD_GEN_STATS.stray[lv].value;
       state.accumulatedSunflowerPot += WORLD_GEN_STATS.sunflower[lv].value;
       state.accumulatedSniperPot += WORLD_GEN_STATS.sniper[lv].value;
       state.accumulatedSpawnerPot += WORLD_GEN_STATS.spawner[lv].value;
-      
       this.updateLevel(); 
     }
-    for (let x = -CHUNK_GEN_RADIUS; x <= CHUNK_GEN_RADIUS; x++) {
-      for (let y = -CHUNK_GEN_RADIUS; y <= CHUNK_GEN_RADIUS; y++) {
-        this.getChunk(pcx + x, pcy + y);
-      }
-    }
+    for (let x = -CHUNK_GEN_RADIUS; x <= CHUNK_GEN_RADIUS; x++) for (let y = -CHUNK_GEN_RADIUS; y <= CHUNK_GEN_RADIUS; y++) this.getChunk(pcx + x, pcy + y);
   }
   updateLevel() {
     let count = state.exploredChunks.size; state.currentChunkLevel = 0;
@@ -502,13 +527,9 @@ export class WorldManager {
     const lv = floor(constrain(state.currentChunkLevel, 0, 10)); state.currentNightWaveBudget = Math.max(state.currentNightWaveBudget, LEVEL_BUDGET[lv]);
   }
   checkLOS(x1: number, y1: number, x2: number, y2: number) {
-    let dx = x2 - x1;
-    let dy = y2 - y1;
-    let dSq = dx*dx + dy*dy;
+    let dx = x2 - x1; let dy = y2 - y1; let dSq = dx*dx + dy*dy;
     let steps = floor(Math.sqrt(dSq) / (GRID_SIZE * 0.5));
-    for (let i = 1; i < steps; i++) {
-      let px = lerp(x1, x2, i / steps); let py = lerp(y1, y2, i / steps); if (this.isBlockAt(px, py)) return false;
-    }
+    for (let i = 1; i < steps; i++) { let px = lerp(x1, x2, i / steps); let py = lerp(y1, y2, i / steps); if (this.isBlockAt(px, py)) return false; }
     return true;
   }
   getNearestBlock(pos: any, range: number) {
@@ -516,22 +537,14 @@ export class WorldManager {
     const viewportMargin = range + 200;
     this.chunks.forEach(chunk => {
       const chunkW = CHUNK_SIZE * GRID_SIZE;
-      const cX = chunk.cx * chunkW;
-      const cY = chunk.cy * chunkW;
-      
-      // Early exit if the chunk itself is way too far
-      const dx = (cX + chunkW/2) - pos.x;
-      const dy = (cY + chunkW/2) - pos.y;
+      const cX = chunk.cx * chunkW; const cY = chunk.cy * chunkW;
+      const dx = (cX + chunkW/2) - pos.x; const dy = (cY + chunkW/2) - pos.y;
       if (dx*dx + dy*dy > (viewportMargin + chunkW)**2) return;
-      
       for (let b of chunk.blocks) { 
         if (b.isMined) continue; 
-        let bX = b.pos.x + GRID_SIZE/2; 
-        let bY = b.pos.y + GRID_SIZE/2; 
+        let bX = b.pos.x + GRID_SIZE/2; let bY = b.pos.y + GRID_SIZE/2; 
         let dSq = (pos.x - bX)**2 + (pos.y - bY)**2;
-        if (dSq < minDistSq && this.checkLOS(pos.x, pos.y, bX, bY)) { 
-          minDistSq = dSq; nearest = b; 
-        } 
+        if (dSq < minDistSq && this.checkLOS(pos.x, pos.y, bX, bY)) { minDistSq = dSq; nearest = b; } 
       }
     });
     return nearest;
@@ -539,7 +552,17 @@ export class WorldManager {
   isBlockAt(x: number, y: number) {
     let gx = floor(x / GRID_SIZE); let gy = floor(y / GRID_SIZE); let cx = floor(gx / CHUNK_SIZE); let cy = floor(gy / CHUNK_SIZE);
     let chunk = this.chunks.get(`${cx},${cy}`); if(!chunk) return false;
-    const b = chunk.blockMap.get(`${gx},${gy}`); return b && !b.isMined;
+    const b = chunk.blockMap.get(`${gx},${gy}`);
+    return b && !b.isMined && (b.config.blocksLOS !== false);
+  }
+  canConnectTo(x: number, y: number, myConfig: any) {
+    let gx = floor(x / GRID_SIZE); let gy = floor(y / GRID_SIZE); let cx = floor(gx / CHUNK_SIZE); let cy = floor(gy / CHUNK_SIZE);
+    let chunk = this.chunks.get(`${cx},${cy}`); if(!chunk) return false;
+    const b = chunk.blockMap.get(`${gx},${gy}`);
+    if (!b || b.isMined) return false;
+    // Crates don't connect to anything
+    if (myConfig.connectToOtherBlock === false || b.config.connectToOtherBlock === false) return false;
+    return true;
   }
   getLiquidAt(gx: number, gy: number) {
     let cx = floor(gx / CHUNK_SIZE); let cy = floor(gy / CHUNK_SIZE);
@@ -547,18 +570,16 @@ export class WorldManager {
     const b = chunk.blockMap.get(`${gx},${gy}`); return b ? b.liquidType : null;
   }
   display(playerPos: any) {
-    // Generous range for initial selection, but actual chunk culling is handled in chunk.display()
     const rangeSq = (width + height + 600)**2;
     this.chunks.forEach(chunk => { 
       const chunkW = CHUNK_SIZE * GRID_SIZE;
-      const cX = chunk.cx * chunkW + chunkW/2;
-      const cY = chunk.cy * chunkW + chunkW/2;
-      const dx = cX - playerPos.x;
-      const dy = cY - playerPos.y;
+      const cX = chunk.cx * chunkW + chunkW/2; const cY = chunk.cy * chunkW + chunkW/2;
+      const dx = cX - playerPos.x; const dy = cY - playerPos.y;
       if (dx*dx + dy*dy < rangeSq) chunk.display(playerPos); 
     });
   }
   checkCollision(x: number, y: number, radius: number) {
+    // Check Blocks
     let gx = floor(x / GRID_SIZE); let gy = floor(y / GRID_SIZE);
     const searchRange = radius > GRID_SIZE ? 2 : 1;
     for (let i = gx - searchRange; i <= gx + searchRange; i++) {
@@ -574,6 +595,14 @@ export class WorldManager {
           } 
         }
       }
+    }
+    // Check Forcefields
+    for (const gf of state.groundFeatures) {
+       if (gf.typeKey === 'gf_forcefield') {
+          const dSq = (x - gf.pos.x)**2 + (y - gf.pos.y)**2;
+          const rSum = radius + gf.config.radius;
+          if (dSq < rSum * rSum) return true;
+       }
     }
     return false;
   }

@@ -15,6 +15,7 @@ declare const noStroke: any;
 declare const rect: any;
 declare const ellipse: any;
 declare const color: any;
+declare const lerpColor: any;
 declare const sin: any;
 declare const cos: any;
 declare const frameCount: any;
@@ -32,7 +33,30 @@ declare const random: any;
 declare const image: any;
 declare const imageMode: any;
 declare const scale: any;
+declare const rectMode: any;
 declare const HALF_PI: any;
+
+export function drawTickingExplosive(tex: any) {
+    const progress = 1 - (tex.timer / tex.maxTimer);
+    const eased = progress * progress; // quadratic easing
+    // Very slow start, much faster near end
+    const pulseFreq = 0.02 + eased * 0.4;
+    const p = 0.5 + 0.5 * sin(frameCount * pulseFreq*0.1);
+    push();
+    translate(tex.x, tex.y);
+    rectMode(CENTER);
+    // Color pulse: Interpolate between intense Red and pure White
+    const cRed = color(255, 30, 30);
+    const cWhite = color(255, 200, 200);
+    const lerpedCol = lerpColor(cRed, cWhite, p);
+
+    noStroke();
+    fill(lerpedCol);
+    rect(0, 0, GRID_SIZE, GRID_SIZE, 8);
+
+    pop();
+}
+
 
 export function drawOverlay(type: string, block: any, opacity: number) {
   const gx = block.gx;
@@ -43,7 +67,6 @@ export function drawOverlay(type: string, block: any, opacity: number) {
   if (oCfg?.assetImgConfig) {
     const cfg = oCfg.assetImgConfig;
     const pool = cfg.idleAssetImg;
-    // Stable random based on coordinates
     const seed = (gx * 31 + gy * 7);
     const variantIdx = Math.abs(seed) % pool.length;
     const sprite = state.assets[pool[variantIdx]];
@@ -51,27 +74,17 @@ export function drawOverlay(type: string, block: any, opacity: number) {
     if (sprite) {
       push();
       translate(GRID_SIZE / 2, GRID_SIZE / 2);
-      
-      if (cfg.randomRotation) {
-        const rotSteps = Math.abs(seed * 13) % 4;
-        rotate(rotSteps * HALF_PI);
-      }
-      
-      if (cfg.randomFlip) {
-        const flip = (Math.abs(seed * 17) % 2 === 0) ? -1 : 1;
-        scale(flip, 1);
-      }
-
+      if (cfg.randomRotation) { rotate((Math.abs(seed * 13) % 4) * HALF_PI); }
+      if (cfg.randomFlip) { scale((Math.abs(seed * 17) % 2 === 0) ? -1 : 1, 1); }
       imageMode(CENTER);
       (window as any).tint(255, opacity);
       image(sprite, 0, 0, GRID_SIZE, GRID_SIZE);
       (window as any).noTint();
       pop();
-      return; // Skip procedural drawing
+      return; 
     }
   }
 
-  // Fallback / Procedural Drawing
   if (type === 'v_sun_tiny' || type === 'v_sun_ore' || type === 'v_sun_clump') {
     push();
     for (let bit of block.sunBits) {
@@ -102,18 +115,29 @@ export function drawOverlay(type: string, block: any, opacity: number) {
     pop();
   } else if (type === 'v_spawner') {
     push();
-    const p = 0.5 + 0.5 * sin(frameCount * 0.15 + (gx + gy));
+    const sCfg = oCfg.enemySpawnConfig;
+    const timeToSpawn = frameCount - block.lastSpawnTime;
+    const isAboutToSpawn = sCfg.spawnInterval > 0 && timeToSpawn > (sCfg.spawnInterval - 60);
+    const activePulse = isAboutToSpawn ? sin(frameCount * 0.5) : sin(frameCount * 0.15 + (gx + gy));
+    const p = 0.5 + 0.5 * activePulse;
+    
     const danger = oCfg?.danger || 1;
-    fill(40, 20, 60, opacity); stroke(80, 40, 120, opacity); strokeWeight(2);
+    fill(isAboutToSpawn ? [80, 20, 100] : [40, 20, 60], opacity); stroke(isAboutToSpawn ? [255, 100, 255] : [80, 40, 120], opacity); strokeWeight(2);
     rect(4, 4, GRID_SIZE-8, GRID_SIZE-8, 3);
-    fill(200, 50, 255, opacity * (0.6 + 0.4 * p));
-    ellipse(GRID_SIZE/2, GRID_SIZE/2, 12 + p * 4);
+    
+    // Core glow
+    fill(200, 50, 255, opacity * (isAboutToSpawn ? 0.9 : (0.6 + 0.4 * p)));
+    ellipse(GRID_SIZE/2, GRID_SIZE/2, 12 + p * (isAboutToSpawn ? 8 : 4));
     fill(255, 200, 255, opacity);
-    ellipse(GRID_SIZE/2, GRID_SIZE/2, 4 + p * 2);
-    fill(255, 255, 100, opacity);
-    for(let i=0; i<danger; i++) {
-        ellipse(6 + i*5, 10, 3);
+    ellipse(GRID_SIZE/2, GRID_SIZE/2, 4 + p * (isAboutToSpawn ? 4 : 2));
+    
+    if (isAboutToSpawn) {
+        noFill(); stroke(255, 150, 255, opacity * p); strokeWeight(1);
+        ellipse(GRID_SIZE/2, GRID_SIZE/2, GRID_SIZE * p * 1.5);
     }
+
+    fill(255, 255, 100, opacity);
+    for(let i=0; i<danger; i++) { ellipse(6 + i*5, 10, 3); }
     pop();
   } else if (type === 'v_sniper_tower') {
     const wPos = { x: block.pos.x + GRID_SIZE/2, y: block.pos.y + GRID_SIZE/2 };

@@ -6,6 +6,7 @@ import { liquidTypes } from './balanceLiquids';
 import { getTime } from './ui';
 import { SunLoot, Enemy } from './entities';
 import { ECONOMY_CONFIG } from './economy';
+import { Bullet } from './entities';
 
 declare const random: any;
 declare const cos: any;
@@ -73,6 +74,17 @@ export function isLegibleSpot(x: number, y: number): boolean {
   return true;
 }
 
+/**
+ * Global helper to request a spawn with a portal VFX
+ */
+export function requestSpawn(x: number, y: number, typeKey: string) {
+  state.pendingSpawns.push({
+    x, y, 
+    type: typeKey,
+    timer: 60
+  });
+}
+
 export function spawnFromBudget(amount: number) {
   let spent = 0;
   let limit = 40; 
@@ -106,7 +118,7 @@ export function spawnFromBudget(amount: number) {
     
     // Check environmental legibility and collision
     if (isLegibleSpot(x, y) && !state.world.checkCollision(x, y, enemyTypes[ek].size * 0.5)) {
-      state.enemies.push(new Enemy(x, y, ek));
+      requestSpawn(x, y, ek);
       const cost = enemyTypes[ek].cost;
       spent += cost;
       state.accumulatedSpentBudget += cost;
@@ -123,6 +135,29 @@ export function updateGameSystems() {
   const t = getTime();
   const lightLevel = getLightLevel(t.hour);
   const isNight = lightLevel === 0;
+
+  // Process Pending Spawns
+  for (let i = state.pendingSpawns.length - 1; i >= 0; i--) {
+    const s = state.pendingSpawns[i];
+    s.timer--;
+    if (s.timer <= 0) {
+      state.enemies.push(new Enemy(s.x, s.y, s.type));
+      state.pendingSpawns.splice(i, 1);
+    }
+  }
+
+  // Process Ticking Explosives (TNT)
+  for (let i = state.tickingExplosives.length - 1; i >= 0; i--) {
+    const tex = state.tickingExplosives[i];
+    tex.timer--;
+    if (tex.timer <= 0) {
+      // Explode
+      let b = new Bullet(tex.x, tex.y, tex.x, tex.y, 'b_tnt_explosion', 'none');
+      b.life = 0; 
+      state.bullets.push(b);
+      state.tickingExplosives.splice(i, 1);
+    }
+  }
 
   if (!isNight && state.frames % ECONOMY_CONFIG.sunSpawnInterval === 0) {
     const ang = random(Math.PI * 2);
@@ -147,7 +182,6 @@ export function updateGameSystems() {
     state.currentNightWaveBudget = budget;
     spawnFromBudget(budget);
     
-    // Log future scaling if not using the next step of the override
     if (t.day > customBudgetPerNight.length) {
        state.currentNightWaveBudget = state.currentNightWaveBudget * 1.2 + 100;
     }
