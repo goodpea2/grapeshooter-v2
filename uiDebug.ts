@@ -280,7 +280,7 @@ export function drawDebugPanel(spawnFromBudget: Function) {
           const cx = floor(gx / CHUNK_SIZE);
           const cy = floor(gy / CHUNK_SIZE);
           const chunk = state.world.getChunk(cx, cy);
-          const existing = chunk.blocks.find(blk => blk.gx === gx && blk.gy === gy);
+          const existing = chunk.blocks.find((blk: Block) => blk.gx === gx && blk.gy === gy);
           if (existing) { chunk.blocks.splice(chunk.blocks.indexOf(existing), 1); }
           const newBlock = new Block(gx, gy, key);
           chunk.blocks.push(newBlock);
@@ -298,7 +298,7 @@ export function drawDebugPanel(spawnFromBudget: Function) {
           const cx = floor(gx / CHUNK_SIZE);
           const cy = floor(gy / CHUNK_SIZE);
           const chunk = state.world.getChunk(cx, cy);
-          const existing = chunk.blocks.find(blk => blk.gx === gx && blk.gy === gy);
+          const existing = chunk.blocks.find((blk: Block) => blk.gx === gx && blk.gy === gy);
           if (existing) { chunk.blocks.splice(chunk.blocks.indexOf(existing), 1); }
           const b = new Block(gx, gy, 'o_dirt');
           chunk.blocks.push(b);
