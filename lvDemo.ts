@@ -136,6 +136,15 @@ export function updateGameSystems() {
   const lightLevel = getLightLevel(t.hour);
   const isNight = lightLevel === 0;
 
+  // BUDGET SCALING FIX: Update currentNightWaveBudget baseline every frame based on the current day
+  const nightIdx = Math.min(t.day - 1, customBudgetPerNight.length - 1);
+  let baseBudget = customBudgetPerNight[nightIdx];
+  if (t.day > customBudgetPerNight.length) {
+     // Scaled growth beyond array limits
+     baseBudget = customBudgetPerNight[customBudgetPerNight.length - 1] * Math.pow(1.2, t.day - customBudgetPerNight.length);
+  }
+  state.currentNightWaveBudget = baseBudget;
+
   // Process Pending Spawns
   for (let i = state.pendingSpawns.length - 1; i >= 0; i--) {
     const s = state.pendingSpawns[i];
@@ -177,14 +186,8 @@ export function updateGameSystems() {
   
   if (isNight && prevLightLevel !== 0 && state.lastNightTriggered !== t.day) {
     state.lastNightTriggered = t.day;
-    const nightIdx = Math.min(t.day - 1, customBudgetPerNight.length - 1);
-    const budget = customBudgetPerNight[nightIdx];
-    state.currentNightWaveBudget = budget;
-    spawnFromBudget(budget);
-    
-    if (t.day > customBudgetPerNight.length) {
-       state.currentNightWaveBudget = state.currentNightWaveBudget * 1.2 + 100;
-    }
+    // Trigger the big wave
+    spawnFromBudget(state.currentNightWaveBudget);
   }
 
   const floorHour = floor(t.totalHours);

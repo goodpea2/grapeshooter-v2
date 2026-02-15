@@ -41,7 +41,8 @@ export const TYPE_MAP: Record<string, string> = {
   't2_minespawner': 't_minespawner',
   't2_icebomb': 't_icebomb',
   't2_stun': 't_stun',
-  't2_spike': 't_spike'
+  't2_spike': 't_spike',
+  't3_triplepea': 't_triplepea'
 };
 
 // Units that do not have a back-facing asset

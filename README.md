@@ -5,6 +5,16 @@ Core Explorer (v3.1) is a procedural 2D survival game built with **TypeScript** 
 
 ---
 
+## 🏗️ Room Prefab System (New)
+Scripted chunk generation that bypasses the standard noise-based pipeline for tactical level design.
+- **Air Ratio**: Ensures a minimum percentage of traversable space by strategically carving blocks.
+- **Enemy Spawners**: Randomly picks spawner overlays with danger levels matched to the room's difficulty.
+- **Loot Pots**: Randomly distributes Sun, TNT, and Crate nodes across the chunk.
+- **Guaranteed Obstacles**: Allows placing specific block types (like Treasure Chests or specific resource crates) in precise quantities.
+- **Immediate Budget**: Triggers a localized enemy wave upon generation to populate the "room".
+
+---
+
 ## 📦 Data-Driven Loot & Economy
 The economy utilizes a three-tier hierarchy managed in `balanceLootTable.ts`.
 

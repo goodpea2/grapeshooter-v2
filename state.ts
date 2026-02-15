@@ -76,11 +76,14 @@ export const state: any = {
   debugScrollVelocity: 0,
   debugSectionsCollapsed: {
     core: false,
+    chunks: false,
+    prefabs: true,
     groundFeatures: true,
     obstacles: true,
     overlays: true
   },
   showWorldGenPreview: false,
+  showChunkBorders: false,
   debugGizmosTurrets: false,
   debugGizmosEnemies: false,
   debugHP: false,
@@ -92,13 +95,13 @@ export const state: any = {
   uiElixirScale: 1.0,
   uiSoilScale: 1.0,
 
-  // Cheats
-  instantRechargeTurrets: false,
-  enableT3Turrets: false,
-
   // Cooldowns
   turretLastUsed: {}, 
   uiAlpha: 255,
+
+  // Development / Debug Toggles
+  makeAllTurretsAvailable: false,
+  instantRechargeTurrets: false,
 
   // Time Warp
   timeWarpRemaining: 0

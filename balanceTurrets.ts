@@ -247,7 +247,21 @@ export const turretTypes: any = {
   },
 
   // --- TIER 3 ---
-  t3_triplepea: { name: 'Tripeater', color: [0, 200, 50], size: 24, tier: 3, mergeCost: 15, ...placeholderT3 },
+  t3_triplepea: { 
+    name: 'Tripeater', cost: 30, mergeCost: 15, health: 150, color: [0, 200, 50], size: 24, tier: 3,
+    tooltip: "Shoots at 3 targets at once. Extra barrels fire even if only one target is nearby.",
+    actionType: ['shootMultiTarget'],
+    actionConfig: {
+      bulletTypeKey: 'b_pea',
+      shootRange: GRID_SIZE * 10,
+      shootFireRate: 60,
+      multiTargetMinCount: 3,
+      multiTargetMaxCount: 3,
+      multiTargetShootDelay: 6
+    },
+    targetType: ['enemy'],
+    targetConfig: { enemyPriority: 'closest' }
+  },
   t3_firepea2: { name: 'Firepea MK2', color: [255, 80, 20], size: 24, tier: 3, mergeCost: 20, ...placeholderT3 },
   t3_spinnut: { name: 'Spin Nut', color: [240, 220, 180], size: 26, tier: 3, mergeCost: 15, ...placeholderT3 },
   t3_mortar2: { name: 'Mortar MK2', color: [200, 120, 60], size: 24, tier: 3, mergeCost: 20, ...placeholderT3 },

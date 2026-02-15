@@ -9,6 +9,7 @@ import { groundFeatureTypes } from './balanceGroundFeatures';
 import { Explosion } from './vfx';
 import { Bullet, GroundFeature } from './entities';
 import { Block } from './world';
+import { ROOM_PREFABS } from './dictionaryRoomPrefab';
 
 // p5.js global variable declarations
 declare const floor: any;
@@ -228,7 +229,7 @@ export function drawDebugPanel(spawnFromBudget: Function) {
       { l: "Turret Gizmo", v: state.debugGizmosTurrets, a: () => state.debugGizmosTurrets = !state.debugGizmosTurrets, type: 'toggle', grid: true },
       { l: "Enemy Gizmo", v: state.debugGizmosEnemies, a: () => state.debugGizmosEnemies = !state.debugGizmosEnemies, type: 'toggle', grid: true },
       { l: "INSTANT CD", v: state.instantRechargeTurrets, a: () => state.instantRechargeTurrets = !state.instantRechargeTurrets, type: 'toggle', grid: true },
-      { l: "T3 Merging", v: state.enableT3Turrets, a: () => state.enableT3Turrets = !state.enableT3Turrets, type: 'toggle', grid: true },
+      { l: "All Turrets", v: state.makeAllTurretsAvailable, a: () => state.makeAllTurretsAvailable = !state.makeAllTurretsAvailable, type: 'toggle', grid: true },
       { l: "WORLD PREV", v: state.showWorldGenPreview, a: () => state.showWorldGenPreview = !state.showWorldGenPreview, type: 'toggle', grid: true },
       { l: "+1k SUN", a: () => state.sunCurrency += 1000, grid: true },
       { l: "WARP 12H", a: () => state.timeWarpRemaining = 60, grid: true },
@@ -243,15 +244,40 @@ export function drawDebugPanel(spawnFromBudget: Function) {
         state.bullets.push(b);
       }, grid: true},
       { l: "CLEAR TURRET", a: () => { state.player.attachments = []; }, grid: true},
-      { l: "SPAWN WAVE", a: () => spawnFromBudget(state.currentNightWaveBudget), grid: true },
-      { l: "ADD LEVEL", a: () => {
+      { l: "SPAWN WAVE", a: () => spawnFromBudget(state.currentNightWaveBudget), grid: true }
+    );
+  }
+
+  // CHUNK ACTIONS Header
+  allItems.push({ l: "CHUNKS", type: 'header', section: 'chunks' });
+  if (!state.debugSectionsCollapsed.chunks) {
+    allItems.push(
+      { l: "Show Borders", v: state.showChunkBorders, a: () => state.showChunkBorders = !state.showChunkBorders, type: 'toggle', grid: true },
+      { l: "Regen Chunk", a: () => state.world.regenerateChunkAt(state.player.pos.x, state.player.pos.y), grid: true },
+      { l: "Add Level", a: () => {
         const count = state.exploredChunks.size;
         const nextThreshold = LEVEL_THRESHOLDS.find(t => t > count) ?? (count + 50);
         for(let i=0; i<(nextThreshold - count); i++) state.exploredChunks.add(`cheat_${count+i}`);
         state.world.updateLevel();
       }, grid: true},
-      { l: "RESET LVL", a: () => { state.exploredChunks.clear(); state.world.updateLevel(); }, grid: true}
+      { l: "Reset Level", a: () => { state.exploredChunks.clear(); state.world.updateLevel(); }, grid: true}
     );
+
+    // PREFABS Collapsible Section
+    allItems.push({ l: "PREFABS", type: 'header', section: 'prefabs' });
+    if (!state.debugSectionsCollapsed.prefabs) {
+        for (const prefab of ROOM_PREFABS) {
+          allItems.push({ l: prefab.id.toUpperCase(), grid: true, a: () => {
+              const gx = floor(state.player.pos.x / GRID_SIZE);
+              const gy = floor(state.player.pos.y / GRID_SIZE);
+              const cx = floor(gx / CHUNK_SIZE);
+              const cy = floor(gy / CHUNK_SIZE);
+              const chunk = state.world.getChunk(cx, cy);
+              chunk.generateFromPrefab(prefab);
+            }
+          });
+        }
+    }
   }
 
   const getSpawnGridCoords = () => {
@@ -372,6 +398,15 @@ export function drawDebugPanel(spawnFromBudget: Function) {
       }
       curY += btnSpacing;
     } 
+    else if (item.type === 'subheader') {
+      if (inBounds) {
+          push();
+          fill(200, 200, 100); textAlign(LEFT, CENTER); textSize(10);
+          text(item.l.toUpperCase(), debugX + 15, curY);
+          pop();
+      }
+      curY += btnSpacing;
+    }
     else if (item.grid) {
       let gridGroup = [item];
       while (i + 1 < allItems.length && allItems[i+1].grid) {
@@ -415,7 +450,7 @@ export function drawDebugPanel(spawnFromBudget: Function) {
         push();
         rectMode(CENTER);
         if (isToggle) { fill(item.v ? [0, 150, 50] : 40); if(hov) fill(item.v ? [0, 200, 70] : 70); }
-        else { fill(hov ? 70 : 40); }
+        else { fill(item.v ? 70 : 40); }
         stroke(255, 50); strokeWeight(1);
         rect(bx, curY, bw, btnH, 4);
         fill(220); textAlign(CENTER, CENTER); textSize(10); 

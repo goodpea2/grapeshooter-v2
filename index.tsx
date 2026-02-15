@@ -16,6 +16,7 @@ import { ASSETS } from './assets';
 import { drawTurretSprite } from './assetTurret';
 import { drawPendingSpawn } from './visualEnemies';
 import { drawTickingExplosive } from './visualObstacles';
+import { EnabledTurrets, DisabledTurrets } from './debug/turretAvailability';
 
 declare const p5: any;
 declare const createCanvas: any;
@@ -55,6 +56,7 @@ declare const textSize: any;
 declare const text: any;
 declare const CENTER: any;
 declare const LEFT: any;
+declare const TOP: any;
 declare const rectMode: any;
 declare const textWidth: any;
 declare const color: any;
@@ -191,8 +193,10 @@ function executePlacement() {
 (window as any).setup = () => {
   createCanvas(windowWidth, windowHeight);
   state.world = new WorldManager(); 
-  state.player = new Player(0, 0); 
-  state.cameraPos = createVector(0, 0);
+  const spawnX = 8 * GRID_SIZE + GRID_SIZE / 2;
+  const spawnY = 8 * GRID_SIZE + GRID_SIZE / 2;
+  state.player = new Player(spawnX, spawnY); 
+  state.cameraPos = createVector(spawnX, spawnY);
   state.deathVisualsBuffer = createGraphics(8000, 8000);
   state.deathVisualsBuffer.pixelDensity(1);
 };
@@ -212,16 +216,36 @@ function executePlacement() {
   image(state.deathVisualsBuffer, -4000, -4000);
   state.world.update(state.player.pos); 
   state.world.display(state.player.pos);
+
+  if (state.showChunkBorders) {
+    push();
+    const cw = CHUNK_SIZE * GRID_SIZE;
+    const xMin = floor((state.cameraPos.x - width / 2) / cw) * cw;
+    const xMax = floor((state.cameraPos.x + width / 2) / cw) * cw + cw;
+    const yMin = floor((state.cameraPos.y - height / 2) / cw) * cw;
+    const yMax = floor((state.cameraPos.y + height / 2) / cw) * cw + cw;
+    for (let lx = xMin; lx < xMax; lx += cw) {
+      for (let ly = yMin; ly < yMax; ly += cw) {
+        const cx = floor(lx / cw);
+        const cy = floor(ly / cw);
+        const explored = state.exploredChunks.has(`${cx},${cy}`);
+        const chunk = state.world.getChunk(cx, cy);
+        noFill(); strokeWeight(2); stroke(explored ? [0, 255, 100, 150] : [255, 0, 0, 100]); rect(lx, ly, cw, cw);
+        fill(255); noStroke(); textAlign(LEFT, TOP); textSize(12);
+        const prefabInfo = chunk.prefabId ? `Prefab: ${chunk.prefabId}` : "No Prefab";
+        text(`Chunk Lvl: ${chunk.localChunkLevel}\n${prefabInfo}`, lx + 5, ly + 5);
+      }
+    }
+    pop();
+  }
   
   for (let tex of state.tickingExplosives) drawTickingExplosive(tex);
   for (let s of state.pendingSpawns) drawPendingSpawn(s);
-
   for (let i = state.trails.length - 1; i >= 0; i--) { state.trails[i].update(); state.trails[i].display(); if (state.trails[i].isDone()) state.trails.splice(i, 1); }
   for (let l of state.loot) l.display();
   for (let i = state.bullets.length - 1; i >= 0; i--) { state.bullets[i].update(); state.bullets[i].display(); if (state.bullets[i].life <= 0) state.bullets.splice(i, 1); }
   for (let i = state.enemyBullets.length - 1; i >= 0; i--) { state.enemyBullets[i].update(); state.enemyBullets[i].display(); if (state.enemyBullets[i].life <= 0) state.enemyBullets.splice(i, 1); }
   for (let i = state.groundFeatures.length - 1; i >= 0; i--) { state.groundFeatures[i].update(); state.groundFeatures[i].display(); if (state.groundFeatures[i].life <= 0) state.groundFeatures.splice(i, 1); }
-  
   state.player.displayAttachments(true);
   for (let i = state.enemies.length - 1; i >= 0; i--) { state.enemies[i].update(state.player.pos, state.player.attachments); state.enemies[i].display(); if (state.enemies[i].health <= 0 || state.enemies[i].markedForDespawn) state.enemies.splice(i, 1); }
   for (let i = state.vfx.length - 1; i >= 0; i--) { state.vfx[i].update(); state.vfx[i].display(); if (state.vfx[i].isDone()) state.vfx.splice(i, 1); }
@@ -234,8 +258,7 @@ function executePlacement() {
         const la = a.config.turretLayer || 'normal'; const lb = b.config.turretLayer || 'normal';
         if (la !== lb) return la === 'normal' ? -1 : 1;
         const posA = a.getWorldPos(); const posB = b.getWorldPos();
-        if (posA.y !== posB.y) return posA.y - posB.y;
-        return posB.x - posA.x;
+        if (posA.y !== posB.y) return posA.y - posB.y; return posB.x - posA.x;
     });
     for (let t of sortedForSelection) { if (dist(mWorld.x, mWorld.y, t.getWorldPos().x, t.getWorldPos().y) < t.size/2 + 5) { state.hoveredTurretInstance = t; break; } }
   }
@@ -243,14 +266,6 @@ function executePlacement() {
   if (state.hoveredTurretInstance) {
     const t = state.hoveredTurretInstance; const wPos = t.getWorldPos();
     push(); noFill(); stroke(255, 255, 100, 150 + sin(frameCount * 0.15) * 100); strokeWeight(4); ellipse(wPos.x, wPos.y, t.size + 8);
-    if (t.target && state.isStationary) {
-      const tc = t.getTargetCenter();
-      if (tc) {
-        stroke(255, 0, 0, 180); strokeWeight(1); line(wPos.x, wPos.y, tc.x, tc.y);
-        push(); translate(tc.x, tc.y); rotate(frameCount * 0.05); noFill(); stroke(255, 0, 0, 255); strokeWeight(2);
-        const cs = 10; line(-cs, 0, cs, 0); line(0, -cs, 0, cs); ellipse(0, 0, cs * 1.5); pop();
-      }
-    }
     const range = t.config.actionConfig?.shootRange || t.config.actionConfig?.beamMaxLength || t.config.actionConfig?.pulseTriggerRadius || 0;
     if (range > 0) { noFill(); stroke(255, 200, 50, 120); strokeWeight(2); ellipse(wPos.x, wPos.y, range * 2); } pop();
   }
@@ -263,13 +278,17 @@ function executePlacement() {
     const ghostType = state.draggedTurretInstance ? state.draggedTurretInstance.type : activePlacementType;
     const ghostConfig = turretTypes[ghostType!]; const ghostLayer = ghostConfig.turretLayer || 'normal';
     const draggingIngredients = state.draggedTurretInstance ? state.draggedTurretInstance.baseIngredients : (activePlacementType ? [activePlacementType] : []);
-    if (ghostLayer === 'normal') {
+    
+    if (ghostLayer === 'normal' && draggingIngredients.length > 0) {
       for (const att of state.player.attachments) {
-        if (att === state.draggedTurretInstance || att.isFrosted || (att.config.turretLayer || 'normal') !== 'normal') continue;
+        if (att === state.draggedTurretInstance || att.isFrosted || (att.config.turretLayer || 'normal') !== 'normal' || att.baseIngredients.length === 0) continue;
         const combinedPool = [...draggingIngredients, ...att.baseIngredients];
         const resType = findMergeResult(combinedPool); const resConfig = resType ? turretTypes[resType] : null;
-        const t3Disabled = resConfig && resConfig.tier >= 3 && !state.enableT3Turrets;
-        if (resType && resConfig && !t3Disabled) {
+        
+        // UPDATED AVAILABILITY: Default to EnabledTurrets, reveal Disabled via makeAllTurretsAvailable toggle
+        const isAvailable = resType ? (EnabledTurrets.includes(resType) || state.makeAllTurretsAvailable) : false;
+
+        if (resType && resConfig && isAvailable) {
           const wPos = att.getWorldPos();
           let combinedMergeCost = resConfig.mergeCost; if (activePlacementType) combinedMergeCost += ghostConfig.cost;
           const canAfford = state.sunCurrency >= combinedMergeCost;
@@ -292,11 +311,14 @@ function executePlacement() {
           let occupantOnSameLayer = ghostLayer === 'ground' ? groundOccupant : normalOccupant;
           let coreOccupant = (q === 0 && r === 0);
           if (occupantOnSameLayer && occupantOnSameLayer !== state.draggedTurretInstance) {
-            if (ghostLayer === 'normal' && !coreOccupant) {
+            if (ghostLayer === 'normal' && !coreOccupant && draggingIngredients.length > 0 && occupantOnSameLayer.baseIngredients.length > 0) {
               const combinedPool = [...draggingIngredients, ...occupantOnSameLayer.baseIngredients];
               const resType = findMergeResult(combinedPool); const resConfig = resType ? turretTypes[resType] : null;
-              const t3Disabled = resConfig && resConfig.tier >= 3 && !state.enableT3Turrets;
-              if (resType && resConfig && !t3Disabled && !occupantOnSameLayer.isFrosted) {
+              
+              // UPDATED AVAILABILITY
+              const isAvailable = resType ? (EnabledTurrets.includes(resType) || state.makeAllTurretsAvailable) : false;
+
+              if (resType && resConfig && isAvailable && !occupantOnSameLayer.isFrosted) {
                 let combinedMergeCost = resConfig.mergeCost; if (activePlacementType) combinedMergeCost += ghostConfig.cost;
                 if (state.sunCurrency >= combinedMergeCost) { if (d < closestDist) { closestDist = d; bestSnap = wPos; bestMergeTarget = occupantOnSameLayer; bestMergeInfo = { resType, resConfig, combinedPool }; } }
               }
@@ -322,10 +344,6 @@ function executePlacement() {
         const ghostAngle = state.draggedTurretInstance ? state.draggedTurretInstance.angle : 0;
         const ghost = { uid: 'ghost', type: ghostType, config: ghostConfig, alpha: 127, angle: ghostAngle, recoil: 0, fireRateMultiplier: 1.0, actionTimers: new Map(), getWorldPos: () => state.previewSnapPos, jumpOffset: null };
         drawTurretSprite(ghost);
-        if (!bestMergeTarget) {
-          const range = ghostConfig.actionConfig?.shootRange || ghostConfig.actionConfig?.beamMaxLength || ghostConfig.actionConfig?.pulseTriggerRadius || 0;
-          if (range > 0) { noFill(); stroke(255, 127); strokeWeight(2); ellipse(bestSnap.x, bestSnap.y, range * 2); }
-        }
       }
     }
   }

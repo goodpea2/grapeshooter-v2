@@ -38,6 +38,10 @@ export const ASSETS = {
   img_t_sunflower_front: "https://i.ibb.co/m5ycbXKr/t-sunflower-front-right.png",
   img_t_lilypad_front: "https://i.ibb.co/LXsjh9Q0/t-lilypad.png",
 
+  // Tripeater Assets
+  img_t_triplepea_front: "https://i.ibb.co/xtrcv6Sp/t-tripea-front-right.png",
+  img_t_triplepea_back: "https://i.ibb.co/7dZFZh4n/t-tripea-back-right.png",
+
   // Block Overlays
   img_spawner_a: "https://i.ibb.co/Wv5XyQdp/blockoverlay-spawner-a.png",
   img_sun_1_a: "https://i.ibb.co/whxrPcXC/blockoverlay-sun-1-a.png",
