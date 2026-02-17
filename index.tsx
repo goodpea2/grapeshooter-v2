@@ -10,6 +10,7 @@ import { bulletTypes } from './balanceBullets';
 import { WorldManager } from './world';
 import { Player, Enemy, AttachedTurret, SunLoot, NPCEntity } from './entities';
 import { getTime, drawUI, drawTurretTooltip } from './ui';
+import { drawGameOver, handleGameOverClick } from './uiGameOver';
 import { drawWorldGenPreview } from './uiDebug';
 import { handleNpcUiClick } from './uiNpcShop';
 import { updateGameSystems, spawnFromBudget, getLightLevel, customDayLightConfig } from './lvDemo';
@@ -129,6 +130,16 @@ function drawGlobalLighting() {
   let g = lerp(k1.c[1], k2.c[1], f);
   let b = lerp(k1.c[2], k2.c[2], f);
   let a = lerp(k1.c[3], k2.c[3], f);
+
+  // GAME OVER TINT Transition (linked to showGameOverPopup)
+  if (state.isGameOver) {
+    const p = state.gameOverProgress;
+    r = lerp(r, 60, p);
+    g = lerp(g, 10, p);
+    b = lerp(b, 120, p);
+    a = lerp(a, 220, p);
+  }
+
   if (a > 1) { push(); noStroke(); fill(r, g, b, a); rect(0, 0, width, height); pop(); }
 }
 
@@ -170,6 +181,7 @@ function executePlacement() {
           const newTurret = new AttachedTurret(state.mergeTargetPreview.type, state.player, target.hq, target.hr);
           newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
           state.player.attachments[indexToReplace] = newTurret;
+          state.totalTurretsAcquired++;
           state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y));
           state.turretLastUsed[activePlacementType] = state.frames;
         }
@@ -182,6 +194,7 @@ function executePlacement() {
       }
       const nt = new AttachedTurret(activePlacementType, state.player, snapAxial.q, snapAxial.r);
       state.player.attachments.push(nt);
+      state.totalTurretsAcquired++;
       state.turretLastUsed[activePlacementType] = state.frames;
     }
   }
@@ -196,6 +209,7 @@ function executePlacement() {
         newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
         state.player.attachments[indexToReplace] = newTurret;
         state.player.attachments.splice(indexToDelete, 1);
+        state.totalTurretsAcquired++;
         state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y));
       }
     } else {
@@ -226,6 +240,11 @@ function executePlacement() {
 (window as any).draw = () => {
   background(10, 10, 25); 
   state.frames++;
+
+  if (state.isGameOver) {
+    state.gameOverProgress = lerp(state.gameOverProgress, state.showGameOverPopup ? 1 : 0, 0.05);
+  }
+
   updateGameSystems();
   rebuildSpatialHash();
   state.cameraPos.x = lerp(state.cameraPos.x, state.player.pos.x, 0.08); 
@@ -308,7 +327,7 @@ function executePlacement() {
   const activePlacementType = state.isCurrentlyDragging ? state.draggedTurretType : state.selectedTurretType;
   state.mergeTargetPreview = null; state.previewSnapPos = null;
 
-  if (state.isStationary && (activePlacementType || state.draggedTurretInstance)) {
+  if (state.isStationary && (activePlacementType || state.draggedTurretInstance) && !state.isGameOver) {
     const ghostType = state.draggedTurretInstance ? state.draggedTurretInstance.type : activePlacementType;
     const ghostConfig = turretTypes[ghostType!]; const ghostLayer = ghostConfig.turretLayer || 'normal';
     const draggingIngredients = state.draggedTurretInstance ? state.draggedTurretInstance.baseIngredients : (activePlacementType ? [activePlacementType] : []);
@@ -429,9 +448,17 @@ function executePlacement() {
   drawWorldGenPreview();
   if (state.hoveredTurretInstance && !state.draggedTurretInstance && !activePlacementType) { drawTurretTooltip(state.hoveredTurretInstance, mouseX, mouseY); } 
   else if (state.mergeTargetPreview) { drawTurretTooltip(state.mergeTargetPreview, mouseX, mouseY, true); }
+
+  if (state.isGameOver) {
+    drawGameOver();
+  }
 };
 
 (window as any).mousePressed = () => {
+  if (state.isGameOver) {
+    if (handleGameOverClick()) return;
+  }
+
   if (state.activeNPC && handleNpcUiClick()) {
     (window as any).mouseIsPressed = false;
     return;
@@ -455,6 +482,8 @@ function executePlacement() {
 };
 
 (window as any).mouseReleased = () => {
+  if (state.isGameOver) return;
+
   state.pressedTradeId = null;
   if (state.draggedTurretType) {
     if (state.isCurrentlyDragging) { executePlacement(); } 
@@ -465,6 +494,7 @@ function executePlacement() {
 };
 
 (window as any).mouseWheel = (event: any) => {
+  if (state.isGameOver) return;
   if (state.showDebug && mouseX > width - 280) { state.debugScrollVelocity -= event.delta * 0.1; return false; }
   if (state.activeNPC && mouseX > width - 320) { state.npcShopScrollVelocity -= event.delta * 0.1; return false; }
 };

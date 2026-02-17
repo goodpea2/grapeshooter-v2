@@ -47,6 +47,14 @@ export class Player {
     this.recoil = (this.recoil || 0) * 0.85;
     if (this.flash > 0) this.flash--;
 
+    // Game Over check
+    if (this.health <= 0 && !state.isGameOver) {
+      state.isGameOver = true;
+      state.showGameOverPopup = true;
+    }
+
+    if (state.isGameOver) return;
+
     // Process Conditions
     let fireRateMult = 1.0;
     for (let [cKey, life] of this.conditions) {
@@ -106,6 +114,7 @@ export class Player {
         } else if (loot.config.type === 'turretAsItem') {
            const itemKey = loot.config.item;
            state.inventory[itemKey] = (state.inventory[itemKey] || 0) + 1;
+           state.totalTurretsAcquired++;
            state.uiAlpha = 255; 
         } else {
            const val = loot.config.itemValue || 1;
@@ -115,9 +124,11 @@ export class Player {
               state.uiSunScale = 1.6;
            } else if (loot.config.item === 'elixir') {
               state.elixirCurrency += val;
+              state.totalElixirLootCollected += val;
               state.uiElixirScale = 1.6;
            } else if (loot.config.item === 'soil') {
               state.soilCurrency += val;
+              state.totalSoilLootCollected += val;
               state.uiSoilScale = 1.6;
            }
         }
@@ -189,6 +200,7 @@ export class Player {
     }
     if (bestSlot) {
       this.attachments.push(new AttachedTurret(type, this, bestSlot.q, bestSlot.r));
+      state.totalTurretsAcquired++;
       state.vfx.push(new Explosion(this.pos.x, this.pos.y, 60, color(255, 255, 100)));
     }
   }

@@ -26,6 +26,15 @@ export const state: any = {
   frames: customStartingHour * HOUR_FRAMES,
   deathVisualsBuffer: null,
   
+  // Game Over state
+  isGameOver: false,
+  showGameOverPopup: false,
+  gameOverProgress: 0, // Used for lighting and modal animation
+  totalElixirLootCollected: 0,
+  totalSoilLootCollected: 0,
+  totalTurretsAcquired: 0,
+  killsByType: {}, // Tracks kills per enemy key
+
   // Spatial Partitioning
   spatialHash: new Map(),
   spatialHashCellSize: SPATIAL_HASH_CELL_SIZE,

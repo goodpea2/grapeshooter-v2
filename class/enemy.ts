@@ -272,6 +272,9 @@ export class Enemy {
       this.isDying = true;
       state.totalEnemiesDead++;
       
+      // Track kill for Game Over stats
+      state.killsByType[this.type] = (state.killsByType[this.type] || 0) + 1;
+      
       // Spawn loot based on enemy type config
       spawnLootAt(this.pos.x, this.pos.y, this.type, this.config.lootConfigOnDeath);
 

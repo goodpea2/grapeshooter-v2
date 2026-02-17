@@ -91,6 +91,7 @@ export function handleNpcUiClick() {
             const amount = trade.itemAmount || 1;
             if (trade.itemType === 'turret') {
               state.inventory[trade.itemKey] = (state.inventory[trade.itemKey] || 0) + amount;
+              state.totalTurretsAcquired += amount;
             } else if (trade.itemType === 'resource') {
               if (trade.itemKey === 'sun') state.sunCurrency += amount;
               if (trade.itemKey === 'soil') state.soilCurrency += amount;
@@ -106,6 +107,7 @@ export function handleNpcUiClick() {
             state.uiVfx.push(new ShopFlyVFX(startX, startY, targetX, targetY, assetKey));
           } else {
             // Drop as loot - player must collect it
+            // Acquisition tracking happens in player collection logic for loot
             npc.spawnTradeLoot(trade);
             state.uiAlpha = 255;
           }
