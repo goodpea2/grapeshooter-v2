@@ -266,7 +266,6 @@ export function drawNPCPanel() {
 
           if (icon) {
             imageMode(CENTER);
-            if (!canAfford) tint(255, 100, 100);
             image(icon, CARD_WIDTH - 40 - costOff, 20, 32, 32);
             noTint();
           }

@@ -458,14 +458,6 @@ export function drawUI(spawnFromBudget: Function) {
   state.uiAlpha = lerp(state.uiAlpha, state.isStationary ? 255 : 40, 0.3);
   const shopAlpha = state.uiAlpha;
 
-  const attachments = state.player.attachments;
-  const isNearWater = attachments.some((a: any) => {
-    const wPos = a.getWorldPos();
-    const gx = floor(wPos.x / GRID_SIZE);
-    const gy = floor(wPos.y / GRID_SIZE);
-    return state.world.getLiquidAt(gx, gy) === 'l_water';
-  });
-
   const stdList: any[] = [];
   const specList: any[] = [];
   for (let key in turretTypes) {
@@ -476,13 +468,9 @@ export function drawUI(spawnFromBudget: Function) {
     if (tr.tier > 0 && tr.tier <= 1.2 && !tr.isSpecial) {
       stdList.push({key, tr});
     } else if (tr.isSpecial || tr.tier === 0) {
-      // Logic update: Special turrets always available if owned
+      // Special turrets (like t_lilypad) only available if owned via NPC trade/inventory
       if (owned) {
         specList.push({key, tr});
-      } else if (tr.isSpecial) {
-        if (key === 't_lilypad' && !isNearWater) continue;
-        // Lilypad stays in special column even if not owned but affordable
-        if (key === 't_lilypad') specList.push({key, tr});
       }
     }
   }

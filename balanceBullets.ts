@@ -178,10 +178,10 @@ export const bulletTypes: any = {
     aoeConfig: { 
       isAoe: true, 
       aoeRadiusGradient: [GRID_SIZE * 1.5, GRID_SIZE * 2.5], 
-      aoeDamageGradient: [80,10], 
+      aoeDamageGradient: [40,10], 
       dealAoeOnObstacle: true, 
       dealAoeAfterLifetime: true, 
-      aoeObstacleDamageMultiplier: 0.5 
+      aoeObstacleDamageMultiplier: 1 
     },
     cameraShakeOnDeath: [6, 9, 0.8],
     damageTargets: ['enemy', 'obstacle']

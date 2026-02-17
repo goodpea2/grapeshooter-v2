@@ -191,7 +191,8 @@ export class Bullet {
     // Trigger camera shake if configured
     if (this.config.cameraShakeOnDeath) {
       const [min, max, falloff] = this.config.cameraShakeOnDeath;
-      state.cameraShake += random(min, max);
+      // Do not stack shake strength, take the max to prevent vibration runaway
+      state.cameraShake = Math.max(state.cameraShake, random(min, max));
       // Expose and apply the third falloff parameter if it exists
       if (falloff !== undefined) {
         state.cameraShakeFalloff = falloff;
