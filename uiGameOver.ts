@@ -123,8 +123,8 @@ export function drawGameOver() {
   }
 
   const cols = 4;
-  const cellW = 80;
-  const cellH = 100;
+  const cellW = 64;
+  const cellH = 90;
   const startX = -((cols - 1) * cellW) / 2;
   const startY = -60;
 
@@ -142,11 +142,11 @@ export function drawGameOver() {
     translate(x, y);
     fill(10, 15, 30, p * 255);
     noStroke();
-    rect(0, 10, 70, 90, 15);
+    rect(0, 10, 56, 76, 15);
 
     fill(40, 47, 96, p * 255);
     noStroke();
-    rect(0, 0, 70, 70, 15);
+    rect(0, 0, 56, 56, 15);
     
     if (sprite) {
       imageMode(CENTER);
@@ -156,7 +156,7 @@ export function drawGameOver() {
     fill(255, p * 255);
     textSize(14);
     textAlign(CENTER);
-    text(item.val, 0, 45);
+    text(item.val, 0, 40);
     pop();
   }
   
