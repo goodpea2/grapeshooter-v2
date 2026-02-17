@@ -60,8 +60,6 @@ export class Player {
     const liquidType = state.world.getLiquidAt(gx, gy); const lData = liquidType ? liquidTypes[liquidType] : null;
     let lMult = lData?.liquidConfig?.playerMovementSpeedMultiplier ?? 1.0;
     
-    this.applyObstacleRepulsion();
-
     // 1. Gather Input Intent
     this.moveInputVec.set(0, 0); 
     const keyIsDown: any = (window as any).keyIsDown;
@@ -78,10 +76,12 @@ export class Player {
       this.moveWithSliding(move); 
     }
 
-    // 3. Update Stationary State
-    // FIXED: Only allow stationary if NO keys are being pressed, even if velocity is 0
+    // 3. Resolve Obstacle Collisions (Snap to surface to prevent jitter)
+    this.applyObstacleRepulsion();
+
+    // 4. Update Stationary State
     let vel = dist(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
-    const isActuallyStationary = (vel < 0.4 && !this.isMovingIntent);
+    const isActuallyStationary = (vel < 0.2 && !this.isMovingIntent);
     
     if (isActuallyStationary) {
       state.stationaryTimer++;
@@ -128,22 +128,35 @@ export class Player {
       }
     }
 
-    this.applyObstacleRepulsion(); 
     this.updateAutoTurret(fireRateMult);
   }
 
   applyObstacleRepulsion() {
     const gx = floor(this.pos.x / GRID_SIZE);
     const gy = floor(this.pos.y / GRID_SIZE);
-    const forceRange = this.size * 0.75; 
+    
+    // Use slightly smaller collision radius for "soft" pushing
+    const myRadius = this.size * 0.45; 
+    const blockRadius = GRID_SIZE * 0.5;
+    const minSafeDist = myRadius + blockRadius;
+
     for (let i = gx - 1; i <= gx + 1; i++) {
       for (let j = gy - 1; j <= gy + 1; j++) {
-        if (state.world.isBlockAt(i * GRID_SIZE + (GRID_SIZE/2), j * GRID_SIZE + (GRID_SIZE/2))) {
-          const bCenter = createVector(i * GRID_SIZE + GRID_SIZE/2, j * GRID_SIZE + GRID_SIZE/2);
-          const d = dist(this.pos.x, this.pos.y, bCenter.x, bCenter.y);
-          if (d < forceRange + GRID_SIZE/2) {
-            const pushDir = p5.Vector.sub(this.pos, bCenter).normalize().mult(5.0 * (1 - d/(forceRange + GRID_SIZE/2)));
-            this.pos.add(pushDir);
+        const bx = i * GRID_SIZE + GRID_SIZE/2;
+        const by = j * GRID_SIZE + GRID_SIZE/2;
+        if (state.world.isBlockAt(bx, by)) {
+          const dx = this.pos.x - bx;
+          const dy = this.pos.y - by;
+          const dSq = dx*dx + dy*dy;
+          
+          if (dSq < minSafeDist * minSafeDist && dSq > 0.01) {
+            const d = Math.sqrt(dSq);
+            const overlap = minSafeDist - d;
+            // STATIC RESOLUTION: Move exactly the overlap distance + epsilon
+            const pushX = (dx / d) * (overlap + 0.05);
+            const pushY = (dy / d) * (overlap + 0.05);
+            this.pos.x += pushX;
+            this.pos.y += pushY;
           }
         }
       }
@@ -226,13 +239,13 @@ export class Player {
 
   moveWithSliding(move: any) {
     let tx = this.pos.x + move.x; 
-    let cx = state.world.checkCollision(tx, this.pos.y, this.size/2); 
+    let cx = state.world.checkCollision(tx, this.pos.y, this.size/2.1); 
     const ltx = state.world.getLiquidAt(floor(tx / GRID_SIZE), floor(this.pos.y / GRID_SIZE)); 
     if (ltx && liquidTypes[ltx]?.liquidConfig?.blocksMovement) cx = true;
     
     const atts = this.attachments as AttachedTurret[];
     for(let a of atts) {
-      if(state.world.checkCollision(tx + a.offset.x, this.pos.y + a.offset.y, a.config.size/2)) {
+      if(state.world.checkCollision(tx + a.offset.x, this.pos.y + a.offset.y, a.config.size/2.1)) {
         cx = true;
         break;
       }
@@ -240,12 +253,12 @@ export class Player {
     if (!cx) this.pos.x = tx;
 
     let ty = this.pos.y + move.y; 
-    let cy = state.world.checkCollision(this.pos.x, ty, this.size/2); 
+    let cy = state.world.checkCollision(this.pos.x, ty, this.size/2.1); 
     const lty = state.world.getLiquidAt(floor(this.pos.x / GRID_SIZE), floor(ty / GRID_SIZE)); 
     if (lty && liquidTypes[lty]?.liquidConfig?.blocksMovement) cy = true;
     
     for(let a of atts) {
-      if(state.world.checkCollision(this.pos.x + a.offset.x, ty + a.offset.y, a.config.size/2)) {
+      if(state.world.checkCollision(this.pos.x + a.offset.x, ty + a.offset.y, a.config.size/2.1)) {
         cy = true;
         break;
       }

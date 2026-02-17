@@ -132,6 +132,7 @@ export class AttachedTurret {
 
     if (liquidType === 'l_ice') { if (state.isStationary && !this.isFrosted) { this.frostLevel = Math.min(1, this.frostLevel + (1 / 900)); if (this.frostLevel >= 1) { this.isFrosted = true; this.iceCubeHealth = 100; } } } else if (!this.isFrosted) { this.frostLevel = Math.max(0, this.frostLevel - (1 / 300)); }
     
+    // Resolve Obstacle Collisions (Snap to surface)
     this.applyObstacleRepulsion(wPos);
 
     for (let [cKey, life] of this.conditions) {
@@ -370,18 +371,25 @@ export class AttachedTurret {
 
   applyObstacleRepulsion(wPos: any) {
     const gx = floor(wPos.x / GRID_SIZE); const gy = floor(wPos.y / GRID_SIZE);
-    // Standardized forceRange to match block distance checks
-    const forceRange = this.size * 0.75; 
+    
+    // Consistency with player radius checks
+    const myRadius = this.size * 0.45; 
+    const blockRadius = GRID_SIZE * 0.5;
+    const minSafeDist = myRadius + blockRadius;
+
     for (let i = gx - 1; i <= gx + 1; i++) for (let j = gy - 1; j <= gy + 1; j++) {
-      if (state.world.isBlockAt(i * GRID_SIZE + (GRID_SIZE/2), j * GRID_SIZE + (GRID_SIZE/2))) {
-        const bx = i * GRID_SIZE + GRID_SIZE/2; const by = j * GRID_SIZE + GRID_SIZE/2;
+      const bx = i * GRID_SIZE + GRID_SIZE/2; 
+      const by = j * GRID_SIZE + GRID_SIZE/2;
+      if (state.world.isBlockAt(bx, by)) {
         const dx = wPos.x - bx; const dy = wPos.y - by; const dSq = dx*dx + dy*dy;
-        const checkRange = forceRange + GRID_SIZE/2;
-        if (dSq < checkRange * checkRange) { 
+        if (dSq < minSafeDist * minSafeDist && dSq > 0.01) { 
           const d = Math.sqrt(dSq); 
-          const force = 5.0 * (1 - d/checkRange); 
-          this.parent.pos.x += dx/d * force; 
-          this.parent.pos.y += dy/d * force; 
+          const overlap = minSafeDist - d;
+          // STATIC RESOLUTION: Instead of adding a force, move exactly enough to touch the boundary
+          const pushX = (dx / d) * (overlap + 0.05);
+          const pushY = (dy / d) * (overlap + 0.05);
+          this.parent.pos.x += pushX; 
+          this.parent.pos.y += pushY; 
         }
       }
     }
