@@ -1,3 +1,4 @@
+
 import { state } from './state';
 import { 
   GRID_SIZE, CHUNK_SIZE, VISIBILITY_RADIUS, LEVEL_THRESHOLDS, LEVEL_BUDGET, WORLD_GEN_STATS, CHUNK_GEN_RADIUS
@@ -406,7 +407,7 @@ export class Chunk {
     this.overlayBlocks = this.blocks.filter(b => !!b.overlay || b.health < b.maxHealth);
   }
 
-  generate(bonusData: any, levelOverride?: number) {
+  generate(bonusData: any = {}, levelOverride?: number) {
     const lv = levelOverride !== undefined ? levelOverride : floor(constrain(state.currentChunkLevel, 0, 10));
     this.localChunkLevel = lv;
     const weights = BLOCK_WEIGHTS[lv];
@@ -537,7 +538,7 @@ export class Chunk {
     }
   }
 
-  generateFromPrefab(prefab: RoomPrefab, bonusData: any) {
+  generateFromPrefab(prefab: RoomPrefab, bonusData: any = {}) {
     const lv = floor(constrain(state.currentChunkLevel, 0, 10));
     this.generate(bonusData, lv);
     
@@ -855,7 +856,7 @@ export class WorldManager {
           if (b && !b.isMined) { 
             let cX = constrain(x, b.pos.x, b.pos.x + GRID_SIZE); 
             let cY = constrain(y, b.pos.y, b.pos.y + GRID_SIZE); 
-            if ((x - cX)**2 + (y - cY)**2 < radius*radius) return true; 
+            if ((x - cX)**2 + (y - cy)**2 < radius*radius) return true; 
           } 
         }
       }

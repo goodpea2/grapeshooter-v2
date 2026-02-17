@@ -223,7 +223,7 @@ export function drawNPCPanel() {
       rect(0, 0, CARD_WIDTH, CARD_HEIGHT, 12);
 
       fill(27, 31, 57, 180);
-      ellipse(35, CARD_HEIGHT / 2, 45, 45);
+      //ellipse(35, CARD_HEIGHT / 2, 45, 45);
 
       let itemAsset = null;
       if (trade.itemType === 'resource') {
@@ -237,7 +237,7 @@ export function drawNPCPanel() {
       if (itemAsset) {
         imageMode(CENTER);
         if (outOfStock) tint(100, 150);
-        image(itemAsset, 35, CARD_HEIGHT / 2, 48, 48);
+        image(itemAsset, 35, CARD_HEIGHT / 2, 64, 64);
         noTint();
       }
 
