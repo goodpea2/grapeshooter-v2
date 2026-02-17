@@ -104,11 +104,11 @@ export const lootTableTypes: Record<string, LootTableEntry[]> = {
     { weight: 9 }
   ],
   lt_elixir_05: [ // avg 0.5
-    { weight: 1, lootTypeKey: ['elixir'], itemCount: [1, 1] },
+    { weight: 1, lootTypeKey: ['elixir'], itemCount: [0, 2] },
     { weight: 1 }
   ],
-  lt_elixir_10: [{ weight: 100, lootTypeKey: ['elixir'], itemCount: [1, 1] }], // avg 1.0
-  lt_elixir_20: [ // avg 0.5
+  lt_elixir_10: [{ weight: 100, lootTypeKey: ['elixir'], itemCount: [0, 2] }], // avg 1.0
+  lt_elixir_20: [
     { weight: 1, lootTypeKey: ['elixir'], itemCount: [1, 3] }
   ],
 

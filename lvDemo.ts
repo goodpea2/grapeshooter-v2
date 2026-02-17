@@ -14,7 +14,6 @@ declare const sin: any;
 declare const frameCount: any;
 declare const floor: any;
 
-// export const customBudgetPerNight = [100, 250, 500, 1000, 1800, 3200, 5600, 8000, 11000, 12500]; // old
 export const customBudgetPerNight = [100, 250, 500, 850, 1500, 2600, 4500, 6700, 8000, 10000]; // new with roomDirector
 export const customDayLightConfig = '000011222222222222110000'; // 0: Night, 1: Transition, 2: Day
 export const customStartingHour = 6;
@@ -66,7 +65,7 @@ function getWeightsForCurrentTime() {
 export function isLegibleSpot(x: number, y: number): boolean {
   if (state.world.isBlockAt(x, y)) return false;
   const gx = floor(x / GRID_SIZE);
-  const gy = floor(y / GRID_SIZE);
+  const gy = floor(y / GRID_SIZE); 
   const liqKey = state.world.getLiquidAt(gx, gy);
   if (liqKey) {
     const lCfg = liquidTypes[liqKey];
@@ -86,7 +85,11 @@ export function requestSpawn(x: number, y: number, typeKey: string) {
   });
 }
 
-export function spawnFromBudget(amount: number) {
+/**
+ * Spawns enemies until amount is reached or attempt limit hit.
+ * Returns the total cost spent.
+ */
+export function spawnFromBudget(amount: number): number {
   let spent = 0;
   let limit = 40; 
   const weights = getWeightsForCurrentTime();
@@ -125,6 +128,7 @@ export function spawnFromBudget(amount: number) {
       state.accumulatedSpentBudget += cost;
     }
   }
+  return spent;
 }
 
 export function updateGameSystems() {
@@ -187,7 +191,7 @@ export function updateGameSystems() {
   
   if (isNight && prevLightLevel !== 0 && state.lastNightTriggered !== t.day) {
     state.lastNightTriggered = t.day;
-    // Trigger the big wave
+    // Trigger the big wave event
     spawnFromBudget(state.currentNightWaveBudget);
   }
 
@@ -206,9 +210,11 @@ export function updateGameSystems() {
     }
   }
 
-  if (state.hourlyBudgetPool >= 10 && frameCount % 600 === 0) {
-    let chunk = Math.min(state.hourlyBudgetPool, 40);
-    spawnFromBudget(chunk);
-    state.hourlyBudgetPool -= chunk;
+  // AGGRESSIVE POOL CONSUMPTION: 
+  // Always attempt to spend the budget pool every frame to counter "running away".
+  // Refunds from despawned enemies go back into this pool instantly.
+  if (state.hourlyBudgetPool >= 2) {
+    const spent = spawnFromBudget(state.hourlyBudgetPool);
+    state.hourlyBudgetPool -= spent;
   }
 }

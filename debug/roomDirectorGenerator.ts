@@ -63,9 +63,7 @@ function pickPrefab(type: string, lvMin: number, lvMax: number, targetValue: num
 }
 
 export function generateRoomDirectorData(): string {
-  const loops = 8;
   const chain: string[] = [];
-  
   let accumulatedValue = 0;
   let targetTotalValue = 0;
 
@@ -87,14 +85,14 @@ export function generateRoomDirectorData(): string {
     }
   }
 
-  // 2. Process Looping Steps
+  // 2. Process Looping Steps a finite number of times (e.g. 10 cycles)
   const dynamicMin = LOOP_STEPS.map(s => s.levelMin);
   const dynamicMax = LOOP_STEPS.map(s => s.levelMax);
 
-  for (let l = 0; l < loops; l++) {
+  for (let cycle = 0; cycle < 10; cycle++) {
     for (let sIdx = 0; sIdx < LOOP_STEPS.length; sIdx++) {
       const step = LOOP_STEPS[sIdx];
-      targetTotalValue -= 15; // Push difficulty value downwards (more hostile) over time
+      targetTotalValue -= 15; 
       
       for (let r = 0; r < step.rooms; r++) {
         const weights = step.weights;
@@ -114,7 +112,6 @@ export function generateRoomDirectorData(): string {
         chain.push(prefabId);
       }
 
-      // Handle level increments for the next loop cycle
       const minIncr = step.lvMinIncr;
       if (typeof minIncr === 'string' && minIncr === "0..1") {
         dynamicMin[sIdx] += (Math.random() < 0.5 ? 1 : 0);
@@ -122,8 +119,6 @@ export function generateRoomDirectorData(): string {
         dynamicMin[sIdx] += Number(minIncr);
       }
       dynamicMax[sIdx] += step.lvMaxIncr;
-      
-      // Clamp to known prefab level range
       dynamicMin[sIdx] = Math.min(5, dynamicMin[sIdx]);
       dynamicMax[sIdx] = Math.min(6, dynamicMax[sIdx]);
     }

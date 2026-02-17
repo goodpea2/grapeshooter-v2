@@ -1,3 +1,4 @@
+
 # Core Explorer: Technical & Design Library
 
 Core Explorer (v3.1) is a procedural 2D survival game built with **TypeScript** and **p5.js**. It features a unique mobile-base expansion system, a deep merging matrix, and a dynamic ecosystem.
@@ -11,6 +12,15 @@ Scripted chunk generation that bypasses the standard noise-based pipeline for ta
 - **Loot Pots**: Randomly distributes Sun, TNT, and Crate nodes across the chunk.
 - **Guaranteed Obstacles**: Allows placing specific block types (like Treasure Chests or specific resource crates) in precise quantities.
 - **Immediate Budget**: Triggers a localized enemy wave upon generation to populate the "room".
+- **Discovery Order Room Director**: The Room Director sequence is applied based on the order in which the player discovers new chunks. The world follows the generated string length exactly; once the scripted sequence is exhausted, chunks fall back to procedural noise generation rather than looping the director sequence.
+
+---
+
+## 👹 Enemy Budget & Aggression
+The game employs a resilient budgeting system to maintain constant pressure.
+- **Shared Pool**: Despawned enemies (those outrun by the player) refund their cost to a central pool.
+- **Aggressive Re-deployment**: The world director attempts to spend the budget pool every frame, instantly spawning new portals near the player's current location if valid ground is found.
+- **Scaling Difficulty**: Base budgets increase daily, ensuring the survival challenge keeps pace with base expansion.
 
 ---
 

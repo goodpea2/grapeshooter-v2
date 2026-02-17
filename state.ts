@@ -122,9 +122,11 @@ export const state: any = {
   // Time Warp
   timeWarpRemaining: 0,
 
-  // Room Director Debug
+  // Room Director Discovery Tracking
   roomDirectorData: "",
   roomDirectorChain: [],
+  nextDirectorIndex: 0,
+  chunkToDirectorIndex: new Map(), // coordinate string -> index in roomDirectorChain
   roomDirectorScrollY: 0,
   roomDirectorScrollVelocity: 0
 };

@@ -1,4 +1,3 @@
-
 import { state } from './state';
 import { 
   GRID_SIZE, CHUNK_SIZE, VISIBILITY_RADIUS, LEVEL_THRESHOLDS, LEVEL_BUDGET, WORLD_GEN_STATS, CHUNK_GEN_RADIUS
@@ -53,20 +52,6 @@ declare const TWO_PI: any;
 declare const atan2: any;
 declare const width: any;
 declare const height: any;
-
-/**
- * Maps a grid coordinate to a 1D spiral index starting from (0,0).
- */
-function getSpiralIndex(x: number, y: number): number {
-  let r = Math.max(Math.abs(x), Math.abs(y));
-  if (r === 0) return 0;
-  let maxSide = 2 * r + 1;
-  let maxIdx = maxSide * maxSide - 1;
-  if (y === -r) return maxIdx - (r - x);
-  if (x === -r) return maxIdx - 2 * r - (y + r);
-  if (y === r) return maxIdx - 4 * r - (x + r);
-  return maxIdx - 6 * r - (r - y);
-}
 
 export class Block {
   gx: number; gy: number; pos: any; type: string; config: any; overlay: string | null;
@@ -232,7 +217,7 @@ export class Block {
       if (isExposed) {
         stroke(bord[0], bord[1], bord[2], opacity); strokeWeight(3); noFill();
         if (!n) line(tl, 0, renderSize - tr, 0); if (!s) line(bl, renderSize, renderSize - br, renderSize); if (!w) line(0, tl, 0, renderSize - bl); if (!e) line(renderSize, tr, renderSize, renderSize - br);
-        if (!n && !w) arc(rad, rad, rad * 2, rad * 2, PI, PI + HALF_PI); if (!n && !e) arc(renderSize - rad, rad, rad * 2, rad * 2, PI + HALF_PI, TWO_PI); if (!s && !e) arc(renderSize - rad, renderSize - rad, rad * 2, rad * 2, 0, HALF_PI); if (!s && !w) arc(rad, renderSize - rad, rad * 2, rad * 2, HALF_PI, PI);
+        if (!n && !w) arc(rad, rad, rad * 2, rad * 2, PI, PI + HALF_PI); if (!n && !e) arc(renderSize - rad, rad, rad * 2, rad * 2, PI + HALF_PI, TWO_PI); if (!s && !e) arc(renderSize - rad, GRID_SIZE - rad, rad * 2, rad * 2, 0, HALF_PI); if (!s && !w) arc(rad, renderSize - rad, rad * 2, rad * 2, HALF_PI, PI);
       }
 
       if (this.feature && isExposed) {
@@ -252,8 +237,8 @@ export class Block {
    * Phase 2 of Layered Rendering: High-cost overlays and status bars.
    */
   renderOverlay(opacity: number) {
-    if (this.isMined || !this.overlay || opacity <= 0) {
-        // Even if mined, handle logic for certain types or just show HP bar if health < max
+    if (opacity <= 0) return;
+    if (this.isMined || !this.overlay) {
         if (!this.isMined && this.health < this.maxHealth) {
            this.renderHealthBar(opacity);
         }
@@ -392,18 +377,20 @@ const BLOCK_KEYS = ['o_dirt', 'o_clay', 'o_stone', 'o_slate', 'o_black'];
 
 export class Chunk {
   cx: number; cy: number; blocks: Block[] = []; blockMap: Map<string, Block> = new Map();
+  overlayBlocks: Block[] = []; // OPTIMIZATION: Keep track of blocks with overlays
   localChunkLevel: number = 0;
   prefabId: string | null = null;
   roomEnemyBudget: number = 0;
   isRoomBudgetTriggered: boolean = false;
 
-  constructor(cx: number, cy: number, bonusData: any = {}) { 
+  constructor(cx: number, cy: number, directorIdx: number, bonusData: any = {}) { 
     this.cx = cx; this.cy = cy; 
     
-    // INTEGRATION: Check Room Director for prefab assignment based on Spiral Index
-    const spiralIdx = getSpiralIndex(cx, cy);
+    // INTEGRATION: Discovery Order Index mapping
     const chain = state.roomDirectorChain || [];
-    const targetPrefabId = (spiralIdx < chain.length) ? chain[spiralIdx] : null;
+    
+    // NO LOOPING: Only use prefab if director index is within chain bounds.
+    const targetPrefabId = (directorIdx >= 0 && directorIdx < chain.length) ? chain[directorIdx] : null;
     const prefab = targetPrefabId ? ROOM_PREFABS.find(p => p.id === targetPrefabId) : null;
 
     if (prefab) {
@@ -411,6 +398,12 @@ export class Chunk {
     } else {
       this.generate(bonusData); 
     }
+    this.rebuildOverlayList();
+  }
+
+  // OPTIMIZATION: Cache blocks that need overlay rendering
+  rebuildOverlayList() {
+    this.overlayBlocks = this.blocks.filter(b => !!b.overlay || b.health < b.maxHealth);
   }
 
   generate(bonusData: any, levelOverride?: number) {
@@ -431,7 +424,6 @@ export class Chunk {
         let isRiver = Math.abs(rn - 0.5) < worldGenConfig.riverThreshold;
         let isLake = ln > worldGenConfig.lakeThreshold;
         
-        // Spawn clear zone around block (8, 8) in origin chunk
         if (this.cx === 0 && this.cy === 0 && dist(gx, gy, 8, 8) < worldGenConfig.spawnClearRadius) continue;
 
         let liquid = null;
@@ -546,27 +538,18 @@ export class Chunk {
   }
 
   generateFromPrefab(prefab: RoomPrefab, bonusData: any) {
-    // 1. Foundational Layer: Generate standard noise-based chunk at CURRENT world level.
-    // INTEGRATION FIX: We must pass the bonusData from the WorldManager (accumulated pots) 
-    // to the standard generator so standard features like snipers and seeds spawn alongside the prefab content.
     const lv = floor(constrain(state.currentChunkLevel, 0, 10));
-    
-    // Call the base generator first - this handles standard noise and standard loot distributions from pots
     this.generate(bonusData, lv);
     
-    // Set metadata for debug tracking
     this.prefabId = prefab.id;
     const cfg = prefab.worldGenConfig;
 
-    // Helper for adding prefab-specific PoIs
     const pickValidBlockForAddition = () => {
-      // Must be solid ground, no liquid, and no existing overlay (additive PoI placement)
       const candidates = this.blocks.filter(b => !b.isMined && !b.overlay && !b.liquidType);
       if (candidates.length === 0) return null;
       return candidates[floor(random(candidates.length))];
     };
 
-    // 2. Guaranteed NPC Logic (Spawn + Clear Surroundings)
     if (cfg.guaranteedNpc) {
       let npcKey = cfg.guaranteedNpc;
       if (npcKey === 'lv1 npc') npcKey = random(['NPC_lv1_lily', 'NPC_lv1_jelly']);
@@ -576,7 +559,6 @@ export class Chunk {
       const spawnGX = floor(this.cx * CHUNK_SIZE + random(4, 12));
       const spawnGY = floor(this.cy * CHUNK_SIZE + random(4, 12));
       
-      // Clear 2-radius surroundings
       for (let i = spawnGX - 2; i <= spawnGX + 2; i++) {
         for (let j = spawnGY - 2; j <= spawnGY + 2; j++) {
            const b = this.blockMap.get(`${i},${j}`);
@@ -587,11 +569,9 @@ export class Chunk {
            }
         }
       }
-
       state.npcs.push(new NPCEntity(spawnGX * GRID_SIZE + GRID_SIZE/2, spawnGY * GRID_SIZE + GRID_SIZE/2, npcKey));
     }
 
-    // 3. Guaranteed Overlay Logic (e.g. Treasure Chest)
     if (cfg.guaranteedOverlay) {
         const target = pickValidBlockForAddition();
         if (target) {
@@ -604,14 +584,10 @@ export class Chunk {
         }
     }
 
-    // 4. Additive Carving (Air Ratio)
     const totalPossibleBlocks = CHUNK_SIZE * CHUNK_SIZE;
-    const getSolidBlocks = () => this.blocks.filter(b => !b.isMined);
-    const getLiquidBlocks = () => this.blocks.filter(b => b.liquidType);
-    
     const calculateCurrentAir = () => {
-        let air = totalPossibleBlocks - getSolidBlocks().length;
-        if (cfg.airIncludeLiquid) air += getLiquidBlocks().length;
+        let air = totalPossibleBlocks - this.blocks.filter(b => !b.isMined).length;
+        if (cfg.airIncludeLiquid) air += this.blocks.filter(b => b.liquidType).length;
         return air;
     };
 
@@ -620,11 +596,8 @@ export class Chunk {
     
     if (currentAir < targetAir) {
         const digAmount = targetAir - currentAir;
-        // Priority: Carve blocks WITHOUT existing overlays (don't mine the natural loot foundation)
         let candidates = this.blocks.filter(b => !b.isMined && !b.overlay);
-        // Fallback: If we still need space, start carving anything
         if (candidates.length < digAmount) candidates = this.blocks.filter(b => !b.isMined);
-        
         for (let i = 0; i < Math.min(digAmount, candidates.length); i++) {
             const idx = floor(random(candidates.length));
             const target = candidates.splice(idx, 1)[0];
@@ -632,7 +605,6 @@ export class Chunk {
         }
     }
 
-    // 5. Additive Prefab Spawners
     const spawnerCount = floor(random(cfg.enemySpawnerCount[0], cfg.enemySpawnerCount[1] + 1));
     const danger = cfg.enemySpawnerConfig.danger;
     const spawnerPool = Object.keys(overlayTypes).filter(k => overlayTypes[k].isEnemySpawner && overlayTypes[k].danger === danger);
@@ -647,7 +619,6 @@ export class Chunk {
       }
     }
 
-    // 6. Additive Multi-tier Sun (Using same logic as sunPot distribution)
     const sunToSpawn = floor(random(cfg.sun[0], cfg.sun[1] + 1));
     if (sunToSpawn > 0) {
       let remainingSun = sunToSpawn;
@@ -664,10 +635,8 @@ export class Chunk {
         let chosenType = affordable[affordable.length - 1].key;
         let sum = 0;
         for (let t of affordable) { sum += t.w; if (r <= sum) { chosenType = t.key; break; } }
-        
         const target = pickValidBlockForAddition();
-        if (!target) break; // Out of space
-        
+        if (!target) break; 
         target.overlay = chosenType;
         target.initSunBits(chosenType);
         state.totalSunSpawned += (ECONOMY_CONFIG.lootValues as any)[chosenType];
@@ -675,51 +644,34 @@ export class Chunk {
       }
     }
 
-    // 7. Additive Prefab TNT and Crates
-    const otherPots = [
-      { key: 'o_tnt', countRange: cfg.tnt },
-      { key: 'o_crate', isBlock: true, countRange: cfg.crate }
-    ];
-
+    const otherPots = [{ key: 'o_tnt', countRange: cfg.tnt },{ key: 'o_crate', isBlock: true, countRange: cfg.crate }];
     for (const p of otherPots) {
       const count = floor(random(p.countRange[0], p.countRange[1] + 1));
       for (let i = 0; i < count; i++) {
         if (p.isBlock) {
-            // For blocks (Crates), find traversable empty air ground
             const candidates = this.blocks.filter(b => b.isMined && !b.liquidType);
             if (candidates.length > 0) {
                 const target = candidates[floor(random(candidates.length))];
-                target.isMined = false;
-                target.type = p.key;
-                target.config = obstacleTypes[p.key] || obstacleTypes['o_crate'];
-                target.health = target.config.health;
-                target.maxHealth = target.health;
+                target.isMined = false; target.type = p.key; target.config = obstacleTypes[p.key] || obstacleTypes['o_crate']; target.health = target.config.health; target.maxHealth = target.health;
             }
         } else {
             const target = pickValidBlockForAddition();
-            if (target) {
-                target.overlay = p.key;
-            }
+            if (target) target.overlay = p.key;
         }
       }
     }
 
-    // 8. Additive Guaranteed Obstacles
     for (const g of cfg.guaranteedObstacleConfig) {
       const count = floor(random(g.count[0], g.count[1] + 1));
       for (let i = 0; i < count; i++) {
         const target = pickValidBlockForAddition();
         if (target) {
-            target.type = g.type;
-            target.config = obstacleTypes[g.type] || obstacleTypes['o_dirt'];
-            target.health = target.config.health;
-            target.maxHealth = target.health;
+            target.type = g.type; target.config = obstacleTypes[g.type] || obstacleTypes['o_dirt']; target.health = target.config.health; target.maxHealth = target.health;
         }
       }
     }
-
-    // 9. Immediate Room Population Encounter -> Defer to trigger via roomEnemyBudget
     this.roomEnemyBudget = prefab.enemyBudget;
+    this.rebuildOverlayList();
   }
 
   display(playerPos: any) {
@@ -733,19 +685,42 @@ export class Chunk {
     const chunkY = this.cy * chunkW;
     if (chunkX + chunkW < left || chunkX > right || chunkY + chunkW < top || chunkY > bottom) return;
     
-    // Multi-pass layered rendering to optimize drawing overhead
+    // SQUARED DISTANCE OPTIMIZATION
+    const px = playerPos.x;
+    const py = playerPos.y;
+    const visRadSq = (VISIBILITY_RADIUS * GRID_SIZE)**2;
+    const fadeStartSq = ((VISIBILITY_RADIUS - 1) * GRID_SIZE)**2;
+
     // Pass 1: Renders bases (Ground/Liquids/Borders)
     for (let b of this.blocks) { 
-        b.update(); 
-        const d = dist(b.pos.x + GRID_SIZE/2, b.pos.y + GRID_SIZE/2, playerPos.x, playerPos.y) / GRID_SIZE;
-        const opacity = constrain(map(d, VISIBILITY_RADIUS - 1, VISIBILITY_RADIUS, 255, 0), 0, 255);
+        const dx = b.pos.x + GRID_SIZE/2 - px;
+        const dy = b.pos.y + GRID_SIZE/2 - py;
+        const dSq = dx*dx + dy*dy;
+        
+        if (dSq > visRadSq) continue;
+        b.update(); // Block logic only runs when near visible
+
+        let opacity = 255;
+        if (dSq > fadeStartSq) {
+          const d = Math.sqrt(dSq);
+          opacity = constrain(map(d, (VISIBILITY_RADIUS - 1) * GRID_SIZE, VISIBILITY_RADIUS * GRID_SIZE, 255, 0), 0, 255);
+        }
         b.renderBase(opacity); 
     }
     
-    // Pass 2: Renders overlays (Assets/Pulsing effects)
-    for (let b of this.blocks) {
-        const d = dist(b.pos.x + GRID_SIZE/2, b.pos.y + GRID_SIZE/2, playerPos.x, playerPos.y) / GRID_SIZE;
-        const opacity = constrain(map(d, VISIBILITY_RADIUS - 1, VISIBILITY_RADIUS, 255, 0), 0, 255);
+    // Pass 2: Renders overlays (Assets/Pulsing effects) - OPTIMIZED LIST
+    for (let b of this.overlayBlocks) {
+        const dx = b.pos.x + GRID_SIZE/2 - px;
+        const dy = b.pos.y + GRID_SIZE/2 - py;
+        const dSq = dx*dx + dy*dy;
+        
+        if (dSq > visRadSq) continue;
+
+        let opacity = 255;
+        if (dSq > fadeStartSq) {
+          const d = Math.sqrt(dSq);
+          opacity = constrain(map(d, (VISIBILITY_RADIUS - 1) * GRID_SIZE, VISIBILITY_RADIUS * GRID_SIZE, 255, 0), 0, 255);
+        }
         b.renderOverlay(opacity);
     }
   }
@@ -755,7 +730,6 @@ export class WorldManager {
   chunks: Map<string, Chunk> = new Map();
 
   constructor() {
-    // INITIALIZATION: Generate the room director chain on first load
     if (state.roomDirectorChain.length === 0) {
       state.roomDirectorData = generateRoomDirectorData();
       state.roomDirectorChain = state.roomDirectorData.split('-');
@@ -765,6 +739,10 @@ export class WorldManager {
   getChunk(cx: number, cy: number) {
     let key = `${cx},${cy}`;
     if (!this.chunks.has(key)) {
+      if (!state.chunkToDirectorIndex.has(key)) {
+        state.chunkToDirectorIndex.set(key, state.nextDirectorIndex++);
+      }
+      const directorIdx = state.chunkToDirectorIndex.get(key);
       const lv = floor(constrain(state.currentChunkLevel, 0, 10));
       const bonusData: any = {};
       const isStart = (cx === 0 && cy === 0);
@@ -778,30 +756,24 @@ export class WorldManager {
           state[potKey] -= amount;
         } else { bonusData[fk] = 0; }
       }
-      this.chunks.set(key, new Chunk(cx, cy, bonusData));
+      this.chunks.set(key, new Chunk(cx, cy, directorIdx, bonusData));
     }
     return this.chunks.get(key);
   }
   regenerateChunkAt(x: number, y: number) {
-    let gx = floor(x / GRID_SIZE);
-    let gy = floor(y / GRID_SIZE);
-    let cx = floor(gx / CHUNK_SIZE);
-    let cy = floor(gy / CHUNK_SIZE);
-    let key = `${cx},${cy}`;
-    this.chunks.delete(key);
+    let gx = floor(x / GRID_SIZE); let gy = floor(y / GRID_SIZE);
+    let cx = floor(gx / CHUNK_SIZE); let cy = floor(gy / CHUNK_SIZE);
+    this.chunks.delete(`${cx},${cy}`);
     this.getChunk(cx, cy);
   }
   update(playerPos: any) {
     let pcx = floor(playerPos.x / (GRID_SIZE * CHUNK_SIZE)); let pcy = floor(playerPos.y / (GRID_SIZE * CHUNK_SIZE));
     const exploredKey = `${pcx},${pcy}`;
-
-    // INTEGRATION: Trigger Room Director enemy budget if player enters a room chunk
     const currentChunk = this.getChunk(pcx, pcy);
     if (currentChunk && currentChunk.roomEnemyBudget > 0 && !currentChunk.isRoomBudgetTriggered) {
       spawnFromBudget(currentChunk.roomEnemyBudget);
       currentChunk.isRoomBudgetTriggered = true;
     }
-
     if (!state.exploredChunks.has(exploredKey)) { 
       state.exploredChunks.add(exploredKey); 
       const lv = floor(constrain(state.currentChunkLevel, 0, 10)); 
@@ -854,7 +826,6 @@ export class WorldManager {
     let chunk = this.chunks.get(`${cx},${cy}`); if(!chunk) return false;
     const b = chunk.blockMap.get(`${gx},${gy}`);
     if (!b || b.isMined) return false;
-    // Crates don't connect to anything
     if (myConfig.connectToOtherBlock === false || b.config.connectToOtherBlock === false) return false;
     return true;
   }
@@ -873,7 +844,6 @@ export class WorldManager {
     });
   }
   checkCollision(x: number, y: number, radius: number) {
-    // Check Blocks
     let gx = floor(x / GRID_SIZE); let gy = floor(y / GRID_SIZE);
     const searchRange = radius > GRID_SIZE ? 2 : 1;
     for (let i = gx - searchRange; i <= gx + searchRange; i++) {
@@ -890,7 +860,6 @@ export class WorldManager {
         }
       }
     }
-    // Check Forcefields
     for (const gf of state.groundFeatures) {
        if (gf.typeKey === 'gf_forcefield') {
           const dSq = (x - gf.pos.x)**2 + (y - gf.pos.y)**2;
