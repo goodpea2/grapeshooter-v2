@@ -111,16 +111,16 @@ export class Bullet {
     }
 
     if (this.damageTargets.includes('turret')) {
-      if (state.isStationary) {
-        for (let a of state.player.attachments) {
-          const awPos = a.getWorldPos();
-          const dSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
-          const minDist = a.size / 2 + 4;
-          if (dSq < minDist*minDist) {
-            a.takeDamage(this.dmg); if (this.config.aoeConfig?.isAoe) this.explode();
-            this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
-            this.life = 0; return;
-          }
+      // Healing check: only stationary or specialized turrets
+      for (let a of state.player.attachments) {
+        const awPos = a.getWorldPos();
+        const dSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
+        const minDist = a.size / 2 + 4;
+        if (dSq < minDist*minDist) {
+          a.takeDamage(this.dmg); 
+          if (this.config.aoeConfig?.isAoe) this.explode();
+          this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
+          this.life = 0; return;
         }
       }
     }
@@ -135,7 +135,11 @@ export class Bullet {
       }
     }
 
-    if (this.life <= 0 && this.config.aoeConfig?.isAoe && this.config.aoeConfig.dealAoeAfterLifetime) { this.explode(); this.spawnFeatures(this.config.spawnGroundFeatureOnContact); }
+    // FIX: Explode and spawn features for dummy bullets (life 0 at start)
+    if (this.life <= 0 && this.config.aoeConfig?.isAoe && (this.config.aoeConfig.dealAoeAfterLifetime || this.config.bulletLifeTime === 1)) { 
+        this.explode(); 
+        this.spawnFeatures(null); // Explicitly pass null to fallback to config keys during explosion
+    }
   }
   applyBulletConditions(target: any) {
     if (!target.applyCondition) return;
@@ -147,16 +151,24 @@ export class Bullet {
     if (this.config.stunDuration > 0) target.applyCondition('c_stun', this.config.stunDuration);
     if (this.config.slowDuration > 0) target.applyCondition('c_chilled', this.config.slowDuration);
   }
-  spawnFeatures(keys: string[]) {
-    if (!keys || keys.length === 0) return;
-    for (const gfKey of keys) {
-      let sx = this.pos.x; let sy = this.pos.y;
-      if (this.config.spawnGroundFeatureInRadius > 0) { let ang = random(TWO_PI); let r = random(this.config.spawnGroundFeatureInRadius); sx += cos(ang)*r; sy += sin(ang)*r; }
-      state.groundFeatures.push(new GroundFeature(sx, sy, gfKey));
+  spawnFeatures(keys: string[] | null) {
+    // FIX: Ensure list prioritization is correct even if an empty array is passed
+    const list = (keys && keys.length > 0) ? keys : (this.config.spawnGroundFeatureKeys || []);
+    if (list.length === 0) return;
+    const count = this.config.spawnGroundFeatureCount || 1;
+
+    for (let i = 0; i < count; i++) {
+        const gfKey = list[floor(random(list.length))];
+        let sx = this.pos.x; let sy = this.pos.y;
+        if (this.config.spawnGroundFeatureInRadius > 0) { 
+            let ang = random(TWO_PI); 
+            let r = random(this.config.spawnGroundFeatureInRadius); 
+            sx += cos(ang)*r; sy += sin(ang)*r; 
+        }
+        state.groundFeatures.push(new GroundFeature(sx, sy, gfKey));
     }
   }
 
-  // Calculate damage based on distance using linear interpolation between gradient points
   getLerpedAoeDamage(d: number, aoe: any) {
     const radii = aoe.aoeRadiusGradient;
     const damages = aoe.aoeDamageGradient;
@@ -164,11 +176,8 @@ export class Bullet {
     
     if (d > maxR) return 0;
     if (radii.length === 1) return d <= radii[0] ? damages[0] : 0;
-    
-    // Check if within first threshold
     if (d <= radii[0]) return damages[0];
 
-    // Lerp between thresholds
     for (let i = 0; i < radii.length - 1; i++) {
       if (d >= radii[i] && d <= radii[i+1]) {
         const factor = (d - radii[i]) / (radii[i+1] - radii[i]);
@@ -179,6 +188,16 @@ export class Bullet {
   }
 
   explode() {
+    // Trigger camera shake if configured
+    if (this.config.cameraShakeOnDeath) {
+      const [min, max, falloff] = this.config.cameraShakeOnDeath;
+      state.cameraShake += random(min, max);
+      // Expose and apply the third falloff parameter if it exists
+      if (falloff !== undefined) {
+        state.cameraShakeFalloff = falloff;
+      }
+    }
+
     const aoe = this.config.aoeConfig; if (!aoe) return;
     const radii = aoe.aoeRadiusGradient;
     const maxR = radii[radii.length - 1] || 10;
@@ -208,15 +227,14 @@ export class Bullet {
     }
 
     if (this.damageTargets.includes('turret')) {
-      if (state.isStationary) {
-        for (let a of state.player.attachments) {
-          const awPos = a.getWorldPos();
-          let adSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
-          if (adSq < maxR*maxR) {
-            const d = Math.sqrt(adSq);
-            const lerpDmg = this.getLerpedAoeDamage(d, aoe);
-            if (lerpDmg > 0) a.takeDamage(lerpDmg);
-          }
+      for (let a of state.player.attachments) {
+        const awPos = a.getWorldPos();
+        let adSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
+        if (adSq < maxR*maxR) {
+          const d = Math.sqrt(adSq);
+          const lerpDmg = this.getLerpedAoeDamage(d, aoe);
+          // Note: lerpDmg can be negative for healing starfruit pulse
+          if (lerpDmg !== 0) a.takeDamage(lerpDmg);
         }
       }
     }
@@ -256,12 +274,10 @@ export class Bullet {
     }
   }
   display() {
-    // Frustum culling
     const margin = 50;
     const screenX = this.pos.x - (state.cameraPos.x - width/2);
     const screenY = this.pos.y - (state.cameraPos.y - height/2);
     if (screenX < -margin || screenX > width + margin || screenY < -margin || screenY > height + margin) return;
-
     drawBullet(this);
   }
 }

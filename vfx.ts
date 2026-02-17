@@ -26,6 +26,8 @@ declare const push: any;
 declare const pop: any;
 declare const translate: any;
 declare const rotate: any;
+// Added missing scale declaration
+declare const scale: any;
 declare const CLOSE: any;
 declare const width: any;
 declare const height: any;
@@ -40,6 +42,98 @@ declare const floor: any;
 declare const HALF_PI: any;
 declare const line: any;
 declare const arc: any;
+declare const image: any;
+declare const imageMode: any;
+declare const CENTER: any;
+declare const tint: any;
+declare const noTint: any;
+
+export class MagicLinkVFX {
+    p1: any; p2: any; life: number = 30; maxLife: number = 30;
+    particles: any[] = [];
+
+    constructor(p1: any, p2: any) {
+        this.p1 = p1.copy();
+        this.p2 = p2.copy();
+        for(let i=0; i<5; i++) {
+            this.particles.push({
+                t: random(1),
+                s: random(4, 8),
+                off: random(TWO_PI)
+            });
+        }
+    }
+    update() { this.life--; }
+    isDone() { return this.life <= 0; }
+    display() {
+        let alpha = map(this.life, 0, this.maxLife, 0, 150);
+        stroke(255, 100, 200, alpha);
+        strokeWeight(2);
+        line(this.p1.x, this.p1.y, this.p2.x, this.p2.y);
+
+        noStroke();
+        fill(255, 150, 255, alpha);
+        for(let p of this.particles) {
+            let x = lerp(this.p1.x, this.p2.x, p.t);
+            let y = lerp(this.p1.y, this.p2.y, p.t);
+            let driftX = sin(frameCount * 0.2 + p.off) * 10;
+            let driftY = cos(frameCount * 0.2 + p.off) * 10;
+            ellipse(x + driftX, y + driftY, p.s);
+        }
+    }
+}
+
+export class ShopFlyVFX {
+  pos: any; 
+  target: any; 
+  life: number; 
+  maxLife: number; 
+  assetKey: string;
+  startPos: any;
+
+  constructor(sx: number, sy: number, tx: number, ty: number, assetKey: string) {
+    this.pos = createVector(sx, sy);
+    this.startPos = createVector(sx, sy);
+    this.target = createVector(tx, ty);
+    this.life = 40;
+    this.maxLife = 40;
+    this.assetKey = assetKey;
+  }
+
+  update() {
+    this.life--;
+    let t = 1 - (this.life / this.maxLife);
+    // Exponential ease in for a "snappy" landing
+    let easedT = pow(t, 2);
+    this.pos.x = lerp(this.startPos.x, this.target.x, easedT);
+    this.pos.y = lerp(this.startPos.y, this.target.y, easedT);
+  }
+
+  isDone() { return this.life <= 0; }
+
+  display() {
+    let t = 1 - (this.life / this.maxLife);
+    let size = map(sin(t * Math.PI), 0, 1, 60, 90);
+    let alpha = map(this.life, 0, 10, 0, 255);
+    
+    push();
+    translate(this.pos.x, this.pos.y);
+    rotate(t * TWO_PI);
+    
+    const sprite = state.assets[this.assetKey];
+    if (sprite) {
+      imageMode(CENTER);
+      tint(255, alpha);
+      image(sprite, 0, 0, size, size);
+      noTint();
+    } else {
+      fill(255, 255, 100, alpha);
+      noStroke();
+      ellipse(0, 0, 20);
+    }
+    pop();
+  }
+}
 
 export class LiquidTrailVFX {
   pos: any; type: string; life: number; maxLife: number; angle: number;
@@ -126,6 +220,11 @@ export class ConditionVFX {
         line(-3, 0, 3, 0); line(0, -3, 0, 3);
         pop();
       }
+    } else if (this.type === 'c_raged') {
+        let r = (this.target.size / 2 || 15) + 8;
+        noFill();
+        stroke(255, 100, 200, 180); strokeWeight(3);
+        ellipse(0, 0, r * 2 + sin(frameCount * 0.1) * 4);
     }
     pop();
   }
@@ -339,26 +438,88 @@ export class Explosion {
 }
 
 export class FirePuddleVFX {
-  pos: any; radius: number; life: number = 60; duration: number = 60;
+  pos: any; radius: number; life: number; duration: number;
   embers: any[] = [];
-  constructor(x: number, y: number, radius: number) {
-    this.pos = createVector(x, y); this.radius = radius;
-    for(let i=0; i<6; i++) this.embers.push({ p: createVector(random(-radius, radius), random(-radius, radius)), v: random(0.8, 2.0), s: random(3, 6) });
+  sparks: any[] = [];
+
+  constructor(x: number, y: number, radius: number, duration: number = 60) {
+    this.pos = createVector(x, y); 
+    this.radius = radius;
+    this.life = duration; 
+    this.duration = duration;
+    for(let i=0; i<6; i++) {
+        this.embers.push({ 
+            p: createVector(random(-radius, radius), random(-radius, radius)), 
+            v: random(0.8, 1.5), 
+            s: random(3, 5),
+            off: random(TWO_PI)
+        });
+    }
   }
-  update() { this.life--; for(let e of this.embers) e.p.y -= e.v; }
-  isDone() { return this.life <= 0; }
-  display() {
-    let alpha = map(this.life, 0, this.duration, 0, 255);
-    let pulse = 1.0 + 0.2 * sin(frameCount * 0.4);
-    push(); translate(this.pos.x, this.pos.y);
-    noStroke();
-    fill(255, 40, 0, alpha * 0.5); ellipse(0, 0, this.radius * 2.8 * pulse);
-    fill(255, 120, 20, alpha); ellipse(0, 0, this.radius * 2.2 * pulse);
-    fill(255, 230, 100, alpha * 0.9); ellipse(0, 0, this.radius * 1.4 * pulse);
+
+  update() { 
+    this.life--; 
     for(let e of this.embers) {
-      fill(255, 255, 150, alpha); ellipse(e.p.x, e.p.y, e.s);
+        e.p.y -= e.v; 
+        if (e.p.y < -this.radius) e.p.y = this.radius;
+    }
+
+    // Persistant spark spawning loop
+    if (this.life > 15 && random() < 0.25) {
+        this.sparks.push({
+            p: createVector(this.pos.x + random(-this.radius*0.7, this.radius*0.7), this.pos.y + random(-this.radius*0.3, this.radius*0.3)),
+            v: createVector(random(-0.5, 0.5), random(-1.5, -3.5)),
+            l: floor(random(20, 40)),
+            s: random(2, 4)
+        });
+    }
+
+    for (let i = this.sparks.length - 1; i >= 0; i--) {
+        this.sparks[i].p.add(this.sparks[i].v);
+        this.sparks[i].l--;
+        if (this.sparks[i].l <= 0) this.sparks.splice(i, 1);
+    }
+  }
+
+  isDone() { return this.life <= 0; }
+
+  display() {
+    // Fading logic: Quick fade in, then persistent, then shrink fade out (outro)
+    let alpha = 130; 
+    let scaleFactor = 1.0;
+    
+    if (this.life > this.duration - 20) {
+        alpha = map(this.life, this.duration, this.duration - 20, 0, 130);
+    } else if (this.life < 20) {
+        alpha = map(this.life, 0, 20, 0, 130);
+        scaleFactor = map(this.life, 0, 20, 0, 1.0);
+    }
+    
+    let pulse = 1.0 + 0.1 * sin(frameCount * 0.3);
+    push(); 
+    translate(this.pos.x, this.pos.y);
+    scale(scaleFactor);
+    noStroke();
+    
+    // Core fire bodies (lower alpha for layered effect)
+    fill(255, 40, 0, alpha * 0.4); ellipse(0, 0, this.radius * 2.8 * pulse);
+    fill(255, 120, 20, alpha * 0.6); ellipse(0, 0, this.radius * 2.1 * pulse);
+    fill(255, 230, 100, alpha * 0.5); ellipse(0, 0, this.radius * 1.3 * pulse);
+    
+    for(let e of this.embers) {
+      fill(255, 255, 150, alpha * 0.8); 
+      let drift = sin(frameCount * 0.1 + e.off) * 3;
+      ellipse(e.p.x + drift, e.p.y, e.s);
     }
     pop();
+
+    // Draw sparks in world space
+    for(let s of this.sparks) {
+        let sAlpha = map(s.l, 0, 40, 0, 255);
+        fill(255, 200, 100, sAlpha);
+        noStroke();
+        ellipse(s.p.x, s.p.y, s.s);
+    }
   }
 }
 

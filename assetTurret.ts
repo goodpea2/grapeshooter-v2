@@ -16,6 +16,9 @@ declare const abs: any;
 declare const HALF_PI: any;
 declare const cos: any;
 declare const sin: any;
+declare const map: any;
+declare const pow: any;
+declare const random: any;
 
 // Map turret logic IDs to asset keys
 export const TYPE_MAP: Record<string, string> = {
@@ -25,7 +28,8 @@ export const TYPE_MAP: Record<string, string> = {
   't_mine': 't_mine',
   't_ice': 't_ice',
   't_sunflower': 't_sunflower',
-  't_seed': 'seed_stray_t1', // Map to the stray seed asset
+  't_seed': 'seed_stray_t1', 
+  't_seed2': 'seed_stray_t2', // Map to the T2 stray seed asset
   't_lilypad': 't_lilypad',
   't2_repeater': 't_repeater',
   't2_firepea': 't_firepea',
@@ -42,11 +46,22 @@ export const TYPE_MAP: Record<string, string> = {
   't2_icebomb': 't_icebomb',
   't2_stun': 't_stun',
   't2_spike': 't_spike',
-  't3_triplepea': 't_triplepea'
+  't3_triplepea': 't_triplepea',
+  // Special Turrets
+  't0_puffshroom': 't0_puffshroom',
+  't0_grapeshot': 't0_grapeshot',
+  't0_jalapeno': 't0_jalapeno',
+  't0_firecherry': 't0_firecherry',
+  't0_starfruit': 't0_starfruit',
+  't0_iceshroom': 't0_iceshroom',
+  't0_cherrybomb': 't0_cherrybomb'
 };
 
 // Units that do not have a back-facing asset
-const NO_BACK_UNITS = new Set(['t_wall', 't2_tall', 't2_pulse', 't2_spike', 't_sunflower', 't_seed', 't_lilypad']);
+const NO_BACK_UNITS = new Set([
+  't_wall', 't2_tall', 't2_pulse', 't2_spike', 't_sunflower', 't_seed', 't_seed2', 't_lilypad',
+  't0_jalapeno', 't0_firecherry', 't0_starfruit', 't0_iceshroom', 't0_cherrybomb'
+]);
 
 export function hasTurretSprite(type: string): boolean {
   return !!TYPE_MAP[type];
@@ -65,7 +80,19 @@ export function drawTurretSprite(t: any) {
   // Render offset for ground layer
   const ly = (t.config.turretLayer === 'ground') ? HEX_DIST * 0.25 : 0;
   
-  translate(wPos.x + jx, wPos.y + jy + ly);
+  // SHAKE LOGIC for explosive turrets
+  let shakeX = 0;
+  let shakeY = 0;
+  if (t.config.explosiveGrowth) {
+    const duration = t.config.actionConfig.dieAfterDuration || 180;
+    const tVal = Math.min(1.0, t.framesAlive / duration);
+    // Cubic scaling for intensity: starts very slow, gets violent at end
+    const intensity = pow(tVal, 3.5) * 6;
+    shakeX = random(-intensity, intensity);
+    shakeY = random(-intensity, intensity);
+  }
+
+  translate(wPos.x + jx + shakeX, wPos.y + jy + ly + shakeY);
 
   let isLeft = false;
   let isBack = false;
@@ -108,6 +135,22 @@ export function drawTurretSprite(t: any) {
   if (sprite) {
     push();
     
+    // Explosive growth visual (scaling)
+    if (config.explosiveGrowth) {
+        const duration = actionConfig.dieAfterDuration || 180;
+        const tVal = Math.min(1.0, t.framesAlive / duration);
+        const sVal = map(tVal, 0, 1, 1.0, 1.5);
+        const whiteVal = map(tVal, 0.5, 1, 255, 500); // Tint white effect
+        scale(sVal, sVal);
+        if (tVal > 0.5) tint(whiteVal, whiteVal, whiteVal, t.alpha);
+    }
+
+    // HEAL / DAMAGE FLASH
+    if (t.flashTimer > 0) {
+      if (t.flashType === 'heal') tint(100, 255, 100, t.alpha);
+      else tint(255, 100, 100, t.alpha);
+    }
+
     // Stable "random" rotation and flip based on UID
     if (config.randomRotation) {
         let hash = 0;
@@ -129,7 +172,7 @@ export function drawTurretSprite(t: any) {
     translate(rx, ry);
 
     imageMode(CENTER);
-    if (t.alpha < 255) tint(255, t.alpha);
+    if (!config.explosiveGrowth && t.flashTimer <= 0 && t.alpha < 255) tint(255, t.alpha);
     image(sprite, 0, 0, 50, 50);
     noTint();
     pop();

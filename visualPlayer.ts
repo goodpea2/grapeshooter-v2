@@ -72,16 +72,24 @@ export function drawPlayer(p: any) {
   if (sprite) {
     push();
     if (isLeft) scale(-1, 1);
+    
+    // CONDITION TINTS
+    const isRaged = p.conditions.has('c_raged');
     if (p.flash > 0) tint(255, 100, 100);
+    else if (isRaged) tint(255, 100 + sin(frameCount * 0.4) * 100, 200); // Raged Pink pulse
+    
     imageMode(CENTER);
     // Draw slightly larger than hitbox to show detail
-    image(sprite, 0, 0, p.size * 2.5, p.size * 2.5);
+    image(sprite, 0, 0, 80, 80);
     noTint();
     pop();
   } else {
     // Fallback if images fail to load
     let c = [30, 40, 70];
+    const isRaged = p.conditions.has('c_raged');
     if (p.flash > 0) c = [255, 100, 100];
+    else if (isRaged) c = [255, 100, 200];
+
     stroke(20, 20, 40);
     strokeWeight(4);
     fill(c[0], c[1], c[2]);
@@ -93,7 +101,7 @@ export function drawPlayer(p: any) {
   }
 
   // 4. Auto Turret (Mining Laser Arm)
-  if (state.isStationary) {
+  if (state.isStationary || p.conditions.has('c_raged')) {
     push();
     rotate(p.autoTurretAngle);
     stroke(20, 20, 40);

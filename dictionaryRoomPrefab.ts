@@ -1,4 +1,3 @@
-
 export interface RoomPrefab {
   id: string;
   name: string;
@@ -22,6 +21,8 @@ export interface RoomPrefab {
       type: string;
       count: [number, number];
     }[];
+    guaranteedNpc?: string; // e.g. "NPC_tutorial", "lv1 npc", "lv2 npc", "lv3 npc"
+    guaranteedOverlay?: string; // e.g. "o_treasurechest_100"
   };
 }
 
@@ -30,6 +31,21 @@ const AIR_NOT_REQUIRED = { minAirRatio: 0, airIncludeLiquid: false };
 const AIR_DEFAULT = { minAirRatio: 0.4, airIncludeLiquid: false };
 
 export const ROOM_PREFABS: RoomPrefab[] = [
+  // --- Empty Prefab ---
+  { id: 'emt0', name: 'Empty Room', roomValue: 0, roomLevel: 0, enemyBudget: 0, worldGenConfig: { ...AIR_NOT_REQUIRED, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 0], tnt: [0, 0], crate: [0, 0], guaranteedObstacleConfig: [] } },
+
+  // --- Treasure Rooms ---
+  { id: 'tre1', name: 'Treasure 1', roomValue: 100, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedOverlay: 'o_treasurechest_100' } },
+  { id: 'tre2', name: 'Treasure 2', roomValue: 200, roomLevel: 2, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedOverlay: 'o_treasurechest_200' } },
+  { id: 'tre3', name: 'Treasure 3', roomValue: 300, roomLevel: 3, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedOverlay: 'o_treasurechest_300' } },
+
+  // --- NPC Rooms ---
+  { id: 'tut0', name: 'Tutor Base', roomValue: 0, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [5, 5], tnt: [0, 0], crate: [0, 0], guaranteedObstacleConfig: [], guaranteedNpc: 'NPC_tutorial' } },
+  { id: 'npc1', name: 'Outpost 1', roomValue: 0, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedNpc: 'lv1 npc' } },
+  { id: 'npc2', name: 'Outpost 2', roomValue: 0, roomLevel: 2, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedNpc: 'lv2 npc' } },
+  { id: 'npc3', name: 'Outpost 3', roomValue: 0, roomLevel: 3, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedNpc: 'lv3 npc' } },
+
+  // --- Existing Prefabs ---
   { id: 'mon1', name: 'Monster Room 1', roomValue: -20, roomLevel: 1, enemyBudget: 60, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 1], crate: [0, 0], guaranteedObstacleConfig: [] } },
   { id: 'mon2', name: 'Monster Room 2', roomValue: -40, roomLevel: 2, enemyBudget: 150, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 1], crate: [0, 0], guaranteedObstacleConfig: [] } },
   { id: 'mon3', name: 'Monster Room 3', roomValue: -80, roomLevel: 3, enemyBudget: 350, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 1], crate: [0, 0], guaranteedObstacleConfig: [] } },
@@ -54,9 +70,9 @@ export const ROOM_PREFABS: RoomPrefab[] = [
   { id: 'sun4', name: 'Sun Cache 4', roomValue: 160, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_NOT_REQUIRED, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [80, 130], tnt: [0, 5], crate: [0, 7], guaranteedObstacleConfig: [] } },
   { id: 'sun5', name: 'Sun Cache 5', roomValue: 300, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_NOT_REQUIRED, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [120, 180], tnt: [0, 6], crate: [0, 8], guaranteedObstacleConfig: [] } },
 
-  { id: 'xpl1', name: 'Blast Zone 1', roomValue: 10, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_NOT_REQUIRED, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [5, 10], tnt: [6, 12], crate: [0, 2], guaranteedObstacleConfig: [] } },
-  { id: 'xpl2', name: 'Blast Zone 2', roomValue: 20, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_NOT_REQUIRED, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [5, 20], tnt: [12, 24], crate: [0, 3], guaranteedObstacleConfig: [] } },
-  { id: 'xpl3', name: 'Blast Zone 3', roomValue: 30, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_NOT_REQUIRED, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [5, 30], tnt: [24, 48], crate: [0, 4], guaranteedObstacleConfig: [] } },
+  { id: 'xpl1', name: 'Blast Zone 1', roomValue: 10, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_NOT_REQUIRED, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [5, 10], tnt: [2, 4], crate: [0, 2], guaranteedObstacleConfig: [] } },
+  { id: 'xpl2', name: 'Blast Zone 2', roomValue: 20, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_NOT_REQUIRED, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [5, 20], tnt: [4, 8], crate: [0, 3], guaranteedObstacleConfig: [] } },
+  { id: 'xpl3', name: 'Blast Zone 3', roomValue: 30, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_NOT_REQUIRED, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [5, 30], tnt: [8, 16], crate: [0, 4], guaranteedObstacleConfig: [] } },
 
   { id: 'crt1', name: 'Storage Room 1', roomValue: 20, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_NOT_REQUIRED, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 1], crate: [4, 8], guaranteedObstacleConfig: [] } },
   { id: 'crt2', name: 'Storage Room 2', roomValue: 40, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_NOT_REQUIRED, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 1], crate: [8, 16], guaranteedObstacleConfig: [] } },

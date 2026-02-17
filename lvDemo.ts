@@ -14,7 +14,8 @@ declare const sin: any;
 declare const frameCount: any;
 declare const floor: any;
 
-export const customBudgetPerNight = [100, 250, 500, 1000, 1800, 3200, 5600, 8000, 11000, 12500];
+// export const customBudgetPerNight = [100, 250, 500, 1000, 1800, 3200, 5600, 8000, 11000, 12500]; // old
+export const customBudgetPerNight = [100, 250, 500, 850, 1500, 2600, 4500, 6700, 8000, 10000]; // new with roomDirector
 export const customDayLightConfig = '000011222222222222110000'; // 0: Night, 1: Transition, 2: Day
 export const customStartingHour = 6;
 
@@ -43,13 +44,13 @@ const SPAWN_WEIGHTS: Record<string, number[]> = {
   "1_day":   [1,   0,   0,   0,   0,   0,   0,   0],
   "1_night": [1,   1,   0,   0,   0,   0,   0,   0],
   "2_day":   [1,   1,   0,   0,   0,   0,   0,   0],
-  "2_night": [1,   1,   1,   0,   0.5, 0,   0,   0],
-  "3_day":   [1,   1,   0.5, 0,   0,   0,   0,   0],
-  "3_night": [0.5, 1,   1,   0.5, 1,   0.5, 0,   0],
-  "4_day":   [0,   1,   0.5, 0,   0,   0,   0,   0],
-  "4_night": [0,   0,   0,   0,   1,   1,   1,   0],
-  "5_day":   [1,   1,   1,   0,   0,   0,   0,   0],
-  "5_night": [0,   0,   0.5, 0.5, 0,   1,   1,   0],
+  "3_night": [1,   1,   1,   0,   0.5, 0,   0,   0],
+  "4_day":   [1,   1,   0.5, 0,   0,   0,   0,   0],
+  "5_night": [0.5, 1,   1,   0.5, 1,   0.5, 0,   0],
+  "6_day":   [0,   1,   0.5, 0,   0,   0,   0,   0],
+  "7_night": [0,   0,   0,   0,   1,   1,   1,   0],
+  "8_day":   [1,   1,   1,   0,   0,   0,   0,   0],
+  "9_night": [0,   0,   0.5, 0.5, 0,   1,   1,   0],
 };
 
 const ENEMY_KEYS = ['e_basic', 'e_armor1', 'e_armor2', 'e_armor3', 'e_shooting', 'e_swarm', 'e_giant', 'e_critter'];
@@ -57,7 +58,7 @@ const ENEMY_KEYS = ['e_basic', 'e_armor1', 'e_armor2', 'e_armor3', 'e_shooting',
 function getWeightsForCurrentTime() {
   const t = getTime();
   const isNight = getLightLevel(t.hour) === 0;
-  const dayKey = Math.min(t.day, 5);
+  const dayKey = Math.min(t.day, 10);
   const key = `${dayKey}_${isNight ? 'night' : 'day'}`;
   return SPAWN_WEIGHTS[key] || SPAWN_WEIGHTS["5_night"];
 }

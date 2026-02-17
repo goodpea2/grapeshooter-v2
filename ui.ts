@@ -1,10 +1,11 @@
 
 import { state } from './state';
-import { HOUR_FRAMES, GRID_SIZE } from './constants';
+import { HOUR_FRAMES, GRID_SIZE, VERSION } from './constants';
 import { turretTypes } from './balanceTurrets';
 import { drawDebugPanel, drawWorldGenPreview } from './uiDebug';
 import { TYPE_MAP } from './assetTurret';
 import { getLightLevel, customDayLightConfig } from './lvDemo';
+import { drawNPCPanel } from './uiNpcShop';
 
 declare const floor: any;
 declare const nf: any;
@@ -22,6 +23,7 @@ declare const LEFT: any;
 declare const RIGHT: any;
 declare const TOP: any;
 declare const CENTER: any;
+declare const BOTTOM: any;
 declare const mouseX: any;
 declare const mouseY: any;
 declare const width: any;
@@ -132,9 +134,10 @@ export function drawTurretTooltip(t: any, x: number, y: number, isPreview: boole
   text(desc, tx + 10, ty + infoYStart + 35, boxW - 20);
 
   if (isPreview) {
-    let totalCost = config.mergeCost || 0;
+    // Dynamic Merge Cost is calculated and passed into the target preview in index.tsx
+    let totalCost = t.cost || 0; 
     
-    // If dragging from shop, add purchase price to the total previewed cost
+    // If dragging from shop, we pay purchase price + gap
     const activeShopType = state.draggedTurretType || state.selectedTurretType;
     if (activeShopType) {
       const shopConfig = turretTypes[activeShopType];
@@ -152,9 +155,12 @@ export function drawTurretTooltip(t: any, x: number, y: number, isPreview: boole
 
 function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha: number) {
   const size = 58;
+  const ownedCount = state.inventory[key] || 0;
+  const isOwned = ownedCount > 0;
+  
   const costType = tr.costType || 'sun';
   const currency = costType === 'soil' ? state.soilCurrency : state.sunCurrency;
-  const canAfford = currency >= tr.cost;
+  const canAfford = isOwned || currency >= tr.cost;
   
   const lastUsed = state.turretLastUsed[key] || -99999;
   const cooldownFrames = (tr.cooldownHours || 0) * HOUR_FRAMES;
@@ -175,7 +181,7 @@ function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha: numbe
   }
   
   noStroke();
-  let bgColor = tr.isSpecial ? [40, 200, 80] : [40, 80, 200]; 
+  let bgColor = tr.isSpecial ? [140, 55, 100] : [40, 80, 200]; 
   if (!canAfford || onCooldown) bgColor = [40, 40, 40]; 
   
   fill(bgColor[0], bgColor[1], bgColor[2], alpha);
@@ -204,26 +210,39 @@ function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha: numbe
     arc(0, 0, size - 4, size - 4, -HALF_PI, endAngle);
   }
 
-  // Cost Pill
-  const priceW = 46;
-  const priceH = 20;
-  const pY = size / 2;
-  rectMode(CENTER);
-  fill(canAfford ? [30, 60, 150] : [40, 40, 40], alpha);
-  noStroke();
-  rect(0, pY, priceW, priceH, 10);
-  
-  // Cost Icon and Text
-  imageMode(CENTER);
-  if (!canAfford) tint(100, 100, 100, alpha);
-  const iconKey = costType === 'soil' ? 'img_icon_soil' : 'img_icon_sun';
-  image(state.assets[iconKey], -12, pY, 22, 22);
-  noTint();
-  
-  fill(255, alpha);
-  textAlign(LEFT, CENTER);
-  textSize(12);
-  text(`${tr.cost}`, 0, pY + 1);
+  // Cost Pill or Owned Count
+  if (!isOwned) {
+    const priceW = 46;
+    const priceH = 20;
+    const pY = size / 2;
+    rectMode(CENTER);
+    fill(canAfford ? [30, 60, 150] : [40, 40, 40], alpha);
+    noStroke();
+    rect(0, pY, priceW, priceH, 10);
+    
+    imageMode(CENTER);
+    if (!canAfford) tint(100, 100, 100, alpha);
+    const iconKey = costType === 'soil' ? 'img_icon_soil' : 'img_icon_sun';
+    image(state.assets[iconKey], -12, pY, 22, 22);
+    noTint();
+    
+    fill(255, alpha);
+    textAlign(LEFT, CENTER);
+    textSize(12);
+    text(`${tr.cost}`, 0, pY + 1);
+  } else {
+    // Show count on top-right panel
+    push();
+    translate(size/2 - 5, -size/2 + 5);
+    fill(20, 20, 40, alpha);
+    noStroke();
+    ellipse(0, 0, 22, 22);
+    fill(255, alpha);
+    textAlign(CENTER, CENTER);
+    textSize(11);
+    text(ownedCount, 0, 0);
+    pop();
+  }
   pop();
 
   if (hov && mouseIsPressed && state.isStationary) {
@@ -422,6 +441,16 @@ function drawStats(alpha: number) {
   pop();
 }
 
+function drawFooter() {
+  push();
+  textAlign(CENTER, BOTTOM);
+  textSize(10);
+  fill(255, 80);
+  noStroke();
+  text(VERSION, width / 2, height - 10);
+  pop();
+}
+
 export function drawUI(spawnFromBudget: Function) {
   drawClock(60, 60, 255);
   drawStats(255);
@@ -441,12 +470,20 @@ export function drawUI(spawnFromBudget: Function) {
   const specList: any[] = [];
   for (let key in turretTypes) {
     let tr = turretTypes[key];
-    if (tr.tier > 1.2) continue;
-    if (tr.isSpecial) {
-      if (key === 't_lilypad' && !isNearWater) continue;
-      specList.push({key, tr});
-    } else {
+    const owned = (state.inventory[key] || 0) > 0;
+    
+    // Tier 1 and 2 standard list
+    if (tr.tier > 0 && tr.tier <= 1.2 && !tr.isSpecial) {
       stdList.push({key, tr});
+    } else if (tr.isSpecial || tr.tier === 0) {
+      // Logic update: Special turrets always available if owned
+      if (owned) {
+        specList.push({key, tr});
+      } else if (tr.isSpecial) {
+        if (key === 't_lilypad' && !isNearWater) continue;
+        // Lilypad stays in special column even if not owned but affordable
+        if (key === 't_lilypad') specList.push({key, tr});
+      }
     }
   }
 
@@ -461,11 +498,17 @@ export function drawUI(spawnFromBudget: Function) {
     curY += spacing;
   }
 
-  // Draw Special Column
+  // Draw Special Column (Multi-column support if needed, currently 1)
   curY = 160;
-  for (let item of specList) {
-    drawTurretIcon(item.tr, item.key, hudXStart + 75, curY, shopAlpha);
+  let colX = hudXStart + 75;
+  for (let i = 0; i < specList.length; i++) {
+    const item = specList[i];
+    drawTurretIcon(item.tr, item.key, colX, curY, shopAlpha);
     curY += spacing;
+    if (curY > height - 100) {
+      curY = 160;
+      colX += 75;
+    }
   }
   pop();
 
@@ -481,6 +524,8 @@ export function drawUI(spawnFromBudget: Function) {
   if (dbgHov && mouseIsPressed) { state.showDebug = !state.showDebug; (window as any).mouseIsPressed = false; }
   pop();
 
+  drawNPCPanel();
   drawDebugPanel(spawnFromBudget);
   drawWorldGenPreview();
+  drawFooter();
 }

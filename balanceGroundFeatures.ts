@@ -6,11 +6,22 @@ export const groundFeatureTypes: any = {
     name: 'Fire Puddle',
     life: 60,
     radius: 16,
-    damage: 1,
+    damage: 1, // firepea's fire puddle also damages obstacles
     tickRate: 6,
     vfxType: 'fire_puddle',
     color: [255, 100, 50],
     appliedCondition: [{ type: 'c_burning', duration: 60, damage: 0 }],
+    conditionDuration: 60
+  },
+  gf_firecherry_puddle: {
+    name: 'Cherry Fire',
+    life: HOUR_FRAMES * 2,
+    radius: 20,
+    damage: 1,
+    tickRate: 6,
+    vfxType: 'fire_puddle',
+    color: [255, 50, 0],
+    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 1 }],
     conditionDuration: 60
   },
   gf_stun_gas: {

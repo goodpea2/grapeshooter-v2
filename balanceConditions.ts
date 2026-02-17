@@ -31,5 +31,11 @@ export const conditionTypes: any = {
     conditionClashesConfig: {
       override: ['c_chilled', 'c_burning', 'c_stun']
     }
+  },
+  c_raged: {
+    name: 'Raged',
+    conditionVfx: 'condition_raged',
+    playerCombatBoost: 4.0,
+    visualFlashColor: [255, 100, 200] // Pink flash
   }
 };

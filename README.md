@@ -1,17 +1,37 @@
-
 # Core Explorer: Technical & Design Library
 
 Core Explorer (v3.1) is a procedural 2D survival game built with **TypeScript** and **p5.js**. It features a unique mobile-base expansion system, a deep merging matrix, and a dynamic ecosystem.
 
 ---
 
-## 🏗️ Room Prefab System (New)
+## 🏗️ Room Prefab System
 Scripted chunk generation that bypasses the standard noise-based pipeline for tactical level design.
 - **Air Ratio**: Ensures a minimum percentage of traversable space by strategically carving blocks.
 - **Enemy Spawners**: Randomly picks spawner overlays with danger levels matched to the room's difficulty.
 - **Loot Pots**: Randomly distributes Sun, TNT, and Crate nodes across the chunk.
 - **Guaranteed Obstacles**: Allows placing specific block types (like Treasure Chests or specific resource crates) in precise quantities.
 - **Immediate Budget**: Triggers a localized enemy wave upon generation to populate the "room".
+
+---
+
+## 👥 NPC Characters
+The world is populated by unique survivors who offer specialized trades. Each character features custom front and back-facing sprites:
+- **Tutor Thyme**: The initial guide.
+- **Lily**: Swamp dweller specializing in Lilypads and aquatic growth.
+- **Jelly**: Provides early-game explosives.
+- **Farmer**: Agricultural expert for T1 and T2 Seeds.
+- **Sour Grape**: Obsessed with purple Elixir; trades for high-value consumables.
+- **Shroom**: Night-themed vendor of cheap Puffshrooms.
+- **Sir Knight**: Defensive veteran providing Tallnuts.
+- **Hunter**: Bulk trader for high-tier combat gear.
+
+---
+
+## 🛠️ Debug Mode & World Preview
+The Debug menu includes a sophisticated **World Generation Preview** for balancing.
+- **Buffered Map Preview**: The noise map is rendered to a separate graphics buffer to maintain 60 FPS even when tweaking parameters.
+- **Room Director Generation**: A sophisticated logic chain that plans out prefab sequences. The generated chain is displayed in a wrapped, scrollable text field with a one-click copy function.
+- **Responsive Layout**: UI modal scales to fit smaller screen resolutions without spilling over boundaries.
 
 ---
 

@@ -1,3 +1,4 @@
+
 import { state } from './state';
 import { GRID_SIZE } from './constants';
 import { hasTurretSprite, drawTurretSprite } from './assetTurret';
@@ -113,6 +114,12 @@ export function drawTurret(t: any) {
     
     let bc = [...t.config.color];
     if (onCooldown) bc = [120, 120, 130];
+    
+    // HEAL / DAMAGE FLASH
+    if (t.flashTimer > 0) {
+        if (t.flashType === 'heal') bc = [100, 255, 100];
+        else bc = [255, 100, 100];
+    }
 
     stroke(20, 20, 40, t.alpha);
     strokeWeight(3);
@@ -163,8 +170,8 @@ export function drawTurret(t: any) {
     }
   }
 
-  // Seed Growth Bar
-  if (t.type === 't_seed' && t.growthProgress > 0) {
+  // Seed Growth Bar (Applies to both T1 and T2 seeds)
+  if ((t.type === 't_seed' || t.type === 't_seed2') && t.growthProgress > 0) {
     const maxG = t.config.actionConfig.maxGrowth || 32;
     const gRatio = t.growthProgress / maxG;
     const barW = t.size + 10;
@@ -174,7 +181,10 @@ export function drawTurret(t: any) {
     const glowAlpha = t.isWaterlogged ? 150 + 100 * sin(state.frames * 0.2) : 180;
 
     push();
-    translate(0, -t.size/2 - 12);
+    // Offset further up if HP bar is also present
+    const hRatio = t.health / t.maxHealth;
+    const verticalOffset = hRatio < 1.0 ? -t.size/2 - 18 : -t.size/2 - 12;
+    translate(0, verticalOffset);
     scale(1.0);
     
     noStroke();
@@ -211,17 +221,23 @@ export function drawTurret(t: any) {
   }
   pop();
 
-  // Health Bar
+  // Health Bar (Rectangular Version)
   let hRatio = t.health / t.maxHealth;
   if (hRatio < 1.0) {
     push();
     translate(wPos.x, wPos.y);
-    noFill();
-    strokeWeight(2);
-    stroke(20, 20, 40, t.alpha * 0.8);
-    ellipse(0, 0, t.config.size);
-    stroke(255, 100, 100, t.alpha);
-    arc(0, 0, t.config.size, t.config.size, -HALF_PI, -HALF_PI + TWO_PI * hRatio);
+    const barW = t.size + 6;
+    const barH = 4;
+    translate(0, -t.size/2 - 8);
+    
+    noStroke();
+    fill(20, 20, 40, t.alpha * 0.8);
+    rectMode(CENTER);
+    rect(0, 0, barW, barH, 2);
+    
+    fill(255, 100, 100, t.alpha);
+    rectMode(CORNER);
+    rect(-barW/2, -barH/2, barW * hRatio, barH, 2);
     pop();
   }
 }

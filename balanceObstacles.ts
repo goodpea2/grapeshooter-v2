@@ -1,4 +1,3 @@
-
 import { GRID_SIZE, HOUR_FRAMES } from './constants';
 
 export const obstacleTypes: any = {
@@ -50,7 +49,6 @@ export const overlayTypes: any = {
     bulletToSpawnOnDeath: ['b_tnt_explosion'],
     assetImgConfig: { idleAssetImg: ['img_tnt_a'], randomRotation: false, randomFlip: true }
   },
-  // Fix: Removed duplicate o_sunflower entry
   o_sunflower: { 
     name: 'Wild Sunflower', 
     minHealth: -1, 
@@ -85,6 +83,20 @@ export const overlayTypes: any = {
       bulletTypeKey: 'b_sniper_shot',
       seeThroughObstacles: true
     }
+  },
+
+  // --- TREASURE CHESTS ---
+  o_treasurechest_100: {
+    name: 'Treasure Chest', minHealth: 250, isValuable: true, obstacleOverlayVfx: 'v_treasurechest', isConcealedAlongWithObstacle: false,
+    lootConfigOnDeath: 'lc_treasurechest_100', assetImgConfig: { idleAssetImg: ['img_treasurechest'], randomRotation: false, randomFlip: false }
+  },
+  o_treasurechest_200: {
+    name: 'Treasure Chest', minHealth: 500, isValuable: true, obstacleOverlayVfx: 'v_treasurechest', isConcealedAlongWithObstacle: false,
+    lootConfigOnDeath: 'lc_treasurechest_200', assetImgConfig: { idleAssetImg: ['img_treasurechest'], randomRotation: false, randomFlip: false }
+  },
+  o_treasurechest_300: {
+    name: 'Treasure Chest', minHealth: 1000, isValuable: true, obstacleOverlayVfx: 'v_treasurechest', isConcealedAlongWithObstacle: false,
+    lootConfigOnDeath: 'lc_treasurechest_300', assetImgConfig: { idleAssetImg: ['img_treasurechest'], randomRotation: false, randomFlip: false }
   },
 
   // --- MONSTER SPAWNERS ---

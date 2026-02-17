@@ -1,9 +1,9 @@
-
 import { state } from '../state';
 import { GRID_SIZE, CHUNK_SIZE, VISIBILITY_RADIUS } from '../constants';
 import { liquidTypes } from '../balanceLiquids';
+import { conditionTypes } from '../balanceConditions';
 import { overlayTypes } from '../balanceObstacles';
-import { Explosion, LiquidTrailVFX, MuzzleFlash } from '../vfx';
+import { Explosion, LiquidTrailVFX, MuzzleFlash, ConditionVFX } from '../vfx';
 import { AttachedTurret } from './attachedTurret';
 import { LootEntity } from './loot';
 import { Bullet } from './bullet';
@@ -23,11 +23,29 @@ declare const TWO_PI: any;
 
 export class Player {
   pos: any; prevPos: any; size = 30; attachments: AttachedTurret[] = []; health = 100; maxHealth = 100; speed = 3.6; flash = 0; autoTurretAngle = 0; autoTurretLastShot = 0; autoTurretRange = GRID_SIZE * 6; autoTurretFireRate = 22; recoil = 0; target: any = null;
+  conditions: Map<string, number> = new Map();
+
   constructor(x: number, y: number) { this.pos = createVector(x, y); this.prevPos = createVector(x, y); }
+  
+  applyCondition(cKey: string, duration: number) {
+    const cfg = conditionTypes[cKey]; if (!cfg) return;
+    this.conditions.set(cKey, Math.max(this.conditions.get(cKey) || 0, duration));
+    if (!state.vfx.some((v: any) => v instanceof ConditionVFX && v.target === this && v.type === cKey)) state.vfx.push(new ConditionVFX(this, cKey));
+  }
+
   update() {
     this.prevPos.set(this.pos); 
     this.recoil = (this.recoil || 0) * 0.85;
     if (this.flash > 0) this.flash--;
+
+    // Process Conditions
+    let fireRateMult = 1.0;
+    for (let [cKey, life] of this.conditions) {
+      const cfg = conditionTypes[cKey];
+      if (cfg.playerCombatBoost) fireRateMult *= cfg.playerCombatBoost;
+      this.conditions.set(cKey, life - 1);
+      if (life <= 0) this.conditions.delete(cKey);
+    }
 
     const gx = floor(this.pos.x / GRID_SIZE); const gy = floor(this.pos.y / GRID_SIZE);
     const liquidType = state.world.getLiquidAt(gx, gy); const lData = liquidType ? liquidTypes[liquidType] : null;
@@ -51,6 +69,10 @@ export class Player {
       if (res === 'collected') {
         if (loot.config.type === 'turret') {
            this.addStrayTurret(loot.config.itemValue !== undefined ? String(loot.config.itemValue) : loot.config.item);
+        } else if (loot.config.type === 'turretAsItem') {
+           const itemKey = loot.config.item;
+           state.inventory[itemKey] = (state.inventory[itemKey] || 0) + 1;
+           state.uiAlpha = 255; // Wake up UI to show inventory update
         } else {
            const val = loot.config.itemValue || 1;
            if (loot.config.item === 'sun') {
@@ -71,7 +93,7 @@ export class Player {
         state.loot.splice(i, 1); 
       }
     }
-    this.updateAutoTurret();
+    this.updateAutoTurret(fireRateMult);
   }
 
   applyObstacleRepulsion() {
@@ -122,15 +144,19 @@ export class Player {
     }
   }
 
-  updateAutoTurret() {
-    if (!state.isStationary) return;
+  updateAutoTurret(fireRateMult: number) {
+    const isRaged = this.conditions.has('c_raged');
+    if (!state.isStationary && !isRaged) return;
+
+    const effectiveFireRate = this.autoTurretFireRate / fireRateMult;
+
     let bestR = null; let minRD = this.autoTurretRange;
     for (let a of this.attachments) if (a.isFrosted && a.iceCubeHealth > 0) { let d = dist(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y); if (d < minRD && state.world.checkLOS(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y)) { minRD = d; bestR = a; } }
-    if (bestR) { this.target = bestR; const bp = bestR.getWorldPos(); this.autoTurretAngle = atan2(bp.y - this.pos.y, bp.x - this.pos.x); if (frameCount - this.autoTurretLastShot > this.autoTurretFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, bp.x, bp.y, 'b_player', 'icecube')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 24, 6, color(100, 200, 255))); this.autoTurretLastShot = frameCount; this.recoil = 6; } return; }
+    if (bestR) { this.target = bestR; const bp = bestR.getWorldPos(); this.autoTurretAngle = atan2(bp.y - this.pos.y, bp.x - this.pos.x); if (frameCount - this.autoTurretLastShot > effectiveFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, bp.x, bp.y, 'b_player', 'icecube')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 24, 6, color(100, 200, 255))); this.autoTurretLastShot = frameCount; this.recoil = 6; } return; }
     let nearestE = null; let minDistE = this.autoTurretRange;
     for (let e of state.enemies) if (!e.isInvisible && e.health > 0 && !e.isDying) { let d = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y); if (d < minDistE && state.world.checkLOS(this.pos.x, this.pos.y, e.pos.x, e.pos.y)) { minDistE = d; nearestE = e; } }
-    if (nearestE) { this.autoTurretAngle = atan2(nearestE.pos.y - this.pos.y, nearestE.pos.x - this.pos.x); if (frameCount - this.autoTurretLastShot > this.autoTurretFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, nearestE.pos.x, nearestE.pos.y, 'b_player', 'enemy')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 24, 6, color(100, 200, 255))); this.autoTurretLastShot = frameCount; this.recoil = 6; } } else {
-      let t = this.findBlockTarget(this.pos, this.autoTurretRange); if (t) { let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); if (frameCount - this.autoTurretLastShot > this.autoTurretFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, bc.x, bc.y, 'b_player_mining', 'none')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 14, 4, color(255, 255, 100))); this.autoTurretLastShot = frameCount; this.recoil = 3; } }
+    if (nearestE) { this.autoTurretAngle = atan2(nearestE.pos.y - this.pos.y, nearestE.pos.x - this.pos.x); if (frameCount - this.autoTurretLastShot > effectiveFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, nearestE.pos.x, nearestE.pos.y, 'b_player', 'enemy')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 24, 6, color(100, 200, 255))); this.autoTurretLastShot = frameCount; this.recoil = 6; } } else {
+      let t = this.findBlockTarget(this.pos, this.autoTurretRange); if (t) { let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); if (frameCount - this.autoTurretLastShot > effectiveFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, bc.x, bc.y, 'b_player_mining', 'none')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 14, 4, color(255, 255, 100))); this.autoTurretLastShot = frameCount; this.recoil = 3; } }
     }
   }
 

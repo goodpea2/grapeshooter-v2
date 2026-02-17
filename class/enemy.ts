@@ -33,6 +33,7 @@ export class Enemy {
   pos: any; type: string; config: any; health: number; maxHealth: number; speed: number; size: number; col: any; target: any = null; flash: number = 0; rot: number; actionType: string[]; actionConfig: any;
   meleeCooldown: number = 0; shootCooldown: number = 0; swarmParticles: any[] = []; markedForDespawn: boolean = false;
   conditions: Map<string, number> = new Map();
+  conditionData: Map<string, any> = new Map();
   prevPos: any; isDying: boolean = false;
   triggeredSpawnThresholds: Set<number> = new Set(); // Tracks already fired health ratios
 
@@ -41,11 +42,23 @@ export class Enemy {
     if (this.type === 'e_swarm') for(let i=0; i<10; i++) this.swarmParticles.push({ offset: p5.Vector.random2D().mult(random(12, 24)), size: random(5, 9), phase: random(TWO_PI) });
   }
 
-  applyCondition(cKey: string, duration: number) {
+  applyCondition(cKey: string, duration: number, data?: any) {
     const cfg = conditionTypes[cKey]; if (!cfg) return;
-    if (cfg.conditionClashesConfig?.override) for (let ov of cfg.conditionClashesConfig.override) this.conditions.delete(ov);
-    // Use Math.max to refresh/cap duration rather than stacking infinitely
+    if (cfg.conditionClashesConfig?.override) {
+        for (let ov of cfg.conditionClashesConfig.override) {
+            this.conditions.delete(ov);
+            this.conditionData.delete(ov + '_dmg');
+        }
+    }
+    
     this.conditions.set(cKey, Math.max(this.conditions.get(cKey) || 0, duration));
+    
+    // Stack logic for highest damage rate
+    if (cKey === 'c_burning' && data?.damage !== undefined) {
+        const currentMax = this.conditionData.get('c_burning_dmg') || 0;
+        this.conditionData.set('c_burning_dmg', Math.max(currentMax, data.damage));
+    }
+
     if (!state.vfx.some((v: any) => v instanceof ConditionVFX && v.target === this && v.type === cKey)) state.vfx.push(new ConditionVFX(this, cKey));
   }
 
@@ -69,10 +82,20 @@ export class Enemy {
     let speedMult = 1.0;
     for (let [cKey, life] of this.conditions) {
       const cfg = conditionTypes[cKey];
-      if (cfg.damage && frameCount % cfg.damageInterval === 0) this.takeDamage(cfg.damage);
+      
+      if (cKey === 'c_burning') {
+          const dmg = this.conditionData.get('c_burning_dmg') || cfg.damage || 0;
+          if (dmg > 0 && frameCount % (cfg.damageInterval || 6) === 0) this.takeDamage(dmg);
+      } else if (cfg.damage && frameCount % cfg.damageInterval === 0) {
+          this.takeDamage(cfg.damage);
+      }
+
       speedMult *= cfg.enemyMovementSpeedMultiplier;
       this.conditions.set(cKey, life - 1);
-      if (life <= 0) this.conditions.delete(cKey);
+      if (life <= 0) {
+          this.conditions.delete(cKey);
+          if (cKey === 'c_burning') this.conditionData.delete('c_burning_dmg');
+      }
     }
 
     const gx = floor(this.pos.x / GRID_SIZE); const gy = floor(this.pos.y / GRID_SIZE);
@@ -88,7 +111,7 @@ export class Enemy {
          const interval = cfg.damageInterval || 10;
          if (frameCount % interval === 0) {
            if (cfg.damage) this.takeDamage(cfg.damage);
-           if (cfg.condition) this.applyCondition(cfg.condition, cfg.conditionDuration || interval * 2);
+           if (cfg.condition) this.applyCondition(cfg.condition, cfg.conditionDuration || interval * 2, { damage: cfg.damage });
          }
        }
     }

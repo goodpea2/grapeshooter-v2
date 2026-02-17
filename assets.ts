@@ -1,4 +1,3 @@
-
 export const ASSETS = {
   img_player_front_right: "https://i.ibb.co/S4YhXH19/player-front-right.png",
   img_player_back_right: "https://i.ibb.co/SwVp44h3/player-back-right.png",
@@ -11,6 +10,28 @@ export const ASSETS = {
   img_giant: "https://i.ibb.co/23cV4ct6/e-giant.png",
   img_shooting: "https://i.ibb.co/d47j3DPF/e-shooting.png",
   img_swarm_center: "https://i.ibb.co/MyKZDBGY/e-swarm-center.png",
+
+  // Character-Specific NPC Assets
+  img_npc_tutorial_front: "https://i.ibb.co/4gVc5ryz/npc-tutorial-front-right.png",
+  img_npc_tutorial_back: "https://i.ibb.co/4gVc5ryz/npc-tutorial-front-right.png",
+  img_npc_lily_front: "https://i.ibb.co/DSfz04t/npc-lily-back-right.png",
+  img_npc_lily_back: "https://i.ibb.co/DSfz04t/npc-lily-back-right.png",
+  img_npc_jelly_front: "https://i.ibb.co/Lz9qd9RQ/npc-jelly-front-right.png",
+  img_npc_jelly_back: "https://i.ibb.co/3YTFkXbQ/npc-jelly-back-right.png",
+  img_npc_farmer_front: "https://i.ibb.co/WNmK5HD9/npc-farmer-back-right.png",
+  img_npc_farmer_back: "https://i.ibb.co/WNmK5HD9/npc-farmer-back-right.png",
+  img_npc_sourgrape_front: "https://i.ibb.co/QFv31tXV/npc-sourgrape-back-right.png",
+  img_npc_sourgrape_back: "https://i.ibb.co/QFv31tXV/npc-sourgrape-back-right.png",
+  img_npc_shroom_front: "https://i.ibb.co/Wpk01YZ1/npc-shroom-back-right.png",
+  img_npc_shroom_back: "https://i.ibb.co/Wpk01YZ1/npc-shroom-back-right.png",
+  img_npc_knight_front: "https://i.ibb.co/mVhgsTC7/npc-knight-font-right.png",
+  img_npc_knight_back: "https://i.ibb.co/y2XGN8P/npc-knight-back-right.png",
+  img_npc_hunter_front: "https://i.ibb.co/8nbF6xhC/npc-hunter-front-right.png",
+  img_npc_hunter_back: "https://i.ibb.co/mrQ6tqBr/npc-hunter-back-right.png",
+
+  // Legacy NPC Template (Fallback)
+  img_npc_template_front: "https://i.ibb.co/yF5JThHT/npc-template-front-right.png",
+  img_npc_template_back: "https://i.ibb.co/Z17bPCMW/npc-template-back-right.png",
 
   // Turret Assets
   img_t_firepea_front: "https://i.ibb.co/Zz2k7PCM/t-firepea-front-right.png",
@@ -38,6 +59,18 @@ export const ASSETS = {
   img_t_sunflower_front: "https://i.ibb.co/m5ycbXKr/t-sunflower-front-right.png",
   img_t_lilypad_front: "https://i.ibb.co/LXsjh9Q0/t-lilypad.png",
 
+  // Special Turrets
+  img_t0_puffshroom_back: "https://i.ibb.co/VGYhBp3/t-puffshroom-back-right.png",
+  img_t0_puffshroom_front: "https://i.ibb.co/yn00YBFP/t-puffshroom-front-right.png",
+  img_t0_grapeshot_back: "https://i.ibb.co/8g8tH2Zy/t-grapeshot-back-right.png",
+  img_t0_grapeshot_front: "https://i.ibb.co/Jw6Lm46D/t-grapeshot-front-right.png",
+  img_t0_jalapeno_front: "https://i.ibb.co/kgvP3ZrD/t-jalapeno-front-right.png",
+  img_t0_firecherry_front: "https://i.ibb.co/h1LjfXPS/t-firecherry-front-right.png",
+  img_t0_starfruit_front: "https://i.ibb.co/sXWz0n3/t-starfruit-front-right.png",
+  img_t0_iceshroom_front: "https://i.ibb.co/sdShyXN8/t-iceshroom-front-right.png",
+  img_t0_cherrybomb_front: "https://i.ibb.co/PzgRmRmL/t-cherrybomb-front-right.png",
+  img_seed_stray_t2: "https://i.ibb.co/gb0CSBYs/seed-stray-t2.png",
+
   // Tripeater Assets
   img_t_triplepea_front: "https://i.ibb.co/xtrcv6Sp/t-tripea-front-right.png",
   img_t_triplepea_back: "https://i.ibb.co/7dZFZh4n/t-tripea-back-right.png",
@@ -52,6 +85,7 @@ export const ASSETS = {
   img_tnt_a: "https://i.ibb.co/RRd6FZG/blockoverlay-tnt-a.png",
   img_seed_stray_t1: "https://i.ibb.co/NnSKj477/seed-stray-t1.png",
   img_seed_sunflower: "https://i.ibb.co/qF4r2s5Q/seed-sunflower.png",
+  img_treasurechest: "https://i.ibb.co/HDnbtq3T/blockoverlay-treasurechest.png",
 
   // UI Icons
   img_icon_elixir: "https://i.ibb.co/yB7nHpR4/icon-elixir.png",

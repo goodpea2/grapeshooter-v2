@@ -6,13 +6,15 @@ import {
 import { obstacleTypes, overlayTypes, BLOCK_WEIGHTS } from './balanceObstacles';
 import { liquidTypes, LIQUID_WEIGHTS, LIQUID_KEYS } from './balanceLiquids';
 import { MuzzleFlash, BlockDebris } from './vfx';
-import { Enemy, Bullet } from './entities';
+import { Enemy, Bullet, NPCEntity } from './entities';
 import { spawnLootAt, ECONOMY_CONFIG } from './economy';
 import { worldGenConfig, requestSpawn, spawnFromBudget } from './lvDemo';
 import { drawOverlay } from './visualObstacles';
 import { enemyTypes } from './balanceEnemies';
 import { drawDecoration } from './visualDecoration';
-import { RoomPrefab } from './dictionaryRoomPrefab';
+// Added RoomPrefab interface to imports
+import { ROOM_PREFABS, RoomPrefab } from './dictionaryRoomPrefab';
+import { generateRoomDirectorData } from './debug/roomDirectorGenerator';
 
 declare const createVector: any;
 declare const dist: any;
@@ -51,6 +53,20 @@ declare const TWO_PI: any;
 declare const atan2: any;
 declare const width: any;
 declare const height: any;
+
+/**
+ * Maps a grid coordinate to a 1D spiral index starting from (0,0).
+ */
+function getSpiralIndex(x: number, y: number): number {
+  let r = Math.max(Math.abs(x), Math.abs(y));
+  if (r === 0) return 0;
+  let maxSide = 2 * r + 1;
+  let maxIdx = maxSide * maxSide - 1;
+  if (y === -r) return maxIdx - (r - x);
+  if (x === -r) return maxIdx - 2 * r - (y + r);
+  if (y === r) return maxIdx - 4 * r - (x + r);
+  return maxIdx - 6 * r - (r - y);
+}
 
 export class Block {
   gx: number; gy: number; pos: any; type: string; config: any; overlay: string | null;
@@ -378,10 +394,23 @@ export class Chunk {
   cx: number; cy: number; blocks: Block[] = []; blockMap: Map<string, Block> = new Map();
   localChunkLevel: number = 0;
   prefabId: string | null = null;
+  roomEnemyBudget: number = 0;
+  isRoomBudgetTriggered: boolean = false;
 
   constructor(cx: number, cy: number, bonusData: any = {}) { 
     this.cx = cx; this.cy = cy; 
-    this.generate(bonusData); 
+    
+    // INTEGRATION: Check Room Director for prefab assignment based on Spiral Index
+    const spiralIdx = getSpiralIndex(cx, cy);
+    const chain = state.roomDirectorChain || [];
+    const targetPrefabId = (spiralIdx < chain.length) ? chain[spiralIdx] : null;
+    const prefab = targetPrefabId ? ROOM_PREFABS.find(p => p.id === targetPrefabId) : null;
+
+    if (prefab) {
+      this.generateFromPrefab(prefab, bonusData);
+    } else {
+      this.generate(bonusData); 
+    }
   }
 
   generate(bonusData: any, levelOverride?: number) {
@@ -516,25 +545,66 @@ export class Chunk {
     }
   }
 
-  generateFromPrefab(prefab: RoomPrefab) {
-    // 1. Foundational Layer: Generate standard noise-based chunk at CURRENT world level
+  generateFromPrefab(prefab: RoomPrefab, bonusData: any) {
+    // 1. Foundational Layer: Generate standard noise-based chunk at CURRENT world level.
+    // INTEGRATION FIX: We must pass the bonusData from the WorldManager (accumulated pots) 
+    // to the standard generator so standard features like snipers and seeds spawn alongside the prefab content.
     const lv = floor(constrain(state.currentChunkLevel, 0, 10));
-    const bonusData: any = {};
-    const featureKeys = ['sun', 'tnt', 'stray', 'sunflower', 'sniper', 'spawner'];
-    for (const fk of featureKeys) {
-        const stats = WORLD_GEN_STATS[fk][lv];
-        if (random() < stats.chance) bonusData[fk] = floor(stats.value || 1);
-        else bonusData[fk] = 0;
-    }
     
-    // Call the base generator first - this handles standard noise and standard loot distributions
+    // Call the base generator first - this handles standard noise and standard loot distributions from pots
     this.generate(bonusData, lv);
     
     // Set metadata for debug tracking
     this.prefabId = prefab.id;
     const cfg = prefab.worldGenConfig;
 
-    // 2. Additive Carving (Air Ratio)
+    // Helper for adding prefab-specific PoIs
+    const pickValidBlockForAddition = () => {
+      // Must be solid ground, no liquid, and no existing overlay (additive PoI placement)
+      const candidates = this.blocks.filter(b => !b.isMined && !b.overlay && !b.liquidType);
+      if (candidates.length === 0) return null;
+      return candidates[floor(random(candidates.length))];
+    };
+
+    // 2. Guaranteed NPC Logic (Spawn + Clear Surroundings)
+    if (cfg.guaranteedNpc) {
+      let npcKey = cfg.guaranteedNpc;
+      if (npcKey === 'lv1 npc') npcKey = random(['NPC_lv1_lily', 'NPC_lv1_jelly']);
+      if (npcKey === 'lv2 npc') npcKey = random(['NPC_lv2_farmer', 'NPC_lv2_sourgrape', 'NPC_lv2_shroom']);
+      if (npcKey === 'lv3 npc') npcKey = random(['NPC_lv3_knight', 'NPC_lv3_hunter']);
+
+      const spawnGX = floor(this.cx * CHUNK_SIZE + random(4, 12));
+      const spawnGY = floor(this.cy * CHUNK_SIZE + random(4, 12));
+      
+      // Clear 2-radius surroundings
+      for (let i = spawnGX - 2; i <= spawnGX + 2; i++) {
+        for (let j = spawnGY - 2; j <= spawnGY + 2; j++) {
+           const b = this.blockMap.get(`${i},${j}`);
+           if (b) {
+             b.isMined = true;
+             b.overlay = null;
+             b.liquidType = null;
+           }
+        }
+      }
+
+      state.npcs.push(new NPCEntity(spawnGX * GRID_SIZE + GRID_SIZE/2, spawnGY * GRID_SIZE + GRID_SIZE/2, npcKey));
+    }
+
+    // 3. Guaranteed Overlay Logic (e.g. Treasure Chest)
+    if (cfg.guaranteedOverlay) {
+        const target = pickValidBlockForAddition();
+        if (target) {
+            target.overlay = cfg.guaranteedOverlay;
+            const oCfg = overlayTypes[cfg.guaranteedOverlay];
+            if (oCfg.minHealth > 0) {
+              target.health = oCfg.minHealth;
+              target.maxHealth = target.health;
+            }
+        }
+    }
+
+    // 4. Additive Carving (Air Ratio)
     const totalPossibleBlocks = CHUNK_SIZE * CHUNK_SIZE;
     const getSolidBlocks = () => this.blocks.filter(b => !b.isMined);
     const getLiquidBlocks = () => this.blocks.filter(b => b.liquidType);
@@ -562,15 +632,7 @@ export class Chunk {
         }
     }
 
-    // Helper for adding prefab-specific PoIs
-    const pickValidBlockForAddition = () => {
-      // Must be solid ground, no liquid, and no existing overlay (additive PoI placement)
-      const candidates = this.blocks.filter(b => !b.isMined && !b.overlay && !b.liquidType);
-      if (candidates.length === 0) return null;
-      return candidates[floor(random(candidates.length))];
-    };
-
-    // 3. Additive Prefab Spawners
+    // 5. Additive Prefab Spawners
     const spawnerCount = floor(random(cfg.enemySpawnerCount[0], cfg.enemySpawnerCount[1] + 1));
     const danger = cfg.enemySpawnerConfig.danger;
     const spawnerPool = Object.keys(overlayTypes).filter(k => overlayTypes[k].isEnemySpawner && overlayTypes[k].danger === danger);
@@ -585,7 +647,7 @@ export class Chunk {
       }
     }
 
-    // 4. Additive Multi-tier Sun (Using same logic as sunPot distribution)
+    // 6. Additive Multi-tier Sun (Using same logic as sunPot distribution)
     const sunToSpawn = floor(random(cfg.sun[0], cfg.sun[1] + 1));
     if (sunToSpawn > 0) {
       let remainingSun = sunToSpawn;
@@ -613,7 +675,7 @@ export class Chunk {
       }
     }
 
-    // 5. Additive Prefab TNT and Crates
+    // 7. Additive Prefab TNT and Crates
     const otherPots = [
       { key: 'o_tnt', countRange: cfg.tnt },
       { key: 'o_crate', isBlock: true, countRange: cfg.crate }
@@ -642,7 +704,7 @@ export class Chunk {
       }
     }
 
-    // 6. Additive Guaranteed Obstacles
+    // 8. Additive Guaranteed Obstacles
     for (const g of cfg.guaranteedObstacleConfig) {
       const count = floor(random(g.count[0], g.count[1] + 1));
       for (let i = 0; i < count; i++) {
@@ -656,10 +718,8 @@ export class Chunk {
       }
     }
 
-    // 7. Immediate Room Population Encounter
-    if (prefab.enemyBudget > 0) {
-        spawnFromBudget(prefab.enemyBudget); 
-    }
+    // 9. Immediate Room Population Encounter -> Defer to trigger via roomEnemyBudget
+    this.roomEnemyBudget = prefab.enemyBudget;
   }
 
   display(playerPos: any) {
@@ -693,6 +753,15 @@ export class Chunk {
 
 export class WorldManager {
   chunks: Map<string, Chunk> = new Map();
+
+  constructor() {
+    // INITIALIZATION: Generate the room director chain on first load
+    if (state.roomDirectorChain.length === 0) {
+      state.roomDirectorData = generateRoomDirectorData();
+      state.roomDirectorChain = state.roomDirectorData.split('-');
+    }
+  }
+
   getChunk(cx: number, cy: number) {
     let key = `${cx},${cy}`;
     if (!this.chunks.has(key)) {
@@ -725,6 +794,14 @@ export class WorldManager {
   update(playerPos: any) {
     let pcx = floor(playerPos.x / (GRID_SIZE * CHUNK_SIZE)); let pcy = floor(playerPos.y / (GRID_SIZE * CHUNK_SIZE));
     const exploredKey = `${pcx},${pcy}`;
+
+    // INTEGRATION: Trigger Room Director enemy budget if player enters a room chunk
+    const currentChunk = this.getChunk(pcx, pcy);
+    if (currentChunk && currentChunk.roomEnemyBudget > 0 && !currentChunk.isRoomBudgetTriggered) {
+      spawnFromBudget(currentChunk.roomEnemyBudget);
+      currentChunk.isRoomBudgetTriggered = true;
+    }
+
     if (!state.exploredChunks.has(exploredKey)) { 
       state.exploredChunks.add(exploredKey); 
       const lv = floor(constrain(state.currentChunkLevel, 0, 10)); 

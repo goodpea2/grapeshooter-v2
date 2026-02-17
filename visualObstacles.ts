@@ -1,4 +1,3 @@
-
 import { GRID_SIZE } from './constants';
 import { state } from './state';
 import { turretTypes } from './balanceTurrets';
@@ -95,6 +94,8 @@ export function drawOverlay(type: string, block: any, opacity: number) {
       ellipse(bit.x + GRID_SIZE*0.5, bit.y + GRID_SIZE*0.5, bit.s * 0.5);
     }
     pop();
+  } else if (type === 'v_treasurechest') {
+     // Rendering is handled by assetImgConfig above
   } else if (type === 'v_tnt') {
     push();
     const p = 0.5 + 0.5 * sin(frameCount * 0.2 + (gx + gy));

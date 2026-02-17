@@ -6,10 +6,12 @@ import {
 import { turretTypes } from './balanceTurrets';
 import { findMergeResult } from './dictionaryTurretMerging';
 import { enemyTypes } from './balanceEnemies';
+import { bulletTypes } from './balanceBullets';
 import { WorldManager } from './world';
-import { Player, Enemy, AttachedTurret, SunLoot } from './entities';
+import { Player, Enemy, AttachedTurret, SunLoot, NPCEntity } from './entities';
 import { getTime, drawUI, drawTurretTooltip } from './ui';
 import { drawWorldGenPreview } from './uiDebug';
+import { handleNpcUiClick } from './uiNpcShop';
 import { updateGameSystems, spawnFromBudget, getLightLevel, customDayLightConfig } from './lvDemo';
 import { MergeVFX } from './vfx';
 import { ASSETS } from './assets';
@@ -65,13 +67,14 @@ declare const rotate: any;
 declare const loadImage: any;
 declare const imageMode: any;
 declare const floor: any;
+declare const noise: any;
 
 function getHexAxial(x: number, y: number) {
   let q = (2/3 * x) / HEX_DIST; let r = (-1/3 * x + sqrt(3)/3 * y) / HEX_DIST;
   let x_ = q; let y_ = -q - r; let z_ = r;
   let rx = round(x_); let ry = round(y_); let rz = round(z_);
-  let dx = abs(rx - x_); let dy = abs(ry - y_); let dz = abs(rz - z_);
-  if (dx > dy && dx > dz) rx = -ry - rz; else if (dy > dz) ry = -rx - rz; else rz = -rx - ry;
+  let dx = abs(rx - x_); let dy = abs(ry - y_); let rz_ = abs(rz - z_);
+  if (dx > dy && dx > rz_) rx = -ry - rz; else if (dy > rz_) ry = -rx - rz; else rz = -rx - ry;
   return { q: rx, r: rz };
 }
 
@@ -133,21 +136,36 @@ function executePlacement() {
   const activePlacementType = state.isCurrentlyDragging ? state.draggedTurretType : state.selectedTurretType;
   if (!activePlacementType && !state.draggedTurretInstance) return;
   const snapAxial = getHexAxial(state.previewSnapPos.x - state.player.pos.x, state.previewSnapPos.y - state.player.pos.y);
+  
   if (activePlacementType) {
     const config = turretTypes[activePlacementType];
+    const isOwned = (state.inventory[activePlacementType] || 0) > 0;
     const costType = config.costType || 'sun';
     const currency = costType === 'soil' ? state.soilCurrency : state.sunCurrency;
+
     if (state.mergeTargetPreview) {
       const target = state.player.attachments.find((t: any) => t.uid === state.mergeTargetPreview.uid);
       if (target && !target.isFrosted) {
         const mergeCost = state.mergeTargetPreview.cost;
-        const purchaseCost = config.cost;
+        const purchaseCost = isOwned ? 0 : config.cost;
         let canAfford = false;
-        if (costType === 'sun') { canAfford = state.sunCurrency >= (purchaseCost + mergeCost); } 
-        else { canAfford = state.soilCurrency >= purchaseCost && state.sunCurrency >= mergeCost; }
+        
+        if (isOwned) {
+           canAfford = state.sunCurrency >= mergeCost;
+        } else {
+           // Purchase cost is always paid first if not owned
+           if (costType === 'sun') { canAfford = state.sunCurrency >= (purchaseCost + mergeCost); } 
+           else { canAfford = state.soilCurrency >= purchaseCost && state.sunCurrency >= mergeCost; }
+        }
+
         if (canAfford) {
-          if (costType === 'sun') { state.sunCurrency -= (purchaseCost + mergeCost); } 
-          else { state.soilCurrency -= purchaseCost; state.sunCurrency -= mergeCost; }
+          if (isOwned) {
+             state.inventory[activePlacementType]--;
+             state.sunCurrency -= mergeCost;
+          } else {
+             if (costType === 'sun') { state.sunCurrency -= (purchaseCost + mergeCost); } 
+             else { state.soilCurrency -= purchaseCost; state.sunCurrency -= mergeCost; }
+          }
           const indexToReplace = state.player.attachments.indexOf(target);
           const newTurret = new AttachedTurret(state.mergeTargetPreview.type, state.player, target.hq, target.hr);
           newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
@@ -156,10 +174,14 @@ function executePlacement() {
           state.turretLastUsed[activePlacementType] = state.frames;
         }
       }
-    } else if (currency >= config.cost) {
+    } else if (isOwned || currency >= config.cost) {
+      if (isOwned) {
+        state.inventory[activePlacementType]--;
+      } else {
+        if (costType === 'soil') state.soilCurrency -= config.cost; else state.sunCurrency -= config.cost;
+      }
       const nt = new AttachedTurret(activePlacementType, state.player, snapAxial.q, snapAxial.r);
       state.player.attachments.push(nt);
-      if (costType === 'soil') state.soilCurrency -= config.cost; else state.sunCurrency -= config.cost;
       state.turretLastUsed[activePlacementType] = state.frames;
     }
   }
@@ -209,8 +231,17 @@ function executePlacement() {
   state.cameraPos.x = lerp(state.cameraPos.x, state.player.pos.x, 0.08); 
   state.cameraPos.y = lerp(state.cameraPos.y, state.player.pos.y, 0.08);
   
+  // Camera Shake Decay using dynamic falloff
+  state.cameraShake = (state.cameraShake || 0) * (state.cameraShakeFalloff || 0.95);
+  if (state.cameraShake < 0.1) state.cameraShake = 0;
+  
+  // EXTENDED FREQUENCY SHAKE: Use coordinated noise for slower oscillation (reduced from 0.2 to 0.1)
+  const shakeFreq = 0.1;
+  const shakeX = (noise(state.frames * shakeFreq, 0) * 2 - 1) * state.cameraShake;
+  const shakeY = (noise(state.frames * shakeFreq, 1000) * 2 - 1) * state.cameraShake;
+
   push(); 
-  translate(width/2 - state.cameraPos.x, height/2 - state.cameraPos.y);
+  translate(width/2 - state.cameraPos.x + shakeX, height/2 - state.cameraPos.y + shakeY);
   let bgCol = [20, 20, 40]; if (state.currentChunkLevel >= 3) bgCol = [40, 20, 60]; if (state.currentChunkLevel >= 6) bgCol = [60, 10, 30];
   push(); noStroke(); fill(bgCol[0], bgCol[1], bgCol[2], 50); rect(state.cameraPos.x - width, state.cameraPos.y - height, width*2, height*2); pop();
   image(state.deathVisualsBuffer, -4000, -4000);
@@ -246,10 +277,15 @@ function executePlacement() {
   for (let i = state.bullets.length - 1; i >= 0; i--) { state.bullets[i].update(); state.bullets[i].display(); if (state.bullets[i].life <= 0) state.bullets.splice(i, 1); }
   for (let i = state.enemyBullets.length - 1; i >= 0; i--) { state.enemyBullets[i].update(); state.enemyBullets[i].display(); if (state.enemyBullets[i].life <= 0) state.enemyBullets.splice(i, 1); }
   for (let i = state.groundFeatures.length - 1; i >= 0; i--) { state.groundFeatures[i].update(); state.groundFeatures[i].display(); if (state.groundFeatures[i].life <= 0) state.groundFeatures.splice(i, 1); }
+  
+  for (let npc of state.npcs) npc.update(state.player.pos);
+  
   state.player.displayAttachments(true);
   for (let i = state.enemies.length - 1; i >= 0; i--) { state.enemies[i].update(state.player.pos, state.player.attachments); state.enemies[i].display(); if (state.enemies[i].health <= 0 || state.enemies[i].markedForDespawn) state.enemies.splice(i, 1); }
   for (let i = state.vfx.length - 1; i >= 0; i--) { state.vfx[i].update(); state.vfx[i].display(); if (state.vfx[i].isDone()) state.vfx.splice(i, 1); }
   state.player.update(); state.player.display();
+
+  for (let npc of state.npcs) npc.display();
 
   const mWorld = createVector(mouseX - width/2 + state.cameraPos.x, mouseY - height/2 + state.cameraPos.y);
   state.hoveredTurretInstance = null;
@@ -284,19 +320,26 @@ function executePlacement() {
         if (att === state.draggedTurretInstance || att.isFrosted || (att.config.turretLayer || 'normal') !== 'normal' || att.baseIngredients.length === 0) continue;
         const combinedPool = [...draggingIngredients, ...att.baseIngredients];
         const resType = findMergeResult(combinedPool); const resConfig = resType ? turretTypes[resType] : null;
-        
-        // UPDATED AVAILABILITY: Default to EnabledTurrets, reveal Disabled via makeAllTurretsAvailable toggle
         const isAvailable = resType ? (EnabledTurrets.includes(resType) || state.makeAllTurretsAvailable) : false;
 
         if (resType && resConfig && isAvailable) {
           const wPos = att.getWorldPos();
-          let combinedMergeCost = resConfig.mergeCost; if (activePlacementType) combinedMergeCost += ghostConfig.cost;
-          const canAfford = state.sunCurrency >= combinedMergeCost;
+          
+          // DYNAMIC COST CALCULATION
+          const ingredientsCostSum = combinedPool.reduce((sum, k) => sum + (turretTypes[k]?.cost || 0), 0);
+          const combinedMergeCost = Math.max(0, resConfig.cost - ingredientsCostSum);
+          
+          let canAffordMerge = state.sunCurrency >= combinedMergeCost;
+          // If we are buying the dragging unit, check if we afford its base cost too
+          const purchaseCost = state.isCurrentlyDragging && state.draggedTurretType ? ghostConfig.cost : 0;
+          const totalReq = combinedMergeCost + purchaseCost;
+          const canAffordTotal = state.sunCurrency >= totalReq;
+
           push(); translate(wPos.x, wPos.y); const pulse = 1.0 + 0.1 * sin(frameCount * 0.2);
           rectMode(CENTER); fill(20, 20, 40, 240); noStroke();
           let tw = textWidth(`${combinedMergeCost}`) + 30; rect(0, att.size/2 + 10, tw, 22, 6);
-          imageMode(CENTER); if (!canAfford) (window as any).tint(150, 100, 100); image(state.assets['img_icon_sun'], -tw/2 + 10, att.size/2 + 10, 22 * pulse, 22 * pulse); (window as any).noTint();
-          fill(canAfford ? [255, 255, 150] : [255, 100, 100]); textAlign(LEFT, CENTER); textSize(12); text(`${combinedMergeCost}`, -tw/2 + 20, att.size/2 + 10); pop();
+          imageMode(CENTER); if (!canAffordTotal) (window as any).tint(150, 100, 100); image(state.assets['img_icon_sun'], -tw/2 + 10, att.size/2 + 10, 22 * pulse, 22 * pulse); (window as any).noTint();
+          fill(canAffordTotal ? [255, 255, 150] : [255, 100, 100]); textAlign(LEFT, CENTER); textSize(12); text(`${combinedMergeCost}`, -tw/2 + 20, att.size/2 + 10); pop();
         }
       }
     }
@@ -314,13 +357,17 @@ function executePlacement() {
             if (ghostLayer === 'normal' && !coreOccupant && draggingIngredients.length > 0 && occupantOnSameLayer.baseIngredients.length > 0) {
               const combinedPool = [...draggingIngredients, ...occupantOnSameLayer.baseIngredients];
               const resType = findMergeResult(combinedPool); const resConfig = resType ? turretTypes[resType] : null;
-              
-              // UPDATED AVAILABILITY
               const isAvailable = resType ? (EnabledTurrets.includes(resType) || state.makeAllTurretsAvailable) : false;
 
               if (resType && resConfig && isAvailable && !occupantOnSameLayer.isFrosted) {
-                let combinedMergeCost = resConfig.mergeCost; if (activePlacementType) combinedMergeCost += ghostConfig.cost;
-                if (state.sunCurrency >= combinedMergeCost) { if (d < closestDist) { closestDist = d; bestSnap = wPos; bestMergeTarget = occupantOnSameLayer; bestMergeInfo = { resType, resConfig, combinedPool }; } }
+                // DYNAMIC COST CALCULATION
+                const ingredientsCostSum = combinedPool.reduce((sum, k) => sum + (turretTypes[k]?.cost || 0), 0);
+                const combinedMergeCost = Math.max(0, resConfig.cost - ingredientsCostSum);
+                const purchaseCost = state.isCurrentlyDragging && state.draggedTurretType ? ghostConfig.cost : 0;
+                
+                if (state.sunCurrency >= (combinedMergeCost + purchaseCost)) { 
+                  if (d < closestDist) { closestDist = d; bestSnap = wPos; bestMergeTarget = occupantOnSameLayer; bestMergeInfo = { resType, resConfig, combinedPool, dynamicMergeCost: combinedMergeCost }; } 
+                }
               }
             }
           } 
@@ -335,15 +382,30 @@ function executePlacement() {
     if (bestSnap) {
       state.previewSnapPos = bestSnap;
       if (bestMergeTarget && bestMergeInfo) {
-        const { resType, resConfig, combinedPool } = bestMergeInfo; const isHovered = dist(mWorld.x, mWorld.y, bestSnap.x, bestSnap.y) < 25;
+        const { resType, resConfig, combinedPool, dynamicMergeCost } = bestMergeInfo; const isHovered = dist(mWorld.x, mWorld.y, bestSnap.x, bestSnap.y) < 25;
         push(); const pulse = 0.8 + 0.2 * sin(frameCount * 0.2); noStroke(); fill(255, 255, 100, isHovered ? 150 : (60 * pulse)); ellipse(bestSnap.x, bestSnap.y, bestMergeTarget.size + 15);
         if (isHovered) { const resRange = resConfig.actionConfig?.shootRange || resConfig.actionConfig?.beamMaxLength || resConfig.actionConfig?.pulseTriggerRadius || 0; if (resRange > 0) { push(); noFill(); stroke(255, 255, 0, 180); strokeWeight(3); ellipse(bestSnap.x, bestSnap.y, resRange * 2); pop(); } }
-        state.mergeTargetPreview = { uid: bestMergeTarget.uid, type: resType, pos: bestSnap, cost: resConfig.mergeCost, ingredients: combinedPool }; pop();
+        state.mergeTargetPreview = { uid: bestMergeTarget.uid, type: resType, pos: bestSnap, cost: dynamicMergeCost, ingredients: combinedPool }; pop();
       }
       if (ghostType) {
         const ghostAngle = state.draggedTurretInstance ? state.draggedTurretInstance.angle : 0;
-        const ghost = { uid: 'ghost', type: ghostType, config: ghostConfig, alpha: 127, angle: ghostAngle, recoil: 0, fireRateMultiplier: 1.0, actionTimers: new Map(), getWorldPos: () => state.previewSnapPos, jumpOffset: null };
+        const ghost = { 
+          uid: 'ghost', type: ghostType, config: ghostConfig, alpha: 127, angle: ghostAngle, 
+          recoil: 0, fireRateMultiplier: 1.0, actionTimers: new Map(), 
+          getWorldPos: () => state.previewSnapPos, jumpOffset: null,
+          framesAlive: 0, flashTimer: 0 
+        };
         drawTurretSprite(ghost);
+        
+        const actionConfig = ghostConfig.actionConfig;
+        let range = actionConfig?.shootRange || actionConfig?.beamMaxLength || actionConfig?.pulseTriggerRadius || 0;
+        if (range === 0 && actionConfig?.pulseBulletTypeKey) {
+            const bCfg = bulletTypes[actionConfig.pulseBulletTypeKey];
+            if (bCfg?.aoeConfig?.isAoe) range = bCfg.aoeConfig.aoeRadiusGradient[bCfg.aoeConfig.aoeRadiusGradient.length - 1];
+        }
+        if (range > 0) {
+            push(); noFill(); stroke(255, 255, 255, 100); strokeWeight(2); ellipse(state.previewSnapPos.x, state.previewSnapPos.y, range * 2); pop();
+        }
       }
     }
   }
@@ -355,12 +417,24 @@ function executePlacement() {
 
   drawGlobalLighting();
   drawUI(spawnFromBudget);
+  
+  for (let i = state.uiVfx.length - 1; i >= 0; i--) {
+    state.uiVfx[i].update();
+    state.uiVfx[i].display();
+    if (state.uiVfx[i].isDone()) state.uiVfx.splice(i, 1);
+  }
+
   drawWorldGenPreview();
   if (state.hoveredTurretInstance && !state.draggedTurretInstance && !activePlacementType) { drawTurretTooltip(state.hoveredTurretInstance, mouseX, mouseY); } 
   else if (state.mergeTargetPreview) { drawTurretTooltip(state.mergeTargetPreview, mouseX, mouseY, true); }
 };
 
 (window as any).mousePressed = () => {
+  if (state.activeNPC && handleNpcUiClick()) {
+    (window as any).mouseIsPressed = false;
+    return;
+  }
+
   if (mouseX > state.uiWidth && state.isStationary) {
     if (state.draggedTurretInstance || state.selectedTurretType) { if (state.previewSnapPos) { executePlacement(); return; } }
     const mWorld = createVector(mouseX - width/2 + state.cameraPos.x, mouseY - height/2 + state.cameraPos.y);
@@ -380,6 +454,8 @@ function executePlacement() {
 };
 
 (window as any).mouseReleased = () => {
+  state.pressedTradeId = null;
+
   if (state.draggedTurretType) {
     if (state.isCurrentlyDragging) { executePlacement(); } 
     else { if (state.selectedTurretType === state.draggedTurretType) { state.selectedTurretType = null; } else { state.selectedTurretType = state.draggedTurretType; } }
@@ -391,6 +467,10 @@ function executePlacement() {
 (window as any).mouseWheel = (event: any) => {
   if (state.showDebug && mouseX > width - 280) {
     state.debugScrollVelocity -= event.delta * 0.1;
+    return false;
+  }
+  if (state.activeNPC && mouseX > width - 320) {
+    state.npcShopScrollVelocity -= event.delta * 0.1;
     return false;
   }
 };

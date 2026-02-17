@@ -6,3 +6,4 @@ export * from './class/bullet';
 export * from './class/attachedTurret';
 export * from './class/enemy';
 export * from './class/player';
+export * from './class/npc';

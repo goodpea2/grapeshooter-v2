@@ -5,10 +5,11 @@ import { turretTypes } from '../balanceTurrets';
 import { conditionTypes } from '../balanceConditions';
 import { liquidTypes } from '../balanceLiquids';
 import { overlayTypes } from '../balanceObstacles';
-import { MuzzleFlash, Explosion, SparkVFX, BlockDebris, ConditionVFX, MergeVFX } from '../vfx';
+import { MuzzleFlash, Explosion, SparkVFX, BlockDebris, ConditionVFX, MergeVFX, MagicLinkVFX } from '../vfx';
 import { Bullet } from './bullet';
 import { SunLoot } from './loot';
 import { drawTurret } from '../visualTurrets';
+import { TURRET_RECIPES } from '../dictionaryTurretMerging';
 
 declare const p5: any;
 declare const createVector: any;
@@ -32,8 +33,12 @@ export class AttachedTurret {
   target: any = null;
   isWaterlogged: boolean = false; isFrosted: boolean = false; frostLevel: number = 0; iceCubeHealth: number = 0; fireRateMultiplier: number = 1.0;
   conditions: Map<string, number> = new Map();
+  conditionData: Map<string, any> = new Map();
   baseIngredients: string[] = []; // T1 components tracking
   growthProgress: number = 0;
+  framesAlive: number = 0;
+  flashTimer: number = 0;
+  flashType: 'damage' | 'heal' = 'damage';
   
   // Staggered target scan
   targetScanTimer: number;
@@ -49,8 +54,19 @@ export class AttachedTurret {
     this.offset = createVector(HEX_DIST * (1.5 * hq), HEX_DIST * (Math.sqrt(3)/2 * hq + Math.sqrt(3) * hr));
     this.targetScanTimer = floor(random(TurretMinScanRate));
 
+    // Resolve ingredients for merging logic
     if (this.config.tier === 1) {
       this.baseIngredients = [this.type];
+    } else if (this.config.tier === 2) {
+      // Find the recipe for this T2 turret to populate its T1 ingredients
+      const recipe = TURRET_RECIPES.find(r => r.id === this.type);
+      if (recipe) {
+        this.baseIngredients = [...recipe.ingredients];
+        // Fill duplicates to reach the total count (e.g. Repeater is 2x Peashooter)
+        while (this.baseIngredients.length < recipe.totalCount) {
+          this.baseIngredients.push(recipe.ingredients[0]);
+        }
+      }
     }
 
     // Initialize arming state if turret has an unarmed asset
@@ -66,15 +82,31 @@ export class AttachedTurret {
   getWorldPos() { return p5.Vector.add(this.parent.pos, this.offset); }
   getTargetCenter() { if (!this.target) return null; if (this.target.getWorldPos) return this.target.getWorldPos(); if (this.target.gx !== undefined) return createVector(this.target.gx * GRID_SIZE + GRID_SIZE/2, this.target.gy * GRID_SIZE + GRID_SIZE/2); return this.target.pos ? this.target.pos.copy() : null; }
   
-  applyCondition(cKey: string, duration: number) {
+  applyCondition(cKey: string, duration: number, data?: any) {
     const cfg = conditionTypes[cKey]; if (!cfg) return;
-    if (cfg.conditionClashesConfig?.override) for (let ov of cfg.conditionClashesConfig.override) this.conditions.delete(ov);
+    if (cfg.conditionClashesConfig?.override) {
+        for (let ov of cfg.conditionClashesConfig.override) {
+            this.conditions.delete(ov);
+            this.conditionData.delete(ov + '_dmg');
+        }
+    }
+    
     this.conditions.set(cKey, Math.max(this.conditions.get(cKey) || 0, duration));
+    
+    // Stack logic for highest damage rate
+    if (cKey === 'c_burning' && data?.damage !== undefined) {
+        const currentMax = this.conditionData.get('c_burning_dmg') || 0;
+        this.conditionData.set('c_burning_dmg', Math.max(currentMax, data.damage));
+    }
+
     if (!state.vfx.some((v: any) => v instanceof ConditionVFX && v.target === this && v.type === cKey)) state.vfx.push(new ConditionVFX(this, cKey));
   }
 
   update() {
     if (this.health <= 0) return;
+    this.framesAlive++;
+    if (this.flashTimer > 0) this.flashTimer--;
+
     const wPos = this.getWorldPos(); const gx = floor(wPos.x / GRID_SIZE); const gy = floor(wPos.y / GRID_SIZE);
     const liquidType = state.world.getLiquidAt(gx, gy); const lData = liquidType ? liquidTypes[liquidType] : null;
     this.fireRateMultiplier = lData?.liquidConfig?.turretFireRateMultiplier ?? 1.0;
@@ -94,7 +126,7 @@ export class AttachedTurret {
             ? (cfg.damageWhileStationary ?? 0) + this.maxHealth * (cfg.damageAsMaxHpWhileStationary ?? 0)
             : (cfg.damageWhileMoving ?? 0);
           if (dmg > 0) this.takeDamage(dmg);
-          if (cfg.condition) this.applyCondition(cfg.condition, cfg.conditionDuration || cfg.damageInterval * 2);
+          if (cfg.condition) this.applyCondition(cfg.condition, cfg.conditionDuration || cfg.damageInterval * 2, { damage: dmg });
       }
     }
 
@@ -104,9 +136,20 @@ export class AttachedTurret {
 
     for (let [cKey, life] of this.conditions) {
       const cfg = conditionTypes[cKey];
-      if (cfg.damage && state.frames % cfg.damageInterval === 0) this.takeDamage(cfg.damage);
+      
+      if (cKey === 'c_burning') {
+          const dmg = this.conditionData.get('c_burning_dmg') || cfg.damage || 0;
+          if (dmg > 0 && state.frames % (cfg.damageInterval || 6) === 0) this.takeDamage(dmg);
+      } else if (cfg.damage && state.frames % cfg.damageInterval === 0) {
+          this.takeDamage(cfg.damage);
+      }
+
+      // Fixed: Removed speedMult *= cfg.enemyMovementSpeedMultiplier; as it was undefined and unused for stationary turrets.
       this.conditions.set(cKey, life - 1);
-      if (life <= 0) this.conditions.delete(cKey);
+      if (life <= 0) {
+          this.conditions.delete(cKey);
+          if (cKey === 'c_burning') this.conditionData.delete('c_burning_dmg');
+      }
     }
 
     if (this.config.actionType.includes('passiveSun')) {
@@ -118,7 +161,7 @@ export class AttachedTurret {
       }
     }
 
-    if (this.type === 't_seed') {
+    if (this.type === 't_seed' || this.type === 't_seed2') {
       const gCfg = this.config.actionConfig;
       const interval = gCfg.growthInterval || 150;
       if (state.frames % interval === 0) {
@@ -126,7 +169,10 @@ export class AttachedTurret {
         if (this.isWaterlogged) gain = 4;
         this.growthProgress += gain;
         if (this.growthProgress >= (gCfg.maxGrowth || 32)) {
-          const pool = ['t_pea', 't_laser', 't_wall', 't_mine', 't_ice'];
+          let pool = ['t_pea', 't_laser', 't_wall', 't_mine', 't_ice'];
+          if (this.type === 't_seed2') {
+             pool = ['t2_repeater', 't2_firepea', 't2_laser2', 't2_peanut', 't2_puncher', 't2_tall', 't2_mortar', 't2_pulse', 't2_laserexplode', 't2_minespawner', 't2_snowpea', 't2_iceray', 't2_spike', 't2_icebomb', 't2_stun'];
+          }
           const chosen = pool[floor(random(pool.length))];
           const index = this.parent.attachments.indexOf(this);
           if (index !== -1) {
@@ -138,8 +184,12 @@ export class AttachedTurret {
       }
     }
 
-    const isActive = state.isStationary && !this.isWaterlogged && !this.isFrosted;
-    this.alpha = lerp(this.alpha, isActive ? 255 : 127, 0.1); this.recoil = (this.recoil || 0) * 0.85;
+    const isRetracted = !state.isStationary && !this.config.isActiveWhileMoving;
+    
+    // VISUAL FIX: Lower alpha for waterlogged turrets correctly
+    const targetAlpha = isRetracted ? 127 : (this.isWaterlogged ? 100 : 255);
+    this.alpha = lerp(this.alpha, targetAlpha, 0.1); 
+    this.recoil = (this.recoil || 0) * 0.85;
     
     if (this.jumpFrames > 0) {
       this.jumpFrames--;
@@ -159,7 +209,7 @@ export class AttachedTurret {
       }
     }
 
-    if (!isActive) return;
+    if (isRetracted || this.isWaterlogged || this.isFrosted) return;
     
     let anyActionReady = false;
     for (const act of this.config.actionType || []) {
@@ -202,6 +252,35 @@ export class AttachedTurret {
       const lastTrigger = this.actionTimers.get(act) || -99999; 
       const config = this.config.actionConfig;
       const step = this.actionSteps.get(act) || 0;
+      
+      // Die logic check
+      if (act === 'die') {
+        const dieDur = config.dieAfterDuration;
+        const dieAct = config.dieAfterAction;
+        const dieCnt = config.dieAfterActionCount;
+        
+        let shouldDie = false;
+        if (dieDur && this.framesAlive >= dieDur) shouldDie = true;
+        if (dieAct && dieCnt && (this.actionSteps.get(dieAct) || 0) >= dieCnt) shouldDie = true;
+        
+        if (shouldDie) {
+           if (config.pulseBulletTypeKey) {
+              let b = new Bullet(wPos.x, wPos.y, wPos.x, wPos.y, config.pulseBulletTypeKey, 'none'); 
+              b.life = 0; state.bullets.push(b);
+           }
+           this.health = 0;
+           return;
+        }
+      }
+
+      if (act === 'boostPlayer') {
+        // Condition System application
+        state.player.applyCondition('c_raged', 15);
+        if (state.frames % 10 === 0) {
+           state.vfx.push(new MagicLinkVFX(wPos, state.player.pos));
+        }
+      }
+
       const frValue = (act === 'shoot' || act === 'shootMultiTarget') ? config.shootFireRate : ((act === 'laserBeam') ? config.beamFireRate : ((act === 'spawnBulletAtRandom') ? config.spawnBulletAtRandom.cooldown : config.pulseCooldown));
       const fr = Array.isArray(frValue) ? frValue[step % frValue.length] : frValue;
       const effectiveFireRate = fr / this.fireRateMultiplier;
@@ -213,13 +292,13 @@ export class AttachedTurret {
         state.bullets.push(new Bullet(wPos.x, wPos.y, wPos.x + cos(sa)*500, wPos.y + sin(sa)*500, config.bulletTypeKey, 'enemy'));
         state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, sa)); this.recoil = 6; 
         this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
-      } else if (act === 'shootMultiTarget') {
+      } else if (act === 'shootMultiTarget' && ready) {
         const subStepKey = act + '_subStep';
         const lastSubKey = act + '_lastSub';
         const subStep = this.actionSteps.get(subStepKey) || 0;
         const lastSub = this.actionTimers.get(lastSubKey) || 0;
 
-        if (subStep === 0 && ready) {
+        if (subStep === 0) {
           const initialTargets = this.findAllTargetsWithin(config.shootRange);
           if (initialTargets.length > 0) {
             this.actionSteps.set(subStepKey, 1);
@@ -259,7 +338,7 @@ export class AttachedTurret {
               b.life = 0; state.bullets.push(b);
             }
         }
-        if (config.appliedConditions && this.target.applyCondition) for (const cond of config.appliedConditions) this.target.applyCondition(cond.type, cond.duration);
+        if (config.appliedConditions && this.target.applyCondition) for (const cond of config.appliedConditions) this.target.applyCondition(cond.type, cond.duration, cond);
         this.recoil = 2; this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
       } else if (act === 'spawnBulletAtRandom' && ready) {
         const sbc = config.spawnBulletAtRandom;
@@ -274,6 +353,9 @@ export class AttachedTurret {
           const dSq = (wPos.x - tCenter.x)**2 + (wPos.y - tCenter.y)**2;
           if (dSq < (config.pulseTriggerRadius * config.pulseTriggerRadius)) triggered = true;
         }
+        // Special Pulse override: Always trigger for certain turrets like Starfruit
+        if (this.type === 't0_starfruit') triggered = true;
+
         if (triggered) {
           if (config.PulseTurretJumpAtTriggerSource && tCenter) { this.jumpFrames = 20; this.jumpTargetPos = tCenter.copy(); }
           else if (config.pulseBulletTypeKey) {
@@ -383,7 +465,24 @@ export class AttachedTurret {
 
   takeDamage(d: number) { 
     if (this.isFrosted) { this.iceCubeHealth -= d; if (this.iceCubeHealth <= 0) { this.isFrosted = false; this.frostLevel = 0; state.vfx.push(new BlockDebris(this.getWorldPos().x, this.getWorldPos().y, [180, 240, 255])); for (let a of this.parent.attachments) if (a.target === this) a.target = null; if (state.player.target === this) state.player.target = null; } return; }
-    this.health = Math.max(0, this.health - d); if (this.health <= 0 && this.config.actionType?.includes('onDeathPulse')) { let wPos = this.getWorldPos(); let b = new Bullet(wPos.x, wPos.y, wPos.x, wPos.y, this.config.actionConfig.pulseBulletTypeKey, 'none'); b.life = 0; state.bullets.push(b); }
+    
+    // HEALING / DAMAGE FLASH TRIGGERS
+    if (d < 0) {
+      this.health = Math.min(this.maxHealth, this.health - d);
+      this.flashTimer = 8;
+      this.flashType = 'heal';
+      return;
+    } else if (d > 0) {
+      this.flashTimer = 8;
+      this.flashType = 'damage';
+    }
+
+    this.health = Math.max(0, this.health - d); 
+    if (this.health <= 0 && this.config.actionType?.includes('onDeathPulse')) { 
+      let wPos = this.getWorldPos(); 
+      let b = new Bullet(wPos.x, wPos.y, wPos.x, wPos.y, this.config.actionConfig.pulseBulletTypeKey, 'none'); 
+      b.life = 0; state.bullets.push(b); 
+    }
   }
   display() {
     const wPos = this.getWorldPos(); const margin = 100;

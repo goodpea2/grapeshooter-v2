@@ -15,7 +15,7 @@ export class GroundFeature {
     this.config = groundFeatureTypes[typeKey];
     this.pos = createVector(x, y);
     this.life = this.config.life;
-    if (this.config.vfxType === 'fire_puddle') this.vfx = new FirePuddleVFX(x, y, this.config.radius);
+    if (this.config.vfxType === 'fire_puddle') this.vfx = new FirePuddleVFX(x, y, this.config.radius, this.config.life);
     if (this.config.vfxType === 'stun_gas') this.vfx = new StunGasVFX(x, y, this.config.radius, this.config.life);
     if (this.config.vfxType === 'forcefield') this.vfx = new ForcefieldVFX(x, y, this.config.radius, this.config.life);
   }
@@ -45,7 +45,7 @@ export class GroundFeature {
              if (typeof cond === 'string') {
                e.applyCondition(cond, this.config.conditionDuration || 60);
              } else {
-               for (const c of cond) e.applyCondition(c.type, c.duration);
+               for (const c of cond) e.applyCondition(c.type, c.duration, c);
              }
           }
           if (this.config.damage > 0) e.takeDamage(this.config.damage);

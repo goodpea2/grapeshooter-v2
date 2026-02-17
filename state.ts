@@ -9,13 +9,18 @@ export const state: any = {
   groundFeatures: [],
   loot: [],
   vfx: [],
+  uiVfx: [], // New array for UI-space visual effects
   trails: [], // Dedicated array for liquid trails (rendered under entities)
   enemies: [],
+  npcs: [],
   enemyBullets: [],
-  sunCurrency: 10,
+  sunCurrency: 3,
   elixirCurrency: 0,
   soilCurrency: 0,
+  inventory: {}, // Map of itemKey -> count
   cameraPos: { x: 0, y: 0 },
+  cameraShake: 0, // Current camera shake intensity
+  cameraShakeFalloff: 0.95, // Default decay rate
   exploredChunks: new Set(),
   currentChunkLevel: 0,
   frames: customStartingHour * HOUR_FRAMES,
@@ -80,15 +85,26 @@ export const state: any = {
     prefabs: true,
     groundFeatures: true,
     obstacles: true,
-    overlays: true
+    overlays: true,
+    entities: false
   },
   showWorldGenPreview: false,
+  worldPreviewBuffer: null, // Buffer to store the noise map to prevent lag
+  worldPreviewNeedsUpdate: true,
   showChunkBorders: false,
   debugGizmosTurrets: false,
   debugGizmosEnemies: false,
   debugHP: false,
   hoveredTurretInstance: null, 
   previewSnapPos: null,
+  activeNPC: null,
+  npcUiPanelPos: 0, // Animation progress for NPC UI
+  activeNpcDialogueIdx: 0,
+  npcDialogueJump: 0,
+  npcStock: {}, // Map of npcUid -> { tradeId: countPurchased }
+  pressedTradeId: null, // Tracks currently clicked shop item
+  npcShopScrollY: 0,
+  npcShopScrollVelocity: 0,
 
   // UI Animation State
   uiSunScale: 1.0,
@@ -104,5 +120,11 @@ export const state: any = {
   instantRechargeTurrets: false,
 
   // Time Warp
-  timeWarpRemaining: 0
+  timeWarpRemaining: 0,
+
+  // Room Director Debug
+  roomDirectorData: "",
+  roomDirectorChain: [],
+  roomDirectorScrollY: 0,
+  roomDirectorScrollVelocity: 0
 };
