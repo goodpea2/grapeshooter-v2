@@ -1,3 +1,4 @@
+
 import { state } from '../state';
 import { ECONOMY_CONFIG } from '../economy';
 import { lootTypes, LootType } from '../balanceLootTable';
@@ -30,6 +31,7 @@ declare const tint: any;
 declare const noTint: any;
 declare const width: any;
 declare const height: any;
+declare const abs: any;
 
 export class LootEntity {
   pos: any; 
@@ -53,7 +55,6 @@ export class LootEntity {
   }
 
   update(playerPos: any): 'none' | 'collected' | 'missed' {
-    // Optimization: Use squared distance to avoid sqrt during range check
     const dx = this.pos.x - playerPos.x;
     const dy = this.pos.y - playerPos.y;
     const dSq = dx*dx + dy*dy;
@@ -77,41 +78,40 @@ export class LootEntity {
   }
 
   display() {
-    // Optimization: Frustum Culling
-    // Do not draw if loot is significantly off-screen
-    const margin = 100;
-    const screenX = this.pos.x - (state.cameraPos.x - width/2);
-    const screenY = this.pos.y - (state.cameraPos.y - height/2);
-    
-    if (screenX < -margin || screenX > width + margin || screenY < -margin || screenY > height + margin) {
-      return;
-    }
-
-    push(); 
-    translate(this.pos.x, this.pos.y);
-    const pulse = 1.0 + 0.1 * sin(frameCount * 0.15);
-    const alpha = map(this.life, 0, 100, 0, 255);
+    // FAST CULLING: Simple AABB check against screen dimensions + margin
+    const dx = abs(this.pos.x - state.cameraPos.x);
+    const dy = abs(this.pos.y - state.cameraPos.y);
+    if (dx > width * 0.6 || dy > height * 0.6) return;
 
     const sprite = state.assets[this.config.idleAssetImg];
-    if (sprite) {
-      if (this.config.type === 'currency') rotate(state.frames * 0.02);
-      imageMode(CENTER);
-      tint(255, alpha);
-      image(sprite, 0, 0, this.renderSize * pulse, this.renderSize * pulse);
-      noTint();
-    } else {
-      // Fallback
-      fill(255, 230, 50, alpha); ellipse(0, 0, 10);
-    }
+    if (!sprite) return; // Skip if asset hasn't loaded
+
+    const ctx = (window as any).drawingContext;
+    push(); 
+    translate(this.pos.x, this.pos.y);
+    
+    // ALPHA OPTIMIZATION: Use native globalAlpha instead of p5 tint()
+    // tint() is very slow because it creates offscreen buffers for pixel manipulation
+    let alpha = 1.0;
+    if (this.life < 100) alpha = this.life / 100;
+    ctx.globalAlpha = alpha;
+
+    // MATH SIMPLIFICATION: Combined pulse and state logic
+    const pulse = 1.0 + 0.1 * sin(frameCount * 0.15);
+    if (this.config.type === 'currency') rotate(state.frames * 0.02);
+    
+    imageMode(CENTER);
+    image(sprite, 0, 0, this.renderSize * pulse, this.renderSize * pulse);
+    
+    // Reset native state
+    ctx.globalAlpha = 1.0;
     pop();
   }
 }
 
-// Added SunLoot class to satisfy imports in other files that expect a specialized sun loot class
 export class SunLoot extends LootEntity {
   constructor(x: number, y: number, amount: number = 1) {
     super(x, y, 'sun');
-    // Override the value if a different amount is passed to the constructor
     if (this.config) {
       this.config = { ...this.config, itemValue: amount };
     }

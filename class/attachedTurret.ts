@@ -144,7 +144,6 @@ export class AttachedTurret {
           this.takeDamage(cfg.damage);
       }
 
-      // Fixed: Removed speedMult *= cfg.enemyMovementSpeedMultiplier; as it was undefined and unused for stationary turrets.
       this.conditions.set(cKey, life - 1);
       if (life <= 0) {
           this.conditions.delete(cKey);
@@ -371,12 +370,19 @@ export class AttachedTurret {
 
   applyObstacleRepulsion(wPos: any) {
     const gx = floor(wPos.x / GRID_SIZE); const gy = floor(wPos.y / GRID_SIZE);
-    const forceRange = GRID_SIZE * 0.8; const forceRangeSq = forceRange * forceRange;
+    // Standardized forceRange to match block distance checks
+    const forceRange = this.size * 0.75; 
     for (let i = gx - 1; i <= gx + 1; i++) for (let j = gy - 1; j <= gy + 1; j++) {
-      if (state.world.isBlockAt(i * GRID_SIZE + 1, j * GRID_SIZE + 1)) {
+      if (state.world.isBlockAt(i * GRID_SIZE + (GRID_SIZE/2), j * GRID_SIZE + (GRID_SIZE/2))) {
         const bx = i * GRID_SIZE + GRID_SIZE/2; const by = j * GRID_SIZE + GRID_SIZE/2;
         const dx = wPos.x - bx; const dy = wPos.y - by; const dSq = dx*dx + dy*dy;
-        if (dSq < forceRangeSq) { const d = Math.sqrt(dSq); const force = 3.5 * (1 - d/forceRange); this.parent.pos.x += dx/d * force; this.parent.pos.y += dy/d * force; }
+        const checkRange = forceRange + GRID_SIZE/2;
+        if (dSq < checkRange * checkRange) { 
+          const d = Math.sqrt(dSq); 
+          const force = 5.0 * (1 - d/checkRange); 
+          this.parent.pos.x += dx/d * force; 
+          this.parent.pos.y += dy/d * force; 
+        }
       }
     }
   }

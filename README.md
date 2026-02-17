@@ -1,7 +1,14 @@
 
 # Core Explorer: Technical & Design Library
 
-Core Explorer (v3.1) is a procedural 2D survival game built with **TypeScript** and **p5.js**. It features a unique mobile-base expansion system, a deep merging matrix, and a dynamic ecosystem.
+Core Explorer (v3.2) is a procedural 2D survival game built with **TypeScript** and **p5.js**. It features a unique mobile-base expansion system, a deep merging matrix, and a dynamic ecosystem.
+
+---
+
+## 🏃 Input & Orientation System
+The game utilizes a **Decoupled Intent Pipeline** for character visuals:
+- **Movement Intent**: Visual orientation (flipping/direction) is tied to raw keyboard input rather than character velocity. This prevents "sprite flickering" when the player is blocked by physical collisions (e.g., slamming into a wall).
+- **State Locking**: The transition to the "Stationary" state (which enables turrets and aiming) is inhibited as long as any movement keys are held. This ensures tactical control over base deployment.
 
 ---
 

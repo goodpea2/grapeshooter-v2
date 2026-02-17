@@ -1,3 +1,4 @@
+
 import { state } from '../state';
 import { GRID_SIZE, CHUNK_SIZE, VISIBILITY_RADIUS } from '../constants';
 import { liquidTypes } from '../balanceLiquids';
@@ -24,8 +25,16 @@ declare const TWO_PI: any;
 export class Player {
   pos: any; prevPos: any; size = 30; attachments: AttachedTurret[] = []; health = 100; maxHealth = 100; speed = 3.6; flash = 0; autoTurretAngle = 0; autoTurretLastShot = 0; autoTurretRange = GRID_SIZE * 6; autoTurretFireRate = 22; recoil = 0; target: any = null;
   conditions: Map<string, number> = new Map();
+  
+  // Input tracking for orientation and state locking
+  moveInputVec: any;
+  isMovingIntent: boolean = false;
 
-  constructor(x: number, y: number) { this.pos = createVector(x, y); this.prevPos = createVector(x, y); }
+  constructor(x: number, y: number) { 
+    this.pos = createVector(x, y); 
+    this.prevPos = createVector(x, y); 
+    this.moveInputVec = createVector(0, 0);
+  }
   
   applyCondition(cKey: string, duration: number) {
     const cfg = conditionTypes[cKey]; if (!cfg) return;
@@ -53,13 +62,38 @@ export class Player {
     
     this.applyObstacleRepulsion();
 
-    let move = createVector(0, 0); const keyIsDown: any = (window as any).keyIsDown;
-    if (keyIsDown(65)) move.x -= 1; if (keyIsDown(68)) move.x += 1; if (keyIsDown(87)) move.y -= 1; if (keyIsDown(83)) move.y += 1;
-    if (move.mag() > 0) { move.normalize().mult(this.speed * lMult); this.moveWithSliding(move); }
-    let vel = dist(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
-    state.isStationary = vel < 0.4 ? (state.stationaryTimer++ > 15) : (state.stationaryTimer = 0, false);
+    // 1. Gather Input Intent
+    this.moveInputVec.set(0, 0); 
+    const keyIsDown: any = (window as any).keyIsDown;
+    if (keyIsDown(65)) this.moveInputVec.x -= 1; 
+    if (keyIsDown(68)) this.moveInputVec.x += 1; 
+    if (keyIsDown(87)) this.moveInputVec.y -= 1; 
+    if (keyIsDown(83)) this.moveInputVec.y += 1;
     
-    if (lData && lData.trailVfxInterval && frameCount % floor(lData.trailVfxInterval / 3) === 0 && vel > 0.5) state.trails.push(new LiquidTrailVFX(this.pos.x, this.pos.y, lData.playerTrailVfx, atan2(this.pos.y - this.prevPos.y, this.pos.x - this.prevPos.x)));
+    this.isMovingIntent = this.moveInputVec.mag() > 0;
+
+    // 2. Perform Movement
+    if (this.isMovingIntent) { 
+      const move = this.moveInputVec.copy().normalize().mult(this.speed * lMult); 
+      this.moveWithSliding(move); 
+    }
+
+    // 3. Update Stationary State
+    // FIXED: Only allow stationary if NO keys are being pressed, even if velocity is 0
+    let vel = dist(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
+    const isActuallyStationary = (vel < 0.4 && !this.isMovingIntent);
+    
+    if (isActuallyStationary) {
+      state.stationaryTimer++;
+      if (state.stationaryTimer > 15) state.isStationary = true;
+    } else {
+      state.stationaryTimer = 0;
+      state.isStationary = false;
+    }
+    
+    if (lData && lData.trailVfxInterval && frameCount % floor(lData.trailVfxInterval / 3) === 0 && vel > 0.5) {
+      state.trails.push(new LiquidTrailVFX(this.pos.x, this.pos.y, lData.playerTrailVfx, atan2(this.pos.y - this.prevPos.y, this.pos.x - this.prevPos.x)));
+    }
 
     for (let i = this.attachments.length - 1; i >= 0; i--) { const a = this.attachments[i]; a.update(); if (a.health <= 0) { state.vfx.push(new Explosion(a.getWorldPos().x, a.getWorldPos().y, a.size * 2, color(a.config.color))); this.attachments.splice(i, 1); } }
     
@@ -72,7 +106,7 @@ export class Player {
         } else if (loot.config.type === 'turretAsItem') {
            const itemKey = loot.config.item;
            state.inventory[itemKey] = (state.inventory[itemKey] || 0) + 1;
-           state.uiAlpha = 255; // Wake up UI to show inventory update
+           state.uiAlpha = 255; 
         } else {
            const val = loot.config.itemValue || 1;
            if (loot.config.item === 'sun') {
@@ -93,20 +127,22 @@ export class Player {
         state.loot.splice(i, 1); 
       }
     }
+
+    this.applyObstacleRepulsion(); 
     this.updateAutoTurret(fireRateMult);
   }
 
   applyObstacleRepulsion() {
     const gx = floor(this.pos.x / GRID_SIZE);
     const gy = floor(this.pos.y / GRID_SIZE);
-    const forceRange = GRID_SIZE * 0.9;
+    const forceRange = this.size * 0.75; 
     for (let i = gx - 1; i <= gx + 1; i++) {
       for (let j = gy - 1; j <= gy + 1; j++) {
-        if (state.world.isBlockAt(i * GRID_SIZE + 1, j * GRID_SIZE + 1)) {
+        if (state.world.isBlockAt(i * GRID_SIZE + (GRID_SIZE/2), j * GRID_SIZE + (GRID_SIZE/2))) {
           const bCenter = createVector(i * GRID_SIZE + GRID_SIZE/2, j * GRID_SIZE + GRID_SIZE/2);
           const d = dist(this.pos.x, this.pos.y, bCenter.x, bCenter.y);
-          if (d < forceRange) {
-            const pushDir = p5.Vector.sub(this.pos, bCenter).normalize().mult(4.0 * (1 - d/forceRange));
+          if (d < forceRange + GRID_SIZE/2) {
+            const pushDir = p5.Vector.sub(this.pos, bCenter).normalize().mult(5.0 * (1 - d/(forceRange + GRID_SIZE/2)));
             this.pos.add(pushDir);
           }
         }
@@ -219,19 +255,15 @@ export class Player {
   takeDamage(dmg: number) { this.health -= dmg; this.flash = 6; if (this.health <= 0) this.health = 0; }
   
   displayAttachments(behind: boolean) { 
-    // Filter by group (Ground/Spikes vs Normal)
     const filtered = this.attachments.filter(a => {
         const isGroundGroup = (a.config.turretLayer === 'ground' || !!a.config.renderBehindEnemy);
         return behind ? isGroundGroup : !isGroundGroup;
     });
 
-    // Sort by higher Y to lower Y, then lower X to higher X
     filtered.sort((a, b) => {
         const posA = a.getWorldPos();
         const posB = b.getWorldPos();
-        // Higher Y values rendered first (painter's algorithm from bottom to top as requested)
         if (posB.y !== posA.y) return posB.y - posA.y;
-        // Lower X values rendered first
         return posA.x - posB.x;
     });
 

@@ -51,19 +51,25 @@ export function drawPlayer(p: any) {
   let isLeft = false;
   let isBack = false;
 
-  if (!state.isStationary) {
-    // Determine direction from movement
+  // PRIORITY FIX: If movement keys are pressed, lock rotation to input direction 
+  // even if slamming into a wall (velocity = 0).
+  if (p.isMovingIntent) {
+    const input = p.moveInputVec;
+    if (abs(input.x) > 0.1) isLeft = input.x < 0;
+    if (abs(input.y) > 0.1) isBack = input.y < 0;
+  } 
+  // If no keys pressed, we only check aiming if the stationary timer has kicked in
+  else if (state.isStationary) {
+    const ang = p.autoTurretAngle; // Range: -PI to PI
+    if (abs(ang) > HALF_PI) isLeft = true;
+    if (ang < 0) isBack = true;
+  }
+  // Fallback: Use last known actual movement if keys are released but not yet stationary
+  else {
     const dx = p.pos.x - p.prevPos.x;
     const dy = p.pos.y - p.prevPos.y;
     if (abs(dx) > 0.1) isLeft = dx < 0;
     if (abs(dy) > 0.1) isBack = dy < 0;
-  } else {
-    // Determine direction from aim
-    const ang = p.autoTurretAngle; // Range: -PI to PI
-    // Horizontal check: Right is -PI/2 to PI/2, Left is outside that
-    if (abs(ang) > HALF_PI) isLeft = true;
-    // Vertical check: Up is -PI to 0
-    if (ang < 0) isBack = true;
   }
 
   const spriteKey = isBack ? 'img_player_back_right' : 'img_player_front_right';
@@ -76,15 +82,13 @@ export function drawPlayer(p: any) {
     // CONDITION TINTS
     const isRaged = p.conditions.has('c_raged');
     if (p.flash > 0) tint(255, 100, 100);
-    else if (isRaged) tint(255, 100 + sin(frameCount * 0.4) * 100, 200); // Raged Pink pulse
+    else if (isRaged) tint(255, 100 + sin(frameCount * 0.4) * 100, 200); 
     
     imageMode(CENTER);
-    // Draw slightly larger than hitbox to show detail
     image(sprite, 0, 0, 80, 80);
     noTint();
     pop();
   } else {
-    // Fallback if images fail to load
     let c = [30, 40, 70];
     const isRaged = p.conditions.has('c_raged');
     if (p.flash > 0) c = [255, 100, 100];

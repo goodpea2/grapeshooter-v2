@@ -217,7 +217,7 @@ export class Block {
 
       if (isExposed) {
         stroke(bord[0], bord[1], bord[2], opacity); strokeWeight(3); noFill();
-        if (!n) line(tl, 0, renderSize - tr, 0); if (!s) line(bl, renderSize, renderSize - br, renderSize); if (!w) line(0, tl, 0, renderSize - bl); if (!e) line(renderSize, tr, renderSize, renderSize - br);
+        if (!n) line(tl, 0, renderSize - tr, 0); if (!s) line(bl, renderSize, renderSize - br, GRID_SIZE); if (!w) line(0, tl, 0, renderSize - bl); if (!e) line(renderSize, tr, renderSize, renderSize - br);
         if (!n && !w) arc(rad, rad, rad * 2, rad * 2, PI, PI + HALF_PI); if (!n && !e) arc(renderSize - rad, rad, rad * 2, rad * 2, PI + HALF_PI, TWO_PI); if (!s && !e) arc(renderSize - rad, GRID_SIZE - rad, rad * 2, rad * 2, 0, HALF_PI); if (!s && !w) arc(rad, renderSize - rad, rad * 2, rad * 2, HALF_PI, PI);
       }
 
@@ -856,7 +856,7 @@ export class WorldManager {
           if (b && !b.isMined) { 
             let cX = constrain(x, b.pos.x, b.pos.x + GRID_SIZE); 
             let cY = constrain(y, b.pos.y, b.pos.y + GRID_SIZE); 
-            if ((x - cX)**2 + (y - cy)**2 < radius*radius) return true; 
+            if ((x - cX)**2 + (y - cY)**2 < radius*radius) return true; 
           } 
         }
       }
