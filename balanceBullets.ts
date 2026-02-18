@@ -73,10 +73,10 @@ export const bulletTypes: any = {
     aoeConfig: { 
       isAoe: true, 
       aoeRadiusGradient: [GRID_SIZE * 2.5,GRID_SIZE * 4.5], 
-      aoeDamageGradient: [150,10], 
+      aoeDamageGradient: [60,5], 
       dealAoeOnObstacle: true, 
       dealAoeAfterLifetime: true, 
-      aoeObstacleDamageMultiplier: 2.0 
+      aoeObstacleDamageMultiplier: 5.0 
     },
     stunDuration: 30, slowDuration: 0, slowFactor: 1, obstacleDamageMultiplier: 1,
     spawnGroundFeatureOnContact: [], spawnGroundFeaturePerFrame: -1, spawnGroundFeatureInRadius: 0,

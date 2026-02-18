@@ -4,14 +4,14 @@ export const HEX_DIST = 22;
 export const CHUNK_SIZE = 16;
 export const VISIBILITY_RADIUS = 14;
 export const CHUNK_GEN_RADIUS = 1; // Radius around player to generate/update chunks
-export const VERSION = "Grapeshooter v200";
+export const VERSION = "Grapeshooter v202";
 export const LEVEL_THRESHOLDS = [10, 22, 35, 50, 70, 100, 140, 200, 280, 400];
 export const HOUR_FRAMES = 600;
 export const MAX_VFX = 400;
 export const LEVEL_BUDGET = [30, 60, 60, 90, 90, 150, 150, 200, 200, 200, 200];
 
 // Optimization Tuning
-export const TurretMinScanRate = 15; // Frame interval for staggered scanning
+export const TurretMinScanRate = 30; // Increased from 15 to spread scan load further
 export const EnemyCollideRadiusCheck = 120; // Neighborhood check distance for physics
 export const SPATIAL_HASH_CELL_SIZE = 120;
 

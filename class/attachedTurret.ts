@@ -1,6 +1,7 @@
 
 import { state } from '../state';
-import { HEX_DIST, GRID_SIZE, HOUR_FRAMES, TurretMinScanRate } from '../constants';
+// Added CHUNK_SIZE to imports to fix undefined name errors
+import { HEX_DIST, GRID_SIZE, HOUR_FRAMES, TurretMinScanRate, CHUNK_SIZE } from '../constants';
 import { turretTypes } from '../balanceTurrets';
 import { conditionTypes } from '../balanceConditions';
 import { liquidTypes } from '../balanceLiquids';
@@ -241,7 +242,7 @@ export class AttachedTurret {
       }
     }
 
-    const justDeployed = state.stationaryTimer === 16; 
+    const justDeployed = state.stationaryTimer === (TurretMinScanRate + 1); 
     if (anyActionReady) {
       const staggeredSlot = state.frames % TurretMinScanRate === this.targetScanTimer;
       const urgentNeed = (!this.target && (targetJustDied || justDeployed));
@@ -331,6 +332,8 @@ export class AttachedTurret {
         const tCenter = this.getTargetCenter(); if (!tCenter) return;
         if (!this.config.randomRotation) this.angle = atan2(tCenter.y - wPos.y, tCenter.x - wPos.x); 
         const killed = this.target.takeDamage(config.beamDamage);
+        
+        // SAFETY: Check this.target still exists, as takeDamage can nullify it (especially for icecubes)
         if (killed && config.spawnBulletOnTargetDeath) {
             const loc = this.getTargetCenter();
             if (loc) {
@@ -338,7 +341,12 @@ export class AttachedTurret {
               b.life = 0; state.bullets.push(b);
             }
         }
-        if (config.appliedConditions && this.target.applyCondition) for (const cond of config.appliedConditions) this.target.applyCondition(cond.type, cond.duration, cond);
+        
+        // BUGFIX: Final safety null check for this.target after takeDamage logic potentially wipes it
+        if (this.target && config.appliedConditions && this.target.applyCondition) {
+          for (const cond of config.appliedConditions) this.target.applyCondition(cond.type, cond.duration, cond);
+        }
+        
         this.recoil = 2; this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
       } else if (act === 'spawnBulletAtRandom' && ready) {
         const sbc = config.spawnBulletAtRandom;
@@ -395,22 +403,39 @@ export class AttachedTurret {
     }
   }
 
+  /**
+   * OPTIMIZED: Use spatial hash to find all targets within range.
+   */
   findAllTargetsWithin(range: number) {
     const wPos = this.getWorldPos();
     const rangeSq = range * range;
     const tTypes = this.config.targetType || [];
     const results: any[] = [];
+    
     if (tTypes.includes('enemy')) {
-      for (let e of state.enemies) {
-        if (e.health > 0 && !e.isInvisible && !e.isDying) {
-          const dSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
-          if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, e.pos.x, e.pos.y)) results.push(e);
+      const cs = state.spatialHashCellSize;
+      const gx = floor(wPos.x / cs);
+      const gy = floor(wPos.y / cs);
+      const searchRadius = Math.ceil(range / cs);
+
+      for (let i = -searchRadius; i <= searchRadius; i++) {
+        for (let j = -searchRadius; j <= searchRadius; j++) {
+          const neighbors = state.spatialHash.get(`${gx + i},${gy + j}`);
+          if (!neighbors) continue;
+          for (const e of neighbors) {
+            if (e.health <= 0 || e.isInvisible || e.isDying) continue;
+            const dSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
+            if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, e.pos.x, e.pos.y)) {
+              results.push(e);
+            }
+          }
         }
       }
     }
+    
     results.sort((a, b) => {
-      const posA = a.pos || a.getWorldPos?.();
-      const posB = b.pos || b.getWorldPos?.();
+      const posA = a.pos;
+      const posB = b.pos;
       const dSqA = (wPos.x - posA.x)**2 + (wPos.y - posA.y)**2;
       const dSqB = (wPos.x - posB.x)**2 + (wPos.y - posB.y)**2;
       return dSqA - dSqB;
@@ -418,63 +443,135 @@ export class AttachedTurret {
     return results;
   }
 
+  /**
+   * OPTIMIZED: Find best target using spatial hash and lazy LOS checking.
+   */
   findTarget() {
-    const tTypes = this.config.targetType || []; const wPos = this.getWorldPos();
+    const tTypes = this.config.targetType || []; 
+    const wPos = this.getWorldPos();
     const tCfg = this.config.targetConfig || {}; 
     const range = this.config.actionConfig.shootRange || this.config.actionConfig.beamMaxLength || this.config.actionConfig.pulseTriggerRadius || 300;
     const rangeSq = (range + 10)**2;
+
+    // 1. Keep existing target if still valid
     if (this.target) {
       const tCenter = this.getTargetCenter(); 
-      if (!tCenter) { this.target = null; } else {
+      if (tCenter) {
         const dSq = (wPos.x - tCenter.x)**2 + (wPos.y - tCenter.y)**2;
         let valid = this.target.isFrosted !== undefined ? (this.target.isFrosted && this.target.iceCubeHealth > 0) : (this.target.health !== undefined ? this.target.health > 0 : !this.target.isMined);
         if (valid && dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, tCenter.x, tCenter.y)) return;
       }
       this.target = null;
     }
-    let bestT = null; let bestVal = Infinity;
-    for (let a of this.parent.attachments) if (a !== this && a.isFrosted && a.iceCubeHealth > 0) {
-      const twPos = a.getWorldPos(); const dSq = (wPos.x - twPos.x)**2 + (wPos.y - twPos.y)**2;
-      if (dSq < range*range && dSq < bestVal && state.world.checkLOS(wPos.x, wPos.y, twPos.x, twPos.y)) { bestVal = dSq; bestT = a; }
+
+    // 2. Priority check: Icecubes (No spatial hash needed as attachments are few)
+    for (let a of this.parent.attachments) {
+      if (a !== this && a.isFrosted && a.iceCubeHealth > 0) {
+        const twPos = a.getWorldPos(); 
+        const dSq = (wPos.x - twPos.x)**2 + (wPos.y - twPos.y)**2;
+        if (dSq < rangeSq && state.world.checkLOS(wPos.x, wPos.y, twPos.x, twPos.y)) { 
+          this.target = a; 
+          this.angle = atan2(twPos.y - wPos.y, twPos.x - wPos.x);
+          return; 
+        }
+      }
     }
-    if (bestT) { this.target = bestT; return; }
+
+    // 3. Enemy Search via Spatial Hash
     if (tTypes.includes('enemy')) {
-      for (let e of state.enemies) if (e.health > 0 && !e.isInvisible && !e.isDying) {
-        const dSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
-        if (dSq <= range*range && state.world.checkLOS(wPos.x, wPos.y, e.pos.x, e.pos.y)) {
-          const d = Math.sqrt(dSq);
-          let v = tCfg.enemyPriority === 'lowestHealth' ? e.health : (tCfg.enemyPriority === 'highestHealth' ? -e.health : (tCfg.enemyPriority === 'random' ? random() : d));
-          if (v < bestVal) { bestVal = v; bestT = e; }
+      const cs = state.spatialHashCellSize;
+      const gx = floor(wPos.x / cs);
+      const gy = floor(wPos.y / cs);
+      const searchRadius = Math.ceil(range / cs);
+      
+      const candidates: { e: any, dSq: number }[] = [];
+
+      for (let i = -searchRadius; i <= searchRadius; i++) {
+        for (let j = -searchRadius; j <= searchRadius; j++) {
+          const cell = state.spatialHash.get(`${gx + i},${gy + j}`);
+          if (!cell) continue;
+          for (const e of cell) {
+            if (e.health <= 0 || e.isInvisible || e.isDying) continue;
+            const dSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
+            if (dSq <= rangeSq) candidates.push({ e, dSq });
+          }
         }
       }
-      if (bestT && tCfg.enemyPriority !== 'random') {
-        this.target = bestT; const tc = this.getTargetCenter();
-        if (!this.config.randomRotation) this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x); return;
+
+      // 4. Also check for valuable/enemy blocks in world (cached chunks nearby)
+      state.world.chunks.forEach((chunk: any) => {
+        // Rough chunk-based culling
+        const cw = CHUNK_SIZE * GRID_SIZE;
+        const dx = (chunk.cx * cw + cw/2) - wPos.x;
+        const dy = (chunk.cy * cw + cw/2) - wPos.y;
+        if (dx*dx + dy*dy > (range + cw)**2) return;
+
+        chunk.overlayBlocks.forEach((b: any) => {
+           if (b.isMined || !b.overlay) return;
+           const oCfg = overlayTypes[b.overlay];
+           if (oCfg?.isEnemy) {
+              const bx = b.pos.x + GRID_SIZE/2;
+              const by = b.pos.y + GRID_SIZE/2;
+              const dSq = (wPos.x - bx)**2 + (wPos.y - by)**2;
+              if (dSq <= rangeSq) candidates.push({ e: b, dSq });
+           }
+        });
+      });
+
+      if (candidates.length > 0) {
+        // Sort by distance (lowest dSq first)
+        candidates.sort((a, b) => a.dSq - b.dSq);
+        
+        // Lazy LOS Check: find the closest one that we can actually see
+        for (const cand of candidates) {
+          const tc = cand.e.pos || cand.e.getWorldPos?.();
+          if (!tc) continue;
+          if (state.world.checkLOS(wPos.x, wPos.y, tc.x, tc.y)) {
+            this.target = cand.e;
+            this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x);
+            return;
+          }
+        }
       }
-      state.world.chunks.forEach((chunk: any) => chunk.blocks.forEach((b: any) => {
-        if (b.isMined || !b.overlay) return;
-        const oCfg = overlayTypes[b.overlay];
-        if (oCfg?.isEnemy) {
-          let bcx = b.pos.x + GRID_SIZE/2; let bcy = b.pos.y + GRID_SIZE/2;
-          let dSq = (wPos.x - bcx)**2 + (wPos.y - bcy)**2;
-          if (dSq <= range*range && state.world.checkLOS(wPos.x, wPos.y, bcx, bcy) && dSq < bestVal) { bestVal = dSq; bestT = b; }
-        }
-      }));
     }
-    if ((!bestT || tCfg.enemyPriority === 'random') && tTypes.includes('obstacle')) {
-      state.world.chunks.forEach((chunk: any) => chunk.blocks.forEach((b: any) => {
-        if (b.isMined) return; const oCfg = b.overlay ? overlayTypes[b.overlay] : null;
-        let bcx = b.pos.x + GRID_SIZE/2; let bcy = b.pos.y + GRID_SIZE/2;
-        let dSq = (wPos.x - bcx)**2 + (wPos.y - bcy)**2;
-        if (dSq <= range*range && state.world.checkLOS(wPos.x, wPos.y, bcx, bcy)) {
-          const d = Math.sqrt(dSq);
-          let score = d - (oCfg?.isValuable ? 2000 : 0) - (oCfg?.isEnemy ? 3000 : 0);
-          if (score < bestVal) { bestVal = score; bestT = b; }
-        }
-      }));
+
+    // 5. Obstacle search (Mining lasers)
+    if (tTypes.includes('obstacle')) {
+      let bestObs = null;
+      let bestObsVal = Infinity;
+      
+      state.world.chunks.forEach((chunk: any) => {
+        const cw = CHUNK_SIZE * GRID_SIZE;
+        const dx = (chunk.cx * cw + cw/2) - wPos.x;
+        const dy = (chunk.cy * cw + cw/2) - wPos.y;
+        if (dx*dx + dy*dy > (range + cw)**2) return;
+
+        chunk.blocks.forEach((b: any) => {
+          if (b.isMined) return;
+          const bcx = b.pos.x + GRID_SIZE/2;
+          const bcy = b.pos.y + GRID_SIZE/2;
+          const dSq = (wPos.x - bcx)**2 + (wPos.y - bcy)**2;
+          if (dSq <= rangeSq) {
+            const d = Math.sqrt(dSq);
+            const oCfg = b.overlay ? overlayTypes[b.overlay] : null;
+            let score = d - (oCfg?.isValuable ? 2000 : 0) - (oCfg?.isEnemy ? 3000 : 0);
+            if (score < bestObsVal) {
+              // Lazy LOS only for candidates that look better
+              if (state.world.checkLOS(wPos.x, wPos.y, bcx, bcy)) {
+                bestObsVal = score;
+                bestObs = b;
+              }
+            }
+          }
+        });
+      });
+      
+      if (bestObs) {
+        this.target = bestObs;
+        const tc = this.getTargetCenter();
+        if (tc) this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x);
+      }
     }
-    this.target = bestT; 
-    if (this.target) { const tc = this.getTargetCenter(); if (!this.config.randomRotation) this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x); }
   }
 
   takeDamage(d: number) { 

@@ -133,22 +133,31 @@ export function drawTurretSprite(t: any) {
   let sprite = state.assets[spriteKey] || state.assets[`img_${baseKey}_front`] || state.assets[`img_${baseKey}`];
 
   if (sprite) {
+    const ctx = (window as any).drawingContext;
     push();
     
+    // NATIVE ALPHA OPTIMIZATION
+    // Only use tint() for actual color flashes, use native alpha for transparency
+    let useTint = false;
+
     // Explosive growth visual (scaling)
     if (config.explosiveGrowth) {
         const duration = actionConfig.dieAfterDuration || 180;
         const tVal = Math.min(1.0, t.framesAlive / duration);
         const sVal = map(tVal, 0, 1, 1.0, 1.5);
-        const whiteVal = map(tVal, 0.5, 1, 255, 500); // Tint white effect
         scale(sVal, sVal);
-        if (tVal > 0.5) tint(whiteVal, whiteVal, whiteVal, t.alpha);
+        if (tVal > 0.5) {
+            const whiteVal = map(tVal, 0.5, 1, 255, 500); 
+            tint(whiteVal, whiteVal, whiteVal, t.alpha);
+            useTint = true;
+        }
     }
 
-    // HEAL / DAMAGE FLASH
+    // HEAL / DAMAGE FLASH (Requires Tint)
     if (t.flashTimer > 0) {
       if (t.flashType === 'heal') tint(100, 255, 100, t.alpha);
       else tint(255, 100, 100, t.alpha);
+      useTint = true;
     }
 
     // Stable "random" rotation and flip based on UID
@@ -172,9 +181,17 @@ export function drawTurretSprite(t: any) {
     translate(rx, ry);
 
     imageMode(CENTER);
-    if (!config.explosiveGrowth && t.flashTimer <= 0 && t.alpha < 255) tint(255, t.alpha);
+    
+    // Performance: Use native globalAlpha instead of p5 tint() for simple transparency
+    if (!useTint && t.alpha < 254) {
+        ctx.globalAlpha = t.alpha / 255;
+    }
+    
     image(sprite, 0, 0, 50, 50);
-    noTint();
+    
+    if (useTint) noTint();
+    else ctx.globalAlpha = 1.0;
+    
     pop();
   }
 
