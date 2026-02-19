@@ -1,9 +1,10 @@
 
 import { state } from '../state';
-import { GRID_SIZE, CHUNK_SIZE, VISIBILITY_RADIUS } from '../constants';
+import { GRID_SIZE, CHUNK_SIZE, VISIBILITY_RADIUS, HEX_DIST } from '../constants';
 import { liquidTypes } from '../balanceLiquids';
 import { conditionTypes } from '../balanceConditions';
 import { overlayTypes } from '../balanceObstacles';
+import { turretTypes } from '../balanceTurrets';
 import { Explosion, LiquidTrailVFX, MuzzleFlash, ConditionVFX } from '../vfx';
 import { AttachedTurret } from './attachedTurret';
 import { LootEntity } from './loot';
@@ -175,13 +176,20 @@ export class Player {
   }
 
   addStrayTurret(type: string) {
-    let bestSlot = null; let minDist = Infinity;
+    const config = turretTypes[type];
+    if (!config) return;
+
+    let bestSlot = null; 
+    let minDist = Infinity;
     const rangeLimit = 8;
+    const turretSize = config.size || 22;
+
     for (let q = -rangeLimit; q <= rangeLimit; q++) {
       for (let r = -rangeLimit; r <= rangeLimit; r++) {
         if (Math.abs(q) + Math.abs(r) + Math.abs(-q-r) <= rangeLimit * 2) {
           let occupied = (q === 0 && r === 0);
           for(let a of this.attachments) if(a.hq === q && a.hr === r) occupied = true;
+          
           if (!occupied) {
              const neighbors = [[1,0], [-1,0], [0,1], [0,-1], [1,-1], [-1,1]];
              let adj = false;
@@ -190,18 +198,43 @@ export class Player {
                if (nq === 0 && nr === 0) { adj = true; break; }
                if (this.attachments.some((a:any) => a.hq === nq && a.hr === nr)) { adj = true; break; }
              }
+
              if (adj) {
-               let d = dist(0, 0, q, r);
-               if (d < minDist) { minDist = d; bestSlot = { q, r }; }
+               // Calculate world position relative to current player position
+               const offX = HEX_DIST * (1.5 * q);
+               const offY = HEX_DIST * (Math.sqrt(3)/2 * q + Math.sqrt(3) * r);
+               const targetWorldX = this.pos.x + offX;
+               const targetWorldY = this.pos.y + offY;
+
+               // PHYSICAL LEGIBILITY CHECK: 
+               // Check if the spot is clear of obstacles before allowing attachment.
+               // We use the same 0.55 multiplier as manual placement.
+               const isClear = !state.world.checkCollision(targetWorldX, targetWorldY, turretSize * 0.55);
+
+               if (isClear) {
+                 let d = dist(0, 0, q, r);
+                 if (d < minDist) { 
+                   minDist = d; 
+                   bestSlot = { q, r }; 
+                 }
+               }
              }
           }
         }
       }
     }
+
     if (bestSlot) {
       this.attachments.push(new AttachedTurret(type, this, bestSlot.q, bestSlot.r));
       state.totalTurretsAcquired++;
       state.vfx.push(new Explosion(this.pos.x, this.pos.y, 60, color(255, 255, 100)));
+    } else {
+      // CRAMPED FALLBACK: 
+      // If no physically clear spot exists adjacent to the base, 
+      // automatically add the turret to the inventory so the player doesn't lose it.
+      state.inventory[type] = (state.inventory[type] || 0) + 1;
+      state.totalTurretsAcquired++;
+      state.uiAlpha = 255; // Flash UI to show item acquisition
     }
   }
 

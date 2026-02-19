@@ -1,3 +1,4 @@
+
 export interface LootType {
   type: 'currency' | 'turret' | 'turretAsItem';
   item: string; 
@@ -59,7 +60,7 @@ export const lootTypes: Record<string, LootType> = {
     idleAssetImg: 'img_seed_sunflower',
     idleAssetImgSize: [40, 40]
   },
-  // Catch-all for basic turret types traded by NPCs
+  // Basic T1
   t_pea: { type: 'turret', item: 't_pea', idleAssetImg: 'img_t_pea_front', idleAssetImgSize: [45, 45] },
   t_laser: { type: 'turret', item: 't_laser', idleAssetImg: 'img_t_laser_front', idleAssetImgSize: [45, 45] },
   t_wall: { type: 'turret', item: 't_wall', idleAssetImg: 'img_t_wall_front', idleAssetImgSize: [45, 45] },
@@ -83,6 +84,33 @@ export const lootTypes: Record<string, LootType> = {
   t2_icebomb: { type: 'turret', item: 't2_icebomb', idleAssetImg: 'img_t_icebomb_front', idleAssetImgSize: [45, 45] },
   t2_stun: { type: 'turret', item: 't2_stun', idleAssetImg: 'img_t_stun_front', idleAssetImgSize: [45, 45] },
   t2_spike: { type: 'turret', item: 't2_spike', idleAssetImg: 'img_t_spike_front', idleAssetImgSize: [45, 45] },
+
+  // T3 Cheat definitions
+  t3_triplepea: { type: 'turret', item: 't3_triplepea', idleAssetImg: 'img_t_triplepea_front', idleAssetImgSize: [50, 50] },
+  t3_firepea2: { type: 'turret', item: 't3_firepea2', idleAssetImg: 'img_t_firepea2_front', idleAssetImgSize: [50, 50] },
+  t3_spinnut: { type: 'turret', item: 't3_spinnut', idleAssetImg: 'img_t_spinnut_front', idleAssetImgSize: [50, 50] },
+  t3_mortar2: { type: 'turret', item: 't3_mortar2', idleAssetImg: 'img_t_mortar2_front', idleAssetImgSize: [50, 50] },
+  t3_snowpea2: { type: 'turret', item: 't3_snowpea2', idleAssetImg: 'img_t_snowpea2_front', idleAssetImgSize: [50, 50] },
+  t3_inferno: { type: 'turret', item: 't3_inferno', idleAssetImg: 'img_t_inferno_front', idleAssetImgSize: [50, 50] },
+  t3_flamethrower: { type: 'turret', item: 't3_flamethrower', idleAssetImg: 'img_t_flamethrower_front', idleAssetImgSize: [50, 50] },
+  t3_bowling: { type: 'turret', item: 't3_bowling', idleAssetImg: 'img_t_bowling_front', idleAssetImgSize: [50, 50] },
+  t3_repulser: { type: 'turret', item: 't3_repulser', idleAssetImg: 'img_t_repulser_front', idleAssetImgSize: [50, 50] },
+  t3_snowpeanut: { type: 'turret', item: 't3_snowpeanut', idleAssetImg: 'img_t_snowpeanut_front', idleAssetImgSize: [50, 50] },
+  t3_skymortar: { type: 'turret', item: 't3_skymortar', idleAssetImg: 'img_t_skymortar_front', idleAssetImgSize: [50, 50] },
+  t3_laser3: { type: 'turret', item: 't3_laser3', idleAssetImg: 'img_t_laser3_front', idleAssetImgSize: [50, 50] },
+  t3_puncher2: { type: 'turret', item: 't3_puncher2', idleAssetImg: 'img_t_puncher2_front', idleAssetImgSize: [50, 50] },
+  t3_aoelaser: { type: 'turret', item: 't3_aoelaser', idleAssetImg: 'img_t_aoelaser_front', idleAssetImgSize: [50, 50] },
+  t3_iceray2: { type: 'turret', item: 't3_iceray2', idleAssetImg: 'img_t_iceray2_front', idleAssetImgSize: [50, 50] },
+  t3_miningbomb: { type: 'turret', item: 't3_miningbomb', idleAssetImg: 'img_t_miningbomb_front', idleAssetImgSize: [50, 50] },
+  t3_tesla: { type: 'turret', item: 't3_tesla', idleAssetImg: 'img_t_tesla_front', idleAssetImgSize: [50, 50] },
+  t3_icepuncher: { type: 'turret', item: 't3_icepuncher', idleAssetImg: 'img_t_icepuncher_front', idleAssetImgSize: [50, 50] },
+  t3_densnut: { type: 'turret', item: 't3_densnut', idleAssetImg: 'img_t_densenut_front', idleAssetImgSize: [50, 50] },
+  t3_durian: { type: 'turret', item: 't3_durian', idleAssetImg: 'img_t_durian_front', idleAssetImgSize: [50, 50] },
+  t3_spike2: { type: 'turret', item: 't3_spike2', idleAssetImg: 'img_t_spike2_front', idleAssetImgSize: [50, 50] },
+  t3_holonut: { type: 'turret', item: 't3_holonut', idleAssetImg: 'img_t_holonut_front', idleAssetImgSize: [50, 50] },
+  t3_minefield: { type: 'turret', item: 't3_minefield', idleAssetImg: 'img_t_minefield_front', idleAssetImgSize: [50, 50] },
+  t3_frostfield: { type: 'turret', item: 't3_frostfield', idleAssetImg: 'img_t_frostfield_front', idleAssetImgSize: [50, 50] },
+  t3_triberg: { type: 'turret', item: 't3_triberg', idleAssetImg: 'img_t_triberg_front', idleAssetImgSize: [50, 50] },
 
   // Special T0 Loot Definitions - Ensure all are turretAsItem
   t0_cherrybomb: { type: 'turretAsItem', item: 't0_cherrybomb', idleAssetImg: 'img_t0_cherrybomb_front', idleAssetImgSize: [45, 45] },

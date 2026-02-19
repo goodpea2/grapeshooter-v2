@@ -1,3 +1,4 @@
+
 import { GRID_SIZE, HOUR_FRAMES } from './constants';
 
 export const obstacleTypes: any = {
@@ -39,7 +40,7 @@ export const overlayTypes: any = {
     lootConfigOnDeath: 'lc_sun_clump',
     assetImgConfig: { idleAssetImg: ['img_sun_10_a'], randomRotation: true, randomFlip: true }
   },
-  o_tnt: { 
+  ov_tnt: { 
     name: 'TNT', 
     minHealth: -1, 
     isValuable: false, 
@@ -49,7 +50,7 @@ export const overlayTypes: any = {
     bulletToSpawnOnDeath: ['b_tnt_explosion'],
     assetImgConfig: { idleAssetImg: ['img_tnt_a'], randomRotation: false, randomFlip: true }
   },
-  o_sunflower: { 
+  ov_sunflower: { 
     name: 'Wild Sunflower', 
     minHealth: -1, 
     isValuable: true, 
@@ -58,7 +59,7 @@ export const overlayTypes: any = {
     lootConfigOnDeath: 'lc_wild_sunflower',
     assetImgConfig: { idleAssetImg: ['img_seed_sunflower'], randomRotation: false, randomFlip: false }
   },
-  o_stray: { 
+  ov_stray: { 
     name: 'Stray Crate', 
     minHealth: -1, 
     isValuable: true, 
@@ -68,7 +69,7 @@ export const overlayTypes: any = {
     lootConfigOnDeath: 'lc_stray_crate',
     assetImgConfig: { idleAssetImg: ['img_seed_stray_t1'], randomRotation: false, randomFlip: false }
   },
-  sniperTower: { 
+  ov_sniper_tower: { 
     name: 'Sniper Tower', 
     minHealth: 300, 
     isEnemy: true, 
@@ -86,16 +87,16 @@ export const overlayTypes: any = {
   },
 
   // --- TREASURE CHESTS ---
-  o_treasurechest_100: {
-    name: 'Treasure Chest', minHealth: 250, isValuable: true, obstacleOverlayVfx: 'v_treasurechest', isConcealedAlongWithObstacle: false,
+  ov_treasurechest_100: {
+    name: 'Treasure Chest', minHealth: 300, isValuable: true, obstacleOverlayVfx: 'v_treasurechest', isConcealedAlongWithObstacle: false,
     lootConfigOnDeath: 'lc_treasurechest_100', assetImgConfig: { idleAssetImg: ['img_treasurechest'], randomRotation: false, randomFlip: false }
   },
-  o_treasurechest_200: {
-    name: 'Treasure Chest', minHealth: 500, isValuable: true, obstacleOverlayVfx: 'v_treasurechest', isConcealedAlongWithObstacle: false,
+  ov_treasurechest_200: {
+    name: 'Treasure Chest', minHealth: 600, isValuable: true, obstacleOverlayVfx: 'v_treasurechest', isConcealedAlongWithObstacle: false,
     lootConfigOnDeath: 'lc_treasurechest_200', assetImgConfig: { idleAssetImg: ['img_treasurechest'], randomRotation: false, randomFlip: false }
   },
-  o_treasurechest_300: {
-    name: 'Treasure Chest', minHealth: 1000, isValuable: true, obstacleOverlayVfx: 'v_treasurechest', isConcealedAlongWithObstacle: false,
+  ov_treasurechest_300: {
+    name: 'Treasure Chest', minHealth: 1200, isValuable: true, obstacleOverlayVfx: 'v_treasurechest', isConcealedAlongWithObstacle: false,
     lootConfigOnDeath: 'lc_treasurechest_300', assetImgConfig: { idleAssetImg: ['img_treasurechest'], randomRotation: false, randomFlip: false }
   },
 

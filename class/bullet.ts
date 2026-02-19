@@ -2,10 +2,11 @@
 import { state } from '../state';
 import { GRID_SIZE, CHUNK_SIZE } from '../constants';
 import { bulletTypes } from '../balanceBullets';
-import { Explosion, MuzzleFlash } from '../vfx';
+import { Explosion, MuzzleFlash, HitSpark } from '../vfx';
 import { GroundFeature } from './groundFeature';
 import { drawBullet } from '../visualBullets';
 
+declare const p5: any;
 declare const createVector: any;
 declare const dist: any;
 declare const floor: any;
@@ -22,19 +23,45 @@ export class Bullet {
   pos: any; prevPos: any; vel: any; col: any; dmg: number; targetType: string; life: number; config: any; typeKey: string;
   damageTargets: string[] = [];
   targetPos: any | null = null;
+  currentPierceChance: number = 0;
+  
+  // Track unique hits for piercing consistency
+  hitTargets: Set<string> = new Set();
 
   constructor(x: number, y: number, tx: number, ty: number, typeKey: string, targetType: string) {
     this.typeKey = typeKey; this.config = bulletTypes[typeKey] || bulletTypes.b_player;
     this.damageTargets = this.config.damageTargets || [];
     this.pos = createVector(x, y); this.prevPos = this.pos.copy();
-    let dx = tx - x; let dy = ty - y; let mag = Math.sqrt(dx * dx + dy * dy);
-    this.vel = mag < 0.1 ? createVector(0,0) : createVector(dx / mag * this.config.bulletSpeed, dy / mag * this.config.bulletSpeed);
+    
     this.col = this.config.bulletColor; this.dmg = this.config.bulletDamage; this.targetType = targetType; this.life = this.config.bulletLifeTime;
+    this.currentPierceChance = this.config.initialPierceChance ?? 0;
+
+    if (this.config.highArcConfig) {
+       this.life = this.config.highArcConfig.arcTravelTime;
+       this.targetPos = createVector(tx, ty);
+       // Calculate required velocity to reach target in exactly arcTravelTime frames
+       let dx = tx - x; let dy = ty - y;
+       this.vel = createVector(dx / this.life, dy / this.life);
+    } else {
+       let dx = tx - x; let dy = ty - y; let mag = Math.sqrt(dx * dx + dy * dy);
+       this.vel = mag < 0.1 ? createVector(0,0) : createVector(dx / mag * this.config.bulletSpeed, dy / mag * this.config.bulletSpeed);
+    }
   }
+
   update() {
     this.prevPos.set(this.pos); this.pos.add(this.vel); this.life--;
     
-    if (this.targetPos) {
+    // BALLISTIC PROJECTILE LOGIC: Ignore all collisions while flying high
+    if (this.config.highArcConfig) {
+        if (this.life <= 0) {
+           this.pos.set(this.targetPos);
+           this.explode();
+           this.spawnFeatures(null);
+        }
+        return; 
+    }
+
+    if (this.targetPos && !this.config.highArcConfig) {
        let dSq = (this.pos.x - this.targetPos.x)**2 + (this.pos.y - this.targetPos.y)**2;
        let mag = this.vel.mag();
        if (dSq < (mag + 2)**2) {
@@ -46,19 +73,25 @@ export class Bullet {
        }
     }
 
-    if (this.config.spawnGroundFeaturePerFrame > 0 && state.frames % this.config.spawnGroundFeaturePerFrame === 0) this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
+    if (this.config.spawnGroundFeatureAfterLifetime && this.life <= 0) {
+       this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
+    }
+
+    if (this.config.spawnGroundFeaturePerFrame > 0 && state.frames % this.config.spawnGroundFeaturePerFrame === 0) {
+       this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
+    }
     
     if (this.damageTargets.includes('icecube')) {
       for (let a of state.player.attachments) {
-        if (a.isFrosted) {
+        if (a.isFrosted && !this.hitTargets.has(a.uid)) {
           const awPos = a.getWorldPos();
           const dSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
           const minDist = a.size / 2 + 6;
           if (dSq < minDist*minDist) {
+            this.hitTargets.add(a.uid);
             a.takeDamage(this.dmg);
-            if (this.config.aoeConfig?.isAoe) this.explode();
-            this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
-            this.life = 0; return;
+            this.handleCollision();
+            if (this.life <= 0) return;
           }
         }
       }
@@ -66,81 +99,141 @@ export class Bullet {
 
     if (this.damageTargets.includes('obstacle')) {
       let gx = floor(this.pos.x / GRID_SIZE); let gy = floor(this.pos.y / GRID_SIZE);
-      let chunk = state.world.getChunk(floor(gx/CHUNK_SIZE), floor(gy/CHUNK_SIZE));
-      let block = chunk?.blocks.find((b: any) => !b.isMined && b.gx === gx && b.gy === gy);
-      if (block) {
-        block.takeDamage(this.dmg * (this.config.obstacleDamageMultiplier || 1));
-        if (this.config.aoeConfig?.isAoe && this.config.aoeConfig.dealAoeOnObstacle) this.explode();
-        this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
-        this.life = 0; return;
+      const blockKey = `${gx},${gy}`;
+      if (!this.hitTargets.has(blockKey)) {
+        let chunk = state.world.getChunk(floor(gx/CHUNK_SIZE), floor(gy/CHUNK_SIZE));
+        let block = chunk?.blocks.find((b: any) => !b.isMined && b.gx === gx && b.gy === gy);
+        if (block) {
+          this.hitTargets.add(blockKey);
+          block.takeDamage(this.dmg * (this.config.obstacleDamageMultiplier || 1));
+          
+          // Trigger sparking Hit VFX on obstacle impact
+          const hitVfx = this.config.bulletHitVfx || 'v_hit_spark';
+          if (hitVfx === 'v_hit_spark') {
+             state.vfx.push(new HitSpark(this.pos.x, this.pos.y, this.col));
+          }
+
+          if (this.config.bounceConfig) {
+             // Calculate bounce
+             const prevGX = floor(this.prevPos.x / GRID_SIZE);
+             const prevGY = floor(this.prevPos.y / GRID_SIZE);
+             if (prevGX !== gx) this.vel.x *= -1;
+             if (prevGY !== gy) this.vel.y *= -1;
+             this.dmg = Math.max(0, this.dmg - (this.config.bounceConfig.damageDecayPerBounce || 0));
+          } else {
+             this.handleCollision(true);
+          }
+          if (this.life <= 0) return;
+        }
       }
     } else {
         if (state.world.isBlockAt(this.pos.x, this.pos.y)) {
-           this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
-           this.life = 0; return;
+           this.handleCollision();
+           if (this.life <= 0) return;
         }
     }
 
     if (this.damageTargets.includes('enemy')) {
-      // Use spatial hash for bullet-enemy collision
       const cs = state.spatialHashCellSize;
       const hgx = floor(this.pos.x / cs);
       const hgy = floor(this.pos.y / cs);
-      let hit = false;
       
-      for (let i = -1; i <= 1 && !hit; i++) {
-        for (let j = -1; j <= 1 && !hit; j++) {
-          const targets = state.spatialHash.get(`${hgx+i},${hgy+j}`);
-          if (targets) {
-            for (const e of targets) {
-              if (e.health <= 0 || e.isDying) continue;
+      for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+          const cell = state.spatialHash.get(`${hgx+i},${hgy+j}`);
+          if (cell) {
+            for (const e of cell) {
+              if (e.health <= 0 || e.isDying || this.hitTargets.has(e.uid)) continue;
               const dSq = (this.pos.x - e.pos.x)**2 + (this.pos.y - e.pos.y)**2;
               const minDist = e.size / 2;
               if (dSq < minDist*minDist) {
+                this.hitTargets.add(e.uid);
                 this.applyBulletConditions(e);
+                
+                // Direct Knockback
+                if (this.config.knockBackStrength) {
+                   const dir = p5.Vector.sub(e.pos, this.prevPos).normalize();
+                   const strength = this.config.knockBackStrength / Math.max(0.2, (e.size / 30));
+                   e.kbVel.add(dir.mult(strength));
+                   if (this.config.knockBackDuration) {
+                      e.kbTimer = Math.max(e.kbTimer || 0, this.config.knockBackDuration);
+                   }
+                }
+
+                // Satisfying Hit VFX
+                const hitVfx = this.config.bulletHitVfx || 'v_hit_spark';
+                if (hitVfx === 'v_hit_spark') {
+                   state.vfx.push(new HitSpark(this.pos.x, this.pos.y, this.col));
+                }
+
                 e.takeDamage(this.dmg); 
-                if (this.config.aoeConfig?.isAoe) this.explode();
-                this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
-                this.life = 0; hit = true; break;
+                this.handleCollision(); // Process pierce and lifetime
+                if (this.life <= 0) return;
               }
             }
           }
         }
       }
-      if (hit) return;
     }
 
     if (this.damageTargets.includes('turret')) {
-      // Healing check: only stationary or specialized turrets
       for (let a of state.player.attachments) {
-        const awPos = a.getWorldPos();
-        const dSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
-        const minDist = a.size / 2 + 4;
-        if (dSq < minDist*minDist) {
-          a.takeDamage(this.dmg); 
-          if (this.config.aoeConfig?.isAoe) this.explode();
-          this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
-          this.life = 0; return;
+        if (!this.hitTargets.has(a.uid)) {
+          const awPos = a.getWorldPos();
+          const dSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
+          const minDist = a.size / 2 + 4;
+          if (dSq < minDist*minDist) {
+            this.hitTargets.add(a.uid);
+            a.takeDamage(this.dmg); 
+            this.handleCollision();
+            if (this.life <= 0) return;
+          }
         }
       }
     }
 
-    if (this.damageTargets.includes('player')) {
+    if (this.damageTargets.includes('player') && !this.hitTargets.has('player')) {
       const pdSq = (this.pos.x - state.player.pos.x)**2 + (this.pos.y - state.player.pos.y)**2;
       const pMinDist = state.player.size / 2;
       if (pdSq < pMinDist*pMinDist) {
-        state.player.takeDamage(this.dmg); if (this.config.aoeConfig?.isAoe) this.explode();
-        this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
-        this.life = 0; return;
+        this.hitTargets.add('player');
+        state.player.takeDamage(this.dmg); 
+        this.handleCollision();
+        if (this.life <= 0) return;
       }
     }
 
-    // FIX: Explode and spawn features for dummy bullets (life 0 at start)
     if (this.life <= 0 && this.config.aoeConfig?.isAoe && (this.config.aoeConfig.dealAoeAfterLifetime || this.config.bulletLifeTime === 1)) { 
         this.explode(); 
-        this.spawnFeatures(null); // Explicitly pass null to fallback to config keys during explosion
+        this.spawnFeatures(null);
     }
   }
+
+  handleCollision(isObstacle: boolean = false) {
+    const aoe = this.config.aoeConfig;
+    const shouldExplodeEveryTime = aoe?.dealAoeOnEveryHit;
+    
+    // PIERCE LOGIC: Bullet only dies if pierce roll fails
+    let willDie = true;
+    if (random() < this.currentPierceChance) {
+        this.currentPierceChance -= (this.config.pierceChanceDecayPerHit || 0);
+        willDie = false;
+    }
+
+    if (aoe?.isAoe) {
+       const isEligible = isObstacle ? aoe.dealAoeOnObstacle : true;
+       if (isEligible) {
+          // Explode either if specifically configured to always explode, or if this is the final impact
+          if (shouldExplodeEveryTime || willDie) {
+             this.explode();
+          }
+       }
+    }
+
+    this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
+    if (willDie) this.life = 0;
+  }
+
   applyBulletConditions(target: any) {
     if (!target.applyCondition) return;
     if (this.config.appliedConditions) {
@@ -152,7 +245,6 @@ export class Bullet {
     if (this.config.slowDuration > 0) target.applyCondition('c_chilled', this.config.slowDuration);
   }
   spawnFeatures(keys: string[] | null) {
-    // FIX: Ensure list prioritization is correct even if an empty array is passed
     const list = (keys && keys.length > 0) ? keys : (this.config.spawnGroundFeatureKeys || []);
     if (list.length === 0) return;
     const count = this.config.spawnGroundFeatureCount || 1;
@@ -188,12 +280,9 @@ export class Bullet {
   }
 
   explode() {
-    // Trigger camera shake if configured
     if (this.config.cameraShakeOnDeath) {
       const [min, max, falloff] = this.config.cameraShakeOnDeath;
-      // Do not stack shake strength, take the max to prevent vibration runaway
       state.cameraShake = Math.max(state.cameraShake, random(min, max));
-      // Expose and apply the third falloff parameter if it exists
       if (falloff !== undefined) {
         state.cameraShakeFalloff = falloff;
       }
@@ -209,6 +298,17 @@ export class Bullet {
         let dSq = (this.pos.x - e.pos.x)**2 + (this.pos.y - e.pos.y)**2;
         if (dSq < maxR*maxR) {
           const d = Math.sqrt(dSq);
+          
+          // AOE Knockback
+          if (aoe.aoeKnockbackStrength) {
+             const dir = p5.Vector.sub(e.pos, this.pos).normalize();
+             const strength = (aoe.aoeKnockbackStrength * (1 - d/maxR)) / Math.max(0.2, (e.size / 30));
+             e.kbVel.add(dir.mult(strength));
+             if (this.config.knockBackDuration) {
+                e.kbTimer = Math.max(e.kbTimer || 0, this.config.knockBackDuration);
+             }
+          }
+
           const lerpDmg = this.getLerpedAoeDamage(d, aoe);
           if (lerpDmg > 0) {
             this.applyBulletConditions(e);
@@ -234,7 +334,6 @@ export class Bullet {
         if (adSq < maxR*maxR) {
           const d = Math.sqrt(adSq);
           const lerpDmg = this.getLerpedAoeDamage(d, aoe);
-          // Note: lerpDmg can be negative for healing starfruit pulse
           if (lerpDmg !== 0) a.takeDamage(lerpDmg);
         }
       }

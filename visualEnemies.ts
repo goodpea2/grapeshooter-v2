@@ -116,7 +116,8 @@ export function drawEnemy(e: any) {
   rotate(e.rot);
   
   const s = e.size;
-  const imgKey = e.type === 'e_swarm' ? 'img_swarm_center' : 'img_' + e.type.slice(2);
+  let imgKey = e.type === 'e_swarm' ? 'img_swarm_center' : 'img_' + e.type.slice(2);
+  if (e.type === 'e_dummyTarget') imgKey = 'img_giant';
   const sprite = state.assets[imgKey];
 
   if (sprite) {
@@ -163,7 +164,7 @@ export function drawEnemy(e: any) {
       vertex(-s * 0.4, -s * 0.45);
       endShape(CLOSE);
     }
-    else if (e.type === 'e_giant') {
+    else if (e.type === 'e_giant' || e.type === 'e_dummyTarget') {
       ellipse(-s * 0.1, -s * 0.2, s * 0.7, s * 0.6);
       ellipse(-s * 0.1, s * 0.2, s * 0.7, s * 0.6);
       ellipse(s * 0.15, 0, s * 0.7, s * 0.7);
@@ -183,7 +184,7 @@ export function drawEnemy(e: any) {
     // PASS 2: Fill (Internal line removal)
     noStroke();
     fill(baseCol[0], baseCol[1], baseCol[2]);
-    if (e.type === 'e_giant') {
+    if (e.type === 'e_giant' || e.type === 'e_dummyTarget') {
       ellipse(-s * 0.1, -s * 0.2, s * 0.7, s * 0.6);
       ellipse(-s * 0.1, s * 0.2, s * 0.7, s * 0.6);
       ellipse(s * 0.15, 0, s * 0.7, s * 0.7);
@@ -234,7 +235,7 @@ export function drawEnemy(e: any) {
       drawHighlight(-s * 0.1, -s * 0.1, s * 0.3, s * 0.15);
       drawEye(s * 0.2, 0, s * 0.25);
     }
-    else if (e.type === 'e_giant') {
+    else if (e.type === 'e_giant' || e.type === 'e_dummyTarget') {
       drawHighlight(-s * 0.2, -s * 0.3, s * 0.3, s * 0.15);
       drawHighlight(-s * 0.2, s * 0.1, s * 0.3, s * 0.15);
       drawHighlight(s * 0.1, -s * 0.1, s * 0.3, s * 0.15);

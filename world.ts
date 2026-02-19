@@ -19,6 +19,8 @@ import { generateRoomDirectorData } from './debug/roomDirectorGenerator';
 declare const createVector: any;
 declare const dist: any;
 declare const floor: any;
+// Added missing abs declaration
+declare const abs: any;
 declare const lerp: any;
 declare const color: any;
 declare const noise: any;
@@ -217,8 +219,15 @@ export class Block {
 
       if (isExposed) {
         stroke(bord[0], bord[1], bord[2], opacity); strokeWeight(3); noFill();
-        if (!n) line(tl, 0, renderSize - tr, 0); if (!s) line(bl, renderSize, renderSize - br, GRID_SIZE); if (!w) line(0, tl, 0, renderSize - bl); if (!e) line(renderSize, tr, renderSize, renderSize - br);
-        if (!n && !w) arc(rad, rad, rad * 2, rad * 2, PI, PI + HALF_PI); if (!n && !e) arc(renderSize - rad, rad, rad * 2, rad * 2, PI + HALF_PI, TWO_PI); if (!s && !e) arc(renderSize - rad, GRID_SIZE - rad, rad * 2, rad * 2, 0, HALF_PI); if (!s && !w) arc(rad, renderSize - rad, rad * 2, rad * 2, HALF_PI, PI);
+        if (!n) line(tl, 0, renderSize - tr, 0); 
+        if (!s) line(bl, renderSize, renderSize - br, renderSize); 
+        if (!w) line(0, tl, 0, renderSize - bl); 
+        if (!e) line(renderSize, tr, renderSize, renderSize - br);
+        
+        if (!n && !w) arc(rad, rad, rad * 2, rad * 2, PI, PI + HALF_PI); 
+        if (!n && !e) arc(renderSize - rad, rad, rad * 2, rad * 2, PI + HALF_PI, TWO_PI); 
+        if (!s && !e) arc(renderSize - rad, renderSize - rad, rad * 2, rad * 2, 0, HALF_PI); 
+        if (!s && !w) arc(rad, renderSize - rad, rad * 2, rad * 2, HALF_PI, PI);
       }
 
       if (this.feature && isExposed) {
@@ -315,11 +324,11 @@ export class Block {
 
       if (oCfg) {
         // --- TNT Override ---
-        if (this.overlay === 'o_tnt') {
+        if (this.overlay === 'ov_tnt') {
             state.tickingExplosives.push({
                 x: this.pos.x + GRID_SIZE/2,
                 y: this.pos.y + GRID_SIZE/2,
-                type: 'o_tnt',
+                type: 'ov_tnt',
                 timer: 180,
                 maxTimer: 180
             });
@@ -470,10 +479,10 @@ export class Chunk {
     }
 
     const bonusOverlays = [
-      { key: 'o_tnt', amount: bonusData.tnt || 0, stat: 'totalTntSpawned' },
-      { key: 'o_stray', amount: bonusData.stray || 0, stat: 'totalStraySpawned' },
-      { key: 'o_sunflower', amount: bonusData.sunflower || 0, stat: 'totalSunflowerSpawned' },
-      { key: 'sniperTower', amount: bonusData.sniper || 0, stat: 'totalSniperSpawned' }
+      { key: 'ov_tnt', amount: bonusData.tnt || 0, stat: 'totalTntSpawned' },
+      { key: 'ov_stray', amount: bonusData.stray || 0, stat: 'totalStraySpawned' },
+      { key: 'ov_sunflower', amount: bonusData.sunflower || 0, stat: 'totalSunflowerSpawned' },
+      { key: 'ov_sniper_tower', amount: bonusData.sniper || 0, stat: 'totalSniperSpawned' }
     ];
 
     for (const bonus of bonusOverlays) {
@@ -551,6 +560,10 @@ export class Chunk {
       return candidates[floor(random(candidates.length))];
     };
 
+    // TRACKING FOR NPC AVOIDANCE
+    let npcSpawnGX: number | null = null;
+    let npcSpawnGY: number | null = null;
+
     if (cfg.guaranteedNpc) {
       let npcKey = cfg.guaranteedNpc;
       if (npcKey === 'lv1 npc') npcKey = random(['NPC_lv1_lily', 'NPC_lv1_jelly']);
@@ -559,6 +572,8 @@ export class Chunk {
 
       const spawnGX = floor(this.cx * CHUNK_SIZE + random(4, 12));
       const spawnGY = floor(this.cy * CHUNK_SIZE + random(4, 12));
+      npcSpawnGX = spawnGX;
+      npcSpawnGY = spawnGY;
       
       for (let i = spawnGX - 2; i <= spawnGX + 2; i++) {
         for (let j = spawnGY - 2; j <= spawnGY + 2; j++) {
@@ -567,6 +582,12 @@ export class Chunk {
              b.isMined = true;
              b.overlay = null;
              b.liquidType = null;
+           } else {
+             // Create an air block if it doesn't exist to ensure we track the NPC area
+             const air = new Block(i, j, 'o_dirt');
+             air.isMined = true;
+             this.blocks.push(air);
+             this.blockMap.set(`${i},${j}`, air);
            }
         }
       }
@@ -578,7 +599,7 @@ export class Chunk {
         if (target) {
             target.overlay = cfg.guaranteedOverlay;
             const oCfg = overlayTypes[cfg.guaranteedOverlay];
-            if (oCfg.minHealth > 0) {
+            if (oCfg && oCfg.minHealth > 0) {
               target.health = oCfg.minHealth;
               target.maxHealth = target.health;
             }
@@ -645,21 +666,11 @@ export class Chunk {
       }
     }
 
-    const otherPots = [{ key: 'o_tnt', countRange: cfg.tnt },{ key: 'o_crate', isBlock: true, countRange: cfg.crate }];
-    for (const p of otherPots) {
-      const count = floor(random(p.countRange[0], p.countRange[1] + 1));
-      for (let i = 0; i < count; i++) {
-        if (p.isBlock) {
-            const candidates = this.blocks.filter(b => b.isMined && !b.liquidType);
-            if (candidates.length > 0) {
-                const target = candidates[floor(random(candidates.length))];
-                target.isMined = false; target.type = p.key; target.config = obstacleTypes[p.key] || obstacleTypes['o_crate']; target.health = target.config.health; target.maxHealth = target.health;
-            }
-        } else {
-            const target = pickValidBlockForAddition();
-            if (target) target.overlay = p.key;
-        }
-      }
+    // Split Pots Logic: TNT remains an overlay on solid blocks
+    const tntCount = floor(random(cfg.tnt[0], cfg.tnt[1] + 1));
+    for (let i = 0; i < tntCount; i++) {
+      const target = pickValidBlockForAddition();
+      if (target) target.overlay = 'ov_tnt';
     }
 
     for (const g of cfg.guaranteedObstacleConfig) {
@@ -671,6 +682,45 @@ export class Chunk {
         }
       }
     }
+
+    // CRATE SPAWNING AS FINAL STEP: Place on TRUE air coordinates (not in blockMap)
+    const crateCount = floor(random(cfg.crate[0], cfg.crate[1] + 1));
+    const airCandidates: {gx: number, gy: number}[] = [];
+    for (let x = 0; x < CHUNK_SIZE; x++) {
+      for (let y = 0; y < CHUNK_SIZE; y++) {
+        let lgx = this.cx * CHUNK_SIZE + x;
+        let lgy = this.cy * CHUNK_SIZE + y;
+        const existing = this.blockMap.get(`${lgx},${lgy}`);
+        if (!existing || existing.isMined) {
+            if (existing && existing.liquidType) continue; // Don't float on liquid
+            // Exclude blocks within NPC clear radius
+            if (npcSpawnGX !== null && npcSpawnGY !== null) {
+                if (abs(lgx - npcSpawnGX) <= 3 && abs(lgy - npcSpawnGY) <= 3) continue;
+            }
+            airCandidates.push({gx: lgx, gy: lgy});
+        }
+      }
+    }
+
+    for (let i = 0; i < crateCount; i++) {
+        if (airCandidates.length === 0) break;
+        const idx = floor(random(airCandidates.length));
+        const c = airCandidates.splice(idx, 1)[0];
+        
+        let target = this.blockMap.get(`${c.gx},${c.gy}`);
+        if (!target) {
+           target = new Block(c.gx, c.gy, 'o_crate');
+           this.blocks.push(target);
+           this.blockMap.set(`${c.gx},${c.gy}`, target);
+        } else {
+           target.isMined = false;
+           target.type = 'o_crate';
+           target.config = obstacleTypes['o_crate'];
+           target.health = target.config.health;
+           target.maxHealth = target.health;
+        }
+    }
+
     this.roomEnemyBudget = prefab.enemyBudget;
     this.rebuildOverlayList();
   }
@@ -831,8 +881,7 @@ export class WorldManager {
     return true;
   }
   getLiquidAt(gx: number, gy: number) {
-    let cx = floor(gx / CHUNK_SIZE); let cy = floor(gy / CHUNK_SIZE);
-    let chunk = this.chunks.get(`${cx},${cy}`); if(!chunk) return null;
+    let cx = floor(gx / CHUNK_SIZE); let cy = floor(gy / CHUNK_SIZE); let chunk = this.chunks.get(`${cx},${cy}`); if(!chunk) return null;
     const b = chunk.blockMap.get(`${gx},${gy}`); return b ? b.liquidType : null;
   }
   display(playerPos: any) {
@@ -853,9 +902,14 @@ export class WorldManager {
         let chunk = this.chunks.get(`${cx},${cy}`);
         if (chunk) { 
           const b = chunk.blockMap.get(`${i},${j}`); 
-          if (b && !b.isMined) { 
-            let cX = constrain(x, b.pos.x, b.pos.x + GRID_SIZE); 
-            let cY = constrain(y, b.pos.y, b.pos.y + GRID_SIZE); 
+          if (b && !b.isMined) {
+            const sizeMult = b.config.sizeMultiplier || 1.0;
+            const renderSize = GRID_SIZE * sizeMult;
+            const offset = (GRID_SIZE - renderSize) / 2;
+            
+            // Constrain point to actual visual bounds of the block
+            let cX = constrain(x, b.pos.x + offset, b.pos.x + offset + renderSize); 
+            let cY = constrain(y, b.pos.y + offset, b.pos.y + offset + renderSize); 
             if ((x - cX)**2 + (y - cY)**2 < radius*radius) return true; 
           } 
         }

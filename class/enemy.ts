@@ -30,16 +30,21 @@ declare const width: any;
 declare const height: any;
 
 export class Enemy {
+  uid: string;
   pos: any; type: string; config: any; health: number; maxHealth: number; speed: number; size: number; col: any; target: any = null; flash: number = 0; rot: number; actionType: string[]; actionConfig: any;
   meleeCooldown: number = 0; shootCooldown: number = 0; swarmParticles: any[] = []; markedForDespawn: boolean = false;
   conditions: Map<string, number> = new Map();
   conditionData: Map<string, any> = new Map();
   prevPos: any; isDying: boolean = false;
   triggeredSpawnThresholds: Set<number> = new Set(); // Tracks already fired health ratios
+  kbVel: any; // Knockback velocity
+  kbTimer: number = 0; // Knockback duration (interrupts movement)
 
   constructor(x: number, y: number, typeKey: string) {
+    this.uid = Math.random().toString(36).substr(2, 9);
     this.pos = createVector(x, y); this.prevPos = this.pos.copy(); this.type = typeKey; this.config = enemyTypes[typeKey]; this.health = this.config.health; this.maxHealth = this.health; this.speed = this.config.speed; this.size = this.config.size; this.col = this.config.col; this.rot = random(TWO_PI); this.actionType = this.config.actionType; this.actionConfig = this.config.actionConfig;
     if (this.type === 'e_swarm') for(let i=0; i<10; i++) this.swarmParticles.push({ offset: p5.Vector.random2D().mult(random(12, 24)), size: random(5, 9), phase: random(TWO_PI) });
+    this.kbVel = createVector(0, 0);
   }
 
   applyCondition(cKey: string, duration: number, data?: any) {
@@ -66,6 +71,13 @@ export class Enemy {
     if (this.isDying) return;
     if (this.flash > 0) this.flash--;
     this.prevPos.set(this.pos);
+
+    // Apply knockback
+    if (this.kbVel.mag() > 0.05) {
+      this.moveWithCollisions(this.kbVel);
+      this.kbVel.mult(0.9);
+    }
+    if (this.kbTimer > 0) this.kbTimer--;
 
     const dSqToPlayer = (this.pos.x - playerPos.x)**2 + (this.pos.y - playerPos.y)**2;
     const despawnRange = (GRID_SIZE * CHUNK_SIZE * 4)**2;
@@ -116,7 +128,7 @@ export class Enemy {
        }
     }
 
-    if (this.conditions.has('c_stun')) return;
+    if (this.conditions.has('c_stun') || this.kbTimer > 0) return;
 
     // Use spatial hash for enemy avoidance
     const cs = state.spatialHashCellSize;
@@ -166,15 +178,39 @@ export class Enemy {
     const dirHeading = atan2(dy, dx);
     this.rot = lerpAngle(this.rot, dirHeading, 0.12);
 
-    if (this.actionType.includes('moveDefault') && this.meleeCooldown <= 0) {
+    // Calculate effective target radius for stopping and attacking
+    let targetRadius = (this.target.size || 32) * 0.5;
+    // If targeting a Holonut or similar unit with a shield, treat the shield as the collision/target boundary
+    if (this.target instanceof AttachedTurret && this.target.config.actionType.includes('shield')) {
+        targetRadius = this.target.config.actionConfig.shieldRadius || targetRadius;
+    }
+
+    const inMeleeRange = d < (this.size * 0.5 + targetRadius + 10);
+    const canShootInRange = this.actionType.includes('shoot') && d < this.actionConfig.shootRange && state.world.checkLOS(this.pos.x, this.pos.y, tp.x, tp.y);
+
+    let shouldMove = true;
+    if (this.actionType.includes('meleeAttack') && inMeleeRange) shouldMove = false;
+    if (canShootInRange) shouldMove = false;
+
+    if (shouldMove && this.actionType.includes('moveDefault')) {
       let rThresh = this.actionType.includes('shoot') ? this.actionConfig.shootRange * 0.75 : this.size * 0.6;
       if (d > rThresh) {
         this.moveWithCollisions(createVector(dx/d, dy/d).mult(this.speed * speedMult));
       }
     }
-    if (this.actionType.includes('meleeAttack') && d < (this.size + (this.target.size || 32))*0.5 + 10 && this.meleeCooldown <= 0) { this.target.takeDamage(this.actionConfig.damage); this.meleeCooldown = this.actionConfig.attackFireRate; if (frameCount % 5 === 0) state.vfx.push(new HitSpark(this.pos.x, this.pos.y, [255, 50, 50])); }
+
+    if (this.actionType.includes('meleeAttack') && inMeleeRange && this.meleeCooldown <= 0) { 
+        this.target.takeDamage(this.actionConfig.damage); 
+        this.meleeCooldown = this.actionConfig.attackFireRate; 
+        if (frameCount % 5 === 0) state.vfx.push(new HitSpark(this.pos.x, this.pos.y, [255, 50, 50])); 
+    }
     if (this.meleeCooldown > 0) this.meleeCooldown--;
-    if (this.actionType.includes('shoot') && d < this.actionConfig.shootRange && this.shootCooldown <= 0 && state.world.checkLOS(this.pos.x, this.pos.y, tp.x, tp.y)) { state.enemyBullets.push(new Bullet(this.pos.x, this.pos.y, tp.x, tp.y, 'b_enemy_basic', 'core')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, dirHeading, 22, 6, color(200, 100, 255))); this.shootCooldown = this.actionConfig.shootFireRate; }
+
+    if (this.actionType.includes('shoot') && canShootInRange && this.shootCooldown <= 0) { 
+        state.enemyBullets.push(new Bullet(this.pos.x, this.pos.y, tp.x, tp.y, 'b_enemy_basic', 'core')); 
+        state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, dirHeading, 22, 6, color(200, 100, 255))); 
+        this.shootCooldown = this.actionConfig.shootFireRate; 
+    }
     if (this.shootCooldown > 0) this.shootCooldown--;
     
     if (this.actionType.includes('spawnEnemy') && this.actionConfig.spawnTriggerOnHealthRatio) {
@@ -223,8 +259,13 @@ export class Enemy {
     if (state.isStationary) {
       for (let t of state.player.attachments) if (t.config.collideWithEnemy !== false) {
         const twPos = t.getWorldPos();
+        // Collision should also consider the shield radius
+        let targetRadius = t.size * 0.5;
+        if (t.config.actionType.includes('shield')) {
+            targetRadius = t.config.actionConfig.shieldRadius || targetRadius;
+        }
         const dSq = (x - twPos.x)**2 + (y - twPos.y)**2;
-        if (dSq < ((this.size + t.size)*0.5)**2) return true;
+        if (dSq < ((this.size * 0.5 + targetRadius) * 0.95)**2) return true;
       }
     }
     return false; 

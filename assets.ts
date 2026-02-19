@@ -1,3 +1,4 @@
+
 export const ASSETS = {
   img_player_front_right: "https://i.ibb.co/S4YhXH19/player-front-right.png",
   img_player_back_right: "https://i.ibb.co/SwVp44h3/player-back-right.png",
@@ -71,9 +72,49 @@ export const ASSETS = {
   img_t0_cherrybomb_front: "https://i.ibb.co/PzgRmRmL/t-cherrybomb-front-right.png",
   img_seed_stray_t2: "https://i.ibb.co/gb0CSBYs/seed-stray-t2.png",
 
-  // Tripeater Assets
+  // Tier 3 Assets
   img_t_triplepea_front: "https://i.ibb.co/xtrcv6Sp/t-tripea-front-right.png",
   img_t_triplepea_back: "https://i.ibb.co/7dZFZh4n/t-tripea-back-right.png",
+  img_t_firepea2_front: "https://i.ibb.co/wZpMCD9x/t-firepea2-front-right.png",
+  img_t_firepea2_back: "https://i.ibb.co/vgPLkkX/t-firepea2-back-right.png",
+  img_t_spinnut_front: "https://i.ibb.co/6cvtzJ1f/t-spinnut-front-right.png",
+  img_t_spinnut_back: "https://i.ibb.co/j96zfqNc/t-spinnut-back-right.png",
+  img_t_mortar2_front: "https://i.ibb.co/cSnHsYz9/t-mortar2-front-right.png",
+  img_t_mortar2_back: "https://i.ibb.co/VRz9Wpc/t-mortar2-back-right.png",
+  img_t_snowpea2_front: "https://i.ibb.co/KpwqrMfX/t-snowpea2-front-right.png",
+  img_t_snowpea2_back: "https://i.ibb.co/s94WvdCG/t-snowpea2-back-right.png",
+  img_t_inferno_front: "https://i.ibb.co/PZwZPcVr/t-inferno-front-right.png",
+  img_t_inferno_back: "https://i.ibb.co/0p2BRPNx/t-inferno-back-right.png",
+  img_t_flamethrower_front: "https://i.ibb.co/v6ZrJ9yH/t-flamethrower-back-right.png",
+  img_t_flamethrower_back: "https://i.ibb.co/v6ZrJ9yH/t-flamethrower-back-right.png",
+  img_t_bowling_front: "https://i.ibb.co/N6VpwCqr/t-bowling-front-right.png",
+  img_t_bowling_back: "https://i.ibb.co/HyWxj89/t-bowling-back-right.png",
+  img_t_repulser_front: "https://i.ibb.co/GvPf6tVZ/t-repulser-front-right.png",
+  img_t_snowpeanut_front: "https://i.ibb.co/rRc0P4JM/t-snowpeanut-front-right.png",
+  img_t_snowpeanut_back: "https://i.ibb.co/yFmWpxFh/t-snowpeanut-back-right.png",
+  img_t_skymortar_front: "https://i.ibb.co/3VtsPmw/t-skymortar-front-right.png",
+  img_t_laser3_front: "https://i.ibb.co/nMkVfHm1/t-laser3-front-right.png",
+  img_t_laser3_back: "https://i.ibb.co/20wwWTpY/t-laser3-back-right.png",
+  img_t_puncher2_front: "https://i.ibb.co/9HJZQm20/t-puncher2-front-right.png",
+  img_t_puncher2_back: "https://i.ibb.co/bjc3Km30/t-puncher2-back-right.png",
+  img_t_aoelaser_front: "https://i.ibb.co/byXm4BD/t-aoelaser-font-right.png",
+  img_t_aoelaser_back: "https://i.ibb.co/KjBC7KjZ/t-aoelaser-back-right.png",
+  img_t_iceray2_front: "https://i.ibb.co/Zp7Mkjgk/t-iceray2-font-right.png",
+  img_t_iceray2_back: "https://i.ibb.co/1tBF9r4K/t-iceray2-back-right.png",
+  img_t_miningbomb_front: "https://i.ibb.co/rGrS7VLh/t-miningbomb-front-right.png",
+  img_t_tesla_front: "https://i.ibb.co/DB53cdN/t-tesla-front-right.png",
+  img_t_icepuncher_front: "https://i.ibb.co/zTyyFkG9/t-icepuncher-front-right.png",
+  img_t_icepuncher_back: "https://i.ibb.co/99xycgvF/t-icepuncher-back-right.png",
+  img_t_densenut_front: "https://i.ibb.co/fYGyVj6Z/t-densenut-front-right.png",
+  img_t_durian_front: "https://i.ibb.co/tMhLDtKw/t-durian-front-right.png",
+  img_t_spike2_front: "https://i.ibb.co/C3GxhRJV/t-spike2-front-right.png",
+  img_t_holonut_front: "https://i.ibb.co/RTtm4hgj/t-holonut-front-right.png",
+  img_t_minefield_front: "https://i.ibb.co/3yCjHzrL/t-minefield-front-right.png",
+  img_t_minefield_unarmed: "https://i.ibb.co/fztQr2NH/t-minefield-unarmed.png",
+  img_t_frostfield_front: "https://i.ibb.co/nM4tLLkJ/t-frostfield-front-right.png",
+  img_t_frostfield_unarmed: "https://i.ibb.co/qwPMs0W/t-frostfield-unarmed.png",
+  img_t_triberg_front: "https://i.ibb.co/CKHGSdgF/t-triberg-front-right.png",
+  img_t_triberg_unarmed: "https://i.ibb.co/hF305Ym5/t-triberg-unarmed.png",
 
   // Block Overlays
   img_spawner_a: "https://i.ibb.co/Wv5XyQdp/blockoverlay-spawner-a.png",
@@ -93,7 +134,15 @@ export const ASSETS = {
   img_icon_soil: "https://i.ibb.co/TBj66xWX/icon-soil.png",
   img_icon_sun: "https://i.ibb.co/vx8rqK71/icon-sun.png",
 
-  // New Batch
+  // New Tooltip Class Icons
+  img_icon_duplicate: "https://i.ibb.co/Qg4SFPS/icon-duplicate.png",
+  img_icon_class_stall: "https://i.ibb.co/bjCZHjt6/icon-class-stall.png",
+  img_icon_class_explode: "https://i.ibb.co/LzPJLTr2/icon-class-explode.png",
+  img_icon_class_armor: "https://i.ibb.co/gZfB36HP/icon-class-armor.png",
+  img_icon_class_miner: "https://i.ibb.co/HDMKj7Dr/icon-class-miner.png",
+  img_icon_class_shooter: "https://i.ibb.co/jk2vm7D3/icon-class-shooter.png",
+
+  // New Batch T1/T2 (Traps/Unarmed)
   img_t_spike_front: "https://i.ibb.co/6JLPggt9/t-spike-front-right.png",
   img_t_stun_front: "https://i.ibb.co/gMjwNPWM/t-stun-front-right.png",
   img_t_tall_front: "https://i.ibb.co/0VnYW5nz/t-tallnut-front-right.png",

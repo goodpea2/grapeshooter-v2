@@ -26,7 +26,6 @@ declare const push: any;
 declare const pop: any;
 declare const translate: any;
 declare const rotate: any;
-// Added missing scale declaration
 declare const scale: any;
 declare const CLOSE: any;
 declare const width: any;
@@ -49,36 +48,164 @@ declare const tint: any;
 declare const noTint: any;
 
 export class MagicLinkVFX {
-    p1: any; p2: any; life: number = 30; maxLife: number = 30;
-    particles: any[] = [];
+    p1: any; p2: any; life: number = 20; maxLife: number = 20;
+    segments: any[] = [];
+    seed: number;
 
     constructor(p1: any, p2: any) {
         this.p1 = p1.copy();
         this.p2 = p2.copy();
-        for(let i=0; i<5; i++) {
-            this.particles.push({
-                t: random(1),
-                s: random(4, 8),
-                off: random(TWO_PI)
-            });
+        this.seed = random(1000);
+        this.generateLightning();
+    }
+
+    generateLightning() {
+        this.segments = [];
+        let count = 5; // Fewer segments for cleaner look
+        let prev = this.p1.copy();
+        let dir = p5.Vector.sub(this.p2, this.p1);
+        let dist = dir.mag();
+        dir.normalize();
+        let perp = createVector(-dir.y, dir.x);
+
+        for (let i = 1; i <= count; i++) {
+            let t = i / count;
+            let target = p5.Vector.lerp(this.p1, this.p2, t);
+            if (i < count) {
+                // Subtle jitter
+                let jitter = (random() - 0.5) * (dist * 0.2);
+                target.add(p5.Vector.mult(perp, jitter));
+            }
+            this.segments.push({ a: prev.copy(), b: target.copy() });
+            prev = target;
         }
     }
-    update() { this.life--; }
-    isDone() { return this.life <= 0; }
-    display() {
-        let alpha = map(this.life, 0, this.maxLife, 0, 150);
-        stroke(255, 100, 200, alpha);
-        strokeWeight(2);
-        line(this.p1.x, this.p1.y, this.p2.x, this.p2.y);
 
+    update() { 
+        this.life--; 
+        // Much slower flicker/regeneration for stability
+        if (this.life % 10 === 0) this.generateLightning();
+    }
+    
+    isDone() { return this.life <= 0; }
+    
+    display() {
+        let alpha = map(this.life, 0, this.maxLife, 0, 200);
+        let pulse = 0.8 + 0.2 * sin(frameCount * 0.3 + this.seed);
+        
+        // Outer Subtle Glow
+        stroke(120, 220, 255, alpha * 0.2 * pulse);
+        strokeWeight(4);
+        for (let s of this.segments) line(s.a.x, s.a.y, s.b.x, s.b.y);
+        
+        // Inner Glow
+        stroke(180, 240, 255, alpha * 0.4);
+        strokeWeight(3);
+        for (let s of this.segments) line(s.a.x, s.a.y, s.b.x, s.b.y);
+
+        // Brilliant White Core
+        stroke(255, 255, 255, alpha);
+        strokeWeight(2);
+        for (let s of this.segments) line(s.a.x, s.a.y, s.b.x, s.b.y);
+
+        // Directional Energy Flow (Tiny beads)
         noStroke();
-        fill(255, 150, 255, alpha);
-        for(let p of this.particles) {
-            let x = lerp(this.p1.x, this.p2.x, p.t);
-            let y = lerp(this.p1.y, this.p2.y, p.t);
-            let driftX = sin(frameCount * 0.2 + p.off) * 10;
-            let driftY = cos(frameCount * 0.2 + p.off) * 10;
-            ellipse(x + driftX, y + driftY, p.s);
+        fill(255, alpha);
+        let flowT = (frameCount * 0.05 + this.seed) % 1;
+        let flowPos = p5.Vector.lerp(this.p1, this.p2, flowT);
+        ellipse(flowPos.x, flowPos.y, 4);
+    }
+}
+
+export class WeldingHitVFX {
+    pos: any; life: number = 6; maxLife: number = 30;
+    col: any;
+    wisps: any[] = [];
+    sparks: any[] = [];
+
+    constructor(x: number, y: number, col: any = [255, 255, 100]) {
+        this.pos = createVector(x, y);
+        this.col = col;
+        // Start with a small burst
+        this.addSpark();
+    }
+
+    addWisp() {
+        this.wisps.push({
+            p: createVector(this.pos.x + random(-2, 2), this.pos.y + random(-2, 2)),
+            v: createVector(random(-0.3, 0.3), random(-0.5, -1.2)),
+            s: random(6, 12),
+            l: 12,
+            ml: 12
+        });
+    }
+
+    addSpark() {
+        this.sparks.push({
+            p: createVector(this.pos.x, this.pos.y),
+            v: p5.Vector.random2D().mult(random(2, 5)),
+            l: 8,
+            ml: 8
+        });
+    }
+
+    update() {
+        this.life--;
+        if (this.life > 5) {
+            if (frameCount % 6 === 0) this.addWisp();
+            if (frameCount % 4 === 0) this.addSpark();
+        }
+
+        for (let i = this.wisps.length - 1; i >= 0; i--) {
+            let w = this.wisps[i];
+            w.p.add(w.v);
+            w.l--;
+            w.s *= 1.05;
+            if (w.l <= 0) this.wisps.splice(i, 1);
+        }
+
+        for (let i = this.sparks.length - 1; i >= 0; i--) {
+            let s = this.sparks[i];
+            s.p.add(s.v);
+            s.l--;
+            if (s.l <= 0) this.sparks.splice(i, 1);
+        }
+    }
+
+    isDone() { return this.life <= 0 && this.wisps.length === 0 && this.sparks.length === 0; }
+
+    display() {
+        // Bright focal point
+        if (this.life > 0) {
+            push();
+            translate(this.pos.x, this.pos.y);
+            let s = 6 + sin(frameCount * 0.8) * 2;
+            
+            noStroke();
+            // Colored Halo
+            fill(this.col[0], this.col[1], this.col[2], 80);
+            ellipse(0, 0, s * 2.5);
+            // Hot Core
+            fill(255, 255, 255, 220);
+            ellipse(0, 0, s);
+            pop();
+        }
+
+        // Micro Smoke Wisps
+        noStroke();
+        for (let w of this.wisps) {
+            let a = map(w.l, 0, w.ml, 0, 120);
+            // Tint smoke slightly with laser color
+            fill(this.col[0], this.col[1], this.col[2], a);
+            ellipse(w.p.x, w.p.y, w.s);
+        }
+
+        // Micro Sparks
+        strokeWeight(3);
+        for (let s of this.sparks) {
+            let a = map(s.l, 0, s.ml, 0, 200);
+            stroke(255, 255, 200, a);
+            line(s.p.x, s.p.y, s.p.x - s.v.x * 0.3, s.p.y - s.v.y * 0.3);
         }
     }
 }

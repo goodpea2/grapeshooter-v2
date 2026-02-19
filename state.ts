@@ -92,6 +92,7 @@ export const state: any = {
     core: false,
     chunks: false,
     prefabs: true,
+    turrets: true,
     groundFeatures: true,
     obstacles: true,
     overlays: true,

@@ -37,7 +37,7 @@ export const TURRET_RECIPES: TurretRecipe[] = [
   
   { id: 't3_inferno', ingredients: ['t_pea', 't_laser', 't_wall'], duplicates: 0, totalCount: 3 },
   { id: 't3_flamethrower', ingredients: ['t_pea', 't_laser', 't_mine'], duplicates: 0, totalCount: 3 },
-  { id: 't3_stickylaser', ingredients: ['t_pea', 't_laser', 't_ice'], duplicates: 0, totalCount: 3 },
+  { id: 't3_bowling', ingredients: ['t_pea', 't_laser', 't_ice'], duplicates: 0, totalCount: 3 },
   { id: 't3_repulser', ingredients: ['t_pea', 't_wall', 't_mine'], duplicates: 0, totalCount: 3 },
   { id: 't3_snowpeanut', ingredients: ['t_pea', 't_wall', 't_ice'], duplicates: 0, totalCount: 3 },
   { id: 't3_skymortar', ingredients: ['t_pea', 't_mine', 't_ice'], duplicates: 0, totalCount: 3 },
@@ -57,7 +57,7 @@ export const TURRET_RECIPES: TurretRecipe[] = [
   
   { id: 't3_holonut', ingredients: ['t_wall', 't_mine', 't_ice'], duplicates: 0, totalCount: 3 },
   
-  { id: 't3_squash', ingredients: ['t_mine'], duplicates: 2, totalCount: 3 },
+  { id: 't3_minefield', ingredients: ['t_mine'], duplicates: 2, totalCount: 3 },
   { id: 't3_frostfield', ingredients: ['t_mine', 't_ice'], duplicates: 1, totalCount: 3 },
   { id: 't3_triberg', ingredients: ['t_ice'], duplicates: 2, totalCount: 3 },
 ];

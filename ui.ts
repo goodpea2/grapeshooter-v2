@@ -6,6 +6,7 @@ import { drawDebugPanel, drawWorldGenPreview } from './uiDebug';
 import { TYPE_MAP } from './assetTurret';
 import { getLightLevel, customDayLightConfig } from './lvDemo';
 import { drawNPCPanel } from './uiNpcShop';
+import { drawNewTurretTooltip } from './UITurretTooltip';
 
 declare const floor: any;
 declare const nf: any;
@@ -91,66 +92,7 @@ function getSkyTint(mins: number) {
 }
 
 export function drawTurretTooltip(t: any, x: number, y: number, isPreview: boolean = false) {
-  const config = t.config || turretTypes[t.type] || t;
-  const name = config.name;
-  const hp = t.health !== undefined ? `${floor(t.health)}/${floor(t.maxHealth)}` : `${config.health} HP`;
-  const dmg = config.actionConfig?.bulletTypeKey ? 10 : (config.actionConfig?.beamDamage || config.actionConfig?.pulseBulletTypeKey ? 45 : 0);
-  const rate = config.actionConfig?.shootFireRate || config.actionConfig?.beamFireRate || config.actionConfig?.pulseCooldown || "N/A";
-  const desc = config.tooltip || "";
-  const isLocked = t.isFrosted === true;
-
-  push();
-  const boxW = 180;
-  const boxH = 110;
-  let tx = x + 20;
-  let ty = y + 20;
-  if (tx + boxW > width) tx = x - boxW - 20;
-  if (ty + boxH > height) ty = y - boxH - 20;
-
-  fill(15, 15, 30, 240);
-  noStroke();
-  rect(tx, ty, boxW, boxH, 12);
-
-  fill(isPreview ? [255, 255, 150] : 255);
-  textAlign(LEFT, TOP);
-  textSize(14);
-  text(name + (isPreview ? " (PREVIEW)" : ""), tx + 10, ty + 10);
-  
-  if (isLocked) {
-    fill(255, 100, 100);
-    textSize(11);
-    text("[ FROZEN / LOCKED ]", tx + 10, ty + 26);
-  }
-
-  textSize(11);
-  fill(180, 200, 255);
-  const infoYStart = isLocked ? 42 : 30;
-  text(`HP: ${hp}`, tx + 10, ty + infoYStart);
-  text(`DMG: ${dmg}`, tx + 10, ty + infoYStart + 15);
-  text(`RATE: ${rate}f`, tx + 90, ty + infoYStart + 15);
-  
-  fill(255, 230, 100);
-  textSize(10);
-  text(desc, tx + 10, ty + infoYStart + 35, boxW - 20);
-
-  if (isPreview) {
-    // Dynamic Merge Cost is calculated and passed into the target preview in index.tsx
-    let totalCost = t.cost || 0; 
-    
-    // If dragging from shop, we pay purchase price + gap
-    const activeShopType = state.draggedTurretType || state.selectedTurretType;
-    if (activeShopType) {
-      const shopConfig = turretTypes[activeShopType];
-      if (shopConfig) totalCost += shopConfig.cost;
-    }
-
-    textAlign(RIGHT, TOP);
-    fill(255, 230, 100);
-    imageMode(CENTER);
-    image(state.assets['img_icon_sun'], tx + boxW - 55, ty + 18, 22, 22);
-    text(`${totalCost}`, tx + boxW - 10, ty + 10);
-  }
-  pop();
+  drawNewTurretTooltip(t, x, y, isPreview);
 }
 
 function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha: number) {
@@ -252,7 +194,8 @@ function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha: numbe
       state.isCurrentlyDragging = false;
     }
   }
-  if (hov) drawTurretTooltip(tr, mouseX, mouseY);
+  // BUGFIX: Inject 'type' so tooltip can find assets
+  if (hov) drawTurretTooltip({ ...tr, type: key }, mouseX, mouseY);
 }
 
 function drawClock(x: number, y: number, alpha: number) {

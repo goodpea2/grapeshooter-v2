@@ -37,6 +37,8 @@ declare const textAlign: any;
 declare const textSize: any;
 declare const text: any;
 declare const floor: any;
+// Added missing radians declaration to fix error on line 147
+declare const radians: any;
 
 export function drawTurret(t: any) {
   let wPos = t.getWorldPos();
@@ -56,45 +58,103 @@ export function drawTurret(t: any) {
     }
 
     // Cooldown/Arming timer for debug mode
-    if (actionConfig.hasUnarmedAsset) {
-      const timersToCheck = ['pulse', 'shoot', 'spawnBulletAtRandom'];
-      let maxRemaining = 0;
-      let activeProgress = 0;
+    const timersToCheck = ['pulse', 'shoot', 'spawnBulletAtRandom', 'passiveSun'];
+    let maxRemaining = 0;
+    let activeProgress = 0;
 
-      for (const act of timersToCheck) {
-        if (config.actionType.includes(act)) {
-          const timer = t.actionTimers.get(act) || -999999;
-          let fr = 0;
-          if (act === 'pulse') fr = actionConfig.pulseCooldown;
-          else if (act === 'shoot') fr = Array.isArray(actionConfig.shootFireRate) ? actionConfig.shootFireRate[0] : actionConfig.shootFireRate;
-          else if (act === 'spawnBulletAtRandom') fr = actionConfig.spawnBulletAtRandom.cooldown;
-          
-          const total = fr / (t.fireRateMultiplier || 1);
-          const elapsed = state.frames - timer;
-          const remaining = total - elapsed;
-          
-          if (remaining > maxRemaining) {
-            maxRemaining = remaining;
-            activeProgress = elapsed / total;
-          }
+    for (const act of timersToCheck) {
+      if (config.actionType.includes(act)) {
+        const timer = t.actionTimers.get(act) || -999999;
+        let fr = 0;
+        if (act === 'pulse') fr = actionConfig.pulseCooldown;
+        else if (act === 'shoot') fr = Array.isArray(actionConfig.shootFireRate) ? actionConfig.shootFireRate[0] : actionConfig.shootFireRate;
+        else if (act === 'spawnBulletAtRandom') fr = actionConfig.spawnBulletAtRandom.cooldown;
+        else if (act === 'passiveSun') fr = actionConfig.sunCooldown;
+        
+        const total = (fr || 1) / (t.fireRateMultiplier || 1);
+        const elapsed = state.frames - timer;
+        const remaining = total - elapsed;
+        
+        if (remaining > maxRemaining) {
+          maxRemaining = remaining;
+          activeProgress = elapsed / total;
         }
       }
+    }
 
-      if (maxRemaining > 0) {
+    if (maxRemaining > 0) {
+      push();
+      translate(wPos.x, wPos.y);
+      noFill();
+      stroke(255, 100, 0, 180);
+      strokeWeight(4);
+      arc(0, 0, t.size + 15, t.size + 15, -HALF_PI, -HALF_PI + TWO_PI * (1 - activeProgress));
+      
+      fill(255);
+      noStroke();
+      textAlign(CENTER, CENTER);
+      textSize(10);
+      text(`${floor(maxRemaining)}f`, 0, t.size/2 + 15);
+      pop();
+    }
+
+    // Lifetime / Charge info
+    let lifeInfo = "";
+    if (actionConfig.dieAfterDuration) {
+        const rem = actionConfig.dieAfterDuration - t.framesAlive;
+        lifeInfo = `Life: ${floor(rem)}f`;
+    } else if (actionConfig.dieAfterActionCount) {
+        const step = t.actionSteps.get(actionConfig.dieAfterAction) || 0;
+        const rem = actionConfig.dieAfterActionCount - step;
+        lifeInfo = `Charge: ${rem}`;
+    }
+
+    if (lifeInfo) {
         push();
         translate(wPos.x, wPos.y);
-        noFill();
-        stroke(255, 100, 0, 180);
-        strokeWeight(4);
-        arc(0, 0, t.size + 15, t.size + 15, -HALF_PI, -HALF_PI + TWO_PI * activeProgress);
-        
-        fill(255);
+        fill(255, 255, 100);
         noStroke();
         textAlign(CENTER, CENTER);
-        textSize(10);
-        text(`${floor(maxRemaining)}f`, 0, t.size/2 + 15);
+        textSize(9);
+        text(lifeInfo, 0, t.size/2 + 25);
         pop();
-      }
+    }
+    pop();
+  }
+
+  // Energy Shield Logic
+  // REFINED: Strictly only render if turret is Active (Not waterlogged, not frosted) and player is stationary
+  const isActive = !t.isWaterlogged && !t.isFrosted;
+  if (config.actionType.includes('shield') && state.isStationary && isActive) {
+    push();
+    translate(wPos.x, wPos.y);
+    const rad = actionConfig.shieldRadius || 50;
+    const pulse = 1.0 + 0.03 * sin(state.frames * 0.05);
+    const alpha = (t.alpha / 255) * (100 + 20 * sin(state.frames * 0.04));
+    
+    // Main Shield Shell
+    noFill();
+    stroke(100, 200, 255, alpha * 1.5);
+    strokeWeight(2);
+    ellipse(0, 0, rad * 2 * pulse);
+    
+    fill(50, 150, 255, alpha * 0.4);
+    noStroke();
+    ellipse(0, 0, rad * 2 * pulse);
+
+    // REACTIVE IMPACT FLARES: Lights up localized sections of the shield outline
+    if (t.shieldImpactAngles && t.shieldImpactAngles.length > 0) {
+        noFill();
+        strokeWeight(4);
+        const flareWidth = radians(30);
+        for (let angle of t.shieldImpactAngles) {
+            stroke(200, 240, 255, 200 + sin(state.frames * 0.5) * 55);
+            arc(0, 0, rad * 2 * pulse, rad * 2 * pulse, angle - flareWidth/2, angle + flareWidth/2);
+            
+            stroke(255, 255, 255, 220);
+            strokeWeight(2);
+            arc(0, 0, rad * 2 * pulse, rad * 2 * pulse, angle - flareWidth/3, angle + flareWidth/3);
+        }
     }
     pop();
   }
@@ -112,7 +172,7 @@ export function drawTurret(t: any) {
     push();
     translate(wPos.x, wPos.y);
     
-    let bc = [...t.config.color];
+    let bc = [...(t.config.color || [100, 100, 100])];
     if (onCooldown) bc = [120, 120, 130];
     
     // HEAL / DAMAGE FLASH
@@ -125,7 +185,7 @@ export function drawTurret(t: any) {
     strokeWeight(3);
     fill(bc[0], bc[1], bc[2], t.alpha);
 
-    if (t.type === 't_spike' || t.type === 't2_spike') {
+    if (t.type === 't_spike' || t.type === 't2_spike' || t.type === 't3_spike2') {
       rectMode(CENTER);
       fill(60, 60, 80, t.alpha);
       rect(0, 0, 30, 30, 6);
@@ -144,10 +204,10 @@ export function drawTurret(t: any) {
         }
       }
     } else {
-      ellipse(0, 0, t.config.size, t.config.size);
+      ellipse(0, 0, t.config.size || 22, t.config.size || 22);
       noStroke();
       fill(255, t.alpha * 0.4);
-      ellipse(-t.config.size * 0.2, -t.config.size * 0.2, t.config.size * 0.4);
+      ellipse(-(t.config.size || 22) * 0.2, -(t.config.size || 22) * 0.2, (t.config.size || 22) * 0.4);
     }
     pop();
   }
@@ -160,11 +220,16 @@ export function drawTurret(t: any) {
     if (t.config.actionType.includes('laserBeam') && t.target) {
       let tc = t.getTargetCenter();
       if (tc) {
+        // Visual ramp factor for Inferno Ray
+        const ramp = t.rampFactor || 0;
+        const baseWidth = t.config.actionConfig.beamWidth;
+        const dynamicWidth = baseWidth * (1 + ramp * 1.5);
+        
         stroke(t.config.color[0], t.config.color[1], t.config.color[2], t.alpha * 0.4);
-        strokeWeight(t.config.actionConfig.beamWidth * 2.5 + sin(state.frames * 0.6) * 4);
+        strokeWeight(dynamicWidth * 2.5 + sin(state.frames * 0.6) * 4);
         line(0, 0, tc.x - wPos.x, tc.y - wPos.y);
         stroke(255, t.alpha * 0.9);
-        strokeWeight(t.config.actionConfig.beamWidth * 0.8);
+        strokeWeight(dynamicWidth * 0.8);
         line(0, 0, tc.x - wPos.x, tc.y - wPos.y);
       }
     }

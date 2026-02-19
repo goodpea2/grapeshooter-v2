@@ -8,8 +8,9 @@ import { obstacleTypes, overlayTypes, BLOCK_WEIGHTS } from './balanceObstacles';
 import { groundFeatureTypes } from './balanceGroundFeatures';
 import { enemyTypes } from './balanceEnemies';
 import { npcTypes } from './balanceNPC';
+import { turretTypes } from './balanceTurrets';
 import { Explosion } from './vfx';
-import { Bullet, GroundFeature, NPCEntity } from './entities';
+import { Bullet, GroundFeature, NPCEntity, LootEntity } from './entities';
 import { Block } from './world';
 import { ROOM_PREFABS } from './dictionaryRoomPrefab';
 import { generateRoomDirectorData } from './debug/roomDirectorGenerator';
@@ -219,7 +220,7 @@ export function drawWorldGenPreview() {
   const genBtnH = 26;
   const hovGen = mouseX > genBtnX && mouseX < genBtnX + genBtnW && mouseY > genBtnY && mouseY < genBtnY + genBtnH;
   fill(hovGen ? 100 : 60); stroke(255, 100); rect(genBtnX, genBtnY, genBtnW, genBtnH, 4);
-  fill(255); textAlign(CENTER, CENTER); textSize(10); text("GENERATE CHAIN", genBtnX + genBtnW/2, genBtnY + genBtnH/2);
+  fill(255); textAlign(CENTER, CENTER); textSize(10); text("GENERATE CHAIN", genBtnX + genBtnW/2, genBtnH + genBtnH/2);
   if (mouseIsPressed && hovGen) {
     state.roomDirectorData = generateRoomDirectorData();
     state.roomDirectorChain = state.roomDirectorData.split('-');
@@ -333,7 +334,7 @@ export function drawDebugPanel(spawnFromBudget: Function) {
   text(`Budget (${floor(state.hourlyBudgetPool)} / ${floor(state.currentNightWaveBudget)} / ${floor(state.accumulatedSpentBudget)} / ${floor(state.refundedBudget)})`, debugX + 10, infoY); infoY += 20;
 
   let curSun = 0, curTnt = 0, curStray = 0, curFlower = 0, curSniper = 0, curSpawner = 0;
-  state.world.chunks.forEach((chunk: any) => { chunk.blocks.forEach((b: any) => { if (!b.isMined && b.overlay) { if (b.overlay.startsWith('sun')) curSun += (b.overlay === 'sunTiny' ? 1 : (b.overlay === 'sunOre' ? 3 : 10)); else if (b.overlay === 'o_tnt') curTnt++; else if (b.overlay === 'o_stray') curStray++; else if (b.overlay === 'o_sunflower') curFlower++; else if (b.overlay === 'sniperTower') curSniper++; else if (overlayTypes[b.overlay]?.isEnemySpawner) curSpawner++; } }); });
+  state.world.chunks.forEach((chunk: any) => { chunk.blocks.forEach((b: any) => { if (!b.isMined && b.overlay) { if (b.overlay.startsWith('sun')) curSun += (b.overlay === 'sunTiny' ? 1 : (b.overlay === 'sunOre' ? 3 : 10)); else if (b.overlay === 'ov_tnt') curTnt++; else if (b.overlay === 'ov_stray') curStray++; else if (b.overlay === 'ov_sunflower') curFlower++; else if (b.overlay === 'ov_sniper_tower') curSniper++; else if (overlayTypes[b.overlay]?.isEnemySpawner) curSpawner++; } }); });
   const potInfo = [
       { l: "SunPot", p: state.accumulatedSunPot, t: state.totalSunSpawned, c: curSun },
       { l: "TNTPot", p: state.accumulatedTntPot, t: state.totalTntSpawned, c: curTnt },
@@ -368,10 +369,8 @@ export function drawDebugPanel(spawnFromBudget: Function) {
   if (!state.debugSectionsCollapsed.core) {
     allItems.push(
       { l: "HP Info", v: state.debugHP, a: () => state.debugHP = !state.debugHP, type: 'toggle', grid: true },
-      { l: "Turret Gizmo", v: state.debugGizmosTurrets, a: () => state.debugGizmosTurrets = !state.debugGizmosTurrets, type: 'toggle', grid: true },
       { l: "Enemy Gizmo", v: state.debugGizmosEnemies, a: () => state.debugGizmosEnemies = !state.debugGizmosEnemies, type: 'toggle', grid: true },
       { l: "INSTANT CD", v: state.instantRechargeTurrets, a: () => state.instantRechargeTurrets = !state.instantRechargeTurrets, type: 'toggle', grid: true },
-      { l: "All Turrets", v: state.makeAllTurretsAvailable, a: () => state.makeAllTurretsAvailable = !state.makeAllTurretsAvailable, type: 'toggle', grid: true },
       { l: "WORLD PREV", v: state.showWorldGenPreview, a: () => { state.showWorldGenPreview = !state.showWorldGenPreview; state.worldPreviewNeedsUpdate = true; }, type: 'toggle', grid: true },
       { l: "+1k ALL", a: () => { state.sunCurrency += 1000; state.soilCurrency += 1000; state.elixirCurrency += 1000; }, grid: true },
       { l: "WARP 12H", a: () => state.timeWarpRemaining = 60, grid: true },
@@ -385,9 +384,35 @@ export function drawDebugPanel(spawnFromBudget: Function) {
         b.life = 0; 
         state.bullets.push(b);
       }, grid: true},
-      { l: "CLEAR TURRET", a: () => { state.player.attachments = []; }, grid: true},
       { l: "SPAWN WAVE", a: () => spawnFromBudget(state.currentNightWaveBudget), grid: true }
     );
+  }
+
+  // Turret Actions Header
+  allItems.push({ l: "TURRETS", type: 'header', section: 'turrets' });
+  if (!state.debugSectionsCollapsed.turrets) {
+    allItems.push(
+      { l: "Make all available", v: state.makeAllTurretsAvailable, a: () => state.makeAllTurretsAvailable = !state.makeAllTurretsAvailable, type: 'toggle', grid: true },
+      { l: "Turret Gizmo", v: state.debugGizmosTurrets, a: () => state.debugGizmosTurrets = !state.debugGizmosTurrets, type: 'toggle', grid: true },
+      { l: "CLEAR TURRET", a: () => {
+        const b = new Bullet(state.player.pos.x, state.player.pos.y, state.player.pos.x, state.player.pos.y, 'b_cheat_destroyTurret', 'none');
+        b.life = 0; 
+        state.bullets.push(b);
+      }, grid: true},
+      { l: "SPAWN LOOT", type: 'subheader' }
+    );
+    // Sort turrets by tier then name
+    const sortedTurretKeys = Object.keys(turretTypes).sort((a, b) => {
+        const ta = turretTypes[a].tier;
+        const tb = turretTypes[b].tier;
+        if (ta !== tb) return ta - tb;
+        return a.localeCompare(b);
+    });
+    for (const key of sortedTurretKeys) {
+        allItems.push({ l: key.toUpperCase(), grid: true, a: () => {
+            state.loot.push(new LootEntity(state.player.pos.x, state.player.pos.y, key));
+        }});
+    }
   }
 
   // CHUNK ACTIONS Header

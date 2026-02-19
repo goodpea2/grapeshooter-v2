@@ -122,7 +122,7 @@ export function drawGameOver() {
     }
   }
 
-  const cols = 4;
+  const cols = 7;
   const cellW = 64;
   const cellH = 90;
   const startX = -((cols - 1) * cellW) / 2;

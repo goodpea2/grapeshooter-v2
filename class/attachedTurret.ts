@@ -1,12 +1,11 @@
 
 import { state } from '../state';
-// Added CHUNK_SIZE to imports to fix undefined name errors
 import { HEX_DIST, GRID_SIZE, HOUR_FRAMES, TurretMinScanRate, CHUNK_SIZE } from '../constants';
 import { turretTypes } from '../balanceTurrets';
 import { conditionTypes } from '../balanceConditions';
 import { liquidTypes } from '../balanceLiquids';
 import { overlayTypes } from '../balanceObstacles';
-import { MuzzleFlash, Explosion, SparkVFX, BlockDebris, ConditionVFX, MergeVFX, MagicLinkVFX } from '../vfx';
+import { MuzzleFlash, Explosion, SparkVFX, BlockDebris, ConditionVFX, MergeVFX, MagicLinkVFX, WeldingHitVFX } from '../vfx';
 import { Bullet } from './bullet';
 import { SunLoot } from './loot';
 import { drawTurret } from '../visualTurrets';
@@ -26,6 +25,11 @@ declare const radians: any;
 declare const TWO_PI: any;
 declare const width: any;
 declare const height: any;
+// Added missing color declaration
+declare const color: any;
+declare const line: any;
+declare const stroke: any;
+declare const strokeWeight: any;
 
 export class AttachedTurret {
   uid: string; type: string; config: any; parent: any; hq: number; hr: number; angle: number = 0; alpha: number = 255; health: number; maxHealth: number; offset: any; size: number;
@@ -41,6 +45,14 @@ export class AttachedTurret {
   flashTimer: number = 0;
   flashType: 'damage' | 'heal' = 'damage';
   
+  // T3 Uninterrupted tracking
+  lastTargetUid: string | null = null;
+  uninterruptedFrames: number = 0;
+  rampFactor: number = 0; // 0 to 1 for visual ramp up
+
+  // T3 Spin tracking
+  spinFrames: number = 0; // Continuous elapsed time for phase calculation
+
   // Staggered target scan
   targetScanTimer: number;
 
@@ -48,6 +60,9 @@ export class AttachedTurret {
   jumpOffset: any = null;
   jumpFrames: number = 0;
   jumpTargetPos: any = null;
+
+  // T3 Holonut Impact Tracking
+  shieldImpactAngles: number[] = [];
 
   constructor(type: string, parent: any, hq: number, hr: number) {
     this.uid = Math.random().toString(36).substr(2, 9); this.type = type; this.config = turretTypes[type]; this.parent = parent; this.hq = hq; this.hr = hr;
@@ -59,21 +74,18 @@ export class AttachedTurret {
     if (this.config.tier === 1) {
       this.baseIngredients = [this.type];
     } else if (this.config.tier === 2) {
-      // Find the recipe for this T2 turret to populate its T1 ingredients
       const recipe = TURRET_RECIPES.find(r => r.id === this.type);
       if (recipe) {
         this.baseIngredients = [...recipe.ingredients];
-        // Fill duplicates to reach the total count (e.g. Repeater is 2x Peashooter)
         while (this.baseIngredients.length < recipe.totalCount) {
           this.baseIngredients.push(recipe.ingredients[0]);
         }
       }
     }
 
-    // Initialize arming state if turret has an unarmed asset
     if (this.config.actionConfig?.hasUnarmedAsset) {
       for (const act of this.config.actionType || []) {
-        if (act === 'pulse' || act === 'shoot' || act === 'spawnBulletAtRandom') {
+        if (act === 'pulse' || act === 'shoot' || act === 'spawnBulletAtRandom' || act === 'launch') {
           this.actionTimers.set(act, state.frames);
         }
       }
@@ -81,7 +93,13 @@ export class AttachedTurret {
   }
   
   getWorldPos() { return p5.Vector.add(this.parent.pos, this.offset); }
-  getTargetCenter() { if (!this.target) return null; if (this.target.getWorldPos) return this.target.getWorldPos(); if (this.target.gx !== undefined) return createVector(this.target.gx * GRID_SIZE + GRID_SIZE/2, this.target.gy * GRID_SIZE + GRID_SIZE/2); return this.target.pos ? this.target.pos.copy() : null; }
+  getTargetCenter() { 
+    if (!this.target) return null; 
+    if (this.target === this) return this.getWorldPos(); // Self targeting support
+    if (this.target.getWorldPos) return this.target.getWorldPos(); 
+    if (this.target.gx !== undefined) return createVector(this.target.gx * GRID_SIZE + GRID_SIZE/2, this.target.gy * GRID_SIZE + GRID_SIZE/2); 
+    return this.target.pos ? this.target.pos.copy() : null; 
+  }
   
   applyCondition(cKey: string, duration: number, data?: any) {
     const cfg = conditionTypes[cKey]; if (!cfg) return;
@@ -94,7 +112,6 @@ export class AttachedTurret {
     
     this.conditions.set(cKey, Math.max(this.conditions.get(cKey) || 0, duration));
     
-    // Stack logic for highest damage rate
     if (cKey === 'c_burning' && data?.damage !== undefined) {
         const currentMax = this.conditionData.get('c_burning_dmg') || 0;
         this.conditionData.set('c_burning_dmg', Math.max(currentMax, data.damage));
@@ -107,6 +124,7 @@ export class AttachedTurret {
     if (this.health <= 0) return;
     this.framesAlive++;
     if (this.flashTimer > 0) this.flashTimer--;
+    this.shieldImpactAngles = []; // Clear every frame
 
     const wPos = this.getWorldPos(); const gx = floor(wPos.x / GRID_SIZE); const gy = floor(wPos.y / GRID_SIZE);
     const liquidType = state.world.getLiquidAt(gx, gy); const lData = liquidType ? liquidTypes[liquidType] : null;
@@ -133,7 +151,6 @@ export class AttachedTurret {
 
     if (liquidType === 'l_ice') { if (state.isStationary && !this.isFrosted) { this.frostLevel = Math.min(1, this.frostLevel + (1 / 900)); if (this.frostLevel >= 1) { this.isFrosted = true; this.iceCubeHealth = 100; } } } else if (!this.isFrosted) { this.frostLevel = Math.max(0, this.frostLevel - (1 / 300)); }
     
-    // Resolve Obstacle Collisions (Snap to surface)
     this.applyObstacleRepulsion(wPos);
 
     for (let [cKey, life] of this.conditions) {
@@ -186,8 +203,6 @@ export class AttachedTurret {
     }
 
     const isRetracted = !state.isStationary && !this.config.isActiveWhileMoving;
-    
-    // VISUAL FIX: Lower alpha for waterlogged turrets correctly
     const targetAlpha = isRetracted ? 127 : (this.isWaterlogged ? 100 : 255);
     this.alpha = lerp(this.alpha, targetAlpha, 0.1); 
     this.recoil = (this.recoil || 0) * 0.85;
@@ -214,11 +229,11 @@ export class AttachedTurret {
     
     let anyActionReady = false;
     for (const act of this.config.actionType || []) {
-      if (['shoot', 'shootMultiTarget', 'laserBeam', 'pulse', 'spawnBulletAtRandom'].includes(act)) {
+      if (['shoot', 'shootMultiTarget', 'laserBeam', 'pulse', 'spawnBulletAtRandom', 'launch', 'generateElectricChain', 'shield'].includes(act)) {
         const lastT = this.actionTimers.get(act) || -99999;
         const cfg = this.config.actionConfig;
         const step = this.actionSteps.get(act) || 0;
-        const frValue = (act === 'shoot' || act === 'shootMultiTarget') ? cfg.shootFireRate : ((act === 'laserBeam') ? cfg.beamFireRate : ((act === 'spawnBulletAtRandom') ? cfg.spawnBulletAtRandom.cooldown : cfg.pulseCooldown));
+        const frValue = (act === 'shoot' || act === 'shootMultiTarget' || act === 'launch') ? cfg.shootFireRate : ((act === 'laserBeam') ? cfg.beamFireRate : ((act === 'spawnBulletAtRandom') ? cfg.spawnBulletAtRandom.cooldown : (act === 'generateElectricChain' ? cfg.electricChainDamageRate : (act === 'shield' ? 1 : cfg.pulseCooldown))));
         const fr = Array.isArray(frValue) ? frValue[step % frValue.length] : frValue;
         if (state.frames - lastT > (fr / this.fireRateMultiplier)) {
           anyActionReady = true;
@@ -232,14 +247,27 @@ export class AttachedTurret {
     let targetJustDied = false;
 
     if (this.target) {
-      const tc = this.getTargetCenter();
-      if (!tc) { this.target = null; targetJustDied = true; } else {
-        const dSq = (wPos.x - tc.x)**2 + (wPos.y - tc.y)**2;
-        const isDead = this.target.isFrosted !== undefined ? (this.target.isFrosted && this.target.iceCubeHealth <= 0) : (this.target.health !== undefined ? this.target.health <= 0 : this.target.isMined);
-        const isOutOfRange = dSq > rangeSq;
-        const isDying = this.target.isDying === true;
-        if (isDead || isOutOfRange || isDying) { this.target = null; targetJustDied = true; }
+      if (this.target === this) {
+          // Self target is never out of range or dead unless health <= 0
+          if (this.health <= 0) { this.target = null; targetJustDied = true; }
+      } else {
+        const tc = this.getTargetCenter();
+        if (!tc) { 
+          this.target = null; targetJustDied = true; 
+          this.spinFrames = 0; 
+        } else {
+          const dSq = (wPos.x - tc.x)**2 + (wPos.y - tc.y)**2;
+          const isDead = this.target.isFrosted !== undefined ? (this.target.isFrosted && this.target.iceCubeHealth <= 0) : (this.target.health !== undefined ? this.target.health <= 0 : this.target.isMined);
+          const isOutOfRange = dSq > rangeSq;
+          const isDying = this.target.isDying === true;
+          if (isDead || isOutOfRange || isDying) { 
+            this.target = null; targetJustDied = true; 
+            this.spinFrames = 0;
+          }
+        }
       }
+    } else {
+      this.spinFrames = 0;
     }
 
     const justDeployed = state.stationaryTimer === (TurretMinScanRate + 1); 
@@ -254,16 +282,13 @@ export class AttachedTurret {
       const config = this.config.actionConfig;
       const step = this.actionSteps.get(act) || 0;
       
-      // Die logic check
       if (act === 'die') {
         const dieDur = config.dieAfterDuration;
         const dieAct = config.dieAfterAction;
-        const dieCnt = config.dieAfterActionCount;
-        
+        const dieCnt = dieAct ? (this.actionSteps.get(dieAct) || 0) : 0;
         let shouldDie = false;
         if (dieDur && this.framesAlive >= dieDur) shouldDie = true;
-        if (dieAct && dieCnt && (this.actionSteps.get(dieAct) || 0) >= dieCnt) shouldDie = true;
-        
+        if (dieAct && dieCnt && dieCnt >= config.dieAfterActionCount) shouldDie = true;
         if (shouldDie) {
            if (config.pulseBulletTypeKey) {
               let b = new Bullet(wPos.x, wPos.y, wPos.x, wPos.y, config.pulseBulletTypeKey, 'none'); 
@@ -275,37 +300,84 @@ export class AttachedTurret {
       }
 
       if (act === 'boostPlayer') {
-        // Condition System application
         state.player.applyCondition('c_raged', 15);
         if (state.frames % 10 === 0) {
            state.vfx.push(new MagicLinkVFX(wPos, state.player.pos));
         }
       }
 
-      const frValue = (act === 'shoot' || act === 'shootMultiTarget') ? config.shootFireRate : ((act === 'laserBeam') ? config.beamFireRate : ((act === 'spawnBulletAtRandom') ? config.spawnBulletAtRandom.cooldown : config.pulseCooldown));
+      const frValue = (act === 'shoot' || act === 'shootMultiTarget' || act === 'launch') ? config.shootFireRate : ((act === 'laserBeam') ? config.beamFireRate : ((act === 'spawnBulletAtRandom') ? config.spawnBulletAtRandom.cooldown : (act === 'generateElectricChain' ? config.electricChainDamageRate : (act === 'shield' ? 1 : config.pulseCooldown))));
       const fr = Array.isArray(frValue) ? frValue[step % frValue.length] : frValue;
       const effectiveFireRate = fr / this.fireRateMultiplier;
       const ready = (state.frames - lastTrigger > effectiveFireRate);
 
+      if (act === 'shield' && state.isStationary) {
+          // Continuous repulsion logic while stationary
+          const sRadius = config.shieldRadius || GRID_SIZE * 1.5;
+          const sRadiusSq = sRadius * sRadius;
+          for (let e of state.enemies) {
+              if (e.health <= 0 || e.isDying) continue;
+              const dx = e.pos.x - wPos.x;
+              const dy = e.pos.y - wPos.y;
+              const dSq = dx*dx + dy*dy;
+              const rSum = (e.size / 2) + sRadius;
+              if (dSq < rSum * rSum) {
+                  const d = Math.sqrt(dSq);
+                  const force = (rSum - d) * 0.15;
+                  e.moveWithCollisions(createVector(dx/d * force, dy/d * force));
+                  
+                  // NEW: Track impact angle for visual feedback
+                  this.shieldImpactAngles.push(atan2(dy, dx));
+              }
+          }
+      }
+
       if (act === 'shoot' && this.target && ready) {
         const tCenter = this.getTargetCenter(); if (!tCenter) return;
-        if (!this.config.randomRotation) this.angle = atan2(tCenter.y - wPos.y, tCenter.x - wPos.x); let sa = this.angle + (config.inaccuracy ? random(-radians(config.inaccuracy), radians(config.inaccuracy)) : 0);
+        const targetAngle = atan2(tCenter.y - wPos.y, tCenter.x - wPos.x);
+        if (config.selfSpinDuration) {
+            this.spinFrames++;
+            const cycleTime = this.spinFrames;
+            const duration = config.selfSpinDuration;
+            const speed = config.selfSpinSpeed * TWO_PI / 60; 
+            if (config.selfSpinBehavior === 'pingpong') {
+                const period = duration * 2;
+                const phase = cycleTime % period;
+                let offset;
+                if (phase < duration) offset = phase * speed;
+                else offset = (period - phase) * speed;
+                this.angle = targetAngle + offset;
+            } else {
+                const phase = cycleTime % duration;
+                this.angle = targetAngle + (phase * speed);
+            }
+        } else if (!this.config.randomRotation) {
+            this.angle = targetAngle;
+        }
+        let sa = this.angle + (config.inaccuracy ? random(-radians(config.inaccuracy), radians(config.inaccuracy)) : 0);
         state.bullets.push(new Bullet(wPos.x, wPos.y, wPos.x + cos(sa)*500, wPos.y + sin(sa)*500, config.bulletTypeKey, 'enemy'));
         state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, sa)); this.recoil = 6; 
         this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
-      } else if (act === 'shootMultiTarget' && ready) {
+        if (this.config.targetConfig?.enemyPriority === 'random') { this.target = null; this.findTarget(); }
+      } 
+      else if (act === 'launch' && this.target && ready) {
+        const tCenter = this.getTargetCenter(); if (!tCenter) return;
+        this.angle = atan2(tCenter.y - wPos.y, tCenter.x - wPos.x);
+        let b = new Bullet(wPos.x, wPos.y, tCenter.x, tCenter.y, config.bulletTypeKey, 'enemy');
+        b.targetPos = tCenter.copy();
+        state.bullets.push(b);
+        state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, this.angle, 32, 10, color(config.color || [255,255,255])));
+        this.recoil = 10;
+        this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
+      }
+      else if (act === 'shootMultiTarget' && ready) {
         const subStepKey = act + '_subStep';
         const lastSubKey = act + '_lastSub';
         const subStep = this.actionSteps.get(subStepKey) || 0;
         const lastSub = this.actionTimers.get(lastSubKey) || 0;
-
         if (subStep === 0) {
           const initialTargets = this.findAllTargetsWithin(config.shootRange);
-          if (initialTargets.length > 0) {
-            this.actionSteps.set(subStepKey, 1);
-            this.actionTimers.set(lastSubKey, state.frames);
-            this.actionTimers.set(act, state.frames); // Start the main cooldown
-          }
+          if (initialTargets.length > 0) { this.actionSteps.set(subStepKey, 1); this.actionTimers.set(lastSubKey, state.frames); this.actionTimers.set(act, state.frames); }
         }
         if (subStep > 0) {
           const delay = config.multiTargetShootDelay || 6;
@@ -328,26 +400,63 @@ export class AttachedTurret {
             else this.actionSteps.set(subStepKey, nextStep);
           }
         }
-      } else if (act === 'laserBeam' && this.target && ready) {
-        const tCenter = this.getTargetCenter(); if (!tCenter) return;
-        if (!this.config.randomRotation) this.angle = atan2(tCenter.y - wPos.y, tCenter.x - wPos.x); 
-        const killed = this.target.takeDamage(config.beamDamage);
-        
-        // SAFETY: Check this.target still exists, as takeDamage can nullify it (especially for icecubes)
-        if (killed && config.spawnBulletOnTargetDeath) {
-            const loc = this.getTargetCenter();
-            if (loc) {
-              const b = new Bullet(loc.x, loc.y, loc.x, loc.y, config.spawnBulletOnTargetDeath, 'none');
-              b.life = 0; state.bullets.push(b);
+      } else if (act === 'laserBeam' && this.target) {
+        const targetId = this.target.uid || `${this.target.gx},${this.target.gy}`;
+        if (targetId === this.lastTargetUid) this.uninterruptedFrames++;
+        else { this.lastTargetUid = targetId; this.uninterruptedFrames = 0; }
+        let currentDamage = config.beamDamage;
+        if (config.uninteruptedDamageIncrease && config.uninteruptedTimeForDamageIncrease) {
+            let cumulativeTime = 0; let foundBracket = -1;
+            for (let i = 0; i < config.uninteruptedTimeForDamageIncrease.length; i++) {
+                cumulativeTime += config.uninteruptedTimeForDamageIncrease[i];
+                if (this.uninterruptedFrames >= cumulativeTime) { currentDamage = config.uninteruptedDamageIncrease[i]; foundBracket = i; }
+                else break;
             }
+            this.rampFactor = (foundBracket + 1) / config.uninteruptedDamageIncrease.length;
+        } else this.rampFactor = 0;
+
+        const tCenter = this.getTargetCenter(); 
+        if (tCenter) {
+           if (state.frames % 3 === 0) {
+               state.vfx.push(new WeldingHitVFX(tCenter.x, tCenter.y, config.color || [255, 255, 100]));
+           }
         }
-        
-        // BUGFIX: Final safety null check for this.target after takeDamage logic potentially wipes it
-        if (this.target && config.appliedConditions && this.target.applyCondition) {
-          for (const cond of config.appliedConditions) this.target.applyCondition(cond.type, cond.duration, cond);
+
+        if (ready) {
+            if (!tCenter) return;
+            if (!this.config.randomRotation) this.angle = atan2(tCenter.y - wPos.y, tCenter.x - wPos.x); 
+            const killed = this.target.takeDamage(currentDamage);
+
+            // AREA DAMAGE ALONG BEAM
+            if (config.beamDamageWidth > 0) {
+              const widthSq = config.beamDamageWidth * config.beamDamageWidth;
+              for (let e of state.enemies) {
+                  if (e === this.target || e.health <= 0 || e.isDying) continue;
+                  const dSegSq = this.distToSegmentSq(e.pos, wPos, tCenter);
+                  if (dSegSq < (widthSq + e.size**2 * 0.25)) {
+                      e.takeDamage(currentDamage);
+                      if (config.appliedConditions && e.applyCondition) {
+                          for (const cond of config.appliedConditions) e.applyCondition(cond.type, cond.duration, cond);
+                      }
+                  }
+              }
+            }
+            
+            // BEAM BULLET Logic (T3 AOE Laser)
+            if (config.beamBulletTypeKey && tCenter) {
+                let b = new Bullet(tCenter.x, tCenter.y, tCenter.x, tCenter.y, config.beamBulletTypeKey, 'none'); 
+                b.life = 0; b.col = config.color || [255,255,255]; state.bullets.push(b);
+            }
+
+            if (killed && config.spawnBulletOnTargetDeath) {
+                const loc = this.getTargetCenter();
+                if (loc) { let b = new Bullet(loc.x, loc.y, loc.x, loc.y, config.spawnBulletOnTargetDeath, 'none'); b.life = 0; b.col = config.color; state.bullets.push(b); }
+            }
+            if (this.target && config.appliedConditions && this.target.applyCondition) {
+              for (const cond of config.appliedConditions) this.target.applyCondition(cond.type, cond.duration, cond);
+            }
+            this.recoil = 2; this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
         }
-        
-        this.recoil = 2; this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
       } else if (act === 'spawnBulletAtRandom' && ready) {
         const sbc = config.spawnBulletAtRandom;
         const ang = random(TWO_PI); const r = random(sbc.distRange[0], sbc.distRange[1]);
@@ -355,69 +464,121 @@ export class AttachedTurret {
         let b = new Bullet(wPos.x, wPos.y, tx, ty, sbc.bulletKey, 'none'); b.targetPos = createVector(tx, ty);
         state.bullets.push(b); this.recoil = 8; this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
       } else if (act === 'pulse' && ready && this.jumpFrames === 0) {
-        const tCenter = this.getTargetCenter();
         let triggered = false;
+        const tCenter = this.getTargetCenter();
         if (tCenter) {
           const dSq = (wPos.x - tCenter.x)**2 + (wPos.y - tCenter.y)**2;
-          if (dSq < (config.pulseTriggerRadius * config.pulseTriggerRadius)) triggered = true;
+          if (dSq < Math.max(1, config.pulseTriggerRadius * config.pulseTriggerRadius)) triggered = true;
         }
-        // Special Pulse override: Always trigger for certain turrets like Starfruit
+        
         if (this.type === 't0_starfruit') triggered = true;
-
         if (triggered) {
-          if (config.PulseTurretJumpAtTriggerSource && tCenter) { this.jumpFrames = 20; this.jumpTargetPos = tCenter.copy(); }
+          if (config.PulseTurretJumpAtTriggerSource && this.getTargetCenter()) { this.jumpFrames = 20; this.jumpTargetPos = this.getTargetCenter()?.copy(); }
           else if (config.pulseBulletTypeKey) {
+            const tCenter = this.getTargetCenter();
             const sx = config.pulseCenteredAtTriggerSource && tCenter ? tCenter.x : wPos.x;
             const sy = config.pulseCenteredAtTriggerSource && tCenter ? tCenter.y : wPos.y;
             let b = new Bullet(sx, sy, sx, sy, config.pulseBulletTypeKey, 'none'); b.life = 0; state.bullets.push(b);
           }
           this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
         }
+      } else if (act === 'generateElectricChain') {
+          // Iterate over other Teslas to create links
+          for (let peer of this.parent.attachments) {
+              if (peer === this || peer.type !== 't3_tesla' || peer.isFrosted || peer.uid < this.uid) continue;
+              const p1 = wPos;
+              const p2 = peer.getWorldPos();
+              const dSq = (p1.x - p2.x)**2 + (p1.y - p2.y)**2;
+              
+              // NEW: Use electricChainMaxLength from config (defaulting to 3 tiles if missing)
+              const maxChainRangeSq = (config.electricChainMaxLength || GRID_SIZE * 3)**2;
+              if (dSq > maxChainRangeSq) continue;
+
+              // Visually draw the chain
+              if (state.frames % 3 === 0) {
+                  state.vfx.push(new MagicLinkVFX(p1, p2));
+              }
+
+              // Damage check
+              if (ready) {
+                  const dmg = config.electricChainDamage || 10;
+                  const widthSq = (config.electricChainDamageWidth || GRID_SIZE)**2;
+                  
+                  // NEW: Global damage cutoff tracker
+                  const maxTotalDmg = config.electricChainMaxDamage || 15;
+
+                  // Check enemies for intersection with line segment p1-p2
+                  for (let e of state.enemies) {
+                      if (e.health <= 0 || e.isDying) continue;
+                      const dSegSq = this.distToSegmentSq(e.pos, p1, p2);
+                      if (dSegSq < (widthSq + e.size**2 * 0.25)) {
+                          // APPLY GLOBAL CUTOFF
+                          if (e.elecFrame !== state.frames) { e.elecFrame = state.frames; e.elecDmg = 0; }
+                          if (e.elecDmg < maxTotalDmg) {
+                              const apply = Math.min(dmg, maxTotalDmg - e.eledmg);
+                              e.takeDamage(apply);
+                              e.elecDmg += apply;
+                              if (random() < 0.2) state.vfx.push(new SparkVFX(e.pos.x, e.pos.y, 5, [100, 200, 255]));
+                          }
+                      }
+                  }
+                  // Check blocks
+                  state.world.chunks.forEach((chunk: any) => {
+                      chunk.blocks.forEach((b: any) => {
+                          if (b.isMined) return;
+                          const bc = createVector(b.pos.x + GRID_SIZE/2, b.pos.y + GRID_SIZE/2);
+                          const dSegSq = this.distToSegmentSq(bc, p1, p2);
+                          if (dSegSq < (widthSq + GRID_SIZE**2 * 0.25)) {
+                              // APPLY GLOBAL CUTOFF (x4 for blocks as per original logic, but relative to cutoff)
+                              if (b.elecFrame !== state.frames) { b.elecFrame = state.frames; b.elecDmg = 0; }
+                              const blockMax = maxTotalDmg * 4;
+                              if (b.elecDmg < blockMax) {
+                                  const apply = Math.min(dmg * 4, blockMax - b.elecDmg);
+                                  b.takeDamage(apply);
+                                  b.elecDmg += apply;
+                              }
+                          }
+                      });
+                  });
+                  this.actionTimers.set(act, state.frames);
+              }
+          }
       }
     }
   }
 
+  // Helper for line-segment distance checking (used by Tesla and wide Lasers)
+  private distToSegmentSq(p: any, v: any, w: any) {
+    const l2 = (v.x - w.x)**2 + (v.y - w.y)**2;
+    if (l2 === 0) return (p.x - v.x)**2 + (p.y - v.y)**2;
+    let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return (p.x - (v.x + t * (w.x - v.x)))**2 + (p.y - (v.y + t * (w.y - v.y)))**2;
+  }
+
   applyObstacleRepulsion(wPos: any) {
     const gx = floor(wPos.x / GRID_SIZE); const gy = floor(wPos.y / GRID_SIZE);
-    
-    // Consistency with player radius checks
-    const myRadius = this.size * 0.45; 
-    const blockRadius = GRID_SIZE * 0.5;
+    const myRadius = this.size * 0.45; const blockRadius = GRID_SIZE * 0.5;
     const minSafeDist = myRadius + blockRadius;
-
     for (let i = gx - 1; i <= gx + 1; i++) for (let j = gy - 1; j <= gy + 1; j++) {
-      const bx = i * GRID_SIZE + GRID_SIZE/2; 
-      const by = j * GRID_SIZE + GRID_SIZE/2;
+      const bx = i * GRID_SIZE + GRID_SIZE/2; const by = j * GRID_SIZE + GRID_SIZE/2;
       if (state.world.isBlockAt(bx, by)) {
         const dx = wPos.x - bx; const dy = wPos.y - by; const dSq = dx*dx + dy*dy;
         if (dSq < minSafeDist * minSafeDist && dSq > 0.01) { 
-          const d = Math.sqrt(dSq); 
-          const overlap = minSafeDist - d;
-          // STATIC RESOLUTION: Instead of adding a force, move exactly enough to touch the boundary
-          const pushX = (dx / d) * (overlap + 0.05);
-          const pushY = (dy / d) * (overlap + 0.05);
-          this.parent.pos.x += pushX; 
-          this.parent.pos.y += pushY; 
+          const d = Math.sqrt(dSq); const overlap = minSafeDist - d;
+          const pushX = (dx / d) * (overlap + 0.05); const pushY = (dy / d) * (overlap + 0.05);
+          this.parent.pos.x += pushX; this.parent.pos.y += pushY; 
         }
       }
     }
   }
 
-  /**
-   * OPTIMIZED: Use spatial hash to find all targets within range.
-   */
   findAllTargetsWithin(range: number) {
-    const wPos = this.getWorldPos();
-    const rangeSq = range * range;
-    const tTypes = this.config.targetType || [];
-    const results: any[] = [];
-    
+    const wPos = this.getWorldPos(); const rangeSq = range * range;
+    const tTypes = this.config.targetType || []; const results: any[] = [];
     if (tTypes.includes('enemy')) {
-      const cs = state.spatialHashCellSize;
-      const gx = floor(wPos.x / cs);
-      const gy = floor(wPos.y / cs);
+      const cs = state.spatialHashCellSize; const gx = floor(wPos.x / cs); const gy = floor(wPos.y / cs);
       const searchRadius = Math.ceil(range / cs);
-
       for (let i = -searchRadius; i <= searchRadius; i++) {
         for (let j = -searchRadius; j <= searchRadius; j++) {
           const neighbors = state.spatialHash.get(`${gx + i},${gy + j}`);
@@ -425,67 +586,68 @@ export class AttachedTurret {
           for (const e of neighbors) {
             if (e.health <= 0 || e.isInvisible || e.isDying) continue;
             const dSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
-            if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, e.pos.x, e.pos.y)) {
-              results.push(e);
-            }
+            if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, e.pos.x, e.pos.y)) results.push(e);
           }
         }
       }
     }
-    
-    results.sort((a, b) => {
-      const posA = a.pos;
-      const posB = b.pos;
-      const dSqA = (wPos.x - posA.x)**2 + (wPos.y - posA.y)**2;
-      const dSqB = (wPos.x - posB.x)**2 + (wPos.y - posB.y)**2;
-      return dSqA - dSqB;
-    });
+    results.sort((a, b) => { const posA = a.pos; const posB = b.pos; const dSqA = (wPos.x - posA.x)**2 + (wPos.y - posA.y)**2; const dSqB = (wPos.x - posB.x)**2 + (wPos.y - posB.y)**2; return dSqA - dSqB; });
     return results;
   }
 
-  /**
-   * OPTIMIZED: Find best target using spatial hash and lazy LOS checking.
-   */
   findTarget() {
-    const tTypes = this.config.targetType || []; 
-    const wPos = this.getWorldPos();
+    const tTypes = this.config.targetType || []; const wPos = this.getWorldPos();
     const tCfg = this.config.targetConfig || {}; 
     const range = this.config.actionConfig.shootRange || this.config.actionConfig.beamMaxLength || this.config.actionConfig.pulseTriggerRadius || 300;
-    const rangeSq = (range + 10)**2;
+    const rangeSq = Math.max(1, (range + 10)**2);
 
-    // 1. Keep existing target if still valid
     if (this.target) {
+      if (this.target === this) {
+          if (this.health <= 0) this.target = null;
+          else return;
+      }
       const tCenter = this.getTargetCenter(); 
       if (tCenter) {
         const dSq = (wPos.x - tCenter.x)**2 + (wPos.y - tCenter.y)**2;
         let valid = this.target.isFrosted !== undefined ? (this.target.isFrosted && this.target.iceCubeHealth > 0) : (this.target.health !== undefined ? this.target.health > 0 : !this.target.isMined);
-        if (valid && dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, tCenter.x, tCenter.y)) return;
+        if (valid && dSq <= rangeSq && (this.config.actionType.includes('launch') || state.world.checkLOS(wPos.x, wPos.y, tCenter.x, tCenter.y))) return;
       }
       this.target = null;
     }
 
-    // 2. Priority check: Icecubes (No spatial hash needed as attachments are few)
+    // Support for base targeting (healing/self-pulses)
+    if (tTypes.includes('turret')) {
+        // High priority: target self for healing if pulseTriggerRadius is small
+        if (range <= GRID_SIZE) {
+            this.target = this;
+            return;
+        }
+        // Otherwise look for neighbor attachments
+        for (let a of this.parent.attachments) {
+            if (a.health <= 0) continue;
+            const twPos = a.getWorldPos();
+            const dSq = (wPos.x - twPos.x)**2 + (wPos.y - twPos.y)**2;
+            if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, twPos.x, twPos.y)) {
+                this.target = a;
+                this.angle = atan2(twPos.y - wPos.y, twPos.x - wPos.x);
+                return;
+            }
+        }
+    }
+
     for (let a of this.parent.attachments) {
       if (a !== this && a.isFrosted && a.iceCubeHealth > 0) {
-        const twPos = a.getWorldPos(); 
-        const dSq = (wPos.x - twPos.x)**2 + (wPos.y - twPos.y)**2;
+        const twPos = a.getWorldPos(); const dSq = (wPos.x - twPos.x)**2 + (wPos.y - twPos.y)**2;
         if (dSq < rangeSq && state.world.checkLOS(wPos.x, wPos.y, twPos.x, twPos.y)) { 
-          this.target = a; 
-          this.angle = atan2(twPos.y - wPos.y, twPos.x - wPos.x);
-          return; 
+          this.target = a; this.angle = atan2(twPos.y - wPos.y, twPos.x - wPos.x); return; 
         }
       }
     }
 
-    // 3. Enemy Search via Spatial Hash
     if (tTypes.includes('enemy')) {
-      const cs = state.spatialHashCellSize;
-      const gx = floor(wPos.x / cs);
-      const gy = floor(wPos.y / cs);
+      const cs = state.spatialHashCellSize; const gx = floor(wPos.x / cs); const gy = floor(wPos.y / cs);
       const searchRadius = Math.ceil(range / cs);
-      
       const candidates: { e: any, dSq: number }[] = [];
-
       for (let i = -searchRadius; i <= searchRadius; i++) {
         for (let j = -searchRadius; j <= searchRadius; j++) {
           const cell = state.spatialHash.get(`${gx + i},${gy + j}`);
@@ -497,21 +659,14 @@ export class AttachedTurret {
           }
         }
       }
-
-      // 4. Also check for valuable/enemy blocks in world (cached chunks nearby)
       state.world.chunks.forEach((chunk: any) => {
-        // Rough chunk-based culling
-        const cw = CHUNK_SIZE * GRID_SIZE;
-        const dx = (chunk.cx * cw + cw/2) - wPos.x;
-        const dy = (chunk.cy * cw + cw/2) - wPos.y;
+        const cw = CHUNK_SIZE * GRID_SIZE; const dx = (chunk.cx * cw + cw/2) - wPos.x; const dy = (chunk.cy * cw + cw/2) - wPos.y;
         if (dx*dx + dy*dy > (range + cw)**2) return;
-
         chunk.overlayBlocks.forEach((b: any) => {
            if (b.isMined || !b.overlay) return;
            const oCfg = overlayTypes[b.overlay];
            if (oCfg?.isEnemy) {
-              const bx = b.pos.x + GRID_SIZE/2;
-              const by = b.pos.y + GRID_SIZE/2;
+              const bx = b.pos.x + GRID_SIZE/2; const by = b.pos.y + GRID_SIZE/2;
               const dSq = (wPos.x - bx)**2 + (wPos.y - by)**2;
               if (dSq <= rangeSq) candidates.push({ e: b, dSq });
            }
@@ -519,80 +674,51 @@ export class AttachedTurret {
       });
 
       if (candidates.length > 0) {
-        // Sort by distance (lowest dSq first)
-        candidates.sort((a, b) => a.dSq - b.dSq);
+        if (tCfg.enemyPriority === 'highestHealth') candidates.sort((a,b) => b.e.health - a.e.health);
+        else if (tCfg.enemyPriority === 'random') {
+            const chosen = candidates[floor(random(candidates.length))];
+            const tc = chosen.e.pos || chosen.e.getWorldPos?.();
+            if (tc && (this.config.actionType.includes('launch') || state.world.checkLOS(wPos.x, wPos.y, tc.x, tc.y))) { this.target = chosen.e; this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x); return; }
+        } else candidates.sort((a, b) => a.dSq - b.dSq);
         
-        // Lazy LOS Check: find the closest one that we can actually see
         for (const cand of candidates) {
           const tc = cand.e.pos || cand.e.getWorldPos?.();
           if (!tc) continue;
-          if (state.world.checkLOS(wPos.x, wPos.y, tc.x, tc.y)) {
-            this.target = cand.e;
-            this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x);
-            return;
-          }
+          if (this.config.actionType.includes('launch') || state.world.checkLOS(wPos.x, wPos.y, tc.x, tc.y)) { this.target = cand.e; this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x); return; }
         }
       }
     }
 
-    // 5. Obstacle search (Mining lasers)
     if (tTypes.includes('obstacle')) {
-      let bestObs = null;
-      let bestObsVal = Infinity;
-      
+      let bestObs = null; let bestObsVal = Infinity;
       state.world.chunks.forEach((chunk: any) => {
-        const cw = CHUNK_SIZE * GRID_SIZE;
-        const dx = (chunk.cx * cw + cw/2) - wPos.x;
-        const dy = (chunk.cy * cw + cw/2) - wPos.y;
+        const cw = CHUNK_SIZE * GRID_SIZE; const dx = (chunk.cx * cw + cw/2) - wPos.x; const dy = (chunk.cy * cw + cw/2) - wPos.y;
         if (dx*dx + dy*dy > (range + cw)**2) return;
-
         chunk.blocks.forEach((b: any) => {
           if (b.isMined) return;
-          const bcx = b.pos.x + GRID_SIZE/2;
-          const bcy = b.pos.y + GRID_SIZE/2;
-          const dSq = (wPos.x - bcx)**2 + (wPos.y - bcy)**2;
+          const bcx = b.pos.x + GRID_SIZE/2; const bcy = b.pos.y + GRID_SIZE/2;
+          // Fixed typo: used 'wPos.y' instead of 'this.pos.y' as AttachedTurret does not have 'pos'
+          const dSq = (wPos.x - bcx)**2 + (wPos.y - bcy)**2; 
           if (dSq <= rangeSq) {
-            const d = Math.sqrt(dSq);
-            const oCfg = b.overlay ? overlayTypes[b.overlay] : null;
+            const d = Math.sqrt(dSq); const oCfg = b.overlay ? overlayTypes[b.overlay] : null;
             let score = d - (oCfg?.isValuable ? 2000 : 0) - (oCfg?.isEnemy ? 3000 : 0);
             if (score < bestObsVal) {
-              // Lazy LOS only for candidates that look better
-              if (state.world.checkLOS(wPos.x, wPos.y, bcx, bcy)) {
-                bestObsVal = score;
-                bestObs = b;
-              }
+              if (state.world.checkLOS(wPos.x, wPos.y, bcx, bcy)) { bestObsVal = score; bestObs = b; }
             }
           }
         });
       });
-      
-      if (bestObs) {
-        this.target = bestObs;
-        const tc = this.getTargetCenter();
-        if (tc) this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x);
-      }
+      if (bestObs) { this.target = bestObs; const tc = this.getTargetCenter(); if (tc) this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x); }
     }
   }
 
   takeDamage(d: number) { 
     if (this.isFrosted) { this.iceCubeHealth -= d; if (this.iceCubeHealth <= 0) { this.isFrosted = false; this.frostLevel = 0; state.vfx.push(new BlockDebris(this.getWorldPos().x, this.getWorldPos().y, [180, 240, 255])); for (let a of this.parent.attachments) if (a.target === this) a.target = null; if (state.player.target === this) state.player.target = null; } return; }
-    
-    // HEALING / DAMAGE FLASH TRIGGERS
-    if (d < 0) {
-      this.health = Math.min(this.maxHealth, this.health - d);
-      this.flashTimer = 8;
-      this.flashType = 'heal';
-      return;
-    } else if (d > 0) {
-      this.flashTimer = 8;
-      this.flashType = 'damage';
-    }
-
+    if (d < 0) { this.health = Math.min(this.maxHealth, this.health - d); this.flashTimer = 8; this.flashType = 'heal'; return; } 
+    else if (d > 0) { this.flashTimer = 8; this.flashType = 'damage'; }
     this.health = Math.max(0, this.health - d); 
     if (this.health <= 0 && this.config.actionType?.includes('onDeathPulse')) { 
-      let wPos = this.getWorldPos(); 
-      let b = new Bullet(wPos.x, wPos.y, wPos.x, wPos.y, this.config.actionConfig.pulseBulletTypeKey, 'none'); 
-      b.life = 0; state.bullets.push(b); 
+      let wPos = this.getWorldPos(); let b = new Bullet(wPos.x, wPos.y, wPos.x, wPos.y, this.config.actionConfig.pulseBulletTypeKey, 'none'); b.life = 0; state.bullets.push(b); 
     }
   }
   display() {

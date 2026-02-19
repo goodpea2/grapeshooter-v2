@@ -10,7 +10,29 @@ export const groundFeatureTypes: any = {
     tickRate: 6,
     vfxType: 'fire_puddle',
     color: [255, 100, 50],
-    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 0 }],
+    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 1 }], // this damage is its own source
+    conditionDuration: 60
+  },
+  gf_fire_puddle_t3: {
+    name: 'T3 Fire Puddle',
+    life: 180, // 3 seconds
+    radius: 20,
+    damage: 1,
+    tickRate: 6,
+    vfxType: 'fire_puddle',
+    color: [255, 120, 0],
+    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 1 }],
+    conditionDuration: 60
+  },
+  gf_fire_puddle_flamethrower: {
+    name: 'Flamethrower fire',
+    life: 60,
+    radius: 20,
+    damage: 0.25, // lower dmg to obstacles but stackable
+    tickRate: 6,
+    vfxType: 'fire_puddle',
+    color: [255, 120, 0],
+    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 1 }], // mainly burn dmg to enemies
     conditionDuration: 60
   },
   gf_firecherry_puddle: {

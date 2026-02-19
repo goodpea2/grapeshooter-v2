@@ -46,7 +46,32 @@ export const TYPE_MAP: Record<string, string> = {
   't2_icebomb': 't_icebomb',
   't2_stun': 't_stun',
   't2_spike': 't_spike',
+  // Tier 3
   't3_triplepea': 't_triplepea',
+  't3_firepea2': 't_firepea2',
+  't3_spinnut': 't_spinnut',
+  't3_mortar2': 't_mortar2',
+  't3_snowpea2': 't_snowpea2',
+  't3_inferno': 't_inferno',
+  't3_flamethrower': 't_flamethrower',
+  't3_bowling': 't_bowling',
+  't3_repulser': 't_repulser',
+  't3_snowpeanut': 't_snowpeanut',
+  't3_skymortar': 't_skymortar',
+  't3_laser3': 't_laser3',
+  't3_puncher2': 't_puncher2',
+  't3_aoelaser': 't_aoelaser',
+  't3_iceray2': 't_iceray2',
+  't3_miningbomb': 't_miningbomb',
+  't3_tesla': 't_tesla',
+  't3_icepuncher': 't_icepuncher',
+  't3_densnut': 't_densenut',
+  't3_durian': 't_durian',
+  't3_spike2': 't_spike2',
+  't3_holonut': 't_holonut',
+  't3_minefield': 't_minefield',
+  't3_frostfield': 't_frostfield',
+  't3_triberg': 't_triberg',
   // Special Turrets
   't0_puffshroom': 't0_puffshroom',
   't0_grapeshot': 't0_grapeshot',
@@ -60,7 +85,10 @@ export const TYPE_MAP: Record<string, string> = {
 // Units that do not have a back-facing asset
 const NO_BACK_UNITS = new Set([
   't_wall', 't2_tall', 't2_pulse', 't2_spike', 't_sunflower', 't_seed', 't_seed2', 't_lilypad',
-  't0_jalapeno', 't0_firecherry', 't0_starfruit', 't0_iceshroom', 't0_cherrybomb'
+  't0_jalapeno', 't0_firecherry', 't0_starfruit', 't0_iceshroom', 't0_cherrybomb',
+  // T3 additions that have no back asset provided
+  't3_repulser', 't3_skymortar', 't3_miningbomb', 't3_tesla', 't3_densnut', 't3_durian',
+  't3_spike2', 't3_holonut', 't3_minefield', 't3_frostfield', 't3_triberg'
 ]);
 
 export function hasTurretSprite(type: string): boolean {

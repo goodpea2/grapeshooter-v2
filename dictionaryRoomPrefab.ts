@@ -1,3 +1,4 @@
+
 export interface RoomPrefab {
   id: string;
   name: string;
@@ -22,7 +23,7 @@ export interface RoomPrefab {
       count: [number, number];
     }[];
     guaranteedNpc?: string; // e.g. "NPC_tutorial", "lv1 npc", "lv2 npc", "lv3 npc"
-    guaranteedOverlay?: string; // e.g. "o_treasurechest_100"
+    guaranteedOverlay?: string; // e.g. "ov_treasurechest_100"
   };
 }
 
@@ -35,9 +36,9 @@ export const ROOM_PREFABS: RoomPrefab[] = [
   { id: 'emt0', name: 'Empty Room', roomValue: 0, roomLevel: 0, enemyBudget: 0, worldGenConfig: { ...AIR_NOT_REQUIRED, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 0], tnt: [0, 0], crate: [0, 0], guaranteedObstacleConfig: [] } },
 
   // --- Treasure Rooms ---
-  { id: 'tre1', name: 'Treasure 1', roomValue: 100, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedOverlay: 'o_treasurechest_100' } },
-  { id: 'tre2', name: 'Treasure 2', roomValue: 200, roomLevel: 2, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedOverlay: 'o_treasurechest_200' } },
-  { id: 'tre3', name: 'Treasure 3', roomValue: 300, roomLevel: 3, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedOverlay: 'o_treasurechest_300' } },
+  { id: 'tre1', name: 'Treasure 1', roomValue: 100, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedOverlay: 'ov_treasurechest_100' } },
+  { id: 'tre2', name: 'Treasure 2', roomValue: 200, roomLevel: 2, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedOverlay: 'ov_treasurechest_200' } },
+  { id: 'tre3', name: 'Treasure 3', roomValue: 300, roomLevel: 3, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedOverlay: 'ov_treasurechest_300' } },
 
   // --- NPC Rooms ---
   { id: 'tut0', name: 'Tutor Base', roomValue: 0, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [5, 5], tnt: [0, 0], crate: [0, 0], guaranteedObstacleConfig: [], guaranteedNpc: 'NPC_tutorial' } },
