@@ -537,7 +537,7 @@ export class AttachedTurret {
 
             if (killed && config.spawnBulletOnTargetDeath) {
                 const loc = this.getTargetCenter();
-                if (loc) { let b = new Bullet(loc.x, loc.y, loc.x, loc.y, config.spawnBulletOnTargetDeath, 'none'); b.life = 0; b.col = config.color; state.bullets.push(b); }
+                if (loc) { let b = new Bullet(loc.x, loc.y, loc.x, loc.y, config.spawnBulletOnTargetDeath, 'none'); b.life = 0; b.col = config.color || [255,255,255]; state.bullets.push(b); }
             }
             if (this.target && config.appliedConditions && this.target.applyCondition) {
               for (const cond of config.appliedConditions) this.target.applyCondition(cond.type, cond.duration, cond);
