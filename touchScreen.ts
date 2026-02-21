@@ -21,7 +21,7 @@ export function handleTouchStarted(touches: any[]) {
   state.touchStartPos = { x: t.x, y: t.y };
   
   // Check if touching UI areas or a turret to allow scrolling/dragging instead of movement
-  const isLeftUI = t.x < 150; // Turret HUD area
+  const isLeftUI = t.x < state.uiWidth; // Turret HUD area
   const isRightUI = (state.showDebug && t.x > width - 280) || (state.activeNPC && t.x > width - 320);
   const isTopUI = t.y < 100; // Clock and stats
   const isTurret = !!state.hoveredTurretInstance;

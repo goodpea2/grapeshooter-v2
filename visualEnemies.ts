@@ -132,8 +132,13 @@ export function drawEnemy(e: any) {
 
   if (sprite) {
     imageMode(CENTER);
+    if (e.flash > 0) {
+      tint(255, 100, 100);
+    }
     image(sprite, 0, 0, 64, 64);
-    noTint();
+    if (e.flash > 0) {
+      noTint();
+    }
 
     // Swarm particles handled separately to stay on top of the center asset
     if (e.type === 'e_swarm' && e.swarmParticles) {

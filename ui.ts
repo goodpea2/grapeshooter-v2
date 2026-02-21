@@ -195,7 +195,8 @@ function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha: numbe
     }
   }
   // BUGFIX: Inject 'type' so tooltip can find assets
-  if (hov) drawTurretTooltip({ ...tr, type: key }, mouseX, mouseY);
+  if (hov) return { ...tr, type: key };
+  return null;
 }
 
 function drawClock(x: number, y: number, alpha: number) {
@@ -421,26 +422,32 @@ export function drawUI(spawnFromBudget: Function) {
   push();
   const hudXStart = 60;
   const spacing = 75;
-  
-  // Draw Standard Column
-  let curY = 160;
-  for (let item of stdList) {
-    drawTurretIcon(item.tr, item.key, hudXStart, curY, shopAlpha);
-    curY += spacing;
-  }
+  const startY = 160;
+  const bottomMargin = -25;
+  const maxItemsPerCol = Math.max(1, floor((height - startY - bottomMargin) / spacing));
 
-  // Draw Special Column (Multi-column support if needed, currently 1)
-  curY = 160;
-  let colX = hudXStart + 75;
-  for (let i = 0; i < specList.length; i++) {
-    const item = specList[i];
-    drawTurretIcon(item.tr, item.key, colX, curY, shopAlpha);
-    curY += spacing;
-    if (curY > height - 100) {
-      curY = 160;
-      colX += 75;
+  let currentX = hudXStart;
+  let currentY = startY;
+  let itemsInCol = 0;
+
+  // Draw Combined Column(s)
+  const combinedList = [...stdList, ...specList];
+  let hoveredTooltipData = null;
+  for (let item of combinedList) {
+    const hovData = drawTurretIcon(item.tr, item.key, currentX, currentY, shopAlpha);
+    if (hovData) hoveredTooltipData = hovData;
+    currentY += spacing;
+    itemsInCol++;
+    if (itemsInCol >= maxItemsPerCol) {
+      currentX += spacing;
+      currentY = startY;
+      itemsInCol = 0;
     }
   }
+
+  // Update uiWidth so world interaction doesn't happen over UI
+  // If itemsInCol is 0, it means we just moved currentX forward but haven't used it.
+  state.uiWidth = (itemsInCol > 0) ? (currentX + 40) : (currentX - 35);
   pop();
 
   push();
@@ -459,4 +466,8 @@ export function drawUI(spawnFromBudget: Function) {
   drawDebugPanel(spawnFromBudget);
   drawWorldGenPreview();
   drawFooter();
+
+  if (hoveredTooltipData) {
+    drawTurretTooltip(hoveredTooltipData, mouseX, mouseY);
+  }
 }

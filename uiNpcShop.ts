@@ -37,6 +37,10 @@ declare const ellipse: any;
 declare const scale: any;
 declare const constrain: any;
 declare const map: any;
+declare const sin: any;
+declare const frameCount: any;
+declare const abs: any;
+declare const PI: any;
 
 const PANEL_WIDTH = 320;
 const SHOP_Y_START = 160; 
@@ -86,6 +90,7 @@ export function handleNpcUiClick() {
           if (trade.cost.elixir) state.elixirCurrency -= trade.cost.elixir;
 
           stockMap[trade.id] = purchasedCount + 1;
+          npc.triggerPurchaseAnim();
 
           if (trade.outputBehavior === 'giveItem') {
             const amount = trade.itemAmount || 1;
@@ -146,8 +151,18 @@ export function drawNPCPanel() {
 
     const sprite = state.assets[`img_${cfg.assetKey}_front`];
     if (sprite) {
+      push();
+      translate(60, 70 - jumpOffset);
+      
+      // Panel Asset Animations
+      const idleHover = sin(frameCount * 0.04) * 5;
+      const purchaseJump = npc.purchaseAnimTimer > 0 ? -abs(sin((1 - npc.purchaseAnimTimer/20) * PI)) * 15 : 0;
+      
+      translate(0, idleHover + purchaseJump);
+      
       imageMode(CENTER);
-      image(sprite, 60, 70 - jumpOffset, 180, 180);
+      image(sprite, 0, 0, 180, 180);
+      pop();
     }
 
     fill(255, 235, 90);

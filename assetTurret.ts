@@ -138,8 +138,10 @@ export function drawTurretSprite(t: any) {
 
   if (actionConfig.hasUnarmedAsset) {
     const primaryActions = ['pulse', 'shoot', 'shootMultiTarget', 'launch', 'spawnBulletAtRandom'];
+    const applyTo = config.unarmedAssetApplyToAction || primaryActions;
+    
     for(const act of primaryActions) {
-      if (config.actionType.includes(act)) {
+      if (config.actionType.includes(act) && applyTo.includes(act)) {
         const timer = t.actionTimers.get(act) || -999999;
         let cooldown = 0;
         if (act === 'spawnBulletAtRandom') cooldown = actionConfig.spawnBulletAtRandom.cooldown;

@@ -44,9 +44,54 @@ export function drawPlayer(p: any) {
   // 2. Draw Attachments (Behind Layer)
   p.displayAttachments(false);
 
-  // 3. Player Core Sprite
+  // 3. Animation Calculation (Soft Body Style)
+  const isMoving = !state.isStationary;
+  const frames = state.frames;
+  
+  let animY = 0;
+  let animX = 0;
+  let animScaleX = 1.0;
+  let animScaleY = 1.0;
+  let animRot = 0;
+
+  // Idle / Breathe
+  if (!isMoving) {
+    const breatheRate = 0.08;
+    const breatheAmp = 0.02; // Subtle
+    animScaleY = 1.0 + sin(frames * breatheRate) * breatheAmp;
+    animScaleX = 1.0 / animScaleY;
+  } 
+  // Moving / Hop
+  else {
+    const hopSpeed = 0.2;
+    const hopHeight = 3; // Subtle
+    const hopVal = abs(sin(frames * hopSpeed));
+    animY = -hopVal * hopHeight;
+    animScaleY = 1.0 + (hopVal * 0.06) - 0.03;
+    animScaleX = 1.0 / animScaleY;
+    animRot = sin(frames * 0.12) * 0.05;
+  }
+
+  // Hurt Shaking
+  if (p.hurtAnimTimer > 0) {
+    const intensity = (p.hurtAnimTimer / 10) * 2;
+    animX += (Math.random() - 0.5) * intensity * 2;
+    animY += (Math.random() - 0.5) * intensity * 2;
+  }
+
+  // Pulse Action Recoil
+  if (p.pulseAnimTimer > 0) {
+    const progress = 1 - (p.pulseAnimTimer / 15);
+    const squash = sin(progress * Math.PI * 2) * (1 - progress) * 0.2; // Subtle
+    animScaleY -= squash;
+    animScaleX += squash;
+  }
+
+  // 4. Player Core Sprite
   push();
-  translate(p.pos.x, p.pos.y);
+  translate(p.pos.x + animX, p.pos.y + animY);
+  rotate(animRot);
+  scale(animScaleX, animScaleY);
 
   let isLeft = false;
   let isBack = false;

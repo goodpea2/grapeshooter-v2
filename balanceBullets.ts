@@ -201,11 +201,11 @@ export const bulletTypes: any = {
     damageTargets: ['enemy', 'obstacle', 'icecube']
   },
   b_floating_mine: {
-    bulletDamage: 0, bulletSpeed: 3, bulletColor: [255, 60, 20], bulletLifeTime: HOUR_FRAMES * 6, bulletSize: 12, bulletLength: 4,
+    bulletDamage: 0, bulletSpeed: 3, bulletColor: [255, 60, 20], bulletLifeTime: HOUR_FRAMES * 3, bulletSize: 20, bulletLength: 4,
     aoeConfig: { 
       isAoe: true, 
       aoeRadiusGradient: [GRID_SIZE * 0.5, GRID_SIZE * 1.5], 
-      aoeDamageGradient: [600,100], 
+      aoeDamageGradient: [300,100], 
       dealAoeOnObstacle: true, 
       dealAoeAfterLifetime: true, 
       aoeObstacleDamageMultiplier: 1.0 

@@ -47,6 +47,7 @@ export class NPCEntity {
   isInteractable: boolean = false;
   rot: number = 0;
   uid: string;
+  purchaseAnimTimer: number = 0;
 
   constructor(x: number, y: number, typeKey: string) {
     this.pos = createVector(x, y);
@@ -89,6 +90,12 @@ export class NPCEntity {
     } else if (state.activeNPC === this) {
       state.activeNPC = null;
     }
+
+    if (this.purchaseAnimTimer > 0) this.purchaseAnimTimer--;
+  }
+
+  triggerPurchaseAnim() {
+    this.purchaseAnimTimer = 20;
   }
 
   /**
@@ -129,12 +136,34 @@ export class NPCEntity {
     const spriteKey = isBack ? `img_${baseKey}_back` : `img_${baseKey}_front`;
     const sprite = state.assets[spriteKey];
 
+    // Animation Calculation
+    let animY = 0;
+    let animScaleX = 1.0;
+    let animScaleY = 1.0;
+    
+    // Idle Hover (Subtle)
+    animY += sin(frameCount * 0.05) * 2;
+    
+    // Panel Open Jump (Subtle)
+    if (state.activeNPC === this) {
+        animY -= abs(sin(frameCount * 0.08)) * 4;
+    }
+
+    // Purchase Pulse
+    if (this.purchaseAnimTimer > 0) {
+        const progress = 1 - (this.purchaseAnimTimer / 20);
+        const squash = sin(progress * PI) * (1 - progress) * 0.15;
+        animScaleY -= squash;
+        animScaleX += squash;
+    }
+
     if (sprite) {
       push();
       if (isLeft) scale(-1, 1);
+      translate(0, animY);
+      scale(animScaleX, animScaleY);
       imageMode(CENTER);
-      const breathe = 1.0 + 0.02 * sin(frameCount * 0.05);
-      image(sprite, 0, 0, 80, 80 * breathe);
+      image(sprite, 0, 0, 80, 80);
       pop();
     }
 

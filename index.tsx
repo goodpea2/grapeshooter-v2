@@ -293,19 +293,20 @@ function executePlacement() {
   for (let tex of state.tickingExplosives) drawTickingExplosive(tex);
   for (let s of state.pendingSpawns) drawPendingSpawn(s);
   for (let i = state.trails.length - 1; i >= 0; i--) { state.trails[i].update(); state.trails[i].display(); if (state.trails[i].isDone()) state.trails.splice(i, 1); }
-  for (let l of state.loot) l.display();
-  for (let i = state.bullets.length - 1; i >= 0; i--) { state.bullets[i].update(); state.bullets[i].display(); if (state.bullets[i].life <= 0) state.bullets.splice(i, 1); }
-  for (let i = state.enemyBullets.length - 1; i >= 0; i--) { state.enemyBullets[i].update(); state.enemyBullets[i].display(); if (state.enemyBullets[i].life <= 0) state.enemyBullets.splice(i, 1); }
   for (let i = state.groundFeatures.length - 1; i >= 0; i--) { state.groundFeatures[i].update(); state.groundFeatures[i].display(); if (state.groundFeatures[i].life <= 0) state.groundFeatures.splice(i, 1); }
   
   for (let npc of state.npcs) npc.update(state.player.pos);
   
   state.player.displayAttachments(true);
   for (let i = state.enemies.length - 1; i >= 0; i--) { state.enemies[i].update(state.player.pos, state.player.attachments); state.enemies[i].display(); if (state.enemies[i].health <= 0 || state.enemies[i].markedForDespawn) state.enemies.splice(i, 1); }
-  for (let i = state.vfx.length - 1; i >= 0; i--) { state.vfx[i].update(); state.vfx[i].display(); if (state.vfx[i].isDone()) state.vfx.splice(i, 1); }
   state.player.update(); state.player.display();
 
   for (let npc of state.npcs) npc.display();
+
+  for (let l of state.loot) l.display();
+  for (let i = state.bullets.length - 1; i >= 0; i--) { state.bullets[i].update(); state.bullets[i].display(); if (state.bullets[i].life <= 0) state.bullets.splice(i, 1); }
+  for (let i = state.enemyBullets.length - 1; i >= 0; i--) { state.enemyBullets[i].update(); state.enemyBullets[i].display(); if (state.enemyBullets[i].life <= 0) state.enemyBullets.splice(i, 1); }
+  for (let i = state.vfx.length - 1; i >= 0; i--) { state.vfx[i].update(); state.vfx[i].display(); if (state.vfx[i].isDone()) state.vfx.splice(i, 1); }
 
   const mWorld = createVector(mouseX - width/2 + state.cameraPos.x, mouseY - height/2 + state.cameraPos.y);
   state.hoveredTurretInstance = null;

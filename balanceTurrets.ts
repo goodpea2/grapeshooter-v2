@@ -112,12 +112,12 @@ export const turretTypes: any = {
     actionType: ['pulse'],
     actionConfig: { 
       pulseBulletTypeKey: 'b_mine_explosion', 
-      pulseTriggerRadius: GRID_SIZE * 1, 
+      pulseTriggerRadius: GRID_SIZE * 1.5, 
       pulseTriggerBy: ['enemy'], 
       pulseCooldown: HOUR_FRAMES * 2, 
-      pulseCenteredAtTriggerSource: false, 
+      pulseCenteredAtTriggerSource: true, 
       hasUnarmedAsset: true,
-      PulseTurretJumpAtTriggerSource: true 
+      pulseTurretJumpAtTriggerSource: true 
     },
     targetType: ['enemy'],
     targetConfig: { enemyPriority: 'closest' }
@@ -128,12 +128,12 @@ export const turretTypes: any = {
     actionType: ['pulse'],
     actionConfig: { 
       pulseBulletTypeKey: 'b_ice_explosion', 
-      pulseTriggerRadius: GRID_SIZE * 1, 
+      pulseTriggerRadius: GRID_SIZE * 1.5, 
       pulseTriggerBy: ['enemy'], 
       pulseCooldown: HOUR_FRAMES, 
       pulseCenteredAtTriggerSource: true, 
       hasUnarmedAsset: true,
-      PulseTurretJumpAtTriggerSource: true 
+      pulseTurretJumpAtTriggerSource: true 
     },
     targetType: ['enemy'],
     targetConfig: { enemyPriority: 'closest' }
@@ -230,7 +230,7 @@ export const turretTypes: any = {
     name: 'Pulser', cost: 30, health: 50, color: [100, 255, 100], size: 22, tier: 2,
     tooltip: "Pulses surrounding damage waves at enemies", animationBodyType: 'soft',
     actionType: ['pulse'],
-    actionConfig: { pulseBulletTypeKey: 'b_pulse_tier2', pulseTriggerRadius: GRID_SIZE * 1.5, pulseTriggerBy: ['enemy', 'obstacle'], pulseCooldown: 120, pulseCenteredAtTriggerSource: false },
+    actionConfig: { pulseBulletTypeKey: 'b_pulse_tier2', pulseTriggerRadius: GRID_SIZE * 2.0, pulseTriggerBy: ['enemy', 'obstacle'], pulseCooldown: 120, pulseCenteredAtTriggerSource: false },
     targetType: ['enemy', 'obstacle'],
     targetConfig: { enemyPriority: 'closest', obstaclePriority: 'closest' }
   },
@@ -248,15 +248,16 @@ export const turretTypes: any = {
   t2_minespawner: {
     name: 'Mine Launcher', cost: 25, health: 50, color: [255, 20, 20], size: 22, tier: 2,
     tooltip: "Launches a mine every 2h to a random direction", animationBodyType: 'soft',
+    unarmedAssetApplyToAction: ['pulse'],
     actionType: ['pulse', 'spawnBulletAtRandom'],
     actionConfig: { 
         pulseBulletTypeKey: 'b_mine_explosion',
-        pulseTriggerRadius: GRID_SIZE * 1, 
+        pulseTriggerRadius: GRID_SIZE * 1.5, 
         pulseTriggerBy: ['enemy'], 
         pulseCooldown: HOUR_FRAMES * 2, 
-        pulseCenteredAtTriggerSource: false,
+        pulseCenteredAtTriggerSource: true,
         hasUnarmedAsset: true,
-        PulseTurretJumpAtTriggerSource: true,
+        pulseTurretJumpAtTriggerSource: true,
         spawnBulletAtRandom: { 
             cooldown: HOUR_FRAMES * 2, 
             distRange: [GRID_SIZE * 3, GRID_SIZE * 3], 
@@ -314,7 +315,7 @@ export const turretTypes: any = {
       pulseCooldown: HOUR_FRAMES * 1, 
       pulseCenteredAtTriggerSource: false, 
       hasUnarmedAsset: true,
-      PulseTurretJumpAtTriggerSource: true 
+      pulseTurretJumpAtTriggerSource: true 
     },
     targetType: ['enemy'],
     targetConfig: { enemyPriority: 'closest' }
@@ -325,12 +326,12 @@ export const turretTypes: any = {
     actionType: ['pulse'],
     actionConfig: { 
       pulseBulletTypeKey: 'b_stun_gas_projectile', 
-      pulseTriggerRadius: GRID_SIZE * 1, 
+      pulseTriggerRadius: GRID_SIZE * 2.0, 
       pulseTriggerBy: ['enemy'], 
       pulseCooldown: HOUR_FRAMES * 1, 
       pulseCenteredAtTriggerSource: true, 
       hasUnarmedAsset: true,
-      PulseTurretJumpAtTriggerSource: true 
+      pulseTurretJumpAtTriggerSource: true 
     },
     targetType: ['enemy'],
     targetConfig: { enemyPriority: 'closest' }
@@ -510,7 +511,7 @@ export const turretTypes: any = {
   t3_miningbomb: { 
     name: 'Mining Bomb', cost: 60, health: 150, color: [255, 100, 50], size: 24, tier: 3, tooltip: "Pulses when close to obstacles, damaging obstacles in a much wider area", animationBodyType: 'tough',
     actionType: ['pulse'],
-    actionConfig: { pulseBulletTypeKey: 'b_miningbomb_explosion', pulseTriggerRadius: GRID_SIZE * 3.5, pulseTriggerBy: ['obstacle'], pulseCooldown: 120, pulseCenteredAtTriggerSource: false },
+    actionConfig: { pulseBulletTypeKey: 'b_miningbomb_explosion', pulseTriggerRadius: GRID_SIZE * 1.5, pulseTriggerBy: ['obstacle'], pulseCooldown: 120, pulseCenteredAtTriggerSource: false },
     targetType: ['obstacle'],
     targetConfig: { obstaclePriority: 'closest' }
   },
@@ -541,7 +542,7 @@ export const turretTypes: any = {
     actionType: ['pulse'],
     actionConfig: { 
         pulseBulletTypeKey: 'b_durian_pulse', 
-        pulseTriggerRadius: GRID_SIZE * 1.0, 
+        pulseTriggerRadius: GRID_SIZE * 1.5, 
         pulseTriggerBy: ['enemy'], 
         pulseCooldown: 15, 
         pulseCenteredAtTriggerSource: false 
@@ -580,15 +581,16 @@ export const turretTypes: any = {
   },
   t3_minefield: { 
     name: 'Mine Field', cost: 45, health: 150, color: [255, 60, 0], size: 22, tier: 3, tooltip: "Launches 8 mini mines upon planting, then keeps launching mines and exploding", animationBodyType: 'soft',
+    unarmedAssetApplyToAction: ['pulse'],
     actionType: ['pulse', 'spawnBulletAtRandom', 'firstStrike'],
     actionConfig: { 
       pulseBulletTypeKey: 'b_minefield_explosion',
-      pulseTriggerRadius: GRID_SIZE * 1, 
+      pulseTriggerRadius: GRID_SIZE * 1.5, 
       pulseTriggerBy: ['enemy'], 
       pulseCooldown: HOUR_FRAMES * 2, 
-      pulseCenteredAtTriggerSource: false,
+      pulseCenteredAtTriggerSource: true,
       hasUnarmedAsset: true,
-      PulseTurretJumpAtTriggerSource: true,
+      pulseTurretJumpAtTriggerSource: true,
       spawnBulletAtRandom: { 
           cooldown: HOUR_FRAMES * 2, 
           distRange: [GRID_SIZE * 3, GRID_SIZE * 3], 
@@ -608,7 +610,7 @@ export const turretTypes: any = {
       pulseCooldown: HOUR_FRAMES * 2, 
       pulseCenteredAtTriggerSource: false, 
       hasUnarmedAsset: true,
-      PulseTurretJumpAtTriggerSource: true,
+      pulseTurretJumpAtTriggerSource: true,
       auraConfig: { radius: GRID_SIZE * 2.8, appliedCondition: 'c_chilled', duration: 150, auraVfx: 'aura_frostfield' }
     },
     targetType: ['enemy'], targetConfig: { enemyPriority: 'closest' }

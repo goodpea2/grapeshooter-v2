@@ -561,7 +561,7 @@ export class AttachedTurret {
         
         if (this.type === 't0_starfruit') triggered = true;
         if (triggered) {
-          if (config.PulseTurretJumpAtTriggerSource && this.getTargetCenter()) { this.jumpFrames = 20; this.jumpTargetPos = this.getTargetCenter()?.copy(); }
+          if (config.pulseTurretJumpAtTriggerSource && this.getTargetCenter()) { this.jumpFrames = 20; this.jumpTargetPos = this.getTargetCenter()?.copy(); }
           else if (config.pulseBulletTypeKey) {
             const tCenter = this.getTargetCenter();
             const sx = config.pulseCenteredAtTriggerSource && tCenter ? tCenter.x : wPos.x;
