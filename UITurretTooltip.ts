@@ -161,8 +161,8 @@ export const TURRET_DISPLAY_STATS: Record<string, TurretDisplayStat[]> = {
 
     // TIER 3
     't3_triplepea': [
-        { label: 'Health', value: '150' }, { label: 'Damage', value: '10 x3' }, { label: 'Fire rate', value: '1 sec' },
-        { label: 'Target', value: '3x Mobs' }, { label: ' ', value: ' ' }, { label: ' ', value: ' ' }
+        { label: 'Health', value: '150' }, { label: 'Damage', value: '10 x4' }, { label: 'Fire rate', value: '1 sec' },
+        { label: 'Target', value: '4x Mobs' }, { label: ' ', value: ' ' }, { label: ' ', value: ' ' }
     ],
     't3_firepea2': [
         { label: 'Health', value: '50' }, { label: 'Damage', value: '10' }, { label: 'Fire rate', value: '1 sec' },

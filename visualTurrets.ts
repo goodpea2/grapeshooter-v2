@@ -7,7 +7,6 @@ declare const push: any;
 declare const pop: any;
 declare const translate: any;
 declare const rotate: any;
-// Added missing scale declaration
 declare const scale: any;
 declare const fill: any;
 declare const noFill: any;
@@ -20,9 +19,10 @@ declare const arc: any;
 declare const HALF_PI: any;
 declare const TWO_PI: any;
 declare const sin: any;
+declare const cos: any;
+declare const abs: any;
 declare const rectMode: any;
 declare const CENTER: any;
-// Added missing p5 constant declarations
 declare const LEFT: any;
 declare const BOTTOM: any;
 declare const CORNER: any;
@@ -37,7 +37,6 @@ declare const textAlign: any;
 declare const textSize: any;
 declare const text: any;
 declare const floor: any;
-// Added missing radians declaration to fix error on line 147
 declare const radians: any;
 
 export function drawTurret(t: any) {
@@ -45,19 +44,100 @@ export function drawTurret(t: any) {
   const config = t.config;
   const actionConfig = config.actionConfig;
   
-  // Debug lines and range indicators
+  // ANIMATION CALCULATION
+  const isMoving = !state.isStationary;
+  const frames = state.frames;
+
+  // Sync Lilypad body type with occupant
+  let isSoft = config.animationBodyType === 'soft';
+  if (t.type === 't_lilypad' && t.parent?.attachments) {
+    const occupant = t.parent.attachments.find((a: any) => 
+      a.hq === t.hq && a.hr === t.hr && a.config.turretLayer !== 'ground'
+    );
+    if (occupant) {
+      isSoft = occupant.config.animationBodyType === 'soft';
+    }
+  }
+
+  // Determine environmental context
+  const gx = floor(wPos.x / GRID_SIZE);
+  const gy = floor(wPos.y / GRID_SIZE);
+  const liquidAtPos = state.world.getLiquidAt(gx, gy);
+  const isOnWater = liquidAtPos === 'l_water';
+  
+  let animY = 0;
+  let animX = 0;
+  let animScaleX = 1.0;
+  let animScaleY = 1.0;
+  let animRot = 0;
+
+  // 1. Idle Animations
+  if (!isMoving) {
+    if (isOnWater) {
+      const bobRate = isSoft ? 0.08 : 0.05;
+      const bobAmp = isSoft ? 2.5 : 1.2;
+      animY = sin(frames * bobRate) * bobAmp;
+    } else {
+      const breatheRate = isSoft ? 0.1 : 0.06;
+      const breatheAmp = isSoft ? 0.04 : 0.02;
+      animScaleY = 1.0 + sin(frames * breatheRate) * breatheAmp;
+      animScaleX = 1.0 / animScaleY;
+    }
+  } 
+  // 2. Moving Animations
+  else {
+    if (isOnWater) {
+      const floatRate = 0.12;
+      const floatAmp = isSoft ? 3 : 1.5;
+      animY = sin(frames * floatRate) * floatAmp;
+      animRot = sin(frames * 0.08) * (isSoft ? 0.12 : 0.05);
+      animScaleY = 1.0 + abs(sin(frames * floatRate)) * 0.02;
+      animScaleX = 1.0 / animScaleY;
+    } else {
+      const hopSpeed = 0.25;
+      const hopHeight = isSoft ? 5 : 3;
+      const hopVal = abs(sin(frames * hopSpeed));
+      animY = -hopVal * hopHeight;
+      animScaleY = 1.0 + (hopVal * 0.1) - 0.05;
+      animScaleX = 1.0 / animScaleY;
+
+      if (isSoft) {
+          animRot = sin(frames * 0.15) * 0.1;
+      }
+    }
+  }
+
+  // 3. Hurt Shaking
+  if (t.hurtAnimTimer > 0) {
+    const intensity = (t.hurtAnimTimer / 10) * 3;
+    animX += random(-intensity, intensity);
+    animY += random(-intensity, intensity);
+  }
+
+  // 4. Pulse Action Recoil
+  if (t.pulseAnimTimer > 0) {
+    const progress = 1 - (t.pulseAnimTimer / 15);
+    const squash = sin(progress * Math.PI * 2) * (1 - progress) * 0.4;
+    animScaleY -= squash;
+    animScaleX += squash;
+  }
+
+  push();
+  translate(wPos.x + animX, wPos.y + animY);
+  rotate(animRot);
+  scale(animScaleX, animScaleY);
+  
   if (state.debugGizmosTurrets && state.isStationary) {
-    push(); // Isolated debug block
+    push();
     if (t.target) {
         let tc = t.getTargetCenter();
         if (tc) {
           stroke(255, 255, 100, 150);
           strokeWeight(2);
-          line(wPos.x, wPos.y, tc.x, tc.y);
+          line(0, 0, tc.x - wPos.x, tc.y - wPos.y);
         }
     }
 
-    // Cooldown/Arming timer for debug mode
     const timersToCheck = ['pulse', 'shoot', 'spawnBulletAtRandom', 'passiveSun'];
     let maxRemaining = 0;
     let activeProgress = 0;
@@ -84,7 +164,6 @@ export function drawTurret(t: any) {
 
     if (maxRemaining > 0) {
       push();
-      translate(wPos.x, wPos.y);
       noFill();
       stroke(255, 100, 0, 180);
       strokeWeight(4);
@@ -98,7 +177,6 @@ export function drawTurret(t: any) {
       pop();
     }
 
-    // Lifetime / Charge info
     let lifeInfo = "";
     if (actionConfig.dieAfterDuration) {
         const rem = actionConfig.dieAfterDuration - t.framesAlive;
@@ -111,7 +189,6 @@ export function drawTurret(t: any) {
 
     if (lifeInfo) {
         push();
-        translate(wPos.x, wPos.y);
         fill(255, 255, 100);
         noStroke();
         textAlign(CENTER, CENTER);
@@ -122,17 +199,13 @@ export function drawTurret(t: any) {
     pop();
   }
 
-  // Energy Shield Logic
-  // REFINED: Strictly only render if turret is Active (Not waterlogged, not frosted) and player is stationary
-  const isActive = !t.isWaterlogged && !t.isFrosted;
-  if (config.actionType.includes('shield') && state.isStationary && isActive) {
+  if (config.actionType.includes('shield') && t.specialActivityLevel > 0.01) {
     push();
-    translate(wPos.x, wPos.y);
-    const rad = actionConfig.shieldRadius || 50;
+    const activity = t.specialActivityLevel;
+    const rad = (actionConfig.shieldRadius || 50) * activity;
     const pulse = 1.0 + 0.03 * sin(state.frames * 0.05);
-    const alpha = (t.alpha / 255) * (100 + 20 * sin(state.frames * 0.04));
+    const alpha = (t.alpha / 255) * (100 + 20 * sin(state.frames * 0.04)) * activity;
     
-    // Main Shield Shell
     noFill();
     stroke(100, 200, 255, alpha * 1.5);
     strokeWeight(2);
@@ -142,16 +215,15 @@ export function drawTurret(t: any) {
     noStroke();
     ellipse(0, 0, rad * 2 * pulse);
 
-    // REACTIVE IMPACT FLARES: Lights up localized sections of the shield outline
     if (t.shieldImpactAngles && t.shieldImpactAngles.length > 0) {
         noFill();
         strokeWeight(4);
         const flareWidth = radians(30);
         for (let angle of t.shieldImpactAngles) {
-            stroke(200, 240, 255, 200 + sin(state.frames * 0.5) * 55);
+            stroke(200, 240, 255, (200 + sin(state.frames * 0.5) * 55) * activity);
             arc(0, 0, rad * 2 * pulse, rad * 2 * pulse, angle - flareWidth/2, angle + flareWidth/2);
             
-            stroke(255, 255, 255, 220);
+            stroke(255, 255, 255, 220 * activity);
             strokeWeight(2);
             arc(0, 0, rad * 2 * pulse, rad * 2 * pulse, angle - flareWidth/3, angle + flareWidth/3);
         }
@@ -159,23 +231,18 @@ export function drawTurret(t: any) {
     pop();
   }
 
-  // Draw Sprite if available
   if (hasTurretSprite(t.type)) {
     drawTurretSprite(t);
   } else {
-    // FALLBACK PROCEDURAL DRAWING
     const isTrap = ['t_mine', 't_ice', 't2_minespawner', 't2_icebomb', 't2_stun'].includes(t.type);
     const pulseTimer = t.actionTimers.get('pulse') || -999999;
     const cooldown = (actionConfig.pulseCooldown || 0) / (t.fireRateMultiplier || 1);
     const onCooldown = isTrap && (state.frames - pulseTimer) < cooldown;
 
     push();
-    translate(wPos.x, wPos.y);
-    
     let bc = [...(t.config.color || [100, 100, 100])];
     if (onCooldown) bc = [120, 120, 130];
     
-    // HEAL / DAMAGE FLASH
     if (t.flashTimer > 0) {
         if (t.flashType === 'heal') bc = [100, 255, 100];
         else bc = [255, 100, 100];
@@ -186,8 +253,8 @@ export function drawTurret(t: any) {
     fill(bc[0], bc[1], bc[2], t.alpha);
 
     if (t.type === 't_spike' || t.type === 't2_spike' || t.type === 't3_spike2') {
-      rectMode(CENTER);
       fill(60, 60, 80, t.alpha);
+      rectMode(CENTER);
       rect(0, 0, 30, 30, 6);
       fill(onCooldown ? 150 : 200, onCooldown ? 150 : 200, onCooldown ? 160 : 255, t.alpha);
       for (let i = -0.5; i <= 0.5; i++) {
@@ -212,15 +279,10 @@ export function drawTurret(t: any) {
     pop();
   }
 
-  // Common Overlays (Active FX, Status, Health)
-  push();
-  translate(wPos.x, wPos.y);
-
   if (state.isStationary && !t.isWaterlogged && !t.isFrosted) {
     if (t.config.actionType.includes('laserBeam') && t.target) {
       let tc = t.getTargetCenter();
       if (tc) {
-        // Visual ramp factor for Inferno Ray
         const ramp = t.rampFactor || 0;
         const baseWidth = t.config.actionConfig.beamWidth;
         const dynamicWidth = baseWidth * (1 + ramp * 1.5);
@@ -235,28 +297,21 @@ export function drawTurret(t: any) {
     }
   }
 
-  // Seed Growth Bar (Applies to both T1 and T2 seeds)
   if ((t.type === 't_seed' || t.type === 't_seed2') && t.growthProgress > 0) {
     const maxG = t.config.actionConfig.maxGrowth || 32;
     const gRatio = t.growthProgress / maxG;
     const barW = t.size + 10;
     const barH = 5;
-    
-    // effect when waterlogged
     const glowAlpha = t.isWaterlogged ? 150 + 100 * sin(state.frames * 0.2) : 180;
 
     push();
-    // Offset further up if HP bar is also present
     const hRatio = t.health / t.maxHealth;
     const verticalOffset = hRatio < 1.0 ? -t.size/2 - 18 : -t.size/2 - 12;
     translate(0, verticalOffset);
-    scale(1.0);
-    
     noStroke();
     fill(20, 180);
     rectMode(CENTER);
     rect(0, 0, barW, barH, 2);
-    
     fill(t.isWaterlogged ? [150, 255, 200, glowAlpha] : [100, 255, 100, 220]);
     rectMode(CORNER);
     rect(-barW/2, -barH/2, barW * gRatio, barH, 2);
@@ -284,25 +339,22 @@ export function drawTurret(t: any) {
     rect(-t.size / 4, -t.size / 4, t.size / 2, t.size / 2, 2);
     pop();
   }
-  pop();
 
-  // Health Bar (Rectangular Version)
   let hRatio = t.health / t.maxHealth;
   if (hRatio < 1.0) {
     push();
-    translate(wPos.x, wPos.y);
     const barW = t.size + 6;
     const barH = 4;
     translate(0, -t.size/2 - 8);
-    
     noStroke();
     fill(20, 20, 40, t.alpha * 0.8);
     rectMode(CENTER);
     rect(0, 0, barW, barH, 2);
-    
     fill(255, 100, 100, t.alpha);
     rectMode(CORNER);
     rect(-barW/2, -barH/2, barW * hRatio, barH, 2);
     pop();
   }
+
+  pop();
 }

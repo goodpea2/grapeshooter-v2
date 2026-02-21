@@ -5,7 +5,7 @@ import { turretTypes } from '../balanceTurrets';
 import { conditionTypes } from '../balanceConditions';
 import { liquidTypes } from '../balanceLiquids';
 import { overlayTypes } from '../balanceObstacles';
-import { MuzzleFlash, Explosion, SparkVFX, BlockDebris, ConditionVFX, MergeVFX, MagicLinkVFX, WeldingHitVFX } from '../vfx';
+import { MuzzleFlash, Explosion, SparkVFX, BlockDebris, ConditionVFX, MergeVFX, MagicLinkVFX, WeldingHitVFX, FirstStrikeVFX, FrostFieldAuraVFX } from '../vfx';
 import { Bullet } from './bullet';
 import { SunLoot } from './loot';
 import { drawTurret } from '../visualTurrets';
@@ -44,7 +44,14 @@ export class AttachedTurret {
   framesAlive: number = 0;
   flashTimer: number = 0;
   flashType: 'damage' | 'heal' = 'damage';
+
+  // Animation Timers
+  hurtAnimTimer: number = 0;
+  pulseAnimTimer: number = 0;
   
+  // T3 Transition logic
+  specialActivityLevel: number = 0; // 0 to 1 for visual transitions (aura/shield)
+
   // T3 Uninterrupted tracking
   lastTargetUid: string | null = null;
   uninterruptedFrames: number = 0;
@@ -52,6 +59,9 @@ export class AttachedTurret {
 
   // T3 Spin tracking
   spinFrames: number = 0; // Continuous elapsed time for phase calculation
+
+  // T3 First Strike tracking
+  firstStrikeCount: number = 0;
 
   // Staggered target scan
   targetScanTimer: number;
@@ -83,9 +93,16 @@ export class AttachedTurret {
       }
     }
 
+    if (this.config.actionType.includes('firstStrike')) {
+      this.firstStrikeCount = this.config.actionConfig.firstStrikeConfig.triggerCount;
+      if (this.config.actionConfig.firstStrikeConfig.FirstStrikeVfx === 'turret_first_strike') {
+        state.vfx.push(new FirstStrikeVFX(this));
+      }
+    }
+
     if (this.config.actionConfig?.hasUnarmedAsset) {
       for (const act of this.config.actionType || []) {
-        if (act === 'pulse' || act === 'shoot' || act === 'spawnBulletAtRandom' || act === 'launch') {
+        if (act === 'pulse' || act === 'shoot' || act === 'spawnBulletAtRandom' || act === 'launch' || act === 'shootMultiTarget') {
           this.actionTimers.set(act, state.frames);
         }
       }
@@ -124,6 +141,8 @@ export class AttachedTurret {
     if (this.health <= 0) return;
     this.framesAlive++;
     if (this.flashTimer > 0) this.flashTimer--;
+    if (this.hurtAnimTimer > 0) this.hurtAnimTimer--;
+    if (this.pulseAnimTimer > 0) this.pulseAnimTimer--;
     this.shieldImpactAngles = []; // Clear every frame
 
     const wPos = this.getWorldPos(); const gx = floor(wPos.x / GRID_SIZE); const gy = floor(wPos.y / GRID_SIZE);
@@ -176,6 +195,7 @@ export class AttachedTurret {
         state.loot.push(new SunLoot(wPos.x, wPos.y, 1));
         state.sunSpawnedTotal += 1;
         this.actionTimers.set('passiveSun', state.frames);
+        this.pulseAnimTimer = 15;
       }
     }
 
@@ -220,20 +240,33 @@ export class AttachedTurret {
             const sx = config.pulseCenteredAtTriggerSource && tCenter ? tCenter.x : wPos.x;
             const sy = config.pulseCenteredAtTriggerSource && tCenter ? tCenter.y : wPos.y;
             let b = new Bullet(sx, sy, sx, sy, config.pulseBulletTypeKey, 'none'); b.life = 0; state.bullets.push(b);
+            this.pulseAnimTimer = 15;
         }
         this.jumpOffset = null; this.jumpTargetPos = null;
       }
     }
 
+    // UPDATE TRANSITION LEVELS
+    const shouldBeSpecialActive = state.isStationary && !this.isWaterlogged && !this.isFrosted;
+    this.specialActivityLevel = lerp(this.specialActivityLevel, shouldBeSpecialActive ? 1 : 0, 0.1);
+
     if (isRetracted || this.isWaterlogged || this.isFrosted) return;
     
     let anyActionReady = false;
     for (const act of this.config.actionType || []) {
-      if (['shoot', 'shootMultiTarget', 'laserBeam', 'pulse', 'spawnBulletAtRandom', 'launch', 'generateElectricChain', 'shield'].includes(act)) {
+      if (['shoot', 'shootMultiTarget', 'laserBeam', 'pulse', 'spawnBulletAtRandom', 'launch', 'generateElectricChain', 'shield', 'firstStrike'].includes(act)) {
         const lastT = this.actionTimers.get(act) || -99999;
         const cfg = this.config.actionConfig;
         const step = this.actionSteps.get(act) || 0;
-        const frValue = (act === 'shoot' || act === 'shootMultiTarget' || act === 'launch') ? cfg.shootFireRate : ((act === 'laserBeam') ? cfg.beamFireRate : ((act === 'spawnBulletAtRandom') ? cfg.spawnBulletAtRandom.cooldown : (act === 'generateElectricChain' ? cfg.electricChainDamageRate : (act === 'shield' ? 1 : cfg.pulseCooldown))));
+        const subStep = this.actionSteps.get(act + '_subStep') || 0;
+        
+        // Multi-actions remain "ready" if they are already in the middle of a sequence
+        if (act === 'shootMultiTarget' && subStep > 0) {
+          anyActionReady = true;
+          break;
+        }
+
+        const frValue = (act === 'shoot' || act === 'shootMultiTarget' || act === 'launch') ? cfg.shootFireRate : ((act === 'laserBeam') ? cfg.beamFireRate : ((act === 'spawnBulletAtRandom') ? cfg.spawnBulletAtRandom.cooldown : (act === 'generateElectricChain' ? cfg.electricChainDamageRate : (act === 'shield' ? 1 : (act === 'firstStrike' ? cfg.firstStrikeConfig.triggerRate : cfg.pulseCooldown)))));
         const fr = Array.isArray(frValue) ? frValue[step % frValue.length] : frValue;
         if (state.frames - lastT > (fr / this.fireRateMultiplier)) {
           anyActionReady = true;
@@ -281,6 +314,8 @@ export class AttachedTurret {
       const lastTrigger = this.actionTimers.get(act) || -99999; 
       const config = this.config.actionConfig;
       const step = this.actionSteps.get(act) || 0;
+      const subStepKey = act + '_subStep';
+      const curSubStep = this.actionSteps.get(subStepKey) || 0;
       
       if (act === 'die') {
         const dieDur = config.dieAfterDuration;
@@ -306,12 +341,14 @@ export class AttachedTurret {
         }
       }
 
-      const frValue = (act === 'shoot' || act === 'shootMultiTarget' || act === 'launch') ? config.shootFireRate : ((act === 'laserBeam') ? config.beamFireRate : ((act === 'spawnBulletAtRandom') ? config.spawnBulletAtRandom.cooldown : (act === 'generateElectricChain' ? config.electricChainDamageRate : (act === 'shield' ? 1 : config.pulseCooldown))));
+      const frValue = (act === 'shoot' || act === 'shootMultiTarget' || act === 'launch') ? config.shootFireRate : ((act === 'laserBeam') ? config.beamFireRate : ((act === 'spawnBulletAtRandom') ? config.spawnBulletAtRandom.cooldown : (act === 'generateElectricChain' ? config.electricChainDamageRate : (act === 'shield' ? 1 : (act === 'firstStrike' ? config.firstStrikeConfig.triggerRate : config.pulseCooldown)))));
       const fr = Array.isArray(frValue) ? frValue[step % frValue.length] : frValue;
       const effectiveFireRate = fr / this.fireRateMultiplier;
-      const ready = (state.frames - lastTrigger > effectiveFireRate);
+      
+      // Ready if cooldown elapsed OR if we are in the middle of a sub-sequence
+      const ready = (state.frames - lastTrigger > effectiveFireRate) || (curSubStep > 0);
 
-      if (act === 'shield' && state.isStationary) {
+      if (act === 'shield' && this.specialActivityLevel > 0.1) {
           // Continuous repulsion logic while stationary
           const sRadius = config.shieldRadius || GRID_SIZE * 1.5;
           const sRadiusSq = sRadius * sRadius;
@@ -320,7 +357,7 @@ export class AttachedTurret {
               const dx = e.pos.x - wPos.x;
               const dy = e.pos.y - wPos.y;
               const dSq = dx*dx + dy*dy;
-              const rSum = (e.size / 2) + sRadius;
+              const rSum = (e.size / 2) + sRadius * this.specialActivityLevel; // Shield radius scales during transition
               if (dSq < rSum * rSum) {
                   const d = Math.sqrt(dSq);
                   const force = (rSum - d) * 0.15;
@@ -330,6 +367,43 @@ export class AttachedTurret {
                   this.shieldImpactAngles.push(atan2(dy, dx));
               }
           }
+      }
+
+      if (act === 'aura') {
+          const cfg = config.auraConfig;
+          const auraRadiusSq = cfg.radius * cfg.radius;
+          
+          // Gameplay effect only if visually present
+          if (this.specialActivityLevel > 0.5) {
+            for (let e of state.enemies) {
+              if (e.health <= 0 || e.isDying) continue;
+              const dx = e.pos.x - wPos.x;
+              const dy = e.pos.y - wPos.y;
+              if (dx*dx + dy*dy < auraRadiusSq) {
+                e.applyCondition(cfg.appliedCondition, cfg.duration);
+              }
+            }
+          }
+          
+          if (cfg.auraVfx === 'aura_frostfield') {
+            if (!state.vfx.some((v: any) => v instanceof FrostFieldAuraVFX && v.target === this)) {
+              state.vfx.push(new FrostFieldAuraVFX(this, cfg.radius));
+            }
+          }
+      }
+
+      if (act === 'firstStrike' && ready && this.firstStrikeCount > 0) {
+        const fsc = config.firstStrikeConfig;
+        if (fsc.actionToTrigger === 'spawnBulletAtRandom') {
+            const sbc = config.spawnBulletAtRandom;
+            const ang = random(TWO_PI); const r = random(sbc.distRange[0], sbc.distRange[1]);
+            const tx = wPos.x + cos(ang) * r; const ty = wPos.y + sin(ang) * r;
+            let b = new Bullet(wPos.x, wPos.y, tx, ty, sbc.bulletKey, 'none'); b.targetPos = createVector(tx, ty);
+            state.bullets.push(b); this.recoil = 8;
+        }
+        this.firstStrikeCount--;
+        this.actionTimers.set(act, state.frames);
+        this.pulseAnimTimer = 10;
       }
 
       if (act === 'shoot' && this.target && ready) {
@@ -358,6 +432,7 @@ export class AttachedTurret {
         state.bullets.push(new Bullet(wPos.x, wPos.y, wPos.x + cos(sa)*500, wPos.y + sin(sa)*500, config.bulletTypeKey, 'enemy'));
         state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, sa)); this.recoil = 6; 
         this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
+        this.pulseAnimTimer = 8;
         if (this.config.targetConfig?.enemyPriority === 'random') { this.target = null; this.findTarget(); }
       } 
       else if (act === 'launch' && this.target && ready) {
@@ -369,16 +444,23 @@ export class AttachedTurret {
         state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, this.angle, 32, 10, color(config.color || [255,255,255])));
         this.recoil = 10;
         this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
+        this.pulseAnimTimer = 12;
       }
       else if (act === 'shootMultiTarget' && ready) {
-        const subStepKey = act + '_subStep';
         const lastSubKey = act + '_lastSub';
         const subStep = this.actionSteps.get(subStepKey) || 0;
         const lastSub = this.actionTimers.get(lastSubKey) || 0;
+        
         if (subStep === 0) {
           const initialTargets = this.findAllTargetsWithin(config.shootRange);
-          if (initialTargets.length > 0) { this.actionSteps.set(subStepKey, 1); this.actionTimers.set(lastSubKey, state.frames); this.actionTimers.set(act, state.frames); }
+          if (initialTargets.length > 0) { 
+            this.actionSteps.set(subStepKey, 1); 
+            this.actionTimers.set(lastSubKey, state.frames); 
+            // Crucial: only reset the MAIN timer when we START the sequence
+            this.actionTimers.set(act, state.frames); 
+          }
         }
+        
         if (subStep > 0) {
           const delay = config.multiTargetShootDelay || 6;
           if (state.frames - lastSub >= delay) {
@@ -392,11 +474,16 @@ export class AttachedTurret {
                 state.bullets.push(new Bullet(wPos.x, wPos.y, tc.x, tc.y, config.bulletTypeKey, 'enemy'));
                 state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, sa));
                 this.recoil = 8; this.angle = sa;
+                this.pulseAnimTimer = 8;
               }
             }
             this.actionTimers.set(lastSubKey, state.frames);
             const nextStep = subStep + 1;
-            if (nextStep > (config.multiTargetMaxCount || 3)) this.actionSteps.set(subStepKey, 0);
+            const maxCnt = config.multiTargetMaxCount || 3;
+            if (nextStep > maxCnt) {
+               this.actionSteps.set(subStepKey, 0);
+               this.actionSteps.set(act, step + 1); // Sequence complete
+            }
             else this.actionSteps.set(subStepKey, nextStep);
           }
         }
@@ -463,6 +550,7 @@ export class AttachedTurret {
         const tx = wPos.x + cos(ang) * r; const ty = wPos.y + sin(ang) * r;
         let b = new Bullet(wPos.x, wPos.y, tx, ty, sbc.bulletKey, 'none'); b.targetPos = createVector(tx, ty);
         state.bullets.push(b); this.recoil = 8; this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
+        this.pulseAnimTimer = 10;
       } else if (act === 'pulse' && ready && this.jumpFrames === 0) {
         let triggered = false;
         const tCenter = this.getTargetCenter();
@@ -479,6 +567,7 @@ export class AttachedTurret {
             const sx = config.pulseCenteredAtTriggerSource && tCenter ? tCenter.x : wPos.x;
             const sy = config.pulseCenteredAtTriggerSource && tCenter ? tCenter.y : wPos.y;
             let b = new Bullet(sx, sy, sx, sy, config.pulseBulletTypeKey, 'none'); b.life = 0; state.bullets.push(b);
+            this.pulseAnimTimer = 15;
           }
           this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
         }
@@ -515,7 +604,7 @@ export class AttachedTurret {
                           // APPLY GLOBAL CUTOFF
                           if (e.elecFrame !== state.frames) { e.elecFrame = state.frames; e.elecDmg = 0; }
                           if (e.elecDmg < maxTotalDmg) {
-                              const apply = Math.min(dmg, maxTotalDmg - e.eledmg);
+                              const apply = Math.min(dmg, maxTotalDmg - e.elecDmg);
                               e.takeDamage(apply);
                               e.elecDmg += apply;
                               if (random() < 0.2) state.vfx.push(new SparkVFX(e.pos.x, e.pos.y, 5, [100, 200, 255]));
@@ -626,6 +715,7 @@ export class AttachedTurret {
         for (let a of this.parent.attachments) {
             if (a.health <= 0) continue;
             const twPos = a.getWorldPos();
+            // FIX: Changed 'this.pos' (undefined) to 'wPos'
             const dSq = (wPos.x - twPos.x)**2 + (wPos.y - twPos.y)**2;
             if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, twPos.x, twPos.y)) {
                 this.target = a;
@@ -667,6 +757,7 @@ export class AttachedTurret {
            const oCfg = overlayTypes[b.overlay];
            if (oCfg?.isEnemy) {
               const bx = b.pos.x + GRID_SIZE/2; const by = b.pos.y + GRID_SIZE/2;
+              // FIX: Changed 'bcy' to 'by' to resolve undefined name error
               const dSq = (wPos.x - bx)**2 + (wPos.y - by)**2;
               if (dSq <= rangeSq) candidates.push({ e: b, dSq });
            }
@@ -715,7 +806,7 @@ export class AttachedTurret {
   takeDamage(d: number) { 
     if (this.isFrosted) { this.iceCubeHealth -= d; if (this.iceCubeHealth <= 0) { this.isFrosted = false; this.frostLevel = 0; state.vfx.push(new BlockDebris(this.getWorldPos().x, this.getWorldPos().y, [180, 240, 255])); for (let a of this.parent.attachments) if (a.target === this) a.target = null; if (state.player.target === this) state.player.target = null; } return; }
     if (d < 0) { this.health = Math.min(this.maxHealth, this.health - d); this.flashTimer = 8; this.flashType = 'heal'; return; } 
-    else if (d > 0) { this.flashTimer = 8; this.flashType = 'damage'; }
+    else if (d > 0) { this.flashTimer = 8; this.flashType = 'damage'; this.hurtAnimTimer = 10; }
     this.health = Math.max(0, this.health - d); 
     if (this.health <= 0 && this.config.actionType?.includes('onDeathPulse')) { 
       let wPos = this.getWorldPos(); let b = new Bullet(wPos.x, wPos.y, wPos.x, wPos.y, this.config.actionConfig.pulseBulletTypeKey, 'none'); b.life = 0; state.bullets.push(b); 

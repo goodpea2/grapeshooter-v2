@@ -119,7 +119,10 @@ export const lootTypes: Record<string, LootType> = {
   t0_starfruit: { type: 'turretAsItem', item: 't0_starfruit', idleAssetImg: 'img_t0_starfruit_front', idleAssetImgSize: [45, 45] },
   t0_jalapeno: { type: 'turretAsItem', item: 't0_jalapeno', idleAssetImg: 'img_t0_jalapeno_front', idleAssetImgSize: [45, 45] },
   t0_puffshroom: { type: 'turretAsItem', item: 't0_puffshroom', idleAssetImg: 'img_t0_puffshroom_front', idleAssetImgSize: [35, 35] },
-  t0_grapeshot: { type: 'turretAsItem', item: 't0_grapeshot', idleAssetImg: 'img_t0_grapeshot_front', idleAssetImgSize: [45, 45] }
+  t0_grapeshot: { type: 'turretAsItem', item: 't0_grapeshot', idleAssetImg: 'img_t0_grapeshot_front', idleAssetImgSize: [45, 45] },
+
+  // Test Units
+  t_dummy: { type: 'turret', item: 't_dummy', idleAssetImg: 'img_t_wall_front', idleAssetImgSize: [50, 50] }
 };
 
 export const lootTableTypes: Record<string, LootTableEntry[]> = {

@@ -117,6 +117,89 @@ export class MagicLinkVFX {
     }
 }
 
+export class FirstStrikeVFX {
+  target: any; life: number = 90;
+  constructor(target: any) { this.target = target; }
+  update() { this.life--; }
+  isDone() { return this.life <= 0 || !this.target || this.target.health <= 0; }
+  display() {
+    const p = this.target.getWorldPos();
+    push(); translate(p.x, p.y);
+    const pulse = 1.0 + 0.2 * sin(frameCount * 0.4);
+    const alpha = map(this.life, 0, 90, 0, 180);
+    noFill();
+    stroke(255, 255, 100, alpha);
+    strokeWeight(2);
+    ellipse(0, 0, 60 * pulse);
+    stroke(255, 200, 50, alpha * 0.5);
+    ellipse(0, 0, 80 * pulse);
+    
+    // Rising sparks
+    for(let i=0; i<3; i++) {
+      const off = (frameCount * 2 + i * 30) % 60;
+      const x = sin(frameCount * 0.1 + i) * 20;
+      fill(255, 255, 150, alpha * (1 - off/60));
+      noStroke();
+      ellipse(x, -20 - off, 4);
+    }
+    pop();
+  }
+}
+
+export class FrostFieldAuraVFX {
+  target: any; radius: number;
+  flakes: {x: number, y: number, s: number, v: number, phase: number}[] = [];
+  constructor(target: any, radius: number) {
+    this.target = target;
+    this.radius = radius;
+    for(let i=0; i<20; i++) {
+      this.flakes.push({
+        x: random(-radius, radius),
+        y: random(-radius, radius),
+        s: random(2, 4),
+        v: random(0.15, 0.5),
+        phase: random(TWO_PI)
+      });
+    }
+  }
+  update() {
+    for(let f of this.flakes) {
+      f.y += f.v;
+      f.x += sin(frameCount * 0.05 + f.phase) * 0.5;
+      if (f.y > this.radius) f.y = -this.radius;
+      if (f.x > this.radius) f.x = -this.radius;
+      if (f.x < -this.radius) f.x = this.radius;
+    }
+  }
+  isDone() { return !this.target || this.target.health <= 0; }
+  display() {
+    const p = this.target.getWorldPos();
+    const activity = this.target.specialActivityLevel || 0;
+    if (activity <= 0.01) return;
+
+    push(); translate(p.x, p.y);
+    const pulse = 1.0 + 0.05 * sin(frameCount * 0.02);
+    const currentRadius = this.radius * activity;
+    const currentAlpha = 255 * activity;
+    
+    // Subtle glow floor
+    noStroke();
+    fill(150, 220, 255, 30 * activity);
+    ellipse(0, 0, currentRadius * 2 * pulse);
+    
+    // Snowflake particles
+    fill(255, 200 * activity);
+    for(let f of this.flakes) {
+      // Circle masking for the flakes
+      const dSq = f.x*f.x + f.y*f.y;
+      if (dSq < currentRadius * currentRadius) {
+        ellipse(f.x, f.y, f.s);
+      }
+    }
+    pop();
+  }
+}
+
 export class WeldingHitVFX {
     pos: any; life: number = 6; maxLife: number = 30;
     col: any;

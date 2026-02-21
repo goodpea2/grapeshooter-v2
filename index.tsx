@@ -16,6 +16,9 @@ import { handleNpcUiClick } from './uiNpcShop';
 import { updateGameSystems, spawnFromBudget, getLightLevel, customDayLightConfig } from './lvDemo';
 import { MergeVFX } from './vfx';
 import { ASSETS } from './assets';
+import { 
+  handleTouchStarted, handleTouchMoved, handleTouchEnded, drawTouchVisuals 
+} from './touchScreen';
 // Added TYPE_MAP to imports to resolve the error on line 413
 import { drawTurretSprite, TYPE_MAP } from './assetTurret';
 import { drawPendingSpawn } from './visualEnemies';
@@ -415,7 +418,12 @@ function executePlacement() {
           getWorldPos: () => state.previewSnapPos, jumpOffset: null,
           framesAlive: 0, flashTimer: 0 
         };
+        // Wraith call in authoritative translation block
+        push();
+        translate(state.previewSnapPos.x, state.previewSnapPos.y);
         drawTurretSprite(ghost);
+        pop();
+        
         const actionConfig = ghostConfig.actionConfig;
         let range = actionConfig?.shootRange || actionConfig?.beamMaxLength || actionConfig?.pulseTriggerRadius || 0;
         if (range === 0 && actionConfig?.pulseBulletTypeKey) {
@@ -443,6 +451,7 @@ function executePlacement() {
   pop(); 
 
   drawGlobalLighting();
+  drawTouchVisuals();
   drawUI(spawnFromBudget);
   for (let i = state.uiVfx.length - 1; i >= 0; i--) { state.uiVfx[i].update(); state.uiVfx[i].display(); if (state.uiVfx[i].isDone()) state.uiVfx.splice(i, 1); }
   drawWorldGenPreview();
@@ -455,6 +464,9 @@ function executePlacement() {
 };
 
 (window as any).mousePressed = () => {
+  if (state.simulateTouchScreen) {
+    handleTouchStarted([{ x: mouseX, y: mouseY }]);
+  }
   if (state.isGameOver) {
     if (handleGameOverClick()) return;
   }
@@ -481,7 +493,16 @@ function executePlacement() {
   }
 };
 
+(window as any).mouseDragged = () => {
+  if (state.simulateTouchScreen) {
+    handleTouchMoved([{ x: mouseX, y: mouseY }]);
+  }
+};
+
 (window as any).mouseReleased = () => {
+  if (state.simulateTouchScreen) {
+    handleTouchEnded();
+  }
   if (state.isGameOver) return;
 
   state.pressedTradeId = null;
@@ -500,4 +521,22 @@ function executePlacement() {
 };
 
 (window as any).windowResized = () => { (window as any).resizeCanvas(windowWidth, windowHeight); };
+
+(window as any).touchStarted = (e: any) => {
+  handleTouchStarted((window as any).touches);
+  (window as any).mousePressed();
+  return false;
+};
+
+(window as any).touchMoved = (e: any) => {
+  handleTouchMoved((window as any).touches);
+  return false;
+};
+
+(window as any).touchEnded = (e: any) => {
+  handleTouchEnded();
+  (window as any).mouseReleased();
+  return false;
+};
+
 function map(n: number, start1: number, stop1: number, start2: number, stop2: number) { return ((n - start1) / (stop1 - start1)) * (stop2 - start2) + start2; }

@@ -115,6 +115,11 @@ export const state: any = {
   pressedTradeId: null, // Tracks currently clicked shop item
   npcShopScrollY: 0,
   npcShopScrollVelocity: 0,
+  
+  // Touch Input
+  touchInputVec: { x: 0, y: 0 },
+  touchStartPos: null,
+  isTouchingUI: false,
 
   // UI Animation State
   uiSunScale: 1.0,
@@ -128,6 +133,8 @@ export const state: any = {
   // Development / Debug Toggles
   makeAllTurretsAvailable: false,
   instantRechargeTurrets: false,
+  simulateTouchScreen: true,
+  showTouchGizmo: true,
 
   // Time Warp
   timeWarpRemaining: 0,

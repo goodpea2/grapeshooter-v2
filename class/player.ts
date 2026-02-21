@@ -77,6 +77,12 @@ export class Player {
     if (keyIsDown(87)) this.moveInputVec.y -= 1; 
     if (keyIsDown(83)) this.moveInputVec.y += 1;
     
+    // Add touch input
+    if (state.touchInputVec.x !== 0 || state.touchInputVec.y !== 0) {
+      this.moveInputVec.x += state.touchInputVec.x;
+      this.moveInputVec.y += state.touchInputVec.y;
+    }
+    
     this.isMovingIntent = this.moveInputVec.mag() > 0;
 
     // 2. Perform Movement
@@ -90,7 +96,7 @@ export class Player {
 
     // 4. Update Stationary State
     let vel = dist(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
-    const isActuallyStationary = (vel < 0.2 && !this.isMovingIntent);
+    const isActuallyStationary = (vel < 0.1);
     
     if (isActuallyStationary) {
       state.stationaryTimer++;

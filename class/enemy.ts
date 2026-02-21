@@ -4,7 +4,7 @@ import { GRID_SIZE, CHUNK_SIZE, EnemyCollideRadiusCheck } from '../constants';
 import { enemyTypes } from '../balanceEnemies';
 import { conditionTypes } from '../balanceConditions';
 import { liquidTypes } from '../balanceLiquids';
-import { BugSplatVFX, GiantDeathVFX, HitSpark, LiquidTrailVFX, MuzzleFlash, ConditionVFX, drawPersistentDeathVisual } from '../vfx';
+import { BugSplatVFX, GiantDeathVFX, HitSpark, LiquidTrailVFX, MuzzleFlash, ConditionVFX, drawPersistentDeathVisual, Explosion } from '../vfx';
 import { AttachedTurret } from './attachedTurret';
 import { Bullet } from './bullet';
 import { lerpAngle } from './utils';
@@ -40,11 +40,17 @@ export class Enemy {
   kbVel: any; // Knockback velocity
   kbTimer: number = 0; // Knockback duration (interrupts movement)
 
+  // Attack Animation State
+  attackAnimTimer: number = 0;
+  attackAnimDuration: number = 0;
+  attackOffset: any;
+
   constructor(x: number, y: number, typeKey: string) {
     this.uid = Math.random().toString(36).substr(2, 9);
     this.pos = createVector(x, y); this.prevPos = this.pos.copy(); this.type = typeKey; this.config = enemyTypes[typeKey]; this.health = this.config.health; this.maxHealth = this.health; this.speed = this.config.speed; this.size = this.config.size; this.col = this.config.col; this.rot = random(TWO_PI); this.actionType = this.config.actionType; this.actionConfig = this.config.actionConfig;
     if (this.type === 'e_swarm') for(let i=0; i<10; i++) this.swarmParticles.push({ offset: p5.Vector.random2D().mult(random(12, 24)), size: random(5, 9), phase: random(TWO_PI) });
     this.kbVel = createVector(0, 0);
+    this.attackOffset = createVector(0, 0);
   }
 
   applyCondition(cKey: string, duration: number, data?: any) {
@@ -130,7 +136,30 @@ export class Enemy {
 
     if (this.conditions.has('c_stun') || this.kbTimer > 0) return;
 
-    // Use spatial hash for enemy avoidance
+    // Handle Attack Animation Sequence
+    if (this.attackAnimTimer > 0) {
+      this.attackAnimTimer--;
+      const progress = 1 - (this.attackAnimTimer / this.attackAnimDuration);
+      
+      const lungeDist = this.actionConfig.meleeAttackRange || (this.size * 0.25);
+
+      if (progress < 0.4) {
+        const backProgress = progress / 0.4;
+        this.attackOffset = p5.Vector.fromAngle(this.rot).mult(-lungeDist * 0.2 * backProgress);
+      } else {
+        const strikeProgress = (progress - 0.4) / 0.6;
+        const strikeAmt = sin(strikeProgress * Math.PI) * lungeDist;
+        this.attackOffset = p5.Vector.fromAngle(this.rot).mult(strikeAmt - (lungeDist * 0.2 * (1 - strikeProgress)));
+
+        if (this.attackAnimTimer === Math.floor(this.attackAnimDuration * 0.35)) {
+           this.performMeleeStrike();
+        }
+      }
+      return; 
+    } else {
+      this.attackOffset.set(0, 0);
+    }
+
     const cs = state.spatialHashCellSize;
     const hgx = floor(this.pos.x / cs);
     const hgy = floor(this.pos.y / cs);
@@ -146,7 +175,6 @@ export class Enemy {
             const dy = this.pos.y - other.pos.y;
             const distSq = dx*dx + dy*dy;
             
-            // Only process if within the constant tuning radius
             if (distSq > checkLimitSq) continue;
             
             const md = (this.size + other.size)*0.55;
@@ -160,14 +188,17 @@ export class Enemy {
     }
     
     let nearestT = null; let minDistTSq = 450*450;
-    if (state.isStationary) {
-      for (let t of turrets) if (t.config.collideWithEnemy !== false) { 
+    for (let t of turrets) {
+        // ENEMY TARGETING REFINEMENT: Ignore retracted, waterlogged, or frosted turrets
+        const isRetracted = !state.isStationary && !t.config.isActiveWhileMoving;
+        const isInactive = isRetracted || t.isWaterlogged || t.isFrosted;
+        if (isInactive || t.config.collideWithEnemy === false) continue;
+
         const twPos = t.getWorldPos();
         const dSq = (this.pos.x - twPos.x)**2 + (this.pos.y - twPos.y)**2;
         if (dSq < minDistTSq && state.world.checkLOS(this.pos.x, this.pos.y, twPos.x, twPos.y)) { 
-          nearestT = t; minDistTSq = dSq; 
+            nearestT = t; minDistTSq = dSq; 
         } 
-      }
     }
     
     let tp = nearestT ? nearestT.getWorldPos() : playerPos; this.target = nearestT || state.player;
@@ -178,14 +209,12 @@ export class Enemy {
     const dirHeading = atan2(dy, dx);
     this.rot = lerpAngle(this.rot, dirHeading, 0.12);
 
-    // Calculate effective target radius for stopping and attacking
     let targetRadius = (this.target.size || 32) * 0.5;
-    // If targeting a Holonut or similar unit with a shield, treat the shield as the collision/target boundary
     if (this.target instanceof AttachedTurret && this.target.config.actionType.includes('shield')) {
         targetRadius = this.target.config.actionConfig.shieldRadius || targetRadius;
     }
 
-    const inMeleeRange = d < (this.size * 0.5 + targetRadius + 10);
+    const inMeleeRange = d < (this.size * 0.5 + targetRadius + 15);
     const canShootInRange = this.actionType.includes('shoot') && d < this.actionConfig.shootRange && state.world.checkLOS(this.pos.x, this.pos.y, tp.x, tp.y);
 
     let shouldMove = true;
@@ -200,9 +229,9 @@ export class Enemy {
     }
 
     if (this.actionType.includes('meleeAttack') && inMeleeRange && this.meleeCooldown <= 0) { 
-        this.target.takeDamage(this.actionConfig.damage); 
-        this.meleeCooldown = this.actionConfig.attackFireRate; 
-        if (frameCount % 5 === 0) state.vfx.push(new HitSpark(this.pos.x, this.pos.y, [255, 50, 50])); 
+        this.attackAnimDuration = Math.max(20, this.actionConfig.attackFireRate || 30);
+        this.attackAnimTimer = this.attackAnimDuration;
+        this.meleeCooldown = this.actionConfig.attackFireRate;
     }
     if (this.meleeCooldown > 0) this.meleeCooldown--;
 
@@ -221,6 +250,40 @@ export class Enemy {
           this.performSummon();
         }
       }
+    }
+  }
+
+  performMeleeStrike() {
+    if (!this.target || this.isDying) return;
+
+    // ENEMY DAMAGE REFINEMENT: Ignore damage to inactive turrets
+    if (this.target instanceof AttachedTurret) {
+        const isRetracted = !state.isStationary && !this.target.config.isActiveWhileMoving;
+        const isInactive = isRetracted || this.target.isWaterlogged || this.target.isFrosted;
+        if (isInactive) return;
+    }
+
+    const strikePos = p5.Vector.add(this.pos, this.attackOffset);
+    const tc = this.target.getWorldPos ? this.target.getWorldPos() : (this.target.pos || null);
+    if (!tc) return;
+
+    let targetRadius = (this.target.size || 32) * 0.5;
+    if (this.target instanceof AttachedTurret && this.target.config.actionType.includes('shield')) {
+        targetRadius = this.target.config.actionConfig.shieldRadius || targetRadius;
+    }
+
+    const distToStrike = dist(strikePos.x, strikePos.y, tc.x, tc.y);
+    const strikeRange = this.size * 0.5 + targetRadius + 20;
+
+    if (distToStrike < strikeRange) {
+        this.target.takeDamage(this.actionConfig.damage);
+        if (frameCount % 5 === 0) state.vfx.push(new HitSpark(strikePos.x, strikePos.y, [255, 50, 50]));
+        
+        if (this.type === 'e_giant') {
+            state.cameraShake = Math.max(state.cameraShake, 10);
+            state.cameraShakeFalloff = 0.9;
+            state.vfx.push(new Explosion(strikePos.x, strikePos.y, this.size * 2, color(255, 100, 0)));
+        }
     }
   }
 
@@ -256,10 +319,15 @@ export class Enemy {
     const dSqToPlayer = (x - state.player.pos.x)**2 + (y - state.player.pos.y)**2;
     const minDSqToPlayer = ((this.size + state.player.size)*0.5)**2;
     if (dSqToPlayer < minDSqToPlayer) return true; 
-    if (state.isStationary) {
-      for (let t of state.player.attachments) if (t.config.collideWithEnemy !== false) {
+
+    // ENEMY COLLISION REFINEMENT: Only collide with ACTIVE turrets
+    for (let t of state.player.attachments) {
+      if (t.config.collideWithEnemy !== false) {
+        const isRetracted = !state.isStationary && !t.config.isActiveWhileMoving;
+        const isInactive = isRetracted || t.isWaterlogged || t.isFrosted;
+        if (isInactive) continue;
+
         const twPos = t.getWorldPos();
-        // Collision should also consider the shield radius
         let targetRadius = t.size * 0.5;
         if (t.config.actionType.includes('shield')) {
             targetRadius = t.config.actionConfig.shieldRadius || targetRadius;
@@ -293,15 +361,12 @@ export class Enemy {
   }
 
   display() { 
-    // Frustum culling using reliable AABB check
     const margin = 100;
     const left = state.cameraPos.x - width/2 - margin;
     const right = state.cameraPos.x + width/2 + margin;
     const top = state.cameraPos.y - height/2 - margin;
     const bottom = state.cameraPos.y + height/2 + margin;
-    
     if (this.pos.x < left || this.pos.x > right || this.pos.y < top || this.pos.y > bottom) return;
-    
     drawEnemy(this);
   }
   takeDamage(dmg: number) { 
@@ -312,19 +377,13 @@ export class Enemy {
       this.health = 0;
       this.isDying = true;
       state.totalEnemiesDead++;
-      
-      // Track kill for Game Over stats
       state.killsByType[this.type] = (state.killsByType[this.type] || 0) + 1;
-      
-      // Spawn loot based on enemy type config
       spawnLootAt(this.pos.x, this.pos.y, this.type, this.config.lootConfigOnDeath);
-
       if (this.actionType.includes('spawnEnemy') && this.actionConfig.spawnTriggerOnHealthRatio) {
         if (this.actionConfig.spawnTriggerOnHealthRatio.includes(0)) {
            this.performSummon();
         }
       }
-
       if (this.type === 'e_giant') {
         state.vfx.push(new GiantDeathVFX(this.pos.x, this.pos.y, this.size, this.col));
         this.markedForDespawn = true; 

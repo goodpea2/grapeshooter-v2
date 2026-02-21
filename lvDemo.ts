@@ -40,19 +40,19 @@ export const worldGenConfig = {
 
 // Enemy weight matrix based on the provided table
 const SPAWN_WEIGHTS: Record<string, number[]> = {
-  "1_day":   [1,   0,   0,   0,   0,   0,   0,   0],
-  "1_night": [1,   1,   0,   0,   0,   0,   0,   0],
-  "2_day":   [1,   1,   0,   0,   0,   0,   0,   0],
-  "3_night": [1,   1,   1,   0,   0.5, 0,   0,   0],
-  "4_day":   [1,   1,   0.5, 0,   0,   0,   0,   0],
-  "5_night": [0.5, 1,   1,   0.5, 1,   0.5, 0,   0],
-  "6_day":   [0,   1,   0.5, 0,   0,   0,   0,   0],
-  "7_night": [0,   0,   0,   0,   1,   1,   1,   0],
-  "8_day":   [1,   1,   1,   0,   0,   0,   0,   0],
-  "9_night": [0,   0,   0.5, 0.5, 0,   1,   1,   0],
+  "1_day":   [0.5, 1,   0,   0,   0,   0,   0,   0,   0],
+  "1_night": [0,   1,   1,   0,   0,   0,   0,   0,   0],
+  "2_day":   [0.5, 1,   1,   0,   0,   0,   0,   0,   0],
+  "3_night": [1,   1,   1,   1,   0,   0.5, 0,   0,   0],
+  "4_day":   [1,   1,   1,   0.5, 0,   0,   0,   0,   0],
+  "5_night": [1,   0.5, 1,   1,   0.5, 1,   0.5, 0,   0],
+  "6_day":   [0,   0,   1,   0.5, 0,   0,   0,   0,   0],
+  "7_night": [0,   0,   0,   0,   0,   1,   1,   1,   0],
+  "8_day":   [1,   1,   1,   1,   0,   0,   0,   0,   0],
+  "9_night": [0,   0,   0,   0.5, 0.5, 0,   1,   1,   0],
 };
 
-const ENEMY_KEYS = ['e_basic', 'e_armor1', 'e_armor2', 'e_armor3', 'e_shooting', 'e_swarm', 'e_giant', 'e_critter'];
+const ENEMY_KEYS = ['e_fast', 'e_basic', 'e_armor1', 'e_armor2', 'e_armor3', 'e_shooting', 'e_swarm', 'e_giant', 'e_critter'];
 
 function getWeightsForCurrentTime() {
   const t = getTime();

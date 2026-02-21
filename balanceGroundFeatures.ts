@@ -57,6 +57,17 @@ export const groundFeatureTypes: any = {
     appliedCondition: 'c_stun',
     conditionDuration: 120
   },
+  gf_stun_gas_t3: {
+    name: 'Stun Gas T3',
+    life: HOUR_FRAMES * 3,
+    radius: 34,
+    damage: 0,
+    tickRate: 10,
+    vfxType: 'stun_gas',
+    color: [200, 200, 255],
+    appliedCondition: 'c_stun',
+    conditionDuration: 180
+  },
   gf_forcefield: {
     name: 'Forcefield',
     life: 180,

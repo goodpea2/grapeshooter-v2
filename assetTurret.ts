@@ -79,13 +79,16 @@ export const TYPE_MAP: Record<string, string> = {
   't0_firecherry': 't0_firecherry',
   't0_starfruit': 't0_starfruit',
   't0_iceshroom': 't0_iceshroom',
-  't0_cherrybomb': 't0_cherrybomb'
+  't0_cherrybomb': 't0_cherrybomb',
+  // Test
+  't_dummy': 't_wall'
 };
 
 // Units that do not have a back-facing asset
 const NO_BACK_UNITS = new Set([
   't_wall', 't2_tall', 't2_pulse', 't2_spike', 't_sunflower', 't_seed', 't_seed2', 't_lilypad',
   't0_jalapeno', 't0_firecherry', 't0_starfruit', 't0_iceshroom', 't0_cherrybomb',
+  't_dummy',
   // T3 additions that have no back asset provided
   't3_repulser', 't3_skymortar', 't3_miningbomb', 't3_tesla', 't3_densnut', 't3_durian',
   't3_spike2', 't3_holonut', 't3_minefield', 't3_frostfield', 't3_triberg'
@@ -96,12 +99,11 @@ export function hasTurretSprite(type: string): boolean {
 }
 
 export function drawTurretSprite(t: any) {
-  const wPos = t.getWorldPos();
   const baseKey = TYPE_MAP[t.type];
   if (!baseKey) return;
 
   push();
-  // Apply jump offset if it exists
+  // Apply jump offset if it exists (internal to unit coordinate)
   const jx = t.jumpOffset ? t.jumpOffset.x : 0;
   const jy = t.jumpOffset ? t.jumpOffset.y : 0;
   
@@ -114,13 +116,13 @@ export function drawTurretSprite(t: any) {
   if (t.config.explosiveGrowth) {
     const duration = t.config.actionConfig.dieAfterDuration || 180;
     const tVal = Math.min(1.0, t.framesAlive / duration);
-    // Cubic scaling for intensity: starts very slow, gets violent at end
     const intensity = pow(tVal, 3.5) * 6;
     shakeX = random(-intensity, intensity);
     shakeY = random(-intensity, intensity);
   }
 
-  translate(wPos.x + jx + shakeX, wPos.y + jy + ly + shakeY);
+  // Authoritative translation to local relative origin
+  translate(jx + shakeX, jy + ly + shakeY);
 
   let isLeft = false;
   let isBack = false;
@@ -135,18 +137,23 @@ export function drawTurretSprite(t: any) {
   const actionConfig = config.actionConfig;
 
   if (actionConfig.hasUnarmedAsset) {
-    // Check pulse cooldown (primary for landmines/traps)
-    if (config.actionType.includes('pulse')) {
-        const pulseTimer = t.actionTimers.get('pulse') || -999999;
-        const cooldown = (actionConfig.pulseCooldown || 0) / (t.fireRateMultiplier || 1.0);
-        if ((state.frames - pulseTimer) < cooldown) onCooldown = true;
-    }
-    // Check shoot fire rate if not already on cooldown (only for turrets that don't have a pulse action)
-    if (!onCooldown && config.actionType.includes('shoot') && !config.actionType.includes('pulse')) {
-        const shootTimer = t.actionTimers.get('shoot') || -999999;
-        const fr = Array.isArray(actionConfig.shootFireRate) ? actionConfig.shootFireRate[0] : actionConfig.shootFireRate;
-        const cooldown = (fr || 0) / (t.fireRateMultiplier || 1.0);
-        if ((state.frames - shootTimer) < cooldown) onCooldown = true;
+    const primaryActions = ['pulse', 'shoot', 'shootMultiTarget', 'launch', 'spawnBulletAtRandom'];
+    for(const act of primaryActions) {
+      if (config.actionType.includes(act)) {
+        const timer = t.actionTimers.get(act) || -999999;
+        let cooldown = 0;
+        if (act === 'spawnBulletAtRandom') cooldown = actionConfig.spawnBulletAtRandom.cooldown;
+        else if (act === 'pulse') cooldown = actionConfig.pulseCooldown;
+        else {
+          const fr = Array.isArray(actionConfig.shootFireRate) ? actionConfig.shootFireRate[0] : actionConfig.shootFireRate;
+          cooldown = fr || 0;
+        }
+        
+        if ((state.frames - timer) < (cooldown / (t.fireRateMultiplier || 1.0))) {
+          onCooldown = true;
+          break;
+        }
+      }
     }
   }
 
@@ -157,15 +164,12 @@ export function drawTurretSprite(t: any) {
     spriteKey = `img_${baseKey}_back`;
   }
 
-  // Fallback chain: specific state -> front -> base key without suffix
   let sprite = state.assets[spriteKey] || state.assets[`img_${baseKey}_front`] || state.assets[`img_${baseKey}`];
 
   if (sprite) {
     const ctx = (window as any).drawingContext;
     push();
     
-    // NATIVE ALPHA OPTIMIZATION
-    // Only use tint() for actual color flashes, use native alpha for transparency
     let useTint = false;
 
     // Explosive growth visual (scaling)
@@ -209,17 +213,9 @@ export function drawTurretSprite(t: any) {
     translate(rx, ry);
 
     imageMode(CENTER);
-    
-    // Performance: Use native globalAlpha instead of p5 tint() for simple transparency
-    if (!useTint && t.alpha < 254) {
-        ctx.globalAlpha = t.alpha / 255;
-    }
-    
+    if (!useTint && t.alpha < 254) { ctx.globalAlpha = t.alpha / 255; }
     image(sprite, 0, 0, 50, 50);
-    
-    if (useTint) noTint();
-    else ctx.globalAlpha = 1.0;
-    
+    if (useTint) noTint(); else ctx.globalAlpha = 1.0;
     pop();
   }
 

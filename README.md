@@ -48,3 +48,7 @@ Base expansion is built on a **Hex-Axial Coordinate System** (q, r).
 - **Standardized Feedback**: All combat impacts now trigger visual hit sparks (`v_hit_spark`) on both enemies and obstacles, ensuring consistent satisfying feedback during high-intensity gameplay.
 - **Tesla Chaining**: The `t3_tesla` turret features a `generateElectricChain` action that dynamically links all active Teslas within a 10-tile radius. This link deals linear area damage to all entities intersecting the segment.
 - **Beam Bullets**: High-tier lasers can now trigger additional effects at their point of impact via the `beamBulletTypeKey` property. This allows for mechanics like the Melting Laser's secondary explosions or the Ice Puncher's focalized chilling bursts.
+- **Special Actions (T3 Exclusive)**: 
+    - **First Strike**: The `t3_minefield` performs a rapid-fire sequence of 8 mine launches immediately upon placement, accompanied by a power-up visual effect.
+    - **Aura**: The `t3_frostfield` emits a continuous chilling field that slows all enemies within a 2.8 tile radius, providing constant crowd control regardless of arming state.
+    - **Gas Barrage**: The `t3_triberg` has been upgraded from a trap to a multi-target ranged lobber, capable of dropping 3 high-duration stun gas puddles on different enemies simultaneously.
