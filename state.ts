@@ -90,13 +90,13 @@ export const state: any = {
   debugScrollVelocity: 0,
   debugSectionsCollapsed: {
     core: false,
-    chunks: false,
+    chunks: true,
     prefabs: true,
     turrets: true,
     groundFeatures: true,
     obstacles: true,
     overlays: true,
-    entities: false
+    entities: true
   },
   showWorldGenPreview: false,
   worldPreviewBuffer: null, // Buffer to store the noise map to prevent lag
@@ -134,7 +134,7 @@ export const state: any = {
   makeAllTurretsAvailable: false,
   instantRechargeTurrets: false,
   simulateTouchScreen: true,
-  showTouchGizmo: true,
+  showTouchGizmo: false,
 
   // Time Warp
   timeWarpRemaining: 0,
