@@ -477,8 +477,12 @@ function executePlacement() {
     return;
   }
   if (mouseX > state.uiWidth && state.isStationary) {
-    if (state.draggedTurretInstance || state.selectedTurretType) { if (state.previewSnapPos) { executePlacement(); return; } }
     const mWorld = createVector(mouseX - width/2 + state.cameraPos.x, mouseY - height/2 + state.cameraPos.y);
+    if (dist(mWorld.x, mWorld.y, state.player.pos.x, state.player.pos.y) < state.player.size / 2) {
+      state.player.isClickHolding = true;
+      return;
+    }
+    if (state.draggedTurretInstance || state.selectedTurretType) { if (state.previewSnapPos) { executePlacement(); return; } }
     const sortedForPicking = [...state.player.attachments].sort((a, b) => {
         const la = a.config.turretLayer || 'normal'; const lb = b.config.turretLayer || 'normal';
         if (la !== lb) return la === 'normal' ? -1 : 1;
@@ -507,6 +511,7 @@ function executePlacement() {
   if (state.isGameOver) return;
 
   state.pressedTradeId = null;
+  state.player.isClickHolding = false;
   if (state.draggedTurretType) {
     if (state.isCurrentlyDragging) { executePlacement(); } 
     else { if (state.selectedTurretType === state.draggedTurretType) { state.selectedTurretType = null; } else { state.selectedTurretType = state.draggedTurretType; } }

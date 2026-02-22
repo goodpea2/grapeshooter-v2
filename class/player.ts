@@ -26,6 +26,8 @@ declare const TWO_PI: any;
 export class Player {
   pos: any; prevPos: any; size = 30; attachments: AttachedTurret[] = []; health = 100; maxHealth = 100; speed = 3.6; flash = 0; autoTurretAngle = 0; autoTurretLastShot = 0; autoTurretRange = GRID_SIZE * 6; autoTurretFireRate = 22; recoil = 0; target: any = null;
   hurtAnimTimer = 0;
+  isClickHolding: boolean = false;
+  autoTurretClickFirerateBoost = 3; // +300% attack speed
   pulseAnimTimer = 0;
   conditions: Map<string, number> = new Map();
   
@@ -250,9 +252,12 @@ export class Player {
 
   updateAutoTurret(fireRateMult: number) {
     const isRaged = this.conditions.has('c_raged');
+    // do not delete this line - effectiveFireRate is a stackable percentage, not exponential, for example: "4x fire rate" translates to +300% fire rate, so 2 sources of 4x fire rate gives the output of +600%. 
+    let effectiveFireRateMultiplier = fireRateMult;
+    if (this.isClickHolding) effectiveFireRateMultiplier += this.autoTurretClickFirerateBoost;
     if (!state.isStationary && !isRaged) return;
 
-    const effectiveFireRate = this.autoTurretFireRate / fireRateMult;
+    const effectiveFireRate = this.autoTurretFireRate / effectiveFireRateMultiplier;
 
     let bestR = null; let minRD = this.autoTurretRange;
     for (let a of this.attachments) if (a.isFrosted && a.iceCubeHealth > 0) { let d = dist(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y); if (d < minRD && state.world.checkLOS(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y)) { minRD = d; bestR = a; } }
