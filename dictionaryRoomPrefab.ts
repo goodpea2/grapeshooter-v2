@@ -23,6 +23,7 @@ export interface RoomPrefab {
       count: [number, number];
     }[];
     guaranteedNpc?: string; // e.g. "NPC_tutorial", "lv1 npc", "lv2 npc", "lv3 npc"
+    prioritizeUniqueNpc?: boolean;
     guaranteedOverlay?: string; // e.g. "ov_treasurechest_100"
   };
 }
@@ -42,9 +43,9 @@ export const ROOM_PREFABS: RoomPrefab[] = [
 
   // --- NPC Rooms ---
   { id: 'tut0', name: 'Tutor Base', roomValue: 0, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [5, 5], tnt: [0, 0], crate: [0, 0], guaranteedObstacleConfig: [], guaranteedNpc: 'NPC_tutorial' } },
-  { id: 'npc1', name: 'Outpost 1', roomValue: 0, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedNpc: 'lv1 npc' } },
-  { id: 'npc2', name: 'Outpost 2', roomValue: 0, roomLevel: 2, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedNpc: 'lv2 npc' } },
-  { id: 'npc3', name: 'Outpost 3', roomValue: 0, roomLevel: 3, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedNpc: 'lv3 npc' } },
+  { id: 'npc1', name: 'Outpost 1', roomValue: 0, roomLevel: 1, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedNpc: 'lv1 npc', prioritizeUniqueNpc: true } },
+  { id: 'npc2', name: 'Outpost 2', roomValue: 0, roomLevel: 2, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedNpc: 'lv2 npc', prioritizeUniqueNpc: true } },
+  { id: 'npc3', name: 'Outpost 3', roomValue: 0, roomLevel: 3, enemyBudget: 0, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 0], crate: [0, 5], guaranteedObstacleConfig: [], guaranteedNpc: 'lv3 npc', prioritizeUniqueNpc: true } },
 
   // --- Existing Prefabs ---
   { id: 'mon1', name: 'Monster Room 1', roomValue: -20, roomLevel: 1, enemyBudget: 60, worldGenConfig: { ...AIR_DEFAULT, enemySpawnerCount: [0, 0], enemySpawnerConfig: { danger: 0, enemySpawnConfig: { budget: [0, 0] } }, sun: [0, 5], tnt: [0, 1], crate: [0, 0], guaranteedObstacleConfig: [] } },

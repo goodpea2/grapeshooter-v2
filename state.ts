@@ -23,6 +23,7 @@ export const state: any = {
   cameraShakeFalloff: 0.95, // Default decay rate
   exploredChunks: new Set(),
   currentChunkLevel: 0,
+  spawnedNpcKeys: new Set(),
   frames: customStartingHour * HOUR_FRAMES,
   deathVisualsBuffer: null,
   

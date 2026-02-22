@@ -261,7 +261,8 @@ export const turretTypes: any = {
         spawnBulletAtRandom: { 
             cooldown: HOUR_FRAMES * 2, 
             distRange: [GRID_SIZE * 3, GRID_SIZE * 3], 
-            bulletKey: 'b_floating_mine' 
+            bulletKey: 'b_floating_mine',
+            enabledWhenActionIsReady: 'pulse'
         }
     },
     targetType: ['enemy'],
@@ -594,7 +595,8 @@ export const turretTypes: any = {
       spawnBulletAtRandom: { 
           cooldown: HOUR_FRAMES * 2, 
           distRange: [GRID_SIZE * 3, GRID_SIZE * 3], 
-          bulletKey: 'b_floating_mine_t3' 
+          bulletKey: 'b_floating_mine_t3',
+          enabledWhenActionIsReady: 'pulse'
       },
       firstStrikeConfig: { actionToTrigger: 'spawnBulletAtRandom', triggerCount: 8, triggerRate: 10, FirstStrikeVfx: 'turret_first_strike' }
     },

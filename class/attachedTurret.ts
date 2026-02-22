@@ -546,11 +546,30 @@ export class AttachedTurret {
         }
       } else if (act === 'spawnBulletAtRandom' && ready) {
         const sbc = config.spawnBulletAtRandom;
-        const ang = random(TWO_PI); const r = random(sbc.distRange[0], sbc.distRange[1]);
-        const tx = wPos.x + cos(ang) * r; const ty = wPos.y + sin(ang) * r;
-        let b = new Bullet(wPos.x, wPos.y, tx, ty, sbc.bulletKey, 'none'); b.targetPos = createVector(tx, ty);
-        state.bullets.push(b); this.recoil = 8; this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
-        this.pulseAnimTimer = 10;
+        
+        let dependencyReady = true;
+        if (sbc.enabledWhenActionIsReady) {
+            const depAct = sbc.enabledWhenActionIsReady;
+            const depLastT = this.actionTimers.get(depAct) || -99999;
+            const depStep = this.actionSteps.get(depAct) || 0;
+            const depFrValue = (depAct === 'shoot' || depAct === 'shootMultiTarget' || depAct === 'launch') ? config.shootFireRate : 
+                               ((depAct === 'laserBeam') ? config.beamFireRate : 
+                               ((depAct === 'spawnBulletAtRandom') ? config.spawnBulletAtRandom.cooldown : 
+                               (depAct === 'generateElectricChain' ? config.electricChainDamageRate : 
+                               (depAct === 'shield' ? 1 : 
+                               (depAct === 'firstStrike' ? config.firstStrikeConfig.triggerRate : 
+                               config.pulseCooldown)))));
+            const depFr = Array.isArray(depFrValue) ? depFrValue[depStep % depFrValue.length] : depFrValue;
+            dependencyReady = (state.frames - depLastT > (depFr / this.fireRateMultiplier));
+        }
+
+        if (dependencyReady) {
+          const ang = random(TWO_PI); const r = random(sbc.distRange[0], sbc.distRange[1]);
+          const tx = wPos.x + cos(ang) * r; const ty = wPos.y + sin(ang) * r;
+          let b = new Bullet(wPos.x, wPos.y, tx, ty, sbc.bulletKey, 'none'); b.targetPos = createVector(tx, ty);
+          state.bullets.push(b); this.recoil = 8; this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
+          this.pulseAnimTimer = 10;
+        }
       } else if (act === 'pulse' && ready && this.jumpFrames === 0) {
         let triggered = false;
         const tCenter = this.getTargetCenter();

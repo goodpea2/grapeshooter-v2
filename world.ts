@@ -566,9 +566,20 @@ export class Chunk {
 
     if (cfg.guaranteedNpc) {
       let npcKey = cfg.guaranteedNpc;
-      if (npcKey === 'lv1 npc') npcKey = random(['NPC_lv1_lily', 'NPC_lv1_jelly']);
-      if (npcKey === 'lv2 npc') npcKey = random(['NPC_lv2_farmer', 'NPC_lv2_sourgrape', 'NPC_lv2_shroom']);
-      if (npcKey === 'lv3 npc') npcKey = random(['NPC_lv3_knight', 'NPC_lv3_hunter']);
+      
+      const resolveNpcKey = (pool: string[]) => {
+        if (cfg.prioritizeUniqueNpc) {
+          const unspawned = pool.filter(k => !state.spawnedNpcKeys.has(k));
+          if (unspawned.length > 0) return random(unspawned);
+        }
+        return random(pool);
+      };
+
+      if (npcKey === 'lv1 npc') npcKey = resolveNpcKey(['NPC_lv1_lily', 'NPC_lv1_jelly']);
+      else if (npcKey === 'lv2 npc') npcKey = resolveNpcKey(['NPC_lv2_farmer', 'NPC_lv2_sourgrape', 'NPC_lv2_shroom']);
+      else if (npcKey === 'lv3 npc') npcKey = resolveNpcKey(['NPC_lv3_knight', 'NPC_lv3_hunter']);
+
+      state.spawnedNpcKeys.add(npcKey);
 
       const spawnGX = floor(this.cx * CHUNK_SIZE + random(4, 12));
       const spawnGY = floor(this.cy * CHUNK_SIZE + random(4, 12));

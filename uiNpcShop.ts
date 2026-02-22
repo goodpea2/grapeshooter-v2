@@ -155,7 +155,7 @@ export function drawNPCPanel() {
       translate(60, 70 - jumpOffset);
       
       // Panel Asset Animations
-      const idleHover = sin(frameCount * 0.04) * 5;
+      const idleHover = sin(frameCount * 0.04) * 3;
       const purchaseJump = npc.purchaseAnimTimer > 0 ? -abs(sin((1 - npc.purchaseAnimTimer/20) * PI)) * 15 : 0;
       
       translate(0, idleHover + purchaseJump);
