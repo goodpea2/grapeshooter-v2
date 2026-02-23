@@ -146,5 +146,9 @@ export const state: any = {
   nextDirectorIndex: 0,
   chunkToDirectorIndex: new Map(), // coordinate string -> index in roomDirectorChain
   roomDirectorScrollY: 0,
-  roomDirectorScrollVelocity: 0
+  roomDirectorScrollVelocity: 0,
+
+  // Fixed Timestep
+  lastFrameTime: 0,
+  accumulator: 0
 };

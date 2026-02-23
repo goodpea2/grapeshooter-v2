@@ -240,8 +240,7 @@ function executePlacement() {
   state.deathVisualsBuffer.pixelDensity(1);
 };
 
-(window as any).draw = () => {
-  background(10, 10, 25); 
+function tick() {
   state.frames++;
 
   if (state.isGameOver) {
@@ -255,7 +254,36 @@ function executePlacement() {
   
   state.cameraShake = (state.cameraShake || 0) * (state.cameraShakeFalloff || 0.95);
   if (state.cameraShake < 0.1) state.cameraShake = 0;
+
+  state.world.update(state.player.pos); 
+  for (let i = state.trails.length - 1; i >= 0; i--) { state.trails[i].update(); if (state.trails[i].isDone()) state.trails.splice(i, 1); }
+  for (let i = state.groundFeatures.length - 1; i >= 0; i--) { state.groundFeatures[i].update(); if (state.groundFeatures[i].life <= 0) state.groundFeatures.splice(i, 1); }
+  for (let npc of state.npcs) npc.update(state.player.pos);
+  for (let i = state.enemies.length - 1; i >= 0; i--) { state.enemies[i].update(state.player.pos, state.player.attachments); if (state.enemies[i].health <= 0 || state.enemies[i].markedForDespawn) state.enemies.splice(i, 1); }
+  state.player.update();
+  for (let i = state.bullets.length - 1; i >= 0; i--) { state.bullets[i].update(); if (state.bullets[i].life <= 0) state.bullets.splice(i, 1); }
+  for (let i = state.enemyBullets.length - 1; i >= 0; i--) { state.enemyBullets[i].update(); if (state.enemyBullets[i].life <= 0) state.enemyBullets.splice(i, 1); }
+  for (let i = state.vfx.length - 1; i >= 0; i--) { state.vfx[i].update(); if (state.vfx[i].isDone()) state.vfx.splice(i, 1); }
+}
+
+(window as any).draw = () => {
+  const now = (window as any).performance.now();
+  if (state.lastFrameTime === 0) state.lastFrameTime = now;
+  const deltaTime = now - state.lastFrameTime;
+  state.lastFrameTime = now;
   
+  state.accumulator += deltaTime;
+  const fixedStep = 1000 / 60;
+  
+  if (state.accumulator > 200) state.accumulator = 200; 
+
+  while (state.accumulator >= fixedStep) {
+    tick();
+    state.accumulator -= fixedStep;
+  }
+
+  background(10, 10, 25); 
+
   const shakeFreq = 0.1;
   const shakeX = (noise(state.frames * shakeFreq, 0) * 2 - 1) * state.cameraShake;
   const shakeY = (noise(state.frames * shakeFreq, 1000) * 2 - 1) * state.cameraShake;
@@ -265,7 +293,6 @@ function executePlacement() {
   let bgCol = [20, 20, 40]; if (state.currentChunkLevel >= 3) bgCol = [40, 20, 60]; if (state.currentChunkLevel >= 6) bgCol = [60, 10, 30];
   push(); noStroke(); fill(bgCol[0], bgCol[1], bgCol[2], 50); rect(state.cameraPos.x - width, state.cameraPos.y - height, width*2, height*2); pop();
   image(state.deathVisualsBuffer, -4000, -4000);
-  state.world.update(state.player.pos); 
   state.world.display(state.player.pos);
 
   if (state.showChunkBorders) {
@@ -292,21 +319,19 @@ function executePlacement() {
   
   for (let tex of state.tickingExplosives) drawTickingExplosive(tex);
   for (let s of state.pendingSpawns) drawPendingSpawn(s);
-  for (let i = state.trails.length - 1; i >= 0; i--) { state.trails[i].update(); state.trails[i].display(); if (state.trails[i].isDone()) state.trails.splice(i, 1); }
-  for (let i = state.groundFeatures.length - 1; i >= 0; i--) { state.groundFeatures[i].update(); state.groundFeatures[i].display(); if (state.groundFeatures[i].life <= 0) state.groundFeatures.splice(i, 1); }
-  
-  for (let npc of state.npcs) npc.update(state.player.pos);
+  for (let i = state.trails.length - 1; i >= 0; i--) { state.trails[i].display(); }
+  for (let i = state.groundFeatures.length - 1; i >= 0; i--) { state.groundFeatures[i].display(); }
   
   state.player.displayAttachments(true);
-  for (let i = state.enemies.length - 1; i >= 0; i--) { state.enemies[i].update(state.player.pos, state.player.attachments); state.enemies[i].display(); if (state.enemies[i].health <= 0 || state.enemies[i].markedForDespawn) state.enemies.splice(i, 1); }
-  state.player.update(); state.player.display();
+  for (let i = state.enemies.length - 1; i >= 0; i--) { state.enemies[i].display(); }
+  state.player.display();
 
   for (let npc of state.npcs) npc.display();
 
   for (let l of state.loot) l.display();
-  for (let i = state.bullets.length - 1; i >= 0; i--) { state.bullets[i].update(); state.bullets[i].display(); if (state.bullets[i].life <= 0) state.bullets.splice(i, 1); }
-  for (let i = state.enemyBullets.length - 1; i >= 0; i--) { state.enemyBullets[i].update(); state.enemyBullets[i].display(); if (state.enemyBullets[i].life <= 0) state.enemyBullets.splice(i, 1); }
-  for (let i = state.vfx.length - 1; i >= 0; i--) { state.vfx[i].update(); state.vfx[i].display(); if (state.vfx[i].isDone()) state.vfx.splice(i, 1); }
+  for (let i = state.bullets.length - 1; i >= 0; i--) { state.bullets[i].display(); }
+  for (let i = state.enemyBullets.length - 1; i >= 0; i--) { state.enemyBullets[i].display(); }
+  for (let i = state.vfx.length - 1; i >= 0; i--) { state.vfx[i].display(); }
 
   const mWorld = createVector(mouseX - width/2 + state.cameraPos.x, mouseY - height/2 + state.cameraPos.y);
   state.hoveredTurretInstance = null;
