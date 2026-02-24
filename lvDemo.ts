@@ -14,7 +14,7 @@ declare const sin: any;
 declare const frameCount: any;
 declare const floor: any;
 
-export const customBudgetPerNight = [100, 250, 500, 850, 1500, 2600, 4500, 6700, 8000, 10000]; // new with roomDirector
+export const customBudgetPerNight = [100, 250, 500, 1000, 2000, 4000, 7000, 12000, 18000, 25000]; // new with roomDirector
 export const customDayLightConfig = '000011222222222222110000'; // 0: Night, 1: Transition, 2: Day
 export const customStartingHour = 6;
 
@@ -146,7 +146,7 @@ export function updateGameSystems() {
   let baseBudget = customBudgetPerNight[nightIdx];
   if (t.day > customBudgetPerNight.length) {
      // Scaled growth beyond array limits
-     baseBudget = customBudgetPerNight[customBudgetPerNight.length - 1] * Math.pow(1.2, t.day - customBudgetPerNight.length);
+     baseBudget = customBudgetPerNight[customBudgetPerNight.length - 1] * Math.pow(1.25, t.day - customBudgetPerNight.length);
   }
   state.currentNightWaveBudget = baseBudget;
 
@@ -198,13 +198,13 @@ export function updateGameSystems() {
   const floorHour = floor(t.totalHours);
   if (floorHour !== state.lastHourProcessed) {
     state.lastHourProcessed = floorHour;
-    let baseNight = 10;
-    let baseDay = 5;
+    let baseNight = 20;
+    let baseDay = 10;
     let nightLvl = t.day - 1;
     let dayLvl = Math.max(0, t.day - 2);
 
     if (isNight) {
-      state.hourlyBudgetPool += baseNight + (nightLvl * 5);
+      state.hourlyBudgetPool += baseNight + (nightLvl * 20);
     } else if (t.day >= 2) {
       state.hourlyBudgetPool += baseDay + (dayLvl * 3);
     }
