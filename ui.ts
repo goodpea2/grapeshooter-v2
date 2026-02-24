@@ -398,6 +398,7 @@ function drawFooter() {
 export function drawUI(spawnFromBudget: Function) {
   drawClock(60, 60, 255);
   drawStats(255);
+  
 
   state.uiAlpha = lerp(state.uiAlpha, state.isStationary ? 255 : 40, 0.3);
   const shopAlpha = state.uiAlpha;
@@ -463,6 +464,7 @@ export function drawUI(spawnFromBudget: Function) {
   pop();
 
   drawDebugPanel(spawnFromBudget);
+  drawNPCPanel();
   drawWorldGenPreview();
   drawFooter();
 
