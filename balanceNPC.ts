@@ -146,5 +146,18 @@ export const npcTypes: Record<string, NPCType> = {
       { id: 'hunt_7', itemType: 'turret', itemKey: 't0_grapeshot', stockCount: 3, cost: { elixir: 5 }, outputBehavior: 'giveItem' },
       { id: 'hunt_8', itemType: 'turret', itemKey: 't_seed2', itemName: 'Seed (T2)', itemAssetImg: 'img_seed_stray_t2', stockCount: -1, cost: { elixir: 25 }, outputBehavior: 'dropAsLoot' },
     ]
+  },
+  NPC_lv3_shadie: {
+    name: "Dryad",
+    description: "Mastress of shady business",
+    dialogue: ["I've got tons of seeds to sell", "Don't ask me how I got them", "Yes, with a price of course", "Legal practices? what's that?", "The elixir? It's not your business."],
+    assetKey: 'npc_shadie',
+    shop: [
+      { id: 'shadie_1', itemType: 'resource', itemKey: 'sun', itemAmount: 30, stockCount: 4, cost: { soil: 60 }, outputBehavior: 'dropAsLoot' },
+      { id: 'shadie_2', itemType: 'resource', itemKey: 'sun', itemAmount: 100, stockCount: 1, cost: { elixir: 150 }, outputBehavior: 'dropAsLoot' },
+      { id: 'shadie_3', itemType: 'turret', itemKey: 't_seed', itemName: 'Seed', itemAssetImg: 'img_seed_stray_t1', itemAmount: 6, stockCount: 3, cost: { soil: 45 }, outputBehavior: 'dropAsLoot' },
+      { id: 'shadie_4', itemType: 'turret', itemKey: 't_seed2', itemName: 'Seed (T2)', itemAssetImg: 'img_seed_stray_t2', itemAmount: 6, stockCount: 3, cost: { soil: 120 }, outputBehavior: 'dropAsLoot' },
+      { id: 'shadie_5', itemType: 'turret', itemKey: 't_sunflower', stockCount: 3, cost: { elixir: 20 }, outputBehavior: 'dropAsLoot' },
+    ]
   }
 };

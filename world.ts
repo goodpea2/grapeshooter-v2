@@ -577,7 +577,7 @@ export class Chunk {
 
       if (npcKey === 'lv1 npc') npcKey = resolveNpcKey(['NPC_lv1_lily', 'NPC_lv1_jelly']);
       else if (npcKey === 'lv2 npc') npcKey = resolveNpcKey(['NPC_lv2_farmer', 'NPC_lv2_sourgrape', 'NPC_lv2_shroom']);
-      else if (npcKey === 'lv3 npc') npcKey = resolveNpcKey(['NPC_lv3_knight', 'NPC_lv3_hunter']);
+      else if (npcKey === 'lv3 npc') npcKey = resolveNpcKey(['NPC_lv3_knight', 'NPC_lv3_hunter', 'NPC_lv3_shadie']);
 
       state.spawnedNpcKeys.add(npcKey);
 

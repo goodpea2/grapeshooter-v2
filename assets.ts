@@ -29,6 +29,8 @@ export const ASSETS = {
   img_npc_knight_back: "https://i.ibb.co/y2XGN8P/npc-knight-back-right.png",
   img_npc_hunter_front: "https://i.ibb.co/8nbF6xhC/npc-hunter-front-right.png",
   img_npc_hunter_back: "https://i.ibb.co/mrQ6tqBr/npc-hunter-back-right.png",
+  img_npc_shadie_front: "https://i.ibb.co/60xMRvtS/npc-shadie-front-right.png",
+  img_npc_shadie_back: "https://i.ibb.co/DPkfj7Mz/npc-shadie-back-right.png",
 
   // Legacy NPC Template (Fallback)
   img_npc_template_front: "https://i.ibb.co/yF5JThHT/npc-template-front-right.png",
@@ -90,8 +92,8 @@ export const ASSETS = {
   img_t_bowling_front: "https://i.ibb.co/N6VpwCqr/t-bowling-front-right.png",
   img_t_bowling_back: "https://i.ibb.co/HyWxj89/t-bowling-back-right.png",
   img_t_repulser_front: "https://i.ibb.co/GvPf6tVZ/t-repulser-front-right.png",
-  img_t_snowpeanut_front: "https://i.ibb.co/rRc0P4JM/t-snowpeanut-front-right.png",
-  img_t_snowpeanut_back: "https://i.ibb.co/yFmWpxFh/t-snowpeanut-back-right.png",
+  img_t_snowpeanut_front: "https://i.ibb.co/WpvXnSQF/t-snowpeanut-front-right.png",
+  img_t_snowpeanut_back: "https://i.ibb.co/pjDzbZx9/t-snowpeanut-back-right.png",
   img_t_skymortar_front: "https://i.ibb.co/3VtsPmw/t-skymortar-front-right.png",
   img_t_laser3_front: "https://i.ibb.co/nMkVfHm1/t-laser3-front-right.png",
   img_t_laser3_back: "https://i.ibb.co/20wwWTpY/t-laser3-back-right.png",
@@ -106,7 +108,7 @@ export const ASSETS = {
   img_t_icepuncher_front: "https://i.ibb.co/zTyyFkG9/t-icepuncher-front-right.png",
   img_t_icepuncher_back: "https://i.ibb.co/99xycgvF/t-icepuncher-back-right.png",
   img_t_densenut_front: "https://i.ibb.co/fYGyVj6Z/t-densenut-front-right.png",
-  img_t_durian_front: "https://i.ibb.co/tMhLDtKw/t-durian-front-right.png",
+  img_t_durian_front: "https://i.ibb.co/1YVCx0Kk/t-durian-front-right.png",
   img_t_spike2_front: "https://i.ibb.co/C3GxhRJV/t-spike2-front-right.png",
   img_t_holonut_front: "https://i.ibb.co/RTtm4hgj/t-holonut-front-right.png",
   img_t_minefield_front: "https://i.ibb.co/3yCjHzrL/t-minefield-front-right.png",
