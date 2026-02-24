@@ -452,7 +452,7 @@ export function drawUI(spawnFromBudget: Function) {
 
   push();
   let dbgX = width - 110;
-  let dbgY = 15;
+  let dbgY = 65; // Moved down by 50px
   let dbgW = 100;
   let dbgH = 30;
   let dbgHov = mouseX > dbgX && mouseX < dbgX + dbgW && mouseY > dbgY && mouseY < dbgY + dbgH;
@@ -462,7 +462,6 @@ export function drawUI(spawnFromBudget: Function) {
   if (dbgHov && mouseIsPressed) { state.showDebug = !state.showDebug; (window as any).mouseIsPressed = false; }
   pop();
 
-  drawNPCPanel();
   drawDebugPanel(spawnFromBudget);
   drawWorldGenPreview();
   drawFooter();

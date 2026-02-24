@@ -150,5 +150,13 @@ export const state: any = {
 
   // Fixed Timestep
   lastFrameTime: 0,
-  accumulator: 0
+  accumulator: 0,
+
+  // Game Speed Control
+  gameSpeed: 1, // 0 = paused, 1 = normal, 2 = speedup
+  requestedGameSpeed: 1, // What the user wants (1x or 2x)
+  isPaused: false,
+  speedupFlashTimer: 0,
+  isPlayerMoving: false,
+  playerSpeedMultiplier: 0, // 0-1.0 multiplier based on drag distance
 };

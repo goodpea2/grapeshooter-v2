@@ -1,7 +1,9 @@
 
 import { state } from './state';
+import { GRID_SIZE, PLAYER_DRAG_MIN_DISTANCE_TILES, PLAYER_DRAG_MAX_DISTANCE_TILES } from './constants';
 
 declare const createVector: any;
+declare const atan2: any;
 declare const dist: any;
 declare const width: any;
 declare const height: any;
@@ -9,6 +11,7 @@ declare const mouseX: any;
 declare const mouseY: any;
 declare const pmouseX: any;
 declare const pmouseY: any;
+declare const map: any;
 
 export function initTouchControls() {
   // We'll use these in index.tsx
@@ -19,6 +22,7 @@ export function handleTouchStarted(touches: any[]) {
   
   const t = touches[0];
   state.touchStartPos = { x: t.x, y: t.y };
+  state.playerSpeedMultiplier = 0; // Reset speed multiplier on new touch
   
   // Check if touching UI areas or a turret to allow scrolling/dragging instead of movement
   const isLeftUI = t.x < state.uiWidth; // Turret HUD area
@@ -29,25 +33,15 @@ export function handleTouchStarted(touches: any[]) {
   state.isTouchingUI = isLeftUI || isRightUI || isTopUI || isTurret;
   
   if (!state.isTouchingUI) {
-    updateTouchMove(t);
-  }
-}
-
-function updateTouchMove(t: any) {
-  const dx = t.x - width / 2;
-  const dy = t.y - height / 2;
-  const d = Math.sqrt(dx * dx + dy * dy);
-  
-  if (d > 20) {
-    const mag = Math.min(1.0, d / 100); 
-    state.touchInputVec = { x: (dx / d) * mag, y: (dy / d) * mag };
-  } else {
+    // Initial touch, don't move yet, wait for drag
     state.touchInputVec = { x: 0, y: 0 };
   }
 }
 
+// Removed updateTouchMove as its logic is integrated directly into handleTouchMoved
+
 export function handleTouchMoved(touches: any[]) {
-  if (touches.length === 0) return;
+  if (touches.length === 0 || !state.touchStartPos) return;
   
   const t = touches[0];
   
@@ -55,13 +49,46 @@ export function handleTouchMoved(touches: any[]) {
     return;
   }
   
-  updateTouchMove(t);
+  const dragDistance = dist(state.touchStartPos.x, state.touchStartPos.y, t.x, t.y);
+  const dragDistanceTiles = dragDistance / GRID_SIZE;
+
+  if (dragDistanceTiles < PLAYER_DRAG_MIN_DISTANCE_TILES) {
+    state.touchInputVec = { x: 0, y: 0 };
+    state.playerSpeedMultiplier = 0;
+    return;
+  }
+
+  // Convert screen touch position to world coordinates
+  const touchWorldX = t.x - width / 2 + state.cameraPos.x;
+  const touchWorldY = t.y - height / 2 + state.cameraPos.y;
+
+  // Calculate direction vector from player to touch world position
+  const dx = touchWorldX - state.player.pos.x;
+  const dy = touchWorldY - state.player.pos.y;
+  const currentDist = dist(0, 0, dx, dy);
+
+  if (currentDist > 0) {
+    state.touchInputVec = { x: dx / currentDist, y: dy / currentDist };
+  } else {
+    state.touchInputVec = { x: 0, y: 0 };
+  }
+
+  // Calculate speed multiplier based on drag distance
+  state.playerSpeedMultiplier = map(
+    dragDistanceTiles,
+    PLAYER_DRAG_MIN_DISTANCE_TILES,
+    PLAYER_DRAG_MAX_DISTANCE_TILES,
+    0.0,
+    1.0
+  );
+  state.playerSpeedMultiplier = Math.min(1.0, Math.max(0.0, state.playerSpeedMultiplier));
 }
 
 export function handleTouchEnded() {
   state.touchStartPos = null;
   state.touchInputVec = { x: 0, y: 0 };
   state.isTouchingUI = false;
+  state.playerSpeedMultiplier = 0;
 }
 
 export function drawTouchVisuals() {

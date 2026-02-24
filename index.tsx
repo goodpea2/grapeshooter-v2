@@ -1,7 +1,7 @@
 
 import { state } from './state';
 import { 
-  GRID_SIZE, HEX_DIST, MAX_VFX, HOUR_FRAMES, CHUNK_SIZE
+  GRID_SIZE, HEX_DIST, MAX_VFX, HOUR_FRAMES, CHUNK_SIZE, PLAYER_DRAG_MIN_DISTANCE_TILES, PLAYER_DRAG_MAX_DISTANCE_TILES
 } from './constants';
 import { turretTypes } from './balanceTurrets';
 import { findMergeResult } from './dictionaryTurretMerging';
@@ -16,9 +16,8 @@ import { handleNpcUiClick } from './uiNpcShop';
 import { updateGameSystems, spawnFromBudget, getLightLevel, customDayLightConfig } from './lvDemo';
 import { MergeVFX } from './vfx';
 import { ASSETS } from './assets';
-import { 
-  handleTouchStarted, handleTouchMoved, handleTouchEnded, drawTouchVisuals 
-} from './touchScreen';
+import { handleTouchStarted, handleTouchMoved, handleTouchEnded, drawTouchVisuals } from './touchScreen';
+import { drawGameSpeedButtons, handleGameSpeedButtonClick } from './uiGameSpeed';
 // Added TYPE_MAP to imports to resolve the error on line 413
 import { drawTurretSprite, TYPE_MAP } from './assetTurret';
 import { drawPendingSpawn } from './visualEnemies';
@@ -241,6 +240,8 @@ function executePlacement() {
 };
 
 function tick() {
+  if (state.isPaused) return;
+
   state.frames++;
 
   if (state.isGameOver) {
@@ -275,11 +276,20 @@ function tick() {
   state.accumulator += deltaTime;
   const fixedStep = 1000 / 60;
   
+  // Determine current game speed, adjusting for player movement if in speedup mode
+  if (state.requestedGameSpeed === 2 && state.player.isMovingIntent) {
+    state.gameSpeed = 1; // Temporarily slow down if player is moving
+  } else {
+    state.gameSpeed = state.isPaused ? 0 : state.requestedGameSpeed;
+  }
+
+  const currentFixedStep = fixedStep / state.gameSpeed; // Adjust fixed step based on game speed
+
   if (state.accumulator > 200) state.accumulator = 200; 
 
-  while (state.accumulator >= fixedStep) {
+  while (state.accumulator >= currentFixedStep) {
     tick();
-    state.accumulator -= fixedStep;
+    state.accumulator -= currentFixedStep;
   }
 
   background(10, 10, 25); 
@@ -476,8 +486,16 @@ function tick() {
   }
   pop(); 
 
+  // Apply speedup flash effect to global lighting
+  if (state.speedupFlashTimer > 0) {
+    const flashAlpha = map(state.speedupFlashTimer, 0, 30, 0, 100);
+    push(); noStroke(); fill(100, 100, 225, flashAlpha*0.2); rect(0, 0, width, height); pop();
+    state.speedupFlashTimer--;
+  }
+
   drawGlobalLighting();
   drawTouchVisuals();
+  drawGameSpeedButtons();
   drawUI(spawnFromBudget);
   for (let i = state.uiVfx.length - 1; i >= 0; i--) { state.uiVfx[i].update(); state.uiVfx[i].display(); if (state.uiVfx[i].isDone()) state.uiVfx.splice(i, 1); }
   drawWorldGenPreview();
@@ -492,10 +510,17 @@ function tick() {
 (window as any).mousePressed = () => {
   if (state.simulateTouchScreen) {
     handleTouchStarted([{ x: mouseX, y: mouseY }]);
+  } else {
+    // Store initial mouse position for drag-to-move
+    state.touchStartPos = { x: mouseX, y: mouseY };
+    state.playerSpeedMultiplier = 0; // Reset speed multiplier on new click
   }
+
   if (state.isGameOver) {
     if (handleGameOverClick()) return;
   }
+
+  if (handleGameSpeedButtonClick()) return; // Handle game speed buttons first
 
   if (state.activeNPC && handleNpcUiClick()) {
     (window as any).mouseIsPressed = false;
@@ -521,17 +546,56 @@ function tick() {
       }
     }
   }
-};
+}
 
 (window as any).mouseDragged = () => {
   if (state.simulateTouchScreen) {
     handleTouchMoved([{ x: mouseX, y: mouseY }]);
+  } else if (state.touchStartPos) {
+    // Mouse drag for player movement
+    const dragDistance = dist(state.touchStartPos.x, state.touchStartPos.y, mouseX, mouseY);
+    const dragDistanceTiles = dragDistance / GRID_SIZE;
+
+    if (dragDistanceTiles < PLAYER_DRAG_MIN_DISTANCE_TILES) {
+      state.touchInputVec = { x: 0, y: 0 };
+      state.playerSpeedMultiplier = 0;
+      return;
+    }
+
+    // Convert screen mouse position to world coordinates
+    const mouseWorldX = mouseX - width / 2 + state.cameraPos.x;
+    const mouseWorldY = mouseY - height / 2 + state.cameraPos.y;
+
+    // Calculate direction vector from player to mouse world position
+    const dx = mouseWorldX - state.player.pos.x;
+    const dy = mouseWorldY - state.player.pos.y;
+    const currentDist = dist(0, 0, dx, dy);
+
+    if (currentDist > 0) {
+      state.touchInputVec = { x: dx / currentDist, y: dy / currentDist };
+    } else {
+      state.touchInputVec = { x: 0, y: 0 };
+    }
+
+    // Calculate speed multiplier based on drag distance
+    state.playerSpeedMultiplier = map(
+      dragDistanceTiles,
+      PLAYER_DRAG_MIN_DISTANCE_TILES,
+      PLAYER_DRAG_MAX_DISTANCE_TILES,
+      0.0,
+      1.0
+    );
+    state.playerSpeedMultiplier = Math.min(1.0, Math.max(0.0, state.playerSpeedMultiplier));
   }
 };
 
 (window as any).mouseReleased = () => {
   if (state.simulateTouchScreen) {
     handleTouchEnded();
+  } else {
+    state.touchStartPos = null;
+    state.touchInputVec = { x: 0, y: 0 };
+    state.playerSpeedMultiplier = 0;
   }
   if (state.isGameOver) return;
 

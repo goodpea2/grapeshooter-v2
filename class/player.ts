@@ -1,6 +1,6 @@
 
 import { state } from '../state';
-import { GRID_SIZE, CHUNK_SIZE, VISIBILITY_RADIUS, HEX_DIST } from '../constants';
+import { GRID_SIZE, CHUNK_SIZE, VISIBILITY_RADIUS, HEX_DIST, PLAYER_DRAG_MIN_DISTANCE_TILES, PLAYER_DRAG_MAX_DISTANCE_TILES } from '../constants';
 import { liquidTypes } from '../balanceLiquids';
 import { conditionTypes } from '../balanceConditions';
 import { overlayTypes } from '../balanceObstacles';
@@ -93,8 +93,10 @@ export class Player {
 
     // 2. Perform Movement
     if (this.isMovingIntent) { 
-      const move = this.moveInputVec.copy().normalize().mult(this.speed * lMult); 
+      const move = this.moveInputVec.copy().normalize().mult(this.speed * lMult * state.playerSpeedMultiplier); 
       this.moveWithSliding(move); 
+    } else {
+      state.playerSpeedMultiplier = 0; // Reset multiplier if no movement intent
     }
 
     // 3. Resolve Obstacle Collisions (Snap to surface to prevent jitter)
