@@ -74,6 +74,14 @@ export const TURRET_DISPLAY_STATS: Record<string, TurretDisplayStat[]> = {
         { label: 'Health', value: '50' }, { label: 'Damage', value: '150' }, { label: 'AOE dmg', value: '10-100' },
         { label: 'AOE radius', value: '1.5 tiles' }, { label: 'Target', value: 'Hi-HP Mobs' }, { label: 'Ammo', value: '16' }
     ],
+    't_lilypad': [
+        { label: 'Health', value: '100' }, { label: ' ', value: ' ' }, { label: ' ', value: ' ' },
+        { label: ' ', value: ' ' }, { label: ' ', value: ' ' }, { label: ' ', value: ' ' }
+    ],
+    't_sunflower': [
+        { label: 'Health', value: '50' }, { label: 'Sun rate', value: '1 per 1h' }, { label: ' ', value: ' ' },
+        { label: ' ', value: ' ' }, { label: ' ', value: ' ' }, { label: ' ', value: ' ' }
+    ],
 
     // TIER 1
     't_pea': [

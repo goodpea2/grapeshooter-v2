@@ -73,8 +73,8 @@ export const bulletTypes: any = {
     damageTargets: ['enemy', 'icecube', 'obstacle']
   },
   b_mortar_shell_t3: {
-    bulletDamage: 40, bulletSpeed: 4, bulletColor: [255, 80, 0], bulletLifeTime: 120, bulletSize: 16, bulletLength: 16,
-    aoeConfig: { isAoe: true, aoeRadiusGradient: [GRID_SIZE*1,GRID_SIZE*2], aoeDamageGradient: [20,10], dealAoeOnObstacle: true, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 1.0 },
+    bulletDamage: 10, bulletSpeed: 4, bulletColor: [255, 80, 0], bulletLifeTime: 120, bulletSize: 16, bulletLength: 16,
+    aoeConfig: { isAoe: true, aoeRadiusGradient: [GRID_SIZE*1,GRID_SIZE*2], aoeDamageGradient: [40,10], dealAoeOnObstacle: true, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 1.0 },
     cameraShakeOnDeath: [5, 8, 0.85],
     damageTargets: ['enemy', 'icecube', 'obstacle']
   },
