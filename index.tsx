@@ -72,6 +72,7 @@ declare const loadImage: any;
 declare const imageMode: any;
 declare const floor: any;
 declare const noise: any;
+declare const keyCode: any;
 
 function getHexAxial(x: number, y: number) {
   let q = (2/3 * x) / HEX_DIST; let r = (-1/3 * x + sqrt(3)/3 * y) / HEX_DIST;
@@ -632,6 +633,22 @@ function tick() {
   handleTouchEnded();
   (window as any).mouseReleased();
   return false;
+};
+
+(window as any).keyPressed = () => {
+  if (keyCode === 87 || keyCode === 65 || keyCode === 83 || keyCode === 68) { // W, A, S, D
+    state.isWASDInput = true;
+  }
+};
+
+(window as any).keyReleased = () => {
+  if (keyCode === 87 || keyCode === 65 || keyCode === 83 || keyCode === 68) { // W, A, S, D
+    // Check if any WASD key is still pressed
+    const keyIsDown: any = (window as any).keyIsDown;
+    if (!keyIsDown(87) && !keyIsDown(65) && !keyIsDown(83) && !keyIsDown(68)) { // W, A, S, D
+      state.isWASDInput = false;
+    }
+  }
 };
 
 function map(n: number, start1: number, stop1: number, start2: number, stop2: number) { return ((n - start1) / (stop1 - start1)) * (stop2 - start2) + start2; }

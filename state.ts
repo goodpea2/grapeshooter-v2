@@ -159,4 +159,5 @@ export const state: any = {
   speedupFlashTimer: 0,
   isPlayerMoving: false,
   playerSpeedMultiplier: 0, // 0-1.0 multiplier based on drag distance
+  isWASDInput: false, // True if WASD keys are currently pressed
 };

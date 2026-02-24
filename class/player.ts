@@ -93,7 +93,8 @@ export class Player {
 
     // 2. Perform Movement
     if (this.isMovingIntent) { 
-      const move = this.moveInputVec.copy().normalize().mult(this.speed * lMult * state.playerSpeedMultiplier); 
+      let effectiveSpeedMultiplier = state.isWASDInput ? 1.0 : state.playerSpeedMultiplier;
+      const move = this.moveInputVec.copy().normalize().mult(this.speed * lMult * effectiveSpeedMultiplier); 
       this.moveWithSliding(move); 
     } else {
       state.playerSpeedMultiplier = 0; // Reset multiplier if no movement intent
