@@ -125,7 +125,6 @@ export function drawTurret(t: any) {
   push();
   translate(wPos.x + animX, wPos.y + animY);
   rotate(animRot);
-  scale(animScaleX, animScaleY);
   
   if (state.debugGizmosTurrets && state.isStationary) {
     push();
@@ -200,7 +199,7 @@ export function drawTurret(t: any) {
   }
 
   if (config.actionType.includes('shield') && t.specialActivityLevel > 0.01) {
-    push();
+    // Shield VFX is intentionally not scaled by animScaleX/Y
     const activity = t.specialActivityLevel;
     const rad = (actionConfig.shieldRadius || 50) * activity;
     const pulse = 1.0 + 0.03 * sin(state.frames * 0.05);
@@ -228,8 +227,10 @@ export function drawTurret(t: any) {
             arc(0, 0, rad * 2 * pulse, rad * 2 * pulse, angle - flareWidth/3, angle + flareWidth/3);
         }
     }
-    pop();
   }
+
+  // Apply scaling after shield to prevent pulse from affecting shield VFX
+  scale(animScaleX, animScaleY);
 
   if (hasTurretSprite(t.type)) {
     drawTurretSprite(t);
