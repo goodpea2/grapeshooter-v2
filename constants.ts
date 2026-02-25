@@ -4,11 +4,11 @@ export const HEX_DIST = 22;
 export const CHUNK_SIZE = 16;
 export const VISIBILITY_RADIUS = 14;
 export const CHUNK_GEN_RADIUS = 1; // Radius around player to generate/update chunks
-export const VERSION = "Grapeshooter - build 25/2 11:14am"; // absolute time from gmt+7, don't remove this comment
+export const VERSION = "Grapeshooter - build 25/2 12:25am"; // absolute time from gmt+7, don't remove this comment
 export const LEVEL_THRESHOLDS = [10, 22, 35, 50, 70, 90, 120, 150, 180, 200];
 export const HOUR_FRAMES = 600;
 export const MAX_VFX = 400;
-export const LEVEL_BUDGET = [30, 60, 60, 90, 90, 150, 150, 200, 200, 200, 200];
+export const LEVEL_BUDGET = [30, 60, 60, 90, 120, 150, 200, 250, 300, 350, 400];
 
 // Optimization Tuning
 export const TurretMinScanRate = 30;
