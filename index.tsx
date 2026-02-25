@@ -14,7 +14,7 @@ import { drawGameOver, handleGameOverClick } from './uiGameOver';
 import { drawWorldGenPreview } from './uiDebug';
 import { handleNpcUiClick } from './uiNpcShop';
 import { updateGameSystems, spawnFromBudget, getLightLevel, customDayLightConfig } from './lvDemo';
-import { MergeVFX } from './vfx';
+import { MergeVFX } from './vfx/index';
 import { ASSETS } from './assets';
 import { handleTouchStarted, handleTouchMoved, handleTouchEnded, drawTouchVisuals } from './touchScreen';
 import { drawGameSpeedButtons, handleGameSpeedButtonClick } from './uiGameSpeed';
@@ -185,7 +185,7 @@ function executePlacement() {
           newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
           state.player.attachments[indexToReplace] = newTurret;
           state.totalTurretsAcquired++;
-          state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y));
+          state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y, [255, 255, 255]));
           state.turretLastUsed[activePlacementType] = state.frames;
         }
       }
@@ -213,12 +213,12 @@ function executePlacement() {
         state.player.attachments[indexToReplace] = newTurret;
         state.player.attachments.splice(indexToDelete, 1);
         state.totalTurretsAcquired++;
-        state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y));
+        state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y, [255, 255, 255]));
       }
     } else {
       state.draggedTurretInstance.hq = snapAxial.q; state.draggedTurretInstance.hr = snapAxial.r;
       state.draggedTurretInstance.offset = axialToWorld(snapAxial.q, snapAxial.r);
-      state.vfx.push(new MergeVFX(state.previewSnapPos.x, state.previewSnapPos.y));
+      state.vfx.push(new MergeVFX(state.previewSnapPos.x, state.previewSnapPos.y, [255, 255, 255]));
     }
   }
   state.draggedTurretInstance = null; state.draggedTurretType = null; state.selectedTurretType = null; state.isCurrentlyDragging = false; state.mergeTargetPreview = null; state.previewSnapPos = null;

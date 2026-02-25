@@ -9,7 +9,7 @@ import { groundFeatureTypes } from './balanceGroundFeatures';
 import { enemyTypes } from './balanceEnemies';
 import { npcTypes } from './balanceNPC';
 import { turretTypes } from './balanceTurrets';
-import { Explosion } from './vfx';
+import { Explosion } from './vfx/index';
 import { Bullet, GroundFeature, NPCEntity, LootEntity } from './entities';
 import { Block } from './world';
 import { ROOM_PREFABS } from './dictionaryRoomPrefab';

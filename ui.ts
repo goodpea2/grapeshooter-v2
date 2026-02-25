@@ -472,3 +472,16 @@ export function drawUI(spawnFromBudget: Function) {
     drawTurretTooltip(hoveredTooltipData, mouseX, mouseY);
   }
 }
+
+export function isMouseOverUI() {
+  // Turret selection/inventory (left panel)
+  if (mouseX < state.uiWidth) return true;
+
+  // NPC Panel (right side)
+  if (state.activeNPC && mouseX > width - 320) return true; // Assuming NPC panel width is 320px from right
+
+  // Debug Panel (right side)
+  if (state.showDebug && mouseX > width - 280) return true; // Assuming Debug panel width is 280px from right
+
+  return false;
+}

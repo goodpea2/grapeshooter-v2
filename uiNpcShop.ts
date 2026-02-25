@@ -2,7 +2,7 @@
 import { state } from './state';
 import { turretTypes } from './balanceTurrets';
 import { TYPE_MAP } from './assetTurret';
-import { ShopFlyVFX } from './vfx';
+import { ShopFlyVFX } from './vfx/index';
 
 declare const floor: any;
 declare const push: any;

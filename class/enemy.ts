@@ -4,7 +4,7 @@ import { GRID_SIZE, CHUNK_SIZE, EnemyCollideRadiusCheck } from '../constants';
 import { enemyTypes } from '../balanceEnemies';
 import { conditionTypes } from '../balanceConditions';
 import { liquidTypes } from '../balanceLiquids';
-import { BugSplatVFX, GiantDeathVFX, HitSpark, LiquidTrailVFX, MuzzleFlash, ConditionVFX, drawPersistentDeathVisual, Explosion } from '../vfx';
+import { BugSplatVFX, GiantDeathVFX, HitSpark, LiquidTrailVFX, MuzzleFlash, ConditionVFX, drawPersistentDeathVisual, Explosion, DamageNumberVFX } from '../vfx/index';
 import { AttachedTurret } from './attachedTurret';
 import { Bullet } from './bullet';
 import { lerpAngle } from './utils';
@@ -373,6 +373,13 @@ export class Enemy {
     if (this.isDying) return false;
     this.health -= dmg; 
     this.flash = 6; 
+
+    const lastTick = state.lastDamageTick.get(this.uid) || 0;
+    const pending = state.pendingDamage.get(this.uid) || 0;
+
+    // no more delayed damage numbers
+        state.vfx.push(new DamageNumberVFX(this.pos.x, this.pos.y - this.size * 0.5, dmg, [255, 255, 255]));
+
     if (this.health <= 0) { 
       this.health = 0;
       this.isDying = true;

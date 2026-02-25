@@ -5,7 +5,7 @@ import { turretTypes } from '../balanceTurrets';
 import { conditionTypes } from '../balanceConditions';
 import { liquidTypes } from '../balanceLiquids';
 import { overlayTypes } from '../balanceObstacles';
-import { MuzzleFlash, Explosion, SparkVFX, BlockDebris, ConditionVFX, MergeVFX, MagicLinkVFX, WeldingHitVFX, FirstStrikeVFX, FrostFieldAuraVFX } from '../vfx';
+import { MuzzleFlash, Explosion, SparkVFX, BlockDebris, ConditionVFX, MergeVFX, MagicLinkVFX, WeldingHitVFX, FirstStrikeVFX, FrostFieldAuraVFX, DamageNumberVFX } from '../vfx/index';
 import { Bullet } from './bullet';
 import { SunLoot } from './loot';
 import { drawTurret } from '../visualTurrets';
@@ -216,7 +216,7 @@ export class AttachedTurret {
           if (index !== -1) {
             const nt = new AttachedTurret(chosen, this.parent, this.hq, this.hr);
             this.parent.attachments[index] = nt;
-            state.vfx.push(new MergeVFX(wPos.x, wPos.y));
+            state.vfx.push(new MergeVFX(wPos.x, wPos.y, 255));
           }
         }
       }
@@ -441,7 +441,7 @@ export class AttachedTurret {
         let b = new Bullet(wPos.x, wPos.y, tCenter.x, tCenter.y, config.bulletTypeKey, 'enemy');
         b.targetPos = tCenter.copy();
         state.bullets.push(b);
-        state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, this.angle, 32, 10, color(config.color || [255,255,255])));
+        state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, this.angle, 32, 10, color(...(config.color || [255,255,255]))));
         this.recoil = 10;
         this.actionTimers.set(act, state.frames); this.actionSteps.set(act, step + 1);
         this.pulseAnimTimer = 12;

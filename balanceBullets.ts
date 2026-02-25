@@ -201,7 +201,7 @@ export const bulletTypes: any = {
     damageTargets: ['enemy', 'obstacle', 'icecube']
   },
   b_floating_mine: {
-    bulletDamage: 0, bulletSpeed: 3, bulletColor: [255, 60, 20], bulletLifeTime: HOUR_FRAMES * 3, bulletSize: 20, bulletLength: 4,
+    bulletDamage: 0, bulletSpeed: 3, bulletColor: [255, 60, 20], bulletLifeTime: HOUR_FRAMES * 3, bulletSize: 20, bulletLength: 20,
     aoeConfig: { 
       isAoe: true, 
       aoeRadiusGradient: [GRID_SIZE * 0.5, GRID_SIZE * 1.5], 
@@ -217,11 +217,11 @@ export const bulletTypes: any = {
     idleAssetImg: 'img_t_mine_front'
   },
   b_floating_mine_t3: {
-    bulletDamage: 0, bulletSpeed: 4, bulletColor: [255, 100, 0], bulletLifeTime: HOUR_FRAMES * 8, bulletSize: 14, bulletLength: 4,
+    bulletDamage: 0, bulletSpeed: 4, bulletColor: [255, 100, 0], bulletLifeTime: HOUR_FRAMES * 8, bulletSize: 20, bulletLength: 20,
     aoeConfig: { 
       isAoe: true, 
       aoeRadiusGradient: [GRID_SIZE * 0.5, GRID_SIZE * 1.5], 
-      aoeDamageGradient: [900,300], 
+      aoeDamageGradient: [600,100], 
       dealAoeOnObstacle: true, 
       dealAoeAfterLifetime: true, 
       aoeObstacleDamageMultiplier: 1.0 

@@ -416,7 +416,7 @@ export const turretTypes: any = {
     name: 'Flamethrower', cost: 55, health: 100, color: [255, 100, 0], size: 22, tier: 3,
     tooltip: "Shoots and spread flaming puddles along the way", animationBodyType: 'soft',
     actionType: ['shoot'],
-    actionConfig: { bulletTypeKey: 'b_flame_shot', shootRange: GRID_SIZE * 10, shootFireRate: [30,90] },
+    actionConfig: { bulletTypeKey: 'b_flame_shot', shootRange: GRID_SIZE * 5, shootFireRate: [30,90] },
     targetType: ['enemy', 'obstacle'],
     targetConfig: { enemyPriority: 'random', obstaclePriority: 'valuable' }
   },

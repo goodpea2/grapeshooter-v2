@@ -5,7 +5,7 @@ import {
 } from './constants';
 import { obstacleTypes, overlayTypes, BLOCK_WEIGHTS } from './balanceObstacles';
 import { liquidTypes, LIQUID_WEIGHTS, LIQUID_KEYS } from './balanceLiquids';
-import { MuzzleFlash, BlockDebris } from './vfx';
+import { MuzzleFlash, BlockDebris } from './vfx/index';
 import { Enemy, Bullet, NPCEntity } from './entities';
 import { spawnLootAt, ECONOMY_CONFIG } from './economy';
 import { worldGenConfig, requestSpawn, spawnFromBudget } from './lvDemo';

@@ -119,7 +119,7 @@ export class Player {
       state.trails.push(new LiquidTrailVFX(this.pos.x, this.pos.y, lData.playerTrailVfx, atan2(this.pos.y - this.prevPos.y, this.pos.x - this.prevPos.x)));
     }
 
-    for (let i = this.attachments.length - 1; i >= 0; i--) { const a = this.attachments[i]; a.update(); if (a.health <= 0) { state.vfx.push(new Explosion(a.getWorldPos().x, a.getWorldPos().y, a.size * 2, color(a.config.color))); this.attachments.splice(i, 1); } }
+    for (let i = this.attachments.length - 1; i >= 0; i--) { const a = this.attachments[i]; a.update(); if (a.health <= 0) { state.vfx.push(new Explosion(a.getWorldPos().x, a.getWorldPos().y, a.size * 2, color(...a.config.color))); this.attachments.splice(i, 1); } }
     
     for (let i = state.loot.length - 1; i >= 0; i--) {
       const loot = state.loot[i] as LootEntity;
