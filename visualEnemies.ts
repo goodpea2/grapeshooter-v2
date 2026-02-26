@@ -1,4 +1,5 @@
 
+import { GRID_SIZE } from "./constants";
 import { state } from './state';
 
 declare const push: any;
@@ -14,6 +15,7 @@ declare const strokeWeight: any;
 declare const line: any;
 declare const rectMode: any;
 declare const CENTER: any;
+declare const BOTTOM: any;
 declare const rect: any;
 declare const beginShape: any;
 declare const endShape: any;
@@ -100,12 +102,55 @@ export function drawEnemy(e: any) {
 
   if (state.debugGizmosEnemies && e.target) {
     push();
-    stroke(255, 50, 50, 100);
-    strokeWeight(1);
     let tp = e.target.getWorldPos ? e.target.getWorldPos() : (e.target.pos || (e.target.gx !== undefined ? {x: e.target.gx * 34 + 17, y: e.target.gy * 34 + 17} : null));
+    let isPathToTargetClear = false;
+    if (tp && !isNaN(tp.x) && !isNaN(tp.y)) {
+      isPathToTargetClear = state.world.checkLOS(e.pos.x, e.pos.y, tp.x, tp.y);
+    }
+    stroke(isPathToTargetClear ? 0 : 255, isPathToTargetClear ? 255 : 50, 50, 100);
+    strokeWeight(1);
     if (tp && !isNaN(tp.x) && !isNaN(tp.y)) {
       line(e.pos.x, e.pos.y, tp.x, tp.y);
     }
+
+    // Draw path
+    if (e.path && e.path.length > 1) {
+      stroke(0, 255, 255, 150); // Cyan for path
+      strokeWeight(2);
+      noFill();
+      beginShape();
+      for (const p of e.path) {
+        vertex(p.x, p.y);
+      }
+      endShape();
+    }
+
+    // Draw look-ahead position (green line)
+    const lookAheadDist = GRID_SIZE; // Consistent with enemy's detection distance
+    const lookAheadX = e.pos.x + cos(e.rot) * lookAheadDist;
+    const lookAheadY = e.pos.y + sin(e.rot) * lookAheadDist;
+
+    stroke(e.isDummyDetectedInLookAhead ? 255 : 0, e.isDummyDetectedInLookAhead ? 0 : 255, 0, 200); // Red if dummy detected, else green
+    strokeWeight(2);
+    line(e.pos.x, e.pos.y, lookAheadX, lookAheadY);
+
+    // Draw a marker at the look-ahead position
+    push();
+    translate(lookAheadX, lookAheadY);
+    rotate(e.rot);
+    // Display dummyDetectedTimer
+    if (e.dummyDetectedTimer > 0) {
+      fill(255, 255, 255);
+      noStroke();
+      textSize(10);
+      textAlign(CENTER, BOTTOM);
+      text(floor(e.dummyDetectedTimer), 0, -15);
+    }
+    fill(0, 255, 0, 200);
+    noStroke();
+    triangle(0, 0, -5, -10, 5, -10); // Arrow pointing forward
+    pop();
+
     pop();
   }
 

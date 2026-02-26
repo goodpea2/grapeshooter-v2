@@ -877,6 +877,24 @@ export class WorldManager {
     });
     return nearest;
   }
+  getBlock(gx: number, gy: number) {
+    let cx = floor(gx / CHUNK_SIZE); let cy = floor(gy / CHUNK_SIZE);
+    let chunk = this.chunks.get(`${cx},${cy}`); if(!chunk) return null;
+    return chunk.blockMap.get(`${gx},${gy}`);
+  }
+
+  isTileDangerous(x: number, y: number): boolean {
+    const gx = floor(x / GRID_SIZE);
+    const gy = floor(y / GRID_SIZE);
+    const block = this.getBlock(gx, gy);
+
+    if (block) {
+      if (block.overlay && overlayTypes[block.overlay]?.isDanger) return true;
+      if (block.liquidType && liquidTypes[block.liquidType]?.isDanger) return true;
+    }
+    return false;
+  }
+
   isBlockAt(x: number, y: number) {
     let gx = floor(x / GRID_SIZE); let gy = floor(y / GRID_SIZE); let cx = floor(gx / CHUNK_SIZE); let cy = floor(gy / CHUNK_SIZE);
     let chunk = this.chunks.get(`${cx},${cy}`); if(!chunk) return false;

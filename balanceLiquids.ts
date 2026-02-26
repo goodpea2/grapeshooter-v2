@@ -39,13 +39,13 @@ export const liquidTypes: any = {
     playerTrailVfx: 'tar_trail',
     enemyTrailVfx: 'tar_trail',
     trailVfxInterval: 60,
-    isDanger: false,
     liquidConfig: {
       playerMovementSpeedMultiplier: 0.67,
       enemyMovementSpeedMultiplier: 0.8,
       turretFireRateMultiplier: 0.5,
       blocksMovement: false,
-    }
+    },
+    isDanger: true
   },
   l_lava: {
     name: 'Lava',
