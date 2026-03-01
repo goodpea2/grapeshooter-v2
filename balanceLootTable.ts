@@ -42,6 +42,13 @@ export const lootTypes: Record<string, LootType> = {
     idleAssetImg: 'img_icon_soil',
     idleAssetImgSize: [40, 40]
   },
+  raisin: {
+    type: 'currency',
+    item: 'raisin',
+    itemValue: 1,
+    idleAssetImg: 'img_icon_raisin',
+    idleAssetImgSize: [40, 40]
+  },
   t_seed: {
     type: 'turret',
     item: 't_seed',
@@ -144,16 +151,17 @@ export const lootTableTypes: Record<string, LootTableEntry[]> = {
   ],
 
   // --- Soil Tables (Based on Block Average Drops) ---
-  lt_soil_005: [
-    { weight: 1, lootTypeKey: ['soil'], itemCount: [1, 1]},
-    { weight: 19 }
+  lt_soil_003: [
+    { weight: 3, lootTypeKey: ['soil'], itemCount: [1, 1]},
+    { weight: 97 }
   ],
 
   // --- Special ---
   lt_stray_crate: [
-    { weight: 8, lootTypeKey: ['t_seed'], itemCount: [1, 1] }
+    { weight: 8, lootTypeKey: ['t_seed2'], itemCount: [1, 1] }
   ],
   lt_wild_sunflower: [{ weight: 1, lootTypeKey: ['t_sunflower'], itemCount: [1, 1] }],
+  lt_raisin_1: [{ weight: 1, lootTypeKey: ['raisin'], itemCount: [1, 1] }],
 
   // --- New: Crates and Pots ---
   lt_crate_loot: [
@@ -224,6 +232,7 @@ export const lootConfigs: Record<string, ExternalLootConfigEntry[]> = {
   lc_sun_clump: [{ lootTableTypeKey: 'lt_sun_node', lootTableRollCount: 10 }],
   lc_stray_crate: [{ lootTableTypeKey: 'lt_stray_crate', lootTableRollCount: 1 }],
   lc_wild_sunflower: [{ lootTableTypeKey: 'lt_wild_sunflower', lootTableRollCount: 1 }],
+  lc_spawner: [{ lootTableTypeKey: 'lt_raisin_1', lootTableRollCount: 1 }],
 
   // Treasure Chests
   lc_treasurechest_100: [
@@ -267,11 +276,23 @@ export const lootConfigs: Record<string, ExternalLootConfigEntry[]> = {
   e_swarm: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 3 }],
   e_breast: [{ lootTableTypeKey: 'lt_elixir_01', lootTableRollCount: 1 }],
   e_giant: [{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 3 },{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 5 }],
+  e_shooting_giant: [{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 3 },{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 5 }],
+  e_fly: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 3 }],
+  e_fly_armor1: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 5 }],
+  e_fly_armor2: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 8 }],
+  e_snowthrower: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 7 }],
+  e_snowthrower_giant: [{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 3 },{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 5 }],
+  e_poison: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 5 }],
+  e_bomb: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 5 }],
+  e_rockpuncher: [{ lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 1 }],
+  e_suneater: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 8 }],
 
   // Blocks
-  o_dirt: [{ lootTableTypeKey: 'lt_soil_005', lootTableRollCount: 5 }],
-  o_clay: [{ lootTableTypeKey: 'lt_soil_005', lootTableRollCount: 6 }],
-  o_stone: [{ lootTableTypeKey: 'lt_soil_005', lootTableRollCount: 7 }],
-  o_slate: [{ lootTableTypeKey: 'lt_soil_005', lootTableRollCount: 8 }],
-  o_black: [{ lootTableTypeKey: 'lt_soil_005', lootTableRollCount: 10 }]
+  o_dirt: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 5 }],
+  o_clay: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 6 }],
+  o_stone: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 7 }],
+  o_slate: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 8 }],
+  o_black: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 10 }]
 };
+
+

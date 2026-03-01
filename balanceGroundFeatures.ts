@@ -68,6 +68,16 @@ export const groundFeatureTypes: any = {
     appliedCondition: 'c_stun',
     conditionDuration: 180
   },
+  gf_poison_gas: {
+    name: 'Poison Gas',
+    life: HOUR_FRAMES,
+    radius: 34,
+    damage: 5,
+    tickRate: 30,
+    vfxType: 'poison_gas',
+    color: [150, 255, 100],
+    damageTargets: ['turret', 'player']
+  },
   gf_forcefield: {
     name: 'Forcefield',
     life: 180,

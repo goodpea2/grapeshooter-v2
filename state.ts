@@ -1,6 +1,6 @@
 
 import { HOUR_FRAMES, SPATIAL_HASH_CELL_SIZE } from './constants';
-import { customStartingHour } from './lvDemo';
+import { customStartingHour, AlmanacProgression } from './lvDemo';
 
 export const state: any = {
   player: null,
@@ -17,7 +17,24 @@ export const state: any = {
   sunCurrency: 3,
   elixirCurrency: 0,
   soilCurrency: 0,
+  raisinCurrency: 0,
+  flyingRaisins: [], // { startX, startY, targetX, targetY, progress, value }
   inventory: {}, // Map of itemKey -> count
+  unlockedTurrets: [...AlmanacProgression.StartingTurret],
+  lockedTurrets: [...AlmanacProgression.LockedTurret],
+  unlockCount: 0,
+  showUnlockPopup: false,
+  lastUnlockedTurret: null,
+  unlockPopupTimer: 0,
+  isAlmanacOpen: false,
+  almanacSelectedTurret: 't_pea', // should be dynamic with previous user selection
+  almanacScrollY: 0,
+  almanacScrollVelocity: 0,
+  almanacIsDragging: false,
+  almanacInfoScrollY: 0,
+  almanacInfoScrollVelocity: 0,
+  almanacUnlockCycleTimer: 0,
+  almanacUnlockCycleIndex: 0,
   cameraPos: { x: 0, y: 0 },
   cameraShake: 0, // Current camera shake intensity
   cameraShakeFalloff: 0.95, // Default decay rate
@@ -25,7 +42,6 @@ export const state: any = {
   currentChunkLevel: 0,
   spawnedNpcKeys: new Set(),
   frames: customStartingHour * HOUR_FRAMES,
-  deathVisualsBuffer: null,
   
   // Game Over state
   isGameOver: false,

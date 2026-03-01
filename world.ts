@@ -53,6 +53,8 @@ declare const HALF_PI: any;
 declare const PI: any;
 declare const TWO_PI: any;
 declare const atan2: any;
+declare const createGraphics: any;
+declare const image: any;
 declare const width: any;
 declare const height: any;
 
@@ -392,6 +394,7 @@ export class Chunk {
   prefabId: string | null = null;
   roomEnemyBudget: number = 0;
   isRoomBudgetTriggered: boolean = false;
+  deathBuffer: any = null;
 
   constructor(cx: number, cy: number, directorIdx: number, bonusData: any = {}) { 
     this.cx = cx; this.cy = cy; 
@@ -736,6 +739,14 @@ export class Chunk {
     this.rebuildOverlayList();
   }
 
+  ensureDeathBuffer() {
+    if (!this.deathBuffer) {
+      this.deathBuffer = createGraphics(CHUNK_SIZE * GRID_SIZE, CHUNK_SIZE * GRID_SIZE);
+      this.deathBuffer.pixelDensity(1);
+    }
+    return this.deathBuffer;
+  }
+
   display(playerPos: any) {
     const margin = 200; 
     const left = state.cameraPos.x - width/2 - margin;
@@ -747,6 +758,10 @@ export class Chunk {
     const chunkY = this.cy * chunkW;
     if (chunkX + chunkW < left || chunkX > right || chunkY + chunkW < top || chunkY > bottom) return;
     
+    if (this.deathBuffer) {
+        image(this.deathBuffer, chunkX, chunkY);
+    }
+
     // SQUARED DISTANCE OPTIMIZATION
     const px = playerPos.x;
     const py = playerPos.y;
@@ -912,6 +927,25 @@ export class WorldManager {
   getLiquidAt(gx: number, gy: number) {
     let cx = floor(gx / CHUNK_SIZE); let cy = floor(gy / CHUNK_SIZE); let chunk = this.chunks.get(`${cx},${cy}`); if(!chunk) return null;
     const b = chunk.blockMap.get(`${gx},${gy}`); return b ? b.liquidType : null;
+  }
+  setBlock(gx: number, gy: number, typeKey: string) {
+    let cx = floor(gx / CHUNK_SIZE); let cy = floor(gy / CHUNK_SIZE);
+    let chunk = this.getChunk(cx, cy);
+    if (!chunk) return;
+    let b = chunk.blockMap.get(`${gx},${gy}`);
+    if (b) {
+      b.isMined = false;
+      b.type = typeKey;
+      b.config = obstacleTypes[typeKey] || obstacleTypes['o_dirt'];
+      b.health = b.config.health;
+      b.maxHealth = b.health;
+      b.overlay = null;
+    } else {
+      b = new Block(gx, gy, typeKey);
+      chunk.blocks.push(b);
+      chunk.blockMap.set(`${gx},${gy}`, b);
+    }
+    chunk.rebuildOverlayList();
   }
   display(playerPos: any) {
     const rangeSq = (width + height + 600)**2;

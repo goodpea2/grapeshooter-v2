@@ -18,6 +18,32 @@ export const customBudgetPerNight = [100, 250, 500, 1000, 2000, 4000, 7000, 1200
 export const customDayLightConfig = '000011222222222222110000'; // 0: Night, 1: Transition, 2: Day
 export const customStartingHour = 6;
 
+export const AlmanacProgression = {
+  StartingTurret: [
+    't_pea', 't_laser', 't_wall', 't_mine', 't_ice', // Tier 1
+    't_sunflower', 't_lilypad', 't_seed', 't_seed2', // Special
+    't0_cherrybomb','t0_firecherry', 't0_jalapeno', 't0_iceshroom', 't0_starfruit', 't0_grapeshot', 't0_puffshroom', // consumable
+    't2_repeater', 't2_laser2', 't2_tall', 't2_minespawner', 't2_stun' // Specific Tier 2
+  ],
+  LockedTurret: [
+    't2_firepea', 't2_peanut', 't2_mortar', 't2_snowpea', 't2_puncher', 't2_laserexplode', 't2_iceray', 't2_pulse', 't2_spike', 't2_icebomb',
+    't3_triplepea', 't3_firepea2', 't3_spinnut', 't3_mortar2', 't3_snowpea2', 't3_inferno', 't3_flamethrower', 't3_bowling', 't3_repulser', 't3_snowpeanut', 't3_skymortar', 't3_laser3', 't3_puncher2', 't3_aoelaser', 't3_iceray2', 't3_miningbomb', 't3_tesla', 't3_icepuncher', 't3_densnut', 't3_durian', 't3_spike2', 't3_holonut', 't3_minefield', 't3_frostfield', 't3_triberg'
+  ],
+  UnlockCost: [
+    { raisin: 5 },
+    { soil: 30 },
+    { elixir: 30 },
+    { elixir: 50 },
+    { elixir: 100 },
+    { elixir: 150 },
+    { elixir: 200 },
+    { elixir: 250 },
+    { elixir: 300 },
+    { elixir: 400 },
+    { elixir: 500 }
+  ]
+};
+
 export function getLightLevel(hour: number): number {
   const h = floor(hour) % 24;
   return parseInt(customDayLightConfig[h]);
@@ -39,27 +65,50 @@ export const worldGenConfig = {
 };
 
 // Enemy weight matrix based on the provided table
-const SPAWN_WEIGHTS: Record<string, number[]> = {
-  "1_day":   [0.5, 1,   0,   0,   0,   0,   0,   0,   0],
-  "1_night": [0,   1,   1,   0,   0,   0,   0,   0,   0],
-  "2_day":   [0.5, 1,   1,   0,   0,   0,   0,   0,   0],
-  "3_night": [1,   1,   1,   1,   0,   0.5, 0,   0,   0],
-  "4_day":   [1,   1,   1,   0.5, 0,   0,   0,   0,   0],
-  "5_night": [1,   0.5, 1,   1,   0.5, 1,   0.5, 0,   0],
-  "6_day":   [0,   0,   1,   0.5, 0,   0,   0,   0,   0],
-  "7_night": [0,   0,   0,   0,   0,   1,   1,   1,   0],
-  "8_day":   [1,   1,   1,   1,   0,   0,   0,   0,   0],
-  "9_night": [0,   0,   0,   0.5, 0.5, 0,   1,   1,   0],
+const DAYTIME_WEIGHTS: Record<string, number[]> = {
+  "1_day":   [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+  "1_night": [1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+  "2_day":   [1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+  "3_night": [1, 1, 1, 0, 0.5, 0, 0, 0, 0, 1, 1, 0, 1, 0, 0, 0, 0, 0],
+  "4_day":   [1, 1, 0.5, 0, 0, 0, 0, 0, 0, 1, 0.5, 0, 1, 0, 0.5, 0, 0, 1],
+  "5_night": [0.5, 1, 1, 0.5, 1, 0.5, 0, 0, 1, 1, 1, 0.5, 0, 0, 1, 0.5, 0, 1],
+  "6_day":   [0, 1, 0.5, 0, 0, 0, 0, 0, 1, 0.5, 0, 1, 1, 0.5, 0, 1, 1, 0.5],
+  "7_night": [0, 0, 0, 0, 1, 1, 1, 0, 0, 0.5, 1, 1, 0.5, 1, 1, 0.5, 1, 0],
+  "8_day":   [1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0.5, 1, 1, 1, 0, 1, 0.5, 0.5],
+  "9_night": [0, 0, 0.5, 0.5, 0.5, 1, 1, 0, 1, 0, 0, 1, 0.5, 1, 0.5, 0.5, 1, 0.5],
 };
 
-const ENEMY_KEYS = ['e_fast', 'e_basic', 'e_armor1', 'e_armor2', 'e_armor3', 'e_shooting', 'e_swarm', 'e_giant', 'e_critter'];
+const CHUNK_LEVEL_WEIGHTS: number[][] = [
+  [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // Lvl 1
+  [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // Lvl 2
+  [0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 1, 0.75, 0, 1, 0.25, 0.25, 0.25, 0, 0.25, 0.25, 0.25, 0.25], // Lvl 3
+  [0.25, 0.25, 0.25, 0.5, 0.5, 0.5, 1, 0.25, 0.5, 1, 0.75, 0.75, 0.75, 0.5, 0.75, 0.75, 0.75, 0.75], // Lvl 4
+  [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 5
+  [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 6
+  [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 7
+  [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 8
+  [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 9
+  [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 10
+];
+
+const ENEMY_KEYS = [
+  'e_basic', 'e_armor1', 'e_armor2', 'e_armor3', 'e_shooting', 'e_swarm', 'e_giant', 'e_critter',
+  'e_shooting_giant', 'e_fly', 'e_fly_armor1', 'e_fly_armor2', 'e_snowthrower', 'e_snowthrower_giant',
+  'e_poison', 'e_bomb', 'e_rockpuncher', 'e_suneater'
+];
 
 function getWeightsForCurrentTime() {
   const t = getTime();
   const isNight = getLightLevel(t.hour) === 0;
-  const dayKey = Math.min(t.day, 10);
+  const dayKey = Math.min(t.day, 9);
   const key = `${dayKey}_${isNight ? 'night' : 'day'}`;
-  return SPAWN_WEIGHTS[key] || SPAWN_WEIGHTS["5_night"];
+  const dtWeights = DAYTIME_WEIGHTS[key] || DAYTIME_WEIGHTS["5_night"];
+  
+  const clIdx = Math.min(Math.max(0, state.currentChunkLevel - 1), CHUNK_LEVEL_WEIGHTS.length - 1);
+  const clWeights = CHUNK_LEVEL_WEIGHTS[clIdx];
+
+  // Multiply weights
+  return dtWeights.map((w, i) => w * clWeights[i]);
 }
 
 export function isLegibleSpot(x: number, y: number): boolean {

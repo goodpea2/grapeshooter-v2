@@ -63,7 +63,7 @@ export class GiantDeathVFX {
       state.vfx.push(new BugSplatVFX(this.pos.x + random(-30, 30), this.pos.y + random(-30, 30), 20, this.color));
     }
     if (this.life === 20) {
-      state.vfx.push(new Explosion(this.pos.x, this.pos.y, this.size * 2.5, color(...this.color)));
+      state.vfx.push(new Explosion(this.pos.x, this.pos.y, this.size * 2.5, color(this.color)));
       drawPersistentDeathVisual(this.pos.x, this.pos.y, this.size * 1.5, [red(this.color), green(this.color), blue(this.color)]);
     }
   }

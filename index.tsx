@@ -10,6 +10,8 @@ import { bulletTypes } from './balanceBullets';
 import { WorldManager } from './world';
 import { Player, Enemy, AttachedTurret, SunLoot, NPCEntity } from './entities';
 import { getTime, drawUI, drawTurretTooltip } from './ui';
+import { drawAlmanac, handleAlmanacClick } from './ui/almanac/mainLayout';
+import { drawUnlockPopup } from './ui/almanac/turretUnlockPopup';
 import { drawGameOver, handleGameOverClick } from './uiGameOver';
 import { drawWorldGenPreview } from './uiDebug';
 import { handleNpcUiClick } from './uiNpcShop';
@@ -22,7 +24,7 @@ import { drawGameSpeedButtons, handleGameSpeedButtonClick } from './uiGameSpeed'
 import { drawTurretSprite, TYPE_MAP } from './assetTurret';
 import { drawPendingSpawn } from './visualEnemies';
 import { drawTickingExplosive } from './visualObstacles';
-import { EnabledTurrets, DisabledTurrets } from './debug/turretAvailability';
+import { DisabledTurrets } from './debug/turretAvailability';
 
 declare const p5: any;
 declare const createCanvas: any;
@@ -68,6 +70,7 @@ declare const textWidth: any;
 declare const color: any;
 declare const lerpColor: any;
 declare const rotate: any;
+declare const scale: any;
 declare const loadImage: any;
 declare const imageMode: any;
 declare const floor: any;
@@ -236,8 +239,6 @@ function executePlacement() {
   const spawnY = 8 * GRID_SIZE + GRID_SIZE / 2;
   state.player = new Player(spawnX, spawnY); 
   state.cameraPos = createVector(spawnX, spawnY);
-  state.deathVisualsBuffer = createGraphics(8000, 8000);
-  state.deathVisualsBuffer.pixelDensity(1);
 };
 
 function tick() {
@@ -303,7 +304,6 @@ function tick() {
   translate(width/2 - state.cameraPos.x + shakeX, height/2 - state.cameraPos.y + shakeY);
   let bgCol = [20, 20, 40]; if (state.currentChunkLevel >= 3) bgCol = [40, 20, 60]; if (state.currentChunkLevel >= 6) bgCol = [60, 10, 30];
   push(); noStroke(); fill(bgCol[0], bgCol[1], bgCol[2], 50); rect(state.cameraPos.x - width, state.cameraPos.y - height, width*2, height*2); pop();
-  image(state.deathVisualsBuffer, -4000, -4000);
   state.world.display(state.player.pos);
 
   if (state.showChunkBorders) {
@@ -377,7 +377,7 @@ function tick() {
         if (att === state.draggedTurretInstance || att.isFrosted || (att.config.turretLayer || 'normal') !== 'normal' || att.baseIngredients.length === 0) continue;
         const combinedPool = [...draggingIngredients, ...att.baseIngredients];
         const resType = findMergeResult(combinedPool); const resConfig = resType ? turretTypes[resType] : null;
-        const isAvailable = resType ? (EnabledTurrets.includes(resType) || state.makeAllTurretsAvailable) : false;
+        const isAvailable = resType ? (state.unlockedTurrets.includes(resType) || state.makeAllTurretsAvailable) : false;
 
         if (resType && resConfig && isAvailable) {
           const wPos = att.getWorldPos();
@@ -409,7 +409,7 @@ function tick() {
             if (ghostLayer === 'normal' && !coreOccupant && draggingIngredients.length > 0 && occupantOnSameLayer.baseIngredients.length > 0) {
               const combinedPool = [...draggingIngredients, ...occupantOnSameLayer.baseIngredients];
               const resType = findMergeResult(combinedPool); const resConfig = resType ? turretTypes[resType] : null;
-              const isAvailable = resType ? (EnabledTurrets.includes(resType) || state.makeAllTurretsAvailable) : false;
+              const isAvailable = resType ? (state.unlockedTurrets.includes(resType) || state.makeAllTurretsAvailable) : false;
               if (resType && resConfig && isAvailable && !occupantOnSameLayer.isFrosted) {
                 const ingredientsCostSum = combinedPool.reduce((sum, k) => sum + (turretTypes[k]?.cost || 0), 0);
                 const combinedMergeCost = Math.max(0, resConfig.cost - ingredientsCostSum);
@@ -506,6 +506,9 @@ function tick() {
   if (state.isGameOver) {
     drawGameOver();
   }
+
+  drawAlmanac();
+  drawUnlockPopup();
 };
 
 (window as any).mousePressed = () => {
@@ -520,6 +523,8 @@ function tick() {
   if (state.isGameOver) {
     if (handleGameOverClick()) return;
   }
+
+  if (handleAlmanacClick()) return;
 
   if (handleGameSpeedButtonClick()) return; // Handle game speed buttons first
 
@@ -612,6 +617,19 @@ function tick() {
 
 (window as any).mouseWheel = (event: any) => {
   if (state.isGameOver) return;
+  if (state.isAlmanacOpen) {
+    const modalW = Math.min(1050, width * 0.9);
+    const leftPanelW = modalW * 0.6;
+    const x = (width - modalW) / 2;
+    const rightX = x + leftPanelW + 60;
+    
+    if (mouseX > rightX) {
+      state.almanacInfoScrollVelocity -= event.delta * 0.25;
+    } else {
+      state.almanacScrollVelocity -= event.delta * 0.25;
+    }
+    return false;
+  }
   if (state.showDebug && mouseX > width - 280) { state.debugScrollVelocity -= event.delta * 0.1; return false; }
   if (state.activeNPC && mouseX > width - 320) { state.npcShopScrollVelocity -= event.delta * 0.1; return false; }
 };
@@ -639,6 +657,9 @@ function tick() {
   if (keyCode === 87 || keyCode === 65 || keyCode === 83 || keyCode === 68) { // W, A, S, D
     state.isWASDInput = true;
   }
+  if (keyCode === 32) { // Spacebar
+    state.player.isClickHolding = true;
+  }
 };
 
 (window as any).keyReleased = () => {
@@ -649,6 +670,10 @@ function tick() {
       state.isWASDInput = false;
     }
   }
+  if (keyCode === 32) { // Spacebar
+    state.player.isClickHolding = false;
+  }
 };
 
 function map(n: number, start1: number, stop1: number, start2: number, stop2: number) { return ((n - start1) / (stop1 - start1)) * (stop2 - start2) + start2; }
+

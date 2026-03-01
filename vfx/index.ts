@@ -14,6 +14,7 @@ export { BlockDebris } from './BlockDebris';
 export { Explosion } from './Explosion';
 export { FirePuddleVFX } from './FirePuddleVFX';
 export { StunGasVFX } from './StunGasVFX';
+export { PoisonGasVFX } from './PoisonGasVFX';
 export { ForcefieldVFX } from './ForcefieldVFX';
 export { MergeVFX } from './MergeVFX';
 export { DamageNumberVFX } from './DamageNumberVFX';

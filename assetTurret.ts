@@ -28,8 +28,8 @@ export const TYPE_MAP: Record<string, string> = {
   't_mine': 't_mine',
   't_ice': 't_ice',
   't_sunflower': 't_sunflower',
-  't_seed': 'seed_stray_t1', 
-  't_seed2': 'seed_stray_t2', // Map to the T2 stray seed asset
+  't_seed': 't_seed', 
+  't_seed2': 't_seed2', // Map to the T2 stray seed asset
   't_lilypad': 't_lilypad',
   't2_repeater': 't_repeater',
   't2_firepea': 't_firepea',

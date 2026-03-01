@@ -2,7 +2,7 @@
 // Added p5.js global variable declarations to avoid TS errors
 import { state } from './state';
 import { GRID_SIZE, LEVEL_THRESHOLDS, HOUR_FRAMES, CHUNK_SIZE } from './constants';
-import { worldGenConfig, requestSpawn } from './lvDemo';
+import { worldGenConfig, requestSpawn, AlmanacProgression } from './lvDemo';
 import { liquidTypes, LIQUID_KEYS, LIQUID_WEIGHTS } from './balanceLiquids';
 import { obstacleTypes, overlayTypes, BLOCK_WEIGHTS } from './balanceObstacles';
 import { groundFeatureTypes } from './balanceGroundFeatures';
@@ -317,8 +317,8 @@ export function drawDebugPanel(spawnFromBudget: Function) {
 
   const debugX = width - 280;
   
-  // Interaction block if World Preview is open
-  const isInteractionBlocked = state.showWorldGenPreview;
+  // Interaction block if World Preview is open or Almanac is open
+  const isInteractionBlocked = state.showWorldGenPreview || state.isAlmanacOpen;
 
   // --- SECTION 1: Fixed Stats Panel ---
   push();
@@ -373,7 +373,7 @@ export function drawDebugPanel(spawnFromBudget: Function) {
       { l: "INSTANT CD", v: state.instantRechargeTurrets, a: () => state.instantRechargeTurrets = !state.instantRechargeTurrets, type: 'toggle', grid: true },
       { l: "Touch Gizmo", v: state.showTouchGizmo, a: () => state.showTouchGizmo = !state.showTouchGizmo, type: 'toggle', grid: true },
       { l: "WORLD PREV", v: state.showWorldGenPreview, a: () => { state.showWorldGenPreview = !state.showWorldGenPreview; state.worldPreviewNeedsUpdate = true; }, type: 'toggle', grid: true },
-      { l: "+1k ALL", a: () => { state.sunCurrency += 1000; state.soilCurrency += 1000; state.elixirCurrency += 1000; }, grid: true },
+      { l: "+1k ALL", a: () => { state.sunCurrency += 1000; state.soilCurrency += 1000; state.elixirCurrency += 1000; state.raisinCurrency += 1000; }, grid: true },
       { l: "WARP 12H", a: () => state.timeWarpRemaining = 60, grid: true },
       { l: "CLEAR BLOCK", a: () => {
         const b = new Bullet(state.player.pos.x, state.player.pos.y, state.player.pos.x, state.player.pos.y, 'b_cheat_blocks', 'none');
@@ -393,7 +393,13 @@ export function drawDebugPanel(spawnFromBudget: Function) {
   allItems.push({ l: "TURRETS", type: 'header', section: 'turrets' });
   if (!state.debugSectionsCollapsed.turrets) {
     allItems.push(
-      { l: "Make all available", v: state.makeAllTurretsAvailable, a: () => state.makeAllTurretsAvailable = !state.makeAllTurretsAvailable, type: 'toggle', grid: true },
+      { l: "Enable Test Turrets", v: state.makeAllTurretsAvailable, a: () => state.makeAllTurretsAvailable = !state.makeAllTurretsAvailable, type: 'toggle', grid: true },
+      { l: "Unlock All", a: () => {
+        AlmanacProgression.LockedTurret.forEach(k => {
+          if (!state.unlockedTurrets.includes(k)) state.unlockedTurrets.push(k);
+        });
+        state.lockedTurrets = [];
+      }, grid: true },
       { l: "Turret Gizmo", v: state.debugGizmosTurrets, a: () => state.debugGizmosTurrets = !state.debugGizmosTurrets, type: 'toggle', grid: true },
       { l: "CLEAR TURRET", a: () => {
         const b = new Bullet(state.player.pos.x, state.player.pos.y, state.player.pos.x, state.player.pos.y, 'b_cheat_destroyTurret', 'none');

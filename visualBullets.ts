@@ -48,7 +48,7 @@ export function drawBullet(b: any) {
     // Draw bullet elevated
     push();
     translate(b.pos.x, b.pos.y - arcVisualOffset * arcHeight);
-    rotate(angle);
+    rotate(angle + (b.rotation || 0));
     if (sprite) {
       imageMode(CENTER);
       image(sprite, 0, 0, b.config.bulletSize * 2.5 * visualScale, b.config.bulletSize * 2.5 * visualScale);
@@ -64,7 +64,7 @@ export function drawBullet(b: any) {
   if (sprite) {
     push();
     translate(b.pos.x, b.pos.y);
-    rotate(angle);
+    rotate(angle + (b.rotation || 0));
     imageMode(CENTER);
     image(sprite, 0, 0, b.config.bulletSize * 2.5, b.config.bulletSize * 2.5);
     pop();

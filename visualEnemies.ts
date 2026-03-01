@@ -178,7 +178,8 @@ export function drawEnemy(e: any) {
   if (sprite) {
     imageMode(CENTER);
     if (e.flash > 0) {
-      tint(255, 100, 100);
+      if (e.flashType === 'heal') tint(100, 255, 100);
+      else tint(255, 100, 100);
     }
     image(sprite, 0, 0, 64, 64);
     if (e.flash > 0) {

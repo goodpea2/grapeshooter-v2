@@ -1,6 +1,6 @@
 
 import { state } from '../state';
-import { HEX_DIST, GRID_SIZE, HOUR_FRAMES, TurretMinScanRate, CHUNK_SIZE } from '../constants';
+import { HEX_DIST, GRID_SIZE, HOUR_FRAMES, TurretMinScanRate, CHUNK_SIZE, FROST_LEVEL_CAP, FROST_BUILDUP_RATE, FROST_DECAY_RATE, ICECUBE_MAX_HEALTH } from '../constants';
 import { turretTypes } from '../balanceTurrets';
 import { conditionTypes } from '../balanceConditions';
 import { liquidTypes } from '../balanceLiquids';
@@ -168,7 +168,7 @@ export class AttachedTurret {
       }
     }
 
-    if (liquidType === 'l_ice') { if (state.isStationary && !this.isFrosted) { this.frostLevel = Math.min(1, this.frostLevel + (1 / 900)); if (this.frostLevel >= 1) { this.isFrosted = true; this.iceCubeHealth = 100; } } } else if (!this.isFrosted) { this.frostLevel = Math.max(0, this.frostLevel - (1 / 300)); }
+    if (liquidType === 'l_ice') { if (state.isStationary && !this.isFrosted) { this.frostLevel = Math.min(FROST_LEVEL_CAP, this.frostLevel + FROST_BUILDUP_RATE); if (this.frostLevel >= FROST_LEVEL_CAP) { this.isFrosted = true; this.iceCubeHealth = ICECUBE_MAX_HEALTH; } } } else if (!this.isFrosted) { this.frostLevel = Math.max(0, this.frostLevel - FROST_DECAY_RATE); }
     
     this.applyObstacleRepulsion(wPos);
 

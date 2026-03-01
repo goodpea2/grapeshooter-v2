@@ -89,8 +89,12 @@ export function spawnLootAt(x: number, y: number, key: string, configSource: any
         const loot = new LootEntity(px, py, typeKey);
         state.loot.push(loot);
         
-        if (loot.config.type === 'currency' && loot.config.item === 'sun') {
-          state.sunSpawnedTotal += (loot.config.itemValue || 1);
+        if (loot.config.type === 'currency') {
+          if (loot.config.item === 'sun') {
+            state.sunSpawnedTotal += (loot.config.itemValue || 1);
+          } else if (loot.config.item === 'raisin') {
+            // No special stat tracking for raisin yet, but it's handled by LootEntity update
+          }
         }
       }
     }

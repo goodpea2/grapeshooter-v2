@@ -75,9 +75,9 @@ export class StunGasVFX {
       let swirlX = cos(frameCount * c.rotV) * c.off.x * expand;
       let swirlY = sin(frameCount * c.rotV) * c.off.y * expand;
       
-      fill(160, 160, 255, alpha * 0.7);
+      fill(100, 255, 100, alpha * 0.7);
       ellipse(swirlX + drift, swirlY + drift, c.s * expand);
-      fill(200, 220, 255, alpha * 0.3);
+      fill(200, 255, 200, alpha * 0.3);
       ellipse(swirlX + drift * 0.5, swirlY + drift * 0.5, c.s * 0.6 * expand);
     }
     pop();

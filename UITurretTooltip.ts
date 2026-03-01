@@ -35,7 +35,7 @@ interface TurretDisplayStat {
     value: string;
 }
 
-const DEFAULT_STATS = [
+export const DEFAULT_STATS = [
     { label: 'WIP', value: '--' },
     { label: 'WIP', value: '--' },
     { label: 'WIP', value: '--' },
@@ -270,7 +270,7 @@ export const TURRET_DISPLAY_STATS: Record<string, TurretDisplayStat[]> = {
     ]
 };
 
-const CLASS_ICON_MAP: Record<string, string> = {
+export const CLASS_ICON_MAP: Record<string, string> = {
     't_pea': 'img_icon_class_shooter',
     't_laser': 'img_icon_class_miner',
     't_wall': 'img_icon_class_armor',

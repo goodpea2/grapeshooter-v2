@@ -1,4 +1,5 @@
 import { state } from './state';
+import { AlmanacProgression } from './lvDemo';
 
 declare const translate: any;
 declare const stroke: any;
@@ -21,17 +22,66 @@ declare const CENTER: any;
 declare const mouseX: any;
 declare const mouseY: any;
 declare const dist: any;
+declare const frameCount: any;
+declare const sin: any;
+declare const lerp: any;
+declare const imageMode: any;
+declare const image: any;
+declare const map: any;
+declare const tint: any;
+declare const noTint: any;
 
 export function drawGameSpeedButtons() {
+  const costIdx = Math.min(state.unlockCount, AlmanacProgression.UnlockCost.length - 1);
+  const costObj = AlmanacProgression.UnlockCost[costIdx];
+  const costType = Object.keys(costObj)[0];
+  const costVal = (costObj as any)[costType];
+  
+  let currentCurrency = 0;
+  if (costType === 'raisin') currentCurrency = state.raisinCurrency;
+  else if (costType === 'soil') currentCurrency = state.soilCurrency;
+  else if (costType === 'elixir') currentCurrency = state.elixirCurrency;
+  
+  const canAfford = currentCurrency >= costVal && state.lockedTurrets.length > 0;
+
   push();
   const btnMargin = 10;
   const btnSize = 40;
+  const almanacBtnSize = 80;
   const speedupBtnX = width - btnMargin - btnSize; // Right-align Speedup button
   const speedupBtnY = btnMargin;
   const pauseBtnX = width - btnMargin - btnSize * 2 - btnMargin; // Right-align Pause button
   const pauseBtnY = btnMargin;
+  const almanacBtnX = width - btnMargin - almanacBtnSize; // Bottom-right Almanac button
+  const almanacBtnY = height - btnMargin - almanacBtnSize;
+
+  // Almanac Button
+  const isHoveringAlmanac = dist(mouseX, mouseY, almanacBtnX + almanacBtnSize / 2, almanacBtnY + almanacBtnSize / 2) < almanacBtnSize / 2;
+  
+  push();
+  imageMode(CENTER);
+  const icon = state.assets['img_icon_almanac'];
+  const glowIcon = state.assets['img_icon_almanac_glow'];
+  
+  if (icon) image(icon, almanacBtnX + almanacBtnSize / 2, almanacBtnY + almanacBtnSize / 2, almanacBtnSize, almanacBtnSize);
+  
+  let glowAlpha = 0;
+  if (isHoveringAlmanac || state.isAlmanacOpen) {
+    glowAlpha = 255;
+  } else if (canAfford) {
+    glowAlpha = map(sin(frameCount * 0.15), -1, 1, 50, 255);
+  }
+  
+  if (glowAlpha > 0 && glowIcon) {
+    tint(255, glowAlpha);
+    image(glowIcon, almanacBtnX + almanacBtnSize / 2, almanacBtnY + almanacBtnSize / 2, almanacBtnSize, almanacBtnSize);
+    noTint();
+  }
+  pop();
 
   // Speedup Button
+  if (state.isAlmanacOpen) return; // Block other buttons if Almanac is open
+  
   const isHoveringSpeedup = dist(mouseX, mouseY, speedupBtnX + btnSize / 2, speedupBtnY + btnSize / 2) < btnSize / 2;
 
   if (state.requestedGameSpeed === 2) {
@@ -69,10 +119,27 @@ export function drawGameSpeedButtons() {
 export function handleGameSpeedButtonClick(): boolean {
   const btnMargin = 10;
   const btnSize = 40;
+  const almanacBtnSize = 120;
   const speedupBtnX = width - btnMargin - btnSize;
   const speedupBtnY = btnMargin;
   const pauseBtnX = width - btnMargin - btnSize * 2 - btnMargin;
   const pauseBtnY = btnMargin;
+  const almanacBtnX = width - btnMargin - almanacBtnSize;
+  const almanacBtnY = height - btnMargin - almanacBtnSize;
+
+  // Check Almanac button
+  if (mouseX > almanacBtnX && mouseX < almanacBtnX + almanacBtnSize &&
+      mouseY > almanacBtnY && mouseY < almanacBtnY + almanacBtnSize) {
+    state.isAlmanacOpen = !state.isAlmanacOpen;
+    if (state.isAlmanacOpen) {
+      state.isPaused = true;
+    } else {
+      state.isPaused = false;
+    }
+    return true;
+  }
+
+  if (state.isAlmanacOpen) return false;
 
   // Check Speedup button
   if (mouseX > speedupBtnX && mouseX < speedupBtnX + btnSize &&

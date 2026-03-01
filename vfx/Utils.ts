@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { GRID_SIZE, CHUNK_SIZE } from '../constants';
 
 declare const p5: any;
 declare const createVector: any;
@@ -47,10 +48,31 @@ declare const tint: any;
 declare const noTint: any;
 
 export function drawPersistentDeathVisual(x: number, y: number, size: number, col: any) {
-    push();
-    translate(x, y);
-    noStroke();
-    fill(col[0], col[1], col[2], 100);
-    ellipse(0, 0, size);
-    pop();
+    const cx = floor(x / (CHUNK_SIZE * GRID_SIZE));
+    const cy = floor(y / (CHUNK_SIZE * GRID_SIZE));
+    const chunk = state.world.getChunk(cx, cy);
+    if (chunk) {
+        const buffer = chunk.ensureDeathBuffer();
+        buffer.push();
+        // Local coordinates within the chunk
+        const lx = x - cx * CHUNK_SIZE * GRID_SIZE;
+        const ly = y - cy * CHUNK_SIZE * GRID_SIZE;
+        buffer.translate(lx, ly);
+        buffer.noStroke();
+        
+        const r = col[0];
+        const g = col[1];
+        const b = col[2];
+
+        // Detailed splat logic from user's reference
+        for (let i = 0; i < 5; i++) {
+            buffer.fill(r, g, b, random(20, 40));
+            let offX = random(-size * 0.4, size * 0.4);
+            let offY = random(-size * 0.4, size * 0.4);
+            let splatSize = random(size * 0.2, size * 0.5);
+            buffer.ellipse(offX, offY, splatSize, splatSize * random(0.7, 1.3));
+        }
+        
+        buffer.pop();
+    }
 }

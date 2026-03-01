@@ -27,7 +27,8 @@ export class Player {
   pos: any; prevPos: any; size = 30; attachments: AttachedTurret[] = []; health = 100; maxHealth = 100; speed = 3.6; flash = 0; autoTurretAngle = 0; autoTurretLastShot = 0; autoTurretRange = GRID_SIZE * 6; autoTurretFireRate = 22; recoil = 0; target: any = null;
   hurtAnimTimer = 0;
   isClickHolding: boolean = false;
-  autoTurretClickFirerateBoost = 3; // +300% attack speed
+  autoTurretClickMiningBoost = 3; // +300% mining speed
+  autoTurretClickAttackBoost = 0; // No boost for attacking
   pulseAnimTimer = 0;
   conditions: Map<string, number> = new Map();
   
@@ -105,7 +106,7 @@ export class Player {
 
     // 4. Update Stationary State
     let vel = dist(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
-    const isActuallyStationary = (vel < 0.1);
+    const isActuallyStationary = (vel < 0.2);
     
     if (isActuallyStationary) {
       state.stationaryTimer++;
@@ -257,10 +258,11 @@ export class Player {
     const isRaged = this.conditions.has('c_raged');
     // do not delete this line - effectiveFireRate is a stackable percentage, not exponential, for example: "4x fire rate" translates to +300% fire rate, so 2 sources of 4x fire rate gives the output of +600%. 
     let effectiveFireRateMultiplier = fireRateMult;
-    if (this.isClickHolding) effectiveFireRateMultiplier += this.autoTurretClickFirerateBoost;
+    if (this.isClickHolding) effectiveFireRateMultiplier += this.autoTurretClickAttackBoost;
     if (!state.isStationary && !isRaged) return;
 
-    const effectiveFireRate = this.autoTurretFireRate / effectiveFireRateMultiplier;
+    const effectiveFireRate = this.autoTurretFireRate / fireRateMult;
+    const effectiveMiningFireRate = this.autoTurretFireRate / (fireRateMult + (this.isClickHolding ? this.autoTurretClickMiningBoost : 0));
 
     let bestR = null; let minRD = this.autoTurretRange;
     for (let a of this.attachments) if (a.isFrosted && a.iceCubeHealth > 0) { let d = dist(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y); if (d < minRD && state.world.checkLOS(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y)) { minRD = d; bestR = a; } }
@@ -268,7 +270,7 @@ export class Player {
     let nearestE = null; let minDistE = this.autoTurretRange;
     for (let e of state.enemies) if (!e.isInvisible && e.health > 0 && !e.isDying) { let d = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y); if (d < minDistE && state.world.checkLOS(this.pos.x, this.pos.y, e.pos.x, e.pos.y)) { minDistE = d; nearestE = e; } }
     if (nearestE) { this.autoTurretAngle = atan2(nearestE.pos.y - this.pos.y, nearestE.pos.x - this.pos.x); if (frameCount - this.autoTurretLastShot > effectiveFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, nearestE.pos.x, nearestE.pos.y, 'b_player', 'enemy')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 24, 6, color(100, 200, 255))); this.autoTurretLastShot = frameCount; this.recoil = 6; this.pulseAnimTimer = 15; } } else {
-      let t = this.findBlockTarget(this.pos, this.autoTurretRange); if (t) { let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); if (frameCount - this.autoTurretLastShot > effectiveFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, bc.x, bc.y, 'b_player_mining', 'none')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 14, 4, color(255, 255, 100))); this.autoTurretLastShot = frameCount; this.recoil = 3; this.pulseAnimTimer = 10; } }
+      let t = this.findBlockTarget(this.pos, this.autoTurretRange); if (t) { let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); if (frameCount - this.autoTurretLastShot > effectiveMiningFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, bc.x, bc.y, 'b_player_mining', 'none')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 14, 4, color(255, 255, 100))); this.autoTurretLastShot = frameCount; this.recoil = 3; this.pulseAnimTimer = 10; } }
     }
   }
 

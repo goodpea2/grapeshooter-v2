@@ -24,6 +24,7 @@ export class Bullet {
   damageTargets: string[] = [];
   targetPos: any | null = null;
   currentPierceChance: number = 0;
+  rotation: number = 0;
   
   // Track unique hits for piercing consistency
   hitTargets: Set<string> = new Set();
@@ -50,6 +51,7 @@ export class Bullet {
 
   update() {
     this.prevPos.set(this.pos); this.pos.add(this.vel); this.life--;
+    this.rotation += 0.2; // Self-spin
     
     // BALLISTIC PROJECTILE LOGIC: Ignore all collisions while flying high
     if (this.config.highArcConfig) {
@@ -185,6 +187,13 @@ export class Bullet {
           if (dSq < minDist*minDist) {
             this.hitTargets.add(a.uid);
             a.takeDamage(this.dmg); 
+            if (this.config.frostAmount && !a.isFrosted) {
+              a.frostLevel = Math.min(1, a.frostLevel + this.config.frostAmount);
+              if (a.frostLevel >= 1) {
+                a.isFrosted = true;
+                a.iceCubeHealth = 100;
+              }
+            }
             this.handleCollision();
             if (this.life <= 0) return;
           }

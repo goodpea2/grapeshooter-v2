@@ -465,8 +465,9 @@ export const turretTypes: any = {
     actionType: ['launch'],
     actionConfig: { 
       bulletTypeKey: 'b_skymortar_shell', 
-      shootRange: GRID_SIZE * 18, 
-      shootFireRate: 480 
+      shootRange: GRID_SIZE * 12, 
+      shootFireRate: 480,
+      hasUnarmedAsset: true
     },
     targetType: ['enemy'],
     targetConfig: { enemyPriority: 'highestHealth' }

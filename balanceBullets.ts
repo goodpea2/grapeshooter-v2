@@ -85,10 +85,38 @@ export const bulletTypes: any = {
     damageTargets: ['enemy', 'obstacle']
   },
   b_enemy_basic: {
-    bulletDamage: 8, bulletSpeed: 3, bulletColor: [255, 100, 100], bulletLifeTime: 180, bulletSize: 4, bulletLength: 12,
+    bulletDamage: 8, bulletSpeed: 3, bulletColor: [255, 100, 100], bulletLifeTime: 180, bulletSize: 8, bulletLength: 8,
+    aoeConfig: { isAoe: false, aoeRadiusGradient: [], aoeDamageGradient: [], dealAoeOnObstacle: false, dealAoeAfterLifetime: false, aoeObstacleDamageMultiplier: 0 },
+    stunDuration: 0, slowDuration: 0, slowFactor: 1, obstacleDamageMultiplier: 1.5,
+    spawnGroundFeatureOnContact: [], spawnGroundFeaturePerFrame: -1, spawnGroundFeatureInRadius: 0,
+    damageTargets: ['player', 'turret', 'obstacle']
+  },
+  b_enemy_giant: {
+    bulletDamage: 10, bulletSpeed: 4, bulletColor: [255, 50, 50], bulletLifeTime: 240, bulletSize: 8, bulletLength: 8,
+    aoeConfig: { isAoe: false, aoeRadiusGradient: [], aoeDamageGradient: [], dealAoeOnObstacle: false, dealAoeAfterLifetime: false, aoeObstacleDamageMultiplier: 0 },
+    stunDuration: 0, slowDuration: 0, slowFactor: 1, obstacleDamageMultiplier: 1.5,
+    spawnGroundFeatureOnContact: [], spawnGroundFeaturePerFrame: -1, spawnGroundFeatureInRadius: 0,
+    damageTargets: ['player', 'turret', 'obstacle']
+  },
+  b_snow: {
+    bulletDamage: 1, bulletSpeed: 3, bulletColor: [200, 240, 255], bulletLifeTime: 180, bulletSize: 6, bulletLength: 6,
+    frostAmount: 0.3, // 300/1000
     aoeConfig: { isAoe: false, aoeRadiusGradient: [], aoeDamageGradient: [], dealAoeOnObstacle: false, dealAoeAfterLifetime: false, aoeObstacleDamageMultiplier: 0 },
     stunDuration: 0, slowDuration: 0, slowFactor: 1, obstacleDamageMultiplier: 0,
     spawnGroundFeatureOnContact: [], spawnGroundFeaturePerFrame: -1, spawnGroundFeatureInRadius: 0,
+    damageTargets: ['player', 'turret']
+  },
+  b_bomb_death: {
+    bulletDamage: 0, bulletSpeed: 0, bulletColor: [255, 100, 0], bulletLifeTime: 1, bulletSize: 1, bulletLength: 1,
+    aoeConfig: { 
+      isAoe: true, 
+      aoeRadiusGradient: [GRID_SIZE * 1.5], 
+      aoeDamageGradient: [30], 
+      dealAoeOnObstacle: false, 
+      dealAoeAfterLifetime: true, 
+      aoeObstacleDamageMultiplier: 0 
+    },
+    cameraShakeOnDeath: [5, 8, 0.9],
     damageTargets: ['player', 'turret']
   },
   b_sniper_shot: {
@@ -103,10 +131,10 @@ export const bulletTypes: any = {
     aoeConfig: { 
       isAoe: true, 
       aoeRadiusGradient: [GRID_SIZE * 2.5,GRID_SIZE * 4.5], 
-      aoeDamageGradient: [60,5], 
+      aoeDamageGradient: [40,5], 
       dealAoeOnObstacle: true, 
       dealAoeAfterLifetime: true, 
-      aoeObstacleDamageMultiplier: 5.0 
+      aoeObstacleDamageMultiplier: 6.0 
     },
     stunDuration: 30, slowDuration: 0, slowFactor: 1, obstacleDamageMultiplier: 1,
     spawnGroundFeatureOnContact: [], spawnGroundFeaturePerFrame: -1, spawnGroundFeatureInRadius: 0,
@@ -337,6 +365,7 @@ export const bulletTypes: any = {
   },
   b_skymortar_shell: {
     bulletDamage: 0, bulletSpeed: 0, bulletLifeTime: 1, bulletSize: 12, bulletLength: 12, bulletColor: [50, 100, 255],
+    bulletAssetImg: 'img_b_skymortar',
     highArcConfig: { arcHeight: 300, arcTravelTime: 90 },
     aoeConfig: { 
       isAoe: true, aoeRadiusGradient: [GRID_SIZE * 1.5,GRID_SIZE * 2.0,GRID_SIZE * 3.5], aoeDamageGradient: [300,30,10], dealAoeOnObstacle: true, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 2.0,

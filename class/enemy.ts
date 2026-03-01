@@ -7,6 +7,7 @@ import { liquidTypes } from '../balanceLiquids';
 import { BugSplatVFX, GiantDeathVFX, HitSpark, LiquidTrailVFX, MuzzleFlash, ConditionVFX, drawPersistentDeathVisual, Explosion, DamageNumberVFX } from '../vfx/index';
 import { AttachedTurret } from './attachedTurret';
 import { Bullet } from './bullet';
+import { GroundFeature } from './groundFeature';
 import { lerpAngle } from './utils';
 import { checkCircleRectCollision } from '../utils/collisions';
 import { Obstacle } from '../balanceObstacles';
@@ -24,6 +25,7 @@ declare const random: any;
 declare const cos: any;
 declare const sin: any;
 declare const color: any;
+declare const radians: any;
 declare const red: any;
 declare const green: any;
 declare const blue: any;
@@ -35,7 +37,9 @@ declare const HALF_PI: any;
 export class Enemy {
   uid: string;
   pos: any; type: string; config: any; health: number; maxHealth: number; speed: number; size: number; col: any; target: any = null; flash: number = 0; rot: number; actionType: string[]; actionConfig: any;
+  flashType: 'damage' | 'heal' = 'damage';
   meleeCooldown: number = 0; shootCooldown: number = 0; swarmParticles: any[] = []; markedForDespawn: boolean = false;
+  actionSteps: Map<string, number> = new Map();
   conditions: Map<string, number> = new Map();
   conditionData: Map<string, any> = new Map();
   prevPos: any; isDying: boolean = false;
@@ -45,6 +49,9 @@ export class Enemy {
   dummyDetectedTimer: number = 0; // Timer for o_dummy debug behavior
   preferredSteeringDirection: number = 0; // -1 for left, 1 for right, 0 for undecided
   isDummyDetectedInLookAhead: boolean = false; // For debug visualization in gizmos
+  isFlying: boolean = false;
+  stealSunTarget: any = null;
+  stealCooldown: number = 0;
 
   // Attack Animation State
   attackAnimTimer: number = 0;
@@ -61,6 +68,7 @@ export class Enemy {
   constructor(x: number, y: number, typeKey: string) {
     this.uid = Math.random().toString(36).substr(2, 9);
     this.pos = createVector(x, y); this.prevPos = this.pos.copy(); this.type = typeKey; this.config = enemyTypes[typeKey]; this.health = this.config.health; this.maxHealth = this.health; this.speed = this.config.speed; this.size = this.config.size; this.col = this.config.col; this.rot = random(TWO_PI); this.actionType = this.config.actionType; this.actionConfig = this.config.actionConfig;
+    this.isFlying = !!this.config.isFlying;
     if (this.type === 'e_swarm') for(let i=0; i<10; i++) this.swarmParticles.push({ offset: p5.Vector.random2D().mult(random(12, 24)), size: random(5, 9), phase: random(TWO_PI) });
     this.kbVel = createVector(0, 0);
     this.attackOffset = createVector(0, 0);
@@ -201,6 +209,38 @@ export class Enemy {
     }
 
     let tp = nearestT ? nearestT.getWorldPos() : playerPos; this.target = nearestT || state.player;
+
+    if (this.actionType.includes('stealSun')) {
+      if (!this.stealSunTarget || this.stealSunTarget.life <= 0) {
+        let bestSun = null;
+        let minDistSq = (this.actionConfig.stealRange || GRID_SIZE * 6)**2;
+        for (let l of state.loot) {
+          if (l.typeKey === 'sun') {
+            const dSq = (this.pos.x - l.pos.x)**2 + (this.pos.y - l.pos.y)**2;
+            if (dSq < minDistSq) {
+              minDistSq = dSq;
+              bestSun = l;
+            }
+          }
+        }
+        this.stealSunTarget = bestSun;
+      }
+
+    if (this.stealSunTarget) {
+      tp = this.stealSunTarget.pos;
+      const dSqToSun = (this.pos.x - tp.x)**2 + (this.pos.y - tp.y)**2;
+      if (this.actionConfig.stealSunSpeedMultiplier) {
+        speedMult *= this.actionConfig.stealSunSpeedMultiplier;
+      }
+      if (dSqToSun < (this.size * 0.5 + 20)**2) {
+          // Steal it
+          this.stealSunTarget.life = 0;
+          this.takeDamage(-(this.actionConfig.healPerSun || 80));
+          this.stealSunTarget = null;
+        }
+      }
+    }
+
     const dx = tp.x - this.pos.x;
     const dy = tp.y - this.pos.y;
     const dSq = dx*dx + dy*dy;
@@ -289,10 +329,10 @@ export class Enemy {
     }
 
     // Check for o_dummy in sight range (debug behavior)
-    const sightRange = 300; // Define a sight range for the dummy obstacle
+    const sightRange = 34; // Define a sight range for the dummy obstacle
     for (const chunk of state.world.chunks.values()) {
       for (const obstacle of chunk.blocks as Obstacle[]) {
-        if (obstacle.type === 'o_dummy') {
+        if (obstacle.type === 'o_dummy') { // only keep as o_dummy for now, we'll integrate this to all obstacles later
           const obsPos = createVector(obstacle.gx * GRID_SIZE + GRID_SIZE / 2, obstacle.gy * GRID_SIZE + GRID_SIZE / 2);
           const dToDummy = dist(this.pos.x, this.pos.y, obsPos.x, obsPos.y);
           const lookAheadPos = createVector(this.pos.x + cos(this.rot) * GRID_SIZE, this.pos.y + sin(this.rot) * GRID_SIZE);
@@ -383,7 +423,8 @@ export class Enemy {
     }
 
     const inMeleeRange = d < (this.size * 0.5 + targetRadius + 15);
-    const canShootInRange = this.actionType.includes('shoot') && d < this.actionConfig.shootRange && state.world.checkLOS(this.pos.x, this.pos.y, tp.x, tp.y);
+    const isShooter = this.type === 'e_shooting' || this.type === 'e_shooting_giant';
+    const canShootInRange = this.actionType.includes('shoot') && d < this.actionConfig.shootRange && (isShooter || state.world.checkLOS(this.pos.x, this.pos.y, tp.x, tp.y));
 
     if (canShootInRange && this.dummyDetectedTimer === 0) shouldMove = false;
 
@@ -406,9 +447,18 @@ export class Enemy {
     if (this.meleeCooldown > 0) this.meleeCooldown--;
 
     if (this.actionType.includes('shoot') && canShootInRange && this.shootCooldown <= 0) { 
-        state.enemyBullets.push(new Bullet(this.pos.x, this.pos.y, tp.x, tp.y, 'b_enemy_basic', 'core')); 
-        state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, dirHeading, 22, 6, color(200, 100, 255))); 
-        this.shootCooldown = this.actionConfig.shootFireRate; 
+        const bType = this.actionConfig.bulletTypeKey || 'b_enemy_basic';
+        let sa = dirHeading + (this.actionConfig.inaccuracy ? random(-radians(this.actionConfig.inaccuracy), radians(this.actionConfig.inaccuracy)) : 0);
+        state.enemyBullets.push(new Bullet(this.pos.x, this.pos.y, this.pos.x + cos(sa)*500, this.pos.y + sin(sa)*500, bType, 'core')); 
+        state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 22, 6, color(200, 100, 255))); 
+        
+        if (Array.isArray(this.actionConfig.shootFireRate)) {
+          const step = this.actionSteps.get('shoot') || 0;
+          this.shootCooldown = this.actionConfig.shootFireRate[step % this.actionConfig.shootFireRate.length];
+          this.actionSteps.set('shoot', step + 1);
+        } else {
+          this.shootCooldown = this.actionConfig.shootFireRate; 
+        }
     }
     if (this.shootCooldown > 0) this.shootCooldown--;
     
@@ -458,6 +508,7 @@ export class Enemy {
   }
 
   applyObstacleRepulsion() {
+    if (this.isFlying) return;
     const gx = floor(this.pos.x / GRID_SIZE);
     const gy = floor(this.pos.y / GRID_SIZE);
     const forceRange = GRID_SIZE * 0.9;
@@ -482,6 +533,11 @@ export class Enemy {
   }
 
   moveWithCollisions(move: any) {
+    if (this.isFlying) {
+      this.pos.x += move.x;
+      this.pos.y += move.y;
+      return;
+    }
     let nx = this.pos.x + move.x; if (!state.world.checkCollision(nx, this.pos.y, this.size/2.2) && !this.checkEntityCollisions(nx, this.pos.y)) this.pos.x = nx;
     let ny = this.pos.y + move.y; if (!state.world.checkCollision(this.pos.x, ny, this.size/2.2) && !this.checkEntityCollisions(this.pos.x, ny)) this.pos.y = ny;
   }
@@ -530,6 +586,79 @@ export class Enemy {
     }
   }
 
+  performSpawnGroundFeature() {
+    const gfKey = this.actionConfig.groundFeatureToSpawn;
+    const count = this.actionConfig.spawnCount || 1;
+    const radius = this.actionConfig.spawnRadius || 0;
+    for (let i = 0; i < count; i++) {
+      let sx = this.pos.x;
+      let sy = this.pos.y;
+      if (radius > 0) {
+        const ang = random(TWO_PI);
+        const r = random(radius);
+        sx += cos(ang) * r;
+        sy += sin(ang) * r;
+      }
+      state.groundFeatures.push(new GroundFeature(sx, sy, gfKey));
+    }
+  }
+
+  performSpawnBullet() {
+    const bType = this.actionConfig.bulletTypeToSpawn;
+    const b = new Bullet(this.pos.x, this.pos.y, this.pos.x, this.pos.y, bType, 'core');
+    b.life = 0;
+    state.enemyBullets.push(b);
+  }
+
+  performSpawnObstacle() {
+    const obsType = this.actionConfig.obstacleTypeToSpawn;
+    const count = this.actionConfig.spawnCount || 1;
+    const radius = this.actionConfig.spawnRadius || 0;
+    for (let i = 0; i < count; i++) {
+      let sx = this.pos.x;
+      let sy = this.pos.y;
+      if (radius > 0) {
+        const ang = random(TWO_PI);
+        const r = random(radius);
+        sx += cos(ang) * r;
+        sy += sin(ang) * r;
+      }
+      let gx = floor(sx / GRID_SIZE);
+      let gy = floor(sy / GRID_SIZE);
+
+      // Check for turrets
+      const isTurretAt = (gx: number, gy: number) => {
+        return state.player.attachments.some((a: any) => {
+          const wPos = a.getWorldPos();
+          return floor(wPos.x / GRID_SIZE) === gx && floor(wPos.y / GRID_SIZE) === gy;
+        });
+      };
+
+      if (isTurretAt(gx, gy)) {
+        // Find nearest available spot
+        let found = false;
+        for (let r = 1; r < 10; r++) { // search up to 10 tiles away
+          for (let dx = -r; dx <= r; dx++) {
+            for (let dy = -r; dy <= r; dy++) {
+              if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+              let ngx = gx + dx;
+              let ngy = gy + dy;
+              if (!isTurretAt(ngx, ngy)) {
+                gx = ngx;
+                gy = ngy;
+                found = true;
+                break;
+              }
+            }
+            if (found) break;
+          }
+          if (found) break;
+        }
+      }
+      state.world.setBlock(gx, gy, obsType);
+    }
+  }
+
   display() { 
     const margin = 100;
     const left = state.cameraPos.x - width/2 - margin;
@@ -543,6 +672,11 @@ export class Enemy {
     if (this.isDying) return false;
     this.health -= dmg; 
     this.flash = 6; 
+    this.flashType = dmg < 0 ? 'heal' : 'damage';
+
+    if (dmg < 0 && !this.actionConfig.bypassMaxHealth) {
+      this.health = Math.min(this.maxHealth, this.health);
+    }
 
     const lastTick = state.lastDamageTick.get(this.uid) || 0;
     const pending = state.pendingDamage.get(this.uid) || 0;
@@ -560,6 +694,15 @@ export class Enemy {
         if (this.actionConfig.spawnTriggerOnHealthRatio.includes(0)) {
            this.performSummon();
         }
+      }
+      if (this.actionType.includes('spawnGroundFeature') && this.actionConfig.spawnTriggerOnHealthRatio?.includes(0)) {
+        this.performSpawnGroundFeature();
+      }
+      if (this.actionType.includes('spawnBullet') && this.actionConfig.spawnTriggerOnHealthRatio?.includes(0)) {
+        this.performSpawnBullet();
+      }
+      if (this.actionType.includes('spawnObstacle') && this.actionConfig.spawnTriggerOnHealthRatio?.includes(0)) {
+        this.performSpawnObstacle();
       }
       if (this.type === 'e_giant') {
         state.vfx.push(new GiantDeathVFX(this.pos.x, this.pos.y, this.size, this.col));

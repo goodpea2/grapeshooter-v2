@@ -380,8 +380,62 @@ function drawStats(alpha: number) {
     fill(220, 160, 100, alpha);
     text(floor(state.soilCurrency), 30, 13);
     pop();
+    currentOffset += spacing;
   }
 
+  // 4. Raisin Bank (Removed from top UI as requested)
+  /*
+  if (state.raisinCurrency > 0) {
+    push();
+    translate(x + currentOffset, curY);
+    fill(30, 25, 60, alpha);
+    rect(0, 0, pillW, pillH, 13);
+    push();
+    translate(13, 13);
+    scale(state.uiElixirScale); // Use elixir scale for now
+    image(state.assets['img_icon_elixir'], 0, 0, 50, 50); // Placeholder icon
+    pop();
+    textAlign(LEFT, CENTER);
+    textSize(16);
+    fill(255, 150, 50, alpha);
+    text(floor(state.raisinCurrency), 30, 13);
+    pop();
+  }
+  */
+
+  pop();
+}
+
+function drawFlyingRaisins() {
+  if (!state.flyingRaisins || state.flyingRaisins.length === 0) return;
+
+  push();
+  imageMode(CENTER);
+  const icon = state.assets['img_icon_raisin'];
+
+  for (let i = state.flyingRaisins.length - 1; i >= 0; i--) {
+    const fr = state.flyingRaisins[i];
+    fr.progress += 0.01; // Speed of flight
+
+    const curX = lerp(fr.startX, fr.targetX, fr.progress);
+    const curY = lerp(fr.startY, fr.targetY, fr.progress);
+    
+    // Arc effect
+    const arcHeight = 100 * sin(fr.progress * PI);
+    const drawY = curY - arcHeight;
+
+    if (icon) {
+      image(icon, curX, drawY, 60, 60);
+    }
+    
+    fill(100, 225, 100);
+    noStroke();
+
+    if (fr.progress >= 1) {
+      state.raisinCurrency += fr.value;
+      state.flyingRaisins.splice(i, 1);
+    }
+  }
   pop();
 }
 
@@ -398,6 +452,7 @@ function drawFooter() {
 export function drawUI(spawnFromBudget: Function) {
   drawClock(60, 60, 255);
   drawStats(255);
+  drawFlyingRaisins();
   
 
   state.uiAlpha = lerp(state.uiAlpha, state.isStationary ? 255 : 40, 0.3);
@@ -410,7 +465,8 @@ export function drawUI(spawnFromBudget: Function) {
     const owned = (state.inventory[key] || 0) > 0;
     
     // Tier 1 and 2 standard list
-    if (tr.tier > 0 && tr.tier <= 1.2 && !tr.isSpecial) {
+    const isUnlocked = state.unlockedTurrets.includes(key);
+    if (tr.tier > 0 && tr.tier <= 1.2 && !tr.isSpecial && isUnlocked) {
       stdList.push({key, tr});
     } else if (tr.isSpecial || tr.tier === 0) {
       // Special turrets (like t_lilypad) only available if owned via NPC trade/inventory
@@ -474,6 +530,9 @@ export function drawUI(spawnFromBudget: Function) {
 }
 
 export function isMouseOverUI() {
+  // Almanac UI blocks everything
+  if (state.isAlmanacOpen || state.showUnlockPopup) return true;
+
   // Turret selection/inventory (left panel)
   if (mouseX < state.uiWidth) return true;
 
