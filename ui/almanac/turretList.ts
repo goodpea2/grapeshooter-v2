@@ -4,6 +4,7 @@ import { turretTypes } from '../../balanceTurrets';
 import { TYPE_MAP, drawTurretSprite } from '../../assetTurret';
 import { CLASS_ICON_MAP } from '../../UITurretTooltip';
 import { TURRET_RECIPES } from '../../dictionaryTurretMerging';
+import { AlmanacProgression } from '../../lvDemo';
 
 declare const push: any;
 declare const pop: any;
@@ -41,7 +42,14 @@ export function drawTurretList(x: number, y: number, w: number, h: number, modal
   const itemH = 105;
   const padding = 10;
 
-  const turrets = Object.keys(turretTypes).filter(k => turretTypes[k].tier > 0 || turretTypes[k].isSpecial);
+  const validTurrets = new Set([
+    ...AlmanacProgression.StartingTurret,
+    ...AlmanacProgression.LockedTurret.map(t => t.type)
+  ]);
+
+  const turrets = Object.keys(turretTypes).filter(k => 
+    (turretTypes[k].tier > 0 || turretTypes[k].isSpecial) && validTurrets.has(k)
+  );
   
   // Group by Tier
   const tiers: Record<string, string[]> = {};
@@ -259,7 +267,15 @@ export function getTurretY(targetKey: string): number {
   const itemH = 105;
   const itemW = 105;
   const w = 450; // Standard Almanac list width
-  const turrets = Object.keys(turretTypes).filter(k => turretTypes[k].tier > 0 || turretTypes[k].isSpecial);
+
+  const validTurrets = new Set([
+    ...AlmanacProgression.StartingTurret,
+    ...AlmanacProgression.LockedTurret.map(t => t.type)
+  ]);
+
+  const turrets = Object.keys(turretTypes).filter(k => 
+    (turretTypes[k].tier > 0 || turretTypes[k].isSpecial) && validTurrets.has(k)
+  );
   
   const tiers: Record<string, string[]> = {};
   const specialTurrets = ['t_sunflower', 't_lilypad', 't_seed', 't_seed2'];
