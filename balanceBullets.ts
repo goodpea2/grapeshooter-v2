@@ -242,7 +242,8 @@ export const bulletTypes: any = {
     damageTargets: ['enemy', 'obstacle', 'icecube'],
     isStationaryVFX: true,
     stopAtTarget: true,
-    idleAssetImg: 'img_t_mine_front'
+    idleAssetImg: 'img_t_mine_front',
+    selfRotateVelocity: 0
   },
   b_floating_mine_t3: {
     bulletDamage: 0, bulletSpeed: 4, bulletColor: [255, 100, 0], bulletLifeTime: HOUR_FRAMES * 8, bulletSize: 20, bulletLength: 20,
@@ -258,7 +259,8 @@ export const bulletTypes: any = {
     damageTargets: ['enemy', 'obstacle', 'icecube'],
     isStationaryVFX: true,
     stopAtTarget: true,
-    idleAssetImg: 'img_t_mine_front'
+    idleAssetImg: 'img_t_mine_front',
+    selfRotateVelocity: 0
   },
   b_laser_explosion: {
     bulletDamage: 0, bulletSpeed: 0, bulletColor: [255, 200, 100], bulletLifeTime: 1, bulletSize: 1, bulletLength: 1,

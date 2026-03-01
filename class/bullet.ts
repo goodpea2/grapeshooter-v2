@@ -51,7 +51,7 @@ export class Bullet {
 
   update() {
     this.prevPos.set(this.pos); this.pos.add(this.vel); this.life--;
-    this.rotation += 0.2; // Self-spin
+    this.rotation += (this.config.selfRotateVelocity !== undefined ? this.config.selfRotateVelocity : 0.2); // Self-spin
     
     // BALLISTIC PROJECTILE LOGIC: Ignore all collisions while flying high
     if (this.config.highArcConfig) {

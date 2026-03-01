@@ -14,7 +14,7 @@ declare const sin: any;
 declare const frameCount: any;
 declare const floor: any;
 
-export const customBudgetPerNight = [100, 250, 500, 1000, 2000, 4000, 7000, 12000, 18000, 25000]; // new with roomDirector
+export const customBudgetPerNight = [150, 300, 500, 800, 1400, 2400, 4000, 7000, 12000, 18000]; // new with roomDirector
 export const customDayLightConfig = '000011222222222222110000'; // 0: Night, 1: Transition, 2: Day
 export const customStartingHour = 6;
 
@@ -30,8 +30,8 @@ export const AlmanacProgression = {
     { type: 't3_triplepea', weight: 3 }, { type: 't3_firepea2', weight: 3 }, { type: 't3_spinnut', weight: 3 }, { type: 't3_mortar2', weight: 3 }, { type: 't3_snowpea2', weight: 3 }, { type: 't3_inferno', weight: 3 }, { type: 't3_flamethrower', weight: 3 }, { type: 't3_bowling', weight: 3 }, { type: 't3_repulser', weight: 3 }, { type: 't3_snowpeanut', weight: 3 }, { type: 't3_skymortar', weight: 3 }, { type: 't3_laser3', weight: 3 }, { type: 't3_puncher2', weight: 3 }, { type: 't3_aoelaser', weight: 3 }, { type: 't3_iceray2', weight: 3 }, { type: 't3_miningbomb', weight: 3 }, { type: 't3_tesla', weight: 3 }, { type: 't3_icepuncher', weight: 3 }, { type: 't3_densnut', weight: 3 }, { type: 't3_durian', weight: 3 }, { type: 't3_spike2', weight: 3 }, { type: 't3_holonut', weight: 3 }, { type: 't3_minefield', weight: 3 }, { type: 't3_frostfield', weight: 3 }, { type: 't3_triberg', weight: 3 }
   ],
   UnlockCost: [
-    { raisin: 3 },
-    { raisin: 3 },
+    { raisin: 1 },
+    { raisin: 2 },
     { raisin: 3 },
     { raisin: 3 },
     { raisin: 3 },
@@ -42,28 +42,28 @@ export const AlmanacProgression = {
     { raisin: 5 },
     { raisin: 5 },
     { raisin: 5 },
-    { raisin: 7 },
-    { raisin: 7 },
-    { raisin: 7 },
-    { raisin: 10 },
-    { raisin: 10 },
-    { raisin: 10 },
+    { raisin: 5 },
+    { raisin: 5 },
+    { raisin: 5 },
+    { raisin: 5 },
+    { raisin: 5 },
+    { raisin: 5 },
     { soil: 400 },
-    { raisin: 12 },
-    { raisin: 12 },
-    { raisin: 12 },
-    { raisin: 14 },
-    { raisin: 14 },
-    { raisin: 14 },
-    { raisin: 16 },
-    { raisin: 16 },
-    { raisin: 16 },
+    { raisin: 7 },
+    { raisin: 7 },
+    { raisin: 7 },
+    { raisin: 7 },
+    { raisin: 7 },
+    { raisin: 7 },
+    { raisin: 7 },
+    { raisin: 7 },
+    { raisin: 7 },
     { soil: 600 },
-    { raisin: 20 },
-    { raisin: 24 },
-    { raisin: 28 },
-    { raisin: 32 },
-    { raisin: 40 }
+    { raisin: 10 },
+    { raisin: 12 },
+    { raisin: 14 },
+    { raisin: 17 },
+    { raisin: 20 }
   ]
 };
 
