@@ -318,7 +318,7 @@ export function drawDebugPanel(spawnFromBudget: Function) {
   const debugX = width - 280;
   
   // Interaction block if World Preview is open or Almanac is open
-  const isInteractionBlocked = state.showWorldGenPreview || state.isAlmanacOpen;
+  const isInteractionBlocked = state.showWorldGenPreview || state.isAlmanacOpen || state.showUnlockPopup;
 
   // --- SECTION 1: Fixed Stats Panel ---
   push();
@@ -395,8 +395,8 @@ export function drawDebugPanel(spawnFromBudget: Function) {
     allItems.push(
       { l: "Enable Test Turrets", v: state.makeAllTurretsAvailable, a: () => state.makeAllTurretsAvailable = !state.makeAllTurretsAvailable, type: 'toggle', grid: true },
       { l: "Unlock All", a: () => {
-        AlmanacProgression.LockedTurret.forEach(k => {
-          if (!state.unlockedTurrets.includes(k)) state.unlockedTurrets.push(k);
+        state.lockedTurrets.forEach((t: any) => {
+          if (!state.unlockedTurrets.includes(t.type)) state.unlockedTurrets.push(t.type);
         });
         state.lockedTurrets = [];
       }, grid: true },

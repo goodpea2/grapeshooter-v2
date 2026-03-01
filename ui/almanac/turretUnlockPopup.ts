@@ -116,3 +116,9 @@ export function drawUnlockPopup() {
 
   pop();
 }
+
+export function handleUnlockPopupClick(): boolean {
+  if (!state.showUnlockPopup) return false;
+  state.showUnlockPopup = false;
+  return true;
+}

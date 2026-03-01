@@ -48,7 +48,7 @@ const CARD_HEIGHT = 60;
 const CARD_SPACING = 68; 
 
 export function handleNpcUiClick() {
-  if (!state.activeNPC) return false;
+  if (!state.activeNPC || state.isAlmanacOpen || state.showUnlockPopup) return false;
   
   const currentX = lerp(width, width - PANEL_WIDTH, state.npcUiPanelPos);
   if (mouseX < currentX) return false;

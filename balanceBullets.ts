@@ -364,11 +364,11 @@ export const bulletTypes: any = {
     damageTargets: ['enemy', 'obstacle']
   },
   b_skymortar_shell: {
-    bulletDamage: 0, bulletSpeed: 0, bulletLifeTime: 1, bulletSize: 12, bulletLength: 12, bulletColor: [50, 100, 255],
+    bulletDamage: 0, bulletSpeed: 0, bulletLifeTime: 1, bulletSize: 12, bulletLength: 12, bulletColor: [225, 100, 100],
     bulletAssetImg: 'img_b_skymortar',
     highArcConfig: { arcHeight: 300, arcTravelTime: 90 },
     aoeConfig: { 
-      isAoe: true, aoeRadiusGradient: [GRID_SIZE * 1.5,GRID_SIZE * 2.0,GRID_SIZE * 3.5], aoeDamageGradient: [300,30,10], dealAoeOnObstacle: true, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 2.0,
+      isAoe: true, aoeRadiusGradient: [GRID_SIZE * 1.5,GRID_SIZE * 2.0,GRID_SIZE * 3.5], aoeDamageGradient: [300,30,10], dealAoeOnObstacle: true, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 0.5,
       aoeKnockbackStrength: 4.0 
     },
     cameraShakeOnDeath: [6, 8, 0.98],

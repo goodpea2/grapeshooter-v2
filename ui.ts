@@ -516,7 +516,7 @@ export function drawUI(spawnFromBudget: Function) {
   fill(state.showDebug ? 80 : 30); if (dbgHov) fill(state.showDebug ? 100 : 50);
   stroke(255, 100); rect(dbgX, dbgY, dbgW, dbgH, 5);
   fill(255); textAlign(CENTER, CENTER); textSize(12); text("Debug", dbgX + dbgW/2, dbgY + dbgH/2);
-  if (dbgHov && mouseIsPressed) { state.showDebug = !state.showDebug; (window as any).mouseIsPressed = false; }
+  if (dbgHov && mouseIsPressed && !state.isAlmanacOpen && !state.showUnlockPopup) { state.showDebug = !state.showDebug; (window as any).mouseIsPressed = false; }
   pop();
 
   drawDebugPanel(spawnFromBudget);

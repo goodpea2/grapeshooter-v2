@@ -11,7 +11,7 @@ import { WorldManager } from './world';
 import { Player, Enemy, AttachedTurret, SunLoot, NPCEntity } from './entities';
 import { getTime, drawUI, drawTurretTooltip } from './ui';
 import { drawAlmanac, handleAlmanacClick } from './ui/almanac/mainLayout';
-import { drawUnlockPopup } from './ui/almanac/turretUnlockPopup';
+import { drawUnlockPopup, handleUnlockPopupClick } from './ui/almanac/turretUnlockPopup';
 import { drawGameOver, handleGameOverClick } from './uiGameOver';
 import { drawWorldGenPreview } from './uiDebug';
 import { handleNpcUiClick } from './uiNpcShop';
@@ -520,11 +520,13 @@ function tick() {
     state.playerSpeedMultiplier = 0; // Reset speed multiplier on new click
   }
 
+  if (handleUnlockPopupClick()) return;
+
+  if (handleAlmanacClick()) return;
+
   if (state.isGameOver) {
     if (handleGameOverClick()) return;
   }
-
-  if (handleAlmanacClick()) return;
 
   if (handleGameSpeedButtonClick()) return; // Handle game speed buttons first
 

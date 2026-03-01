@@ -1,5 +1,6 @@
 
 import { state } from './state';
+import { ENEMY_KEYS } from './lvDemo';
 
 declare const floor: any;
 declare const push: any;
@@ -115,8 +116,7 @@ export function drawGameOver() {
   ];
   
   // Enemy stats keys
-  const enemyKeys = ['e_basic', 'e_armor1', 'e_armor2', 'e_armor3', 'e_fast', 'e_shooting', 'e_critter', 'e_swarm', 'e_giant'];
-  for (const k of enemyKeys) {
+  for (const k of ENEMY_KEYS) {
     if (state.killsByType[k] > 0) {
       items.push({ asset: 'img_' + (k === 'e_swarm' ? 'swarm_center' : k.slice(2)), val: state.killsByType[k] });
     }

@@ -26,21 +26,44 @@ export const AlmanacProgression = {
     't2_repeater', 't2_laser2', 't2_tall', 't2_minespawner', 't2_stun' // Specific Tier 2
   ],
   LockedTurret: [
-    't2_firepea', 't2_peanut', 't2_mortar', 't2_snowpea', 't2_puncher', 't2_laserexplode', 't2_iceray', 't2_pulse', 't2_spike', 't2_icebomb',
-    't3_triplepea', 't3_firepea2', 't3_spinnut', 't3_mortar2', 't3_snowpea2', 't3_inferno', 't3_flamethrower', 't3_bowling', 't3_repulser', 't3_snowpeanut', 't3_skymortar', 't3_laser3', 't3_puncher2', 't3_aoelaser', 't3_iceray2', 't3_miningbomb', 't3_tesla', 't3_icepuncher', 't3_densnut', 't3_durian', 't3_spike2', 't3_holonut', 't3_minefield', 't3_frostfield', 't3_triberg'
+    { type: 't2_firepea', weight: 10 }, { type: 't2_peanut', weight: 10 }, { type: 't2_mortar', weight: 10 }, { type: 't2_snowpea', weight: 10 }, { type: 't2_puncher', weight: 10 }, { type: 't2_laserexplode', weight: 10 }, { type: 't2_iceray', weight: 10 }, { type: 't2_pulse', weight: 10 }, { type: 't2_spike', weight: 10 }, { type: 't2_icebomb', weight: 10 },
+    { type: 't3_triplepea', weight: 3 }, { type: 't3_firepea2', weight: 3 }, { type: 't3_spinnut', weight: 3 }, { type: 't3_mortar2', weight: 3 }, { type: 't3_snowpea2', weight: 3 }, { type: 't3_inferno', weight: 3 }, { type: 't3_flamethrower', weight: 3 }, { type: 't3_bowling', weight: 3 }, { type: 't3_repulser', weight: 3 }, { type: 't3_snowpeanut', weight: 3 }, { type: 't3_skymortar', weight: 3 }, { type: 't3_laser3', weight: 3 }, { type: 't3_puncher2', weight: 3 }, { type: 't3_aoelaser', weight: 3 }, { type: 't3_iceray2', weight: 3 }, { type: 't3_miningbomb', weight: 3 }, { type: 't3_tesla', weight: 3 }, { type: 't3_icepuncher', weight: 3 }, { type: 't3_densnut', weight: 3 }, { type: 't3_durian', weight: 3 }, { type: 't3_spike2', weight: 3 }, { type: 't3_holonut', weight: 3 }, { type: 't3_minefield', weight: 3 }, { type: 't3_frostfield', weight: 3 }, { type: 't3_triberg', weight: 3 }
   ],
   UnlockCost: [
+    { raisin: 3 },
+    { raisin: 3 },
+    { raisin: 3 },
+    { raisin: 3 },
+    { raisin: 3 },
+    { raisin: 3 },
+    { raisin: 3 },
+    { raisin: 3 },
+    { soil: 200 },
     { raisin: 5 },
-    { soil: 30 },
-    { elixir: 30 },
-    { elixir: 50 },
-    { elixir: 100 },
-    { elixir: 150 },
-    { elixir: 200 },
-    { elixir: 250 },
-    { elixir: 300 },
-    { elixir: 400 },
-    { elixir: 500 }
+    { raisin: 5 },
+    { raisin: 5 },
+    { raisin: 7 },
+    { raisin: 7 },
+    { raisin: 7 },
+    { raisin: 10 },
+    { raisin: 10 },
+    { raisin: 10 },
+    { soil: 400 },
+    { raisin: 12 },
+    { raisin: 12 },
+    { raisin: 12 },
+    { raisin: 14 },
+    { raisin: 14 },
+    { raisin: 14 },
+    { raisin: 16 },
+    { raisin: 16 },
+    { raisin: 16 },
+    { soil: 600 },
+    { raisin: 20 },
+    { raisin: 24 },
+    { raisin: 28 },
+    { raisin: 32 },
+    { raisin: 40 }
   ]
 };
 
@@ -91,7 +114,7 @@ const CHUNK_LEVEL_WEIGHTS: number[][] = [
   [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 10
 ];
 
-const ENEMY_KEYS = [
+export const ENEMY_KEYS = [
   'e_basic', 'e_armor1', 'e_armor2', 'e_armor3', 'e_shooting', 'e_swarm', 'e_giant', 'e_critter',
   'e_shooting_giant', 'e_fly', 'e_fly_armor1', 'e_fly_armor2', 'e_snowthrower', 'e_snowthrower_giant',
   'e_poison', 'e_bomb', 'e_rockpuncher', 'e_suneater'

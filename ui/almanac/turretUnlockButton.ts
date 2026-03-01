@@ -71,7 +71,7 @@ export function drawTurretUnlockButton(x: number, y: number, w: number, h: numbe
   if (canAfford) {
     grad.addColorStop(0, 'rgba(255, 255, 200, 1)');
     grad.addColorStop(0.4, 'rgba(255, 255, 150, 0.8)');
-    grad.addColorStop(1, 'rgba(255, 255, 100, 0.5)');
+    grad.addColorStop(1, 'rgba(255, 255, 100, 0)');
   } else {
     grad.addColorStop(0, 'rgba(200, 200, 200, 1)');
     grad.addColorStop(0.4, 'rgba(150, 150, 150, 0.5)');
@@ -152,7 +152,7 @@ export function drawTurretUnlockButton(x: number, y: number, w: number, h: numbe
   if (state.lockedTurrets.length > 0) {
     const cycleRate = 15;
     const cycleIndex = floor(frameCount / cycleRate) % state.lockedTurrets.length;
-    const cycleKey = state.lockedTurrets[cycleIndex];
+    const cycleKey = state.lockedTurrets[cycleIndex].type;
     
     push();
     translate(bx, by - 10);
@@ -194,9 +194,23 @@ export function drawTurretUnlockButton(x: number, y: number, w: number, h: numbe
     else if (costType === 'soil') state.soilCurrency -= costVal;
     else if (costType === 'elixir') state.elixirCurrency -= costVal;
 
-    // Unlock a random turret from locked list
-    const randIdx = floor(random(state.lockedTurrets.length));
-    const unlockedKey = state.lockedTurrets.splice(randIdx, 1)[0];
+    // Unlock a random turret from locked list with weights
+    let totalWeight = 0;
+    state.lockedTurrets.forEach((t: any) => totalWeight += t.weight);
+    let r = random(totalWeight);
+    let sum = 0;
+    let unlockedIdx = -1;
+    for (let i = 0; i < state.lockedTurrets.length; i++) {
+      sum += state.lockedTurrets[i].weight;
+      if (r <= sum) {
+        unlockedIdx = i;
+        break;
+      }
+    }
+    if (unlockedIdx === -1) unlockedIdx = 0; // Fallback
+
+    const unlockedObj = state.lockedTurrets.splice(unlockedIdx, 1)[0];
+    const unlockedKey = unlockedObj.type;
     state.unlockedTurrets.push(unlockedKey);
     state.unlockCount++;
 
