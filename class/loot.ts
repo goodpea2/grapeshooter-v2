@@ -73,40 +73,26 @@ export class LootEntity {
     
     const collectionRangeSq = ECONOMY_CONFIG.sunLootCollectionRange * ECONOMY_CONFIG.sunLootCollectionRange;
     if (dSq < collectionRangeSq) {
-      if (this.config.type === 'currency') {
-        if (this.config.item === 'sun') {
-          state.sunCurrency += (this.config.itemValue || 1);
-          state.uiSunScale = 1.5;
-        } else if (this.config.item === 'elixir') {
-          state.elixirCurrency += (this.config.itemValue || 1);
-          state.uiElixirScale = 1.5;
-        } else if (this.config.item === 'soil') {
-          state.soilCurrency += (this.config.itemValue || 1);
-          state.uiSoilScale = 1.5;
-        } else if (this.config.item === 'raisin') {
-          // Trigger flying raisin VFX
-          const val = (this.config.itemValue || 1);
-          const screenPos = {
-            x: this.pos.x - (state.cameraPos.x - width/2),
-            y: this.pos.y - (state.cameraPos.y - height/2)
-          };
-          const btnMargin = 10;
-          const almanacBtnSize = 80;
-          const targetX = width - btnMargin - almanacBtnSize / 2;
-          const targetY = height - btnMargin - almanacBtnSize / 2;
-          
-          state.flyingRaisins.push({
-            startX: screenPos.x,
-            startY: screenPos.y,
-            targetX: targetX,
-            targetY: targetY,
-            progress: 0,
-            value: val
-          });
-        }
-      } else if (this.config.type === 'turret' || this.config.type === 'turretAsItem') {
-        const key = this.config.item;
-        state.inventory[key] = (state.inventory[key] || 0) + 1;
+      if (this.config.type === 'currency' && this.config.item === 'raisin') {
+        // Trigger flying raisin VFX
+        const val = (this.config.itemValue || 1);
+        const screenPos = {
+          x: this.pos.x - (state.cameraPos.x - width/2),
+          y: this.pos.y - (state.cameraPos.y - height/2)
+        };
+        const btnMargin = 10;
+        const almanacBtnSize = 80;
+        const targetX = width - btnMargin - almanacBtnSize / 2;
+        const targetY = height - btnMargin - almanacBtnSize / 2;
+        
+        state.flyingRaisins.push({
+          startX: screenPos.x,
+          startY: screenPos.y,
+          targetX: targetX,
+          targetY: targetY,
+          progress: 0,
+          value: val
+        });
       }
       return 'collected';
     }
