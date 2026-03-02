@@ -233,7 +233,7 @@ export const TURRET_DISPLAY_STATS: Record<string, TurretDisplayStat[]> = {
         { label: 'Dmg rate', value: '2 sec' }, { label: 'Target', value: 'Blocks' }, { label: ' ', value: ' ' }
     ],
     't3_tesla': [
-        { label: 'Health', value: '150' }, { label: 'Damage', value: '10' }, { label: 'Fire rate', value: '1/4 sec' },
+        { label: 'Health', value: '300' }, { label: 'Damage', value: '10' }, { label: 'Fire rate', value: '1/4 sec' },
         { label: 'Target', value: 'All' }, { label: 'Laser chains', value: '' }, { label: 'x4 block dmg', value: '' }
     ],
     't3_icepuncher': [

@@ -48,6 +48,7 @@ declare const fill: any;
 declare const dist: any;
 declare const round: any;
 declare const abs: any;
+declare const constrain: any;
 declare const sqrt: any;
 declare const frameCount: any;
 declare const random: any;
@@ -233,7 +234,8 @@ function executePlacement() {
 };
 
 (window as any).setup = () => {
-  createCanvas(windowWidth, windowHeight);
+  const canvas = createCanvas(windowWidth, windowHeight);
+  canvas.elt.oncontextmenu = () => false; // Prevent right-click menu
   state.world = new WorldManager(); 
   const spawnX = 8 * GRID_SIZE + GRID_SIZE / 2;
   const spawnY = 8 * GRID_SIZE + GRID_SIZE / 2;
@@ -300,8 +302,31 @@ function tick() {
   const shakeX = (noise(state.frames * shakeFreq, 0) * 2 - 1) * state.cameraShake;
   const shakeY = (noise(state.frames * shakeFreq, 1000) * 2 - 1) * state.cameraShake;
 
+  const activePlacementType = state.isCurrentlyDragging ? state.draggedTurretType : state.selectedTurretType;
+  const isScaling = !!(activePlacementType || state.draggedTurretInstance);
+  
+  let currentZoom = 1.0;
+  if (isScaling) {
+    let maxVerticalOffset = 0;
+    for (const att of state.player.attachments) {
+      const off = abs(att.offset.y);
+      if (off > maxVerticalOffset) maxVerticalOffset = off;
+    }
+    const padding = 80; 
+    const requiredHalfHeight = maxVerticalOffset + padding;
+    const availableHalfHeight = height / 2;
+    currentZoom = constrain(availableHalfHeight / requiredHalfHeight, 1.0, 2.0);
+  }
+
   push(); 
-  translate(width/2 - state.cameraPos.x + shakeX, height/2 - state.cameraPos.y + shakeY);
+  if (isScaling) {
+    translate(width/2 + shakeX, height/2 + shakeY);
+    scale(currentZoom);
+    translate(-state.cameraPos.x, -state.cameraPos.y);
+  } else {
+    translate(width/2 - state.cameraPos.x + shakeX, height/2 - state.cameraPos.y + shakeY);
+  }
+  
   let bgCol = [20, 20, 40]; if (state.currentChunkLevel >= 3) bgCol = [40, 20, 60]; if (state.currentChunkLevel >= 6) bgCol = [60, 10, 30];
   push(); noStroke(); fill(bgCol[0], bgCol[1], bgCol[2], 50); rect(state.cameraPos.x - width, state.cameraPos.y - height, width*2, height*2); pop();
   state.world.display(state.player.pos);
@@ -344,7 +369,10 @@ function tick() {
   for (let i = state.enemyBullets.length - 1; i >= 0; i--) { state.enemyBullets[i].display(); }
   for (let i = state.vfx.length - 1; i >= 0; i--) { state.vfx[i].display(); }
 
-  const mWorld = createVector(mouseX - width/2 + state.cameraPos.x, mouseY - height/2 + state.cameraPos.y);
+  const mWorld = isScaling 
+    ? createVector((mouseX - width/2)/currentZoom + state.cameraPos.x, (mouseY - height/2)/currentZoom + state.cameraPos.y)
+    : createVector(mouseX - width/2 + state.cameraPos.x, mouseY - height/2 + state.cameraPos.y);
+
   state.hoveredTurretInstance = null;
   if (mouseX > state.uiWidth || !state.isStationary) {
     const sortedForSelection = [...state.player.attachments].sort((a, b) => {
@@ -358,13 +386,12 @@ function tick() {
 
   if (state.hoveredTurretInstance) {
     const t = state.hoveredTurretInstance; const wPos = t.getWorldPos();
-    push(); noFill(); stroke(255, 255, 100, 150 + sin(frameCount * 0.15) * 100); strokeWeight(4); ellipse(wPos.x, wPos.y, t.size + 8);
+    push(); noFill(); stroke(255, 255, 100, 150 + sin(frameCount * 0.15) * 100); strokeWeight(isScaling ? 4 / currentZoom : 4); ellipse(wPos.x, wPos.y, t.size + 8);
     const range = t.config.actionConfig?.shootRange || t.config.actionConfig?.beamMaxLength || t.config.actionConfig?.pulseTriggerRadius || 0;
-    if (range > 0) { noFill(); stroke(255, 200, 50, 120); strokeWeight(2); ellipse(wPos.x, wPos.y, range * 2); } pop();
+    if (range > 0) { noFill(); stroke(255, 200, 50, 120); strokeWeight(isScaling ? 2 / currentZoom : 2); ellipse(wPos.x, wPos.y, range * 2); } pop();
   }
 
   if ((state.draggedTurretType || state.draggedTurretInstance) && !state.isCurrentlyDragging) { if (dist(mouseX, mouseY, state.dragOrigin.x, state.dragOrigin.y) > 8) { state.isCurrentlyDragging = true; } }
-  const activePlacementType = state.isCurrentlyDragging ? state.draggedTurretType : state.selectedTurretType;
   state.mergeTargetPreview = null; state.previewSnapPos = null;
 
   if (state.isStationary && (activePlacementType || state.draggedTurretInstance) && !state.isGameOver) {
@@ -372,72 +399,131 @@ function tick() {
     const ghostConfig = turretTypes[ghostType!]; const ghostLayer = ghostConfig.turretLayer || 'normal';
     const draggingIngredients = state.draggedTurretInstance ? state.draggedTurretInstance.baseIngredients : (activePlacementType ? [activePlacementType] : []);
     
-    if (ghostLayer === 'normal' && draggingIngredients.length > 0) {
-      for (const att of state.player.attachments) {
-        if (att === state.draggedTurretInstance || att.isFrosted || (att.config.turretLayer || 'normal') !== 'normal' || att.baseIngredients.length === 0) continue;
-        const combinedPool = [...draggingIngredients, ...att.baseIngredients];
-        const resType = findMergeResult(combinedPool); const resConfig = resType ? turretTypes[resType] : null;
-        const isAvailable = resType ? (state.unlockedTurrets.includes(resType) || state.makeAllTurretsAvailable) : false;
+    // Purchase cost only applies if we are placing a NEW turret (not repositioning an instance)
+    const isNewPlacement = !!activePlacementType;
+    const isOwned = activePlacementType ? (state.inventory[activePlacementType] || 0) > 0 : false;
+    const purchaseCost = (isNewPlacement && !isOwned) ? (ghostConfig?.cost || 0) : 0;
 
-        if (resType && resConfig && isAvailable) {
-          const wPos = att.getWorldPos();
-          const ingredientsCostSum = combinedPool.reduce((sum, k) => sum + (turretTypes[k]?.cost || 0), 0);
-          const combinedMergeCost = Math.max(0, resConfig.cost - ingredientsCostSum);
-          let canAffordMerge = state.sunCurrency >= combinedMergeCost;
-          const purchaseCost = state.isCurrentlyDragging && state.draggedTurretType ? ghostConfig.cost : 0;
-          const totalReq = combinedMergeCost + purchaseCost;
-          const canAffordTotal = state.sunCurrency >= totalReq;
-          push(); translate(wPos.x, wPos.y); const pulse = 1.0 + 0.1 * sin(frameCount * 0.2);
-          rectMode(CENTER); fill(20, 20, 40, 240); noStroke();
-          let tw = textWidth(`${combinedMergeCost}`) + 30; rect(0, att.size/2 + 10, tw, 22, 6);
-          imageMode(CENTER); if (!canAffordTotal) (window as any).tint(150, 100, 100); image(state.assets['img_icon_sun'], -tw/2 + 10, att.size/2 + 10, 22 * pulse, 22 * pulse); (window as any).noTint();
-          fill(canAffordTotal ? [255, 255, 150] : [255, 100, 100]); textAlign(LEFT, CENTER); textSize(12); text(`${combinedMergeCost}`, -tw/2 + 20, att.size/2 + 10); pop();
-        }
-      }
-    }
     let closestDist = Infinity; let bestSnap = null; let bestMergeTarget = null; let bestMergeInfo = null;
     const rangeLimit = 8;
+
+    // 1. Draw all available empty spots and find bestSnap
     for (let q = -rangeLimit; q <= rangeLimit; q++) {
       for (let r = -rangeLimit; r <= rangeLimit; r++) {
         if (abs(q) + abs(r) + abs(-q-r) <= rangeLimit * 2) {
-          const wPos = axialToWorld(q, r).add(state.player.pos); const d = dist(mWorld.x, mWorld.y, wPos.x, wPos.y);
+          const wPos = axialToWorld(q, r).add(state.player.pos);
+          const d = dist(mWorld.x, mWorld.y, wPos.x, wPos.y);
+          let coreOccupant = (q === 0 && r === 0);
+          if (coreOccupant) continue;
+          
           let normalOccupant = state.player.attachments.find((a: any) => a.hq === q && a.hr === r && (a.config.turretLayer || 'normal') === 'normal');
           let groundOccupant = state.player.attachments.find((a: any) => a.hq === q && a.hr === r && a.config.turretLayer === 'ground');
           let occupantOnSameLayer = ghostLayer === 'ground' ? groundOccupant : normalOccupant;
-          let coreOccupant = (q === 0 && r === 0);
-          if (occupantOnSameLayer && occupantOnSameLayer !== state.draggedTurretInstance) {
-            if (ghostLayer === 'normal' && !coreOccupant && draggingIngredients.length > 0 && occupantOnSameLayer.baseIngredients.length > 0) {
-              const combinedPool = [...draggingIngredients, ...occupantOnSameLayer.baseIngredients];
-              const resType = findMergeResult(combinedPool); const resConfig = resType ? turretTypes[resType] : null;
-              const isAvailable = resType ? (state.unlockedTurrets.includes(resType) || state.makeAllTurretsAvailable) : false;
-              if (resType && resConfig && isAvailable && !occupantOnSameLayer.isFrosted) {
-                const ingredientsCostSum = combinedPool.reduce((sum, k) => sum + (turretTypes[k]?.cost || 0), 0);
-                const combinedMergeCost = Math.max(0, resConfig.cost - ingredientsCostSum);
-                const purchaseCost = state.isCurrentlyDragging && state.draggedTurretType ? ghostConfig.cost : 0;
-                if (state.sunCurrency >= (combinedMergeCost + purchaseCost)) { 
-                  if (d < closestDist) { closestDist = d; bestSnap = wPos; bestMergeTarget = occupantOnSameLayer; bestMergeInfo = { resType, resConfig, combinedPool, dynamicMergeCost: combinedMergeCost }; } 
-                }
-              }
-            }
-          } 
-          else if (!occupantOnSameLayer || occupantOnSameLayer === state.draggedTurretInstance) {
-            if (!coreOccupant && isAdjacent(q, r, state.draggedTurretInstance)) {
-              // IMPROVED: Use full circular collision check for placement instead of point isBlockAt
-              // Using a slightly larger safety multiplier (0.55) than physics (0.45) for spawning
+
+          if (!occupantOnSameLayer || occupantOnSameLayer === state.draggedTurretInstance) {
+            if (isAdjacent(q, r, state.draggedTurretInstance)) {
               const isClear = !state.world.checkCollision(wPos.x, wPos.y, ghostConfig.size * 0.55);
-              if (isClear) { 
-                if (d < closestDist) { closestDist = d; bestSnap = wPos; bestMergeTarget = null; bestMergeInfo = null; } 
-                fill(100, 255, 150, 40); noStroke(); ellipse(wPos.x, wPos.y, 10, 10); 
-              } else {
-                // Visual feedback for adjacency that is physically blocked
-                if (d < 30) {
-                  push(); translate(wPos.x, wPos.y); stroke(255, 50, 50, 180); strokeWeight(2); line(-5, -5, 5, 5); line(5, -5, -5, 5); pop();
+              if (isClear) {
+                const canAfford = state.sunCurrency >= purchaseCost;
+                push(); translate(wPos.x, wPos.y);
+                noStroke();
+                fill(canAfford ? [100, 255, 150, 80] : [255, 100, 100, 80]);
+                ellipse(0, 0, 15, 15);
+                stroke(canAfford ? [100, 255, 150, 150] : [255, 100, 100, 150]);
+                strokeWeight(2);
+                noFill();
+                ellipse(0, 0, 20, 20);
+                pop();
+
+                if (d < closestDist && d < GRID_SIZE * 3) {
+                  closestDist = d; bestSnap = wPos; bestMergeTarget = null; bestMergeInfo = null;
                 }
+              } else if (d < 30) {
+                push(); translate(wPos.x, wPos.y); stroke(255, 50, 50, 180); strokeWeight(2); line(-5, -5, 5, 5); line(5, -5, -5, 5); pop();
               }
             }
           }
         }
       }
+    }
+
+    // 2. Draw circles and costs for all turrets and find bestMerge
+    for (const att of state.player.attachments) {
+      if (att === state.draggedTurretInstance) continue;
+      const wPos = att.getWorldPos();
+      const d = dist(mWorld.x, mWorld.y, wPos.x, wPos.y);
+      const isMergeableLayer = (att.config.turretLayer || 'normal') === 'normal' && ghostLayer === 'normal';
+      let mergeInfo = null;
+      if (isMergeableLayer && !att.isFrosted && draggingIngredients.length > 0 && att.baseIngredients.length > 0) {
+        const combinedPool = [...draggingIngredients, ...att.baseIngredients];
+        const resType = findMergeResult(combinedPool);
+        const resConfig = resType ? turretTypes[resType] : null;
+        const isAvailable = resType ? (state.unlockedTurrets.includes(resType) || state.makeAllTurretsAvailable) : false;
+        if (resType && resConfig && isAvailable) {
+          const ingredientsCostSum = combinedPool.reduce((sum, k) => sum + (turretTypes[k]?.cost || 0), 0);
+          const combinedMergeCost = Math.max(0, resConfig.cost - ingredientsCostSum);
+          mergeInfo = { resType, resConfig, combinedMergeCost, combinedPool };
+        }
+      }
+
+      const totalReq = mergeInfo ? (mergeInfo.combinedMergeCost + purchaseCost) : purchaseCost;
+      const canAfford = state.sunCurrency >= totalReq;
+      const isPossible = !!mergeInfo;
+
+      push(); translate(wPos.x, wPos.y);
+      noFill();
+      stroke(isPossible ? (canAfford ? [100, 255, 150] : [255, 100, 100]) : [255, 100, 100, 100]);
+      strokeWeight(2);
+      ellipse(0, 0, att.size + 10);
+
+      if (mergeInfo) {
+
+        // Fade transition for result based on mouse distance
+        const distTiles = d / GRID_SIZE;
+        // 4 tiles -> 0 alpha, 3 tiles -> 255 alpha
+        const fadeAlpha = map(distTiles, 4, 3, 0, 255);
+        const finalAlpha = Math.min(255, Math.max(0, fadeAlpha));
+
+        const isBestSnap = (d < closestDist && d < GRID_SIZE * 3);
+        if (isBestSnap) {
+          closestDist = d; bestSnap = wPos; bestMergeTarget = att; 
+          bestMergeInfo = { resType: mergeInfo.resType, resConfig: mergeInfo.resConfig, combinedPool: mergeInfo.combinedPool, dynamicMergeCost: mergeInfo.combinedMergeCost, finalAlpha };
+        } else if (finalAlpha > 0 && canAfford) {
+          push();
+          // Add glow effect behind preview
+          noStroke();
+          fill(255, 255, 150, finalAlpha);
+          const pulse = 1.0 + 0.05 * sin(frameCount * 0.2);
+          ellipse(0, 0, att.size * 1.75 * pulse);
+
+          const ghost = { 
+            uid: 'merge_preview_loop', type: mergeInfo.resType, config: mergeInfo.resConfig, alpha: finalAlpha, angle: att.angle, 
+            recoil: 0, fireRateMultiplier: 1.0, actionTimers: new Map(), 
+            getWorldPos: () => wPos, jumpOffset: null, framesAlive: 0, flashTimer: 0 
+          };
+          drawTurretSprite(ghost);
+          pop();
+        }
+
+        // Draw smaller cost above turret with sun icon
+        rectMode(CENTER); fill(20, 20, 40, 240); noStroke();
+        const costText = `${totalReq}`;
+        textSize(6); // 40% smaller than 10
+        let tw = textWidth(costText) + 18; 
+        const costY = att.size/2 +6;
+        rect(0, costY, tw, 12, 3);
+        
+        imageMode(CENTER);
+        const sunIcon = state.assets['img_icon_sun'];
+        if (sunIcon) {
+          image(sunIcon, -tw/2 + 6, costY, 10, 10);
+        }
+        
+        fill(canAfford ? [255, 255, 150] : [255, 100, 100]); 
+        textAlign(LEFT, CENTER); 
+        text(costText, -tw/2 + 12, costY);
+      }
+      pop();
     }
     if (bestSnap) {
       state.previewSnapPos = bestSnap;
@@ -460,6 +546,29 @@ function tick() {
         translate(state.previewSnapPos.x, state.previewSnapPos.y);
         drawTurretSprite(ghost);
         pop();
+
+        // Render merge preview OVER the ghost if we are merging (snapped target)
+        if (bestMergeTarget && bestMergeInfo && bestMergeInfo.finalAlpha > 0) {
+          const { resType, resConfig, finalAlpha } = bestMergeInfo;
+          const canAfford = state.sunCurrency >= (bestMergeInfo.dynamicMergeCost + purchaseCost);
+          if (canAfford) {
+            push();
+            translate(state.previewSnapPos.x, state.previewSnapPos.y);
+            // Add glow effect (additional layer for the snapped target)
+            noStroke();
+            fill(255, 255, 150, finalAlpha * 0.4);
+            const pulse = 1.0 + 0.1 * sin(frameCount * 0.2);
+            ellipse(0, 0, bestMergeTarget.size * 1.6 * pulse);
+            
+            const mergeGhost = { 
+              uid: 'merge_preview_snap', type: resType, config: resConfig, alpha: finalAlpha, angle: bestMergeTarget.angle, 
+              recoil: 0, fireRateMultiplier: 1.0, actionTimers: new Map(), 
+              getWorldPos: () => state.previewSnapPos, jumpOffset: null, framesAlive: 0, flashTimer: 0 
+            };
+            drawTurretSprite(mergeGhost);
+            pop();
+          }
+        }
         
         const actionConfig = ghostConfig.actionConfig;
         let range = actionConfig?.shootRange || actionConfig?.beamMaxLength || actionConfig?.pulseTriggerRadius || 0;
@@ -471,14 +580,6 @@ function tick() {
             push(); noFill(); stroke(255, 255, 255, 100); strokeWeight(2); ellipse(state.previewSnapPos.x, state.previewSnapPos.y, range * 2); pop();
         }
       }
-    } else if (activePlacementType || state.draggedTurretInstance) {
-       // If no valid snap found but dragging, show invalid ghost at mouse
-       push(); translate(mWorld.x, mWorld.y); (window as any).tint(255, 100, 100, 100);
-       const ghostType = state.draggedTurretInstance ? state.draggedTurretInstance.type : activePlacementType;
-       const spriteKey = `img_${TYPE_MAP[ghostType!]}_front`;
-       const sprite = state.assets[spriteKey];
-       if (sprite) { imageMode(CENTER); image(sprite, 0, 0, 50, 50); }
-       (window as any).noTint(); pop();
     }
   }
   if (state.draggedTurretInstance && state.isStationary) {
@@ -512,6 +613,17 @@ function tick() {
 };
 
 (window as any).mousePressed = () => {
+  const RIGHT: any = (window as any).RIGHT;
+  const mouseButton: any = (window as any).mouseButton;
+
+  if (mouseButton === RIGHT) {
+    state.selectedTurretType = null;
+    state.draggedTurretInstance = null;
+    state.draggedTurretType = null;
+    state.isCurrentlyDragging = false;
+    return false; // Prevent default context menu
+  }
+
   if (state.simulateTouchScreen) {
     handleTouchStarted([{ x: mouseX, y: mouseY }]);
   } else {
@@ -535,7 +647,26 @@ function tick() {
     return;
   }
   if (mouseX > state.uiWidth && state.isStationary) {
-    const mWorld = createVector(mouseX - width/2 + state.cameraPos.x, mouseY - height/2 + state.cameraPos.y);
+    const activePlacementType = state.isCurrentlyDragging ? state.draggedTurretType : state.selectedTurretType;
+    const isScaling = !!(activePlacementType || state.draggedTurretInstance);
+    
+    let currentZoom = 1.0;
+    if (isScaling) {
+      let maxVerticalOffset = 0;
+      for (const att of state.player.attachments) {
+        const off = abs(att.offset.y);
+        if (off > maxVerticalOffset) maxVerticalOffset = off;
+      }
+      const padding = 80; 
+      const requiredHalfHeight = maxVerticalOffset + padding;
+      const availableHalfHeight = height / 2;
+      currentZoom = constrain(availableHalfHeight / requiredHalfHeight, 1.0, 2.0);
+    }
+
+    const mWorld = isScaling 
+      ? createVector((mouseX - width/2)/currentZoom + state.cameraPos.x, (mouseY - height/2)/currentZoom + state.cameraPos.y)
+      : createVector(mouseX - width/2 + state.cameraPos.x, mouseY - height/2 + state.cameraPos.y);
+
     if (dist(mWorld.x, mWorld.y, state.player.pos.x, state.player.pos.y) < state.player.size / 2) {
       state.player.isClickHolding = true;
       return;

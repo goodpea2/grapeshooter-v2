@@ -518,11 +518,11 @@ export const turretTypes: any = {
     targetConfig: { obstaclePriority: 'closest' }
   },
   t3_tesla: { 
-    name: 'Tesla Laser', cost: 40, health: 150, color: [100, 200, 255], size: 24, tier: 3, tooltip: "Creates electric chains between other Teslas, damaging everything on the way", animationBodyType: 'tough',
+    name: 'Tesla Laser', cost: 40, health: 300, color: [100, 200, 255], size: 24, tier: 3, tooltip: "Creates electric chains between other Teslas, damaging everything on the way", animationBodyType: 'tough',
     actionType: ['generateElectricChain', 'shoot'],
     actionConfig: { 
       electricChainDamageRate: 15, electricChainDamage: 5, electricChainDamageWidth: GRID_SIZE,
-      electricChainMaxLength: GRID_SIZE * 3, electricChainMaxDamage: 15,
+      electricChainMaxLength: GRID_SIZE * 5, electricChainMaxDamage: 15,
       bulletTypeKey: 'b_tesla_zap', shootRange: GRID_SIZE * 2, shootFireRate: 15
     },
     targetType: ['enemy', 'obstacle'],

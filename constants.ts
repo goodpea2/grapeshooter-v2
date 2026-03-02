@@ -4,7 +4,7 @@ export const HEX_DIST = 22;
 export const CHUNK_SIZE = 16;
 export const VISIBILITY_RADIUS = 14;
 export const CHUNK_GEN_RADIUS = 1; // Radius around player to generate/update chunks
-export const VERSION = "Grapeshooter - build 3/2 2:48am"; // absolute time from gmt+7, don't remove this comment
+export const VERSION = "Grapeshooter - build 3/3 1:43am"; // absolute time from gmt+7, don't remove this comment
 export const LEVEL_THRESHOLDS = [10, 22, 35, 50, 70, 90, 120, 150, 180, 200];
 export const HOUR_FRAMES = 600;
 export const MAX_VFX = 400;
@@ -50,17 +50,17 @@ export const WORLD_GEN_STATS: Record<string, { value: number, chance: number, bu
     { value: 1.0,  chance: 0.10 }
   ],
   stray: [
-    { value: 0.12, chance: 1.00 },
-    { value: 0.14, chance: 1.00 },
-    { value: 0.16, chance: 0.50 },
-    { value: 0.18, chance: 0.50 },
-    { value: 0.20, chance: 0.50 },
-    { value: 0.20, chance: 0.50 },
-    { value: 0.20, chance: 0.25 },
-    { value: 0.20, chance: 0.25 },
-    { value: 0.15, chance: 0.25 },
-    { value: 0.15, chance: 0.25 },
-    { value: 0.10, chance: 0.10 }
+    { value: 0.2, chance: 1.00 },
+    { value: 0.24, chance: 1.00 },
+    { value: 0.26, chance: 0.50 },
+    { value: 0.28, chance: 0.50 },
+    { value: 0.3, chance: 0.50 },
+    { value: 0.3, chance: 0.50 },
+    { value: 0.3, chance: 0.25 },
+    { value: 0.3, chance: 0.25 },
+    { value: 0.25, chance: 0.25 },
+    { value: 0.25, chance: 0.25 },
+    { value: 0.2, chance: 0.10 }
   ],
   sunflower: [
     { value: 0.10, chance: 1.00 },

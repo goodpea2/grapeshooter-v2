@@ -72,7 +72,7 @@ export class MagicLinkVFX {
             let target = p5.Vector.lerp(this.p1, this.p2, t);
             if (i < count) {
                 // Subtle jitter
-                let jitter = (random() - 0.5) * (dist * 0.2);
+                let jitter = (random() - 0.5) * (10);
                 target.add(p5.Vector.mult(perp, jitter));
             }
             this.segments.push({ a: prev.copy(), b: target.copy() });

@@ -47,7 +47,7 @@ export function drawGameSpeedButtons() {
   push();
   const btnMargin = 10;
   const btnSize = 40;
-  const almanacBtnSize = 80;
+  const almanacBtnSize = 60;
   const speedupBtnX = width - btnMargin - btnSize; // Right-align Speedup button
   const speedupBtnY = btnMargin;
   const pauseBtnX = width - btnMargin - btnSize * 2 - btnMargin; // Right-align Pause button
@@ -119,7 +119,7 @@ export function drawGameSpeedButtons() {
 export function handleGameSpeedButtonClick(): boolean {
   const btnMargin = 10;
   const btnSize = 40;
-  const almanacBtnSize = 120;
+  const almanacBtnSize = 80;
   const speedupBtnX = width - btnMargin - btnSize;
   const speedupBtnY = btnMargin;
   const pauseBtnX = width - btnMargin - btnSize * 2 - btnMargin;

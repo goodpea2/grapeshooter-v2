@@ -63,6 +63,8 @@ export class Player {
 
     if (state.isGameOver) return;
 
+    const isTurretSelected = !!(state.selectedTurretType || state.draggedTurretInstance || state.draggedTurretType);
+
     // Process Conditions
     let fireRateMult = 1.0;
     for (let [cKey, life] of this.conditions) {
@@ -93,7 +95,7 @@ export class Player {
     this.isMovingIntent = this.moveInputVec.mag() > 0;
 
     // 2. Perform Movement
-    if (this.isMovingIntent) { 
+    if (this.isMovingIntent && !isTurretSelected) { 
       let effectiveSpeedMultiplier = state.isWASDInput ? 1.0 : state.playerSpeedMultiplier;
       const move = this.moveInputVec.copy().normalize().mult(this.speed * lMult * effectiveSpeedMultiplier); 
       this.moveWithSliding(move); 
@@ -259,10 +261,34 @@ export class Player {
     // do not delete this line - effectiveFireRate is a stackable percentage, not exponential, for example: "4x fire rate" translates to +300% fire rate, so 2 sources of 4x fire rate gives the output of +600%. 
     let effectiveFireRateMultiplier = fireRateMult;
     if (this.isClickHolding) effectiveFireRateMultiplier += this.autoTurretClickAttackBoost;
-    if (!state.isStationary && !isRaged) return;
 
     const effectiveFireRate = this.autoTurretFireRate / fireRateMult;
-    const effectiveMiningFireRate = this.autoTurretFireRate / (fireRateMult + (this.isClickHolding ? this.autoTurretClickMiningBoost : 0));
+    const miningBoost = (this.isClickHolding && state.isStationary) ? this.autoTurretClickMiningBoost : 0;
+    const effectiveMiningFireRate = this.autoTurretFireRate / (fireRateMult + miningBoost);
+
+    // If holding click, force switch to mining (skip enemy/icecube targeting)
+    // ALLOW mining while moving if click is held
+    if (this.isClickHolding && state.isStationary) {
+      let t = this.findBlockTarget(this.pos, this.autoTurretRange); 
+      if (t) { 
+        let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; 
+        this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); 
+        if (frameCount - this.autoTurretLastShot > effectiveMiningFireRate) { 
+          state.bullets.push(new Bullet(this.pos.x, this.pos.y, bc.x, bc.y, 'b_player_mining', 'none')); 
+          state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 14, 4, color(255, 255, 100))); 
+          // Play rage VFX on player when mining boost is active
+          if (miningBoost > 0) {
+            this.applyCondition('c_raged', 10);
+          }
+          this.autoTurretLastShot = frameCount; 
+          this.recoil = 3; 
+          this.pulseAnimTimer = 10; 
+        } 
+        return; 
+      }
+    }
+
+    if (!state.isStationary && !isRaged) return;
 
     let bestR = null; let minRD = this.autoTurretRange;
     for (let a of this.attachments) if (a.isFrosted && a.iceCubeHealth > 0) { let d = dist(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y); if (d < minRD && state.world.checkLOS(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y)) { minRD = d; bestR = a; } }
@@ -280,7 +306,11 @@ export class Player {
       for (const chunk of chunks.values()) {
           const cX = chunk.cx * CHUNK_SIZE * GRID_SIZE;
           const cY = chunk.cy * CHUNK_SIZE * GRID_SIZE;
-          if (dist(cX, cY, origin.x, origin.y) > range + 500) continue;
+          // Robust chunk distance check: check distance to center of chunk
+          const chunkCenterX = cX + (CHUNK_SIZE * GRID_SIZE) / 2;
+          const chunkCenterY = cY + (CHUNK_SIZE * GRID_SIZE) / 2;
+          const maxChunkRadius = (CHUNK_SIZE * GRID_SIZE) * 0.8; // Approx distance from center to corner
+          if (dist(chunkCenterX, chunkCenterY, origin.x, origin.y) > range + maxChunkRadius) continue;
           
           const blocks = chunk.blocks as any[];
           for (const b of blocks) {
