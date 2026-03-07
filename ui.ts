@@ -58,6 +58,7 @@ declare const scale: any;
 declare const atan2: any;
 declare const constrain: any;
 declare const triangle: any;
+declare const textWidth: any;
 
 export function getTime() {
   let totalHours = (state.frames / HOUR_FRAMES);
@@ -223,87 +224,77 @@ function drawStats(alpha: number) {
   
   // Currency Row
   const curY = y + 36;
-  const pillW = 60;
   const pillH = 26;
-  const spacing = 65;
-  let currentOffset = 0;
+  const iconSize = 26;
+  const gap = 14;
+  const padding = 0;
 
-  // 1. Sun Bank
-  if (state.sunCurrency > 0) {
-    push();
-    translate(x + currentOffset, curY);
-    fill(30, 25, 60, alpha);
-    rect(0, 0, pillW, pillH, 13);
-    push();
-    translate(13, 13);
-    scale(state.uiSunScale);
-    image(state.assets['img_icon_sun'], 0, 0, 50, 50);
-    pop();
-    textAlign(LEFT, CENTER);
-    textSize(16);
-    fill(255, 230, 50, alpha);
-    text(floor(state.sunCurrency), 30, 13);
-    pop();
-    currentOffset += spacing;
+  const currencies = [
+    {
+      val: state.sunCurrency,
+      icon: 'img_icon_sun',
+      color: [255, 230, 50],
+      scale: state.uiSunScale
+    },
+    {
+      val: state.elixirCurrency,
+      icon: 'img_icon_elixir',
+      color: [200, 100, 255],
+      scale: state.uiElixirScale
+    },
+    {
+      val: state.soilCurrency,
+      icon: 'img_icon_soil',
+      color: [220, 160, 100],
+      scale: state.uiSoilScale
+    }
+  ];
+
+  push();
+  textSize(16);
+  textAlign(LEFT, CENTER);
+
+  // Filter active currencies
+  const active = currencies.filter(c => c.val > 0);
+
+  // --- Calculate total width ---
+  let totalW = padding;
+
+  for (let cur of active) {
+    const valText = floor(cur.val).toString();
+    const textW = textWidth(valText);
+
+    totalW += iconSize + 6 + textW + gap;
   }
 
-  // 2. Elixir Bank
-  if (state.elixirCurrency > 0) {
-    push();
-    translate(x + currentOffset, curY);
-    fill(30, 25, 60, alpha);
-    rect(0, 0, pillW, pillH, 13);
-    push();
-    translate(13, 13);
-    scale(state.uiElixirScale);
-    image(state.assets['img_icon_elixir'], 0, 0, 50, 50);
-    pop();
-    textAlign(LEFT, CENTER);
-    textSize(16);
-    fill(200, 100, 255, alpha);
-    text(floor(state.elixirCurrency), 30, 13);
-    pop();
-    currentOffset += spacing;
-  }
+  totalW += padding;
 
-  // 3. Soil Bank
-  if (state.soilCurrency > 0) {
-    push();
-    translate(x + currentOffset, curY);
+  // --- Draw single pill background ---
+  if (active.length > 0) {
     fill(30, 25, 60, alpha);
-    rect(0, 0, pillW, pillH, 13);
-    push();
-    translate(13, 13);
-    scale(state.uiSoilScale);
-    image(state.assets['img_icon_soil'], 0, 0, 50, 50);
-    pop();
-    textAlign(LEFT, CENTER);
-    textSize(16);
-    fill(220, 160, 100, alpha);
-    text(floor(state.soilCurrency), 30, 13);
-    pop();
-    currentOffset += spacing;
-  }
+    rect(x, curY, totalW, pillH, 13);
 
-  // 4. Raisin Bank (Removed from top UI as requested)
-  /*
-  if (state.raisinCurrency > 0) {
-    push();
-    translate(x + currentOffset, curY);
-    fill(30, 25, 60, alpha);
-    rect(0, 0, pillW, pillH, 13);
-    push();
-    translate(13, 13);
-    scale(state.uiElixirScale); // Use elixir scale for now
-    image(state.assets['img_icon_elixir'], 0, 0, 50, 50); // Placeholder icon
-    pop();
-    textAlign(LEFT, CENTER);
-    textSize(16);
-    fill(255, 150, 50, alpha);
-    text(floor(state.raisinCurrency), 30, 13);
-    pop();
+    let cursorX = x + padding;
+
+    // --- Draw currencies ---
+    for (let cur of active) {
+      const valText = floor(cur.val).toString();
+      const textW = textWidth(valText);
+
+      // icon
+      push();
+      translate(cursorX + iconSize/2, curY + pillH/2);
+      scale(cur.scale);
+      image(state.assets[cur.icon], 0, 0, 50, 50);
+      pop();
+
+      // text
+      fill(cur.color[0], cur.color[1], cur.color[2], alpha);
+      text(valText, cursorX + iconSize + 6, curY + pillH/2 + 2);
+
+      cursorX += iconSize + 6 + textW + gap;
+    }
   }
-  */
 
   pop();
 }
@@ -345,7 +336,7 @@ function drawFooter() {
   push();
   textAlign(CENTER, BOTTOM);
   textSize(10);
-  fill(255, 80);
+  fill(255, 40);
   noStroke();
   text(VERSION, width / 2, height - 10);
   pop();

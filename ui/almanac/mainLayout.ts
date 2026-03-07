@@ -29,6 +29,7 @@ declare const tint: any;
 declare const noTint: any;
 declare const floor: any;
 declare const ellipse: any;
+declare const textWidth: any;
 
 export function drawAlmanac() {
   if (!state.isAlmanacOpen) return;
@@ -62,47 +63,64 @@ export function drawAlmanac() {
   rect(0, 0, modalW, modalH, 40);
 
   // --- Resource Bar (Top of Left Panel) ---
-  const resBarY = 15;
-  const resSpacing = 65; // Tighter spacing
-  const resXStart = 40;
-  const allResources = [
-    { key: 'sun', icon: 'img_icon_sun', val: state.sunCurrency, color: [255, 230, 50] },
-    { key: 'elixir', icon: 'img_icon_elixir', val: state.elixirCurrency, color: [200, 100, 255] },
-    { key: 'soil', icon: 'img_icon_soil', val: state.soilCurrency, color: [220, 160, 100] },
-    { key: 'raisin', icon: 'img_icon_raisin', val: state.raisinCurrency, color: [255, 150, 50] },
-    { key: 'leaf', icon: 'img_icon_leaf', val: state.leafCurrency, color: [100, 255, 100] },
-    { key: 'shard', icon: 'img_icon_shard', val: state.shardCurrency, color: [50, 200, 255] },
-    { key: 'shell', icon: 'img_icon_shell', val: state.shellCurrency, color: [200, 200, 220] },
-    { key: 'fuel', icon: 'img_icon_fuel', val: state.fuelCurrency, color: [255, 100, 20] },
-    { key: 'ice', icon: 'img_icon_ice', val: state.iceCurrency, color: [150, 240, 255] },
-  ];
+const resBarY = 15;
+const resXStart = 40;
 
-  // Only show resources the player has at least one of
-  const resources = allResources.filter(r => r.val > 0);
+const iconSize = 32;
+const padding = -2;     // space between icon and text, the resource img has a lot of spaces itself
+const itemGap = 4;     // space between resources
 
-  push();
-  imageMode(CENTER);
-  textAlign(LEFT, CENTER);
-  textSize(16);
-  
-  // Draw a single dark pill for all resources
-  if (resources.length > 0) {
-    const totalW = resources.length * resSpacing + 10;
-    fill(0);
-    noStroke();
-    rect(resXStart - 15, resBarY, totalW, 28, 12);
+const allResources = [
+  { key: 'sun', icon: 'img_icon_sun', val: state.sunCurrency },
+  { key: 'elixir', icon: 'img_icon_elixir', val: state.elixirCurrency },
+  { key: 'soil', icon: 'img_icon_soil', val: state.soilCurrency },
+  { key: 'raisin', icon: 'img_icon_raisin', val: state.raisinCurrency },
+  { key: 'leaf', icon: 'img_icon_leaf', val: state.leafCurrency },
+  { key: 'shard', icon: 'img_icon_shard', val: state.shardCurrency },
+  { key: 'shell', icon: 'img_icon_shell', val: state.shellCurrency },
+  { key: 'fuel', icon: 'img_icon_fuel', val: state.fuelCurrency },
+  { key: 'ice', icon: 'img_icon_ice', val: state.iceCurrency },
+];
 
-    for (let i = 0; i < resources.length; i++) {
-      const res = resources[i];
-      const rx = resXStart + i * resSpacing;
-      const ry = resBarY + 14;
-      
-      image(state.assets[res.icon], rx, ry, 32, 32);
-      fill(255); // Use white for numbers as in the image
-      text(floor(res.val), rx + 15, ry + 2);
-    }
+// Only show resources the player has at least one of
+const resources = allResources.filter(r => r.val > 0);
+
+push();
+imageMode(CENTER);
+textAlign(LEFT, CENTER);
+textSize(16);
+
+// Calculate total width first (for background pill)
+let totalW = 10;
+for (let res of resources) {
+  const valText = floor(res.val).toString();
+  const textW = textWidth(valText);
+  totalW += iconSize + padding + textW + itemGap;
+}
+
+// Draw pill
+if (resources.length > 0) {
+  fill(0);
+  noStroke();
+  rect(resXStart - 15, resBarY, totalW, 28, 12);
+
+  let cursorX = resXStart;
+
+  for (let res of resources) {
+    const ry = resBarY + 14;
+    const valText = floor(res.val).toString();
+    const textW = textWidth(valText);
+
+    image(state.assets[res.icon], cursorX, ry, iconSize, iconSize);
+
+    fill(255);
+    text(valText, cursorX + iconSize/2 + padding, ry + 2);
+
+    cursorX += iconSize + padding + textW + itemGap;
   }
-  pop();
+}
+
+pop();
   
   // Layout proportions
   const leftPanelW = modalW * 0.6;
