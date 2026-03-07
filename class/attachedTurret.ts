@@ -933,8 +933,7 @@ export class AttachedTurret {
         }
         return;
       }
-      // Farm turrets are invulnerable while growing to prevent accidental player destruction
-      if (!isHarvestStage) return;
+      // Farm turrets are now destructible while growing to allow clearing space and enemy interaction
     }
 
     if (d < 0) { this.health = Math.min(this.maxHealth, this.health - d); this.flashTimer = 8; this.flashType = 'heal'; return; } 
