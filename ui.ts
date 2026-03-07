@@ -1,11 +1,12 @@
 
 import { state } from './state';
-import { HOUR_FRAMES, GRID_SIZE, VERSION } from './constants';
+import { HOUR_FRAMES, GRID_SIZE, VERSION, HUD_SAFEZONE } from './constants';
 import { turretTypes } from './balanceTurrets';
 import { drawDebugPanel, drawWorldGenPreview } from './uiDebug';
 import { TYPE_MAP } from './assetTurret';
 import { getLightLevel, customDayLightConfig } from './lvDemo';
 import { drawNPCPanel } from './uiNpcShop';
+import { drawTurretIcon } from './ui/inventory/turretIcon';
 import { drawNewTurretTooltip } from './UITurretTooltip';
 
 declare const floor: any;
@@ -24,6 +25,7 @@ declare const LEFT: any;
 declare const RIGHT: any;
 declare const TOP: any;
 declare const CENTER: any;
+declare const CORNER: any;
 declare const BOTTOM: any;
 declare const mouseX: any;
 declare const mouseY: any;
@@ -34,6 +36,7 @@ declare const ellipse: any;
 declare const stroke: any;
 declare const strokeWeight: any;
 declare const dist: any;
+declare const map: any;
 declare const lerp: any;
 declare const PI: any;
 declare const HALF_PI: any;
@@ -52,6 +55,9 @@ declare const beginShape: any;
 declare const vertex: any;
 declare const endShape: any;
 declare const scale: any;
+declare const atan2: any;
+declare const constrain: any;
+declare const triangle: any;
 
 export function getTime() {
   let totalHours = (state.frames / HOUR_FRAMES);
@@ -93,110 +99,6 @@ function getSkyTint(mins: number) {
 
 export function drawTurretTooltip(t: any, x: number, y: number, isPreview: boolean = false) {
   drawNewTurretTooltip(t, x, y, isPreview);
-}
-
-function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha: number) {
-  const size = 58;
-  const ownedCount = state.inventory[key] || 0;
-  const isOwned = ownedCount > 0;
-  
-  const costType = tr.costType || 'sun';
-  const currency = costType === 'soil' ? state.soilCurrency : state.sunCurrency;
-  const canAfford = isOwned || currency >= tr.cost;
-  
-  const lastUsed = state.turretLastUsed[key] || -99999;
-  const cooldownFrames = (tr.cooldownHours || 0) * HOUR_FRAMES;
-  const onCooldown = !state.instantRechargeTurrets && (state.frames - lastUsed < cooldownFrames);
-  const cooldownProgress = onCooldown ? (state.frames - lastUsed) / cooldownFrames : 1;
-  
-  const hov = dist(mouseX, mouseY, x, y) < size / 2;
-  const isDraggingThis = state.draggedTurretType === key;
-  const isSelected = state.selectedTurretType === key || isDraggingThis;
-  
-  push();
-  translate(x, y);
-  
-  if (isSelected) {
-    noStroke();
-    fill(255, 230, 100, alpha);
-    ellipse(0, 0, size + 10);
-  }
-  
-  noStroke();
-  let bgColor = tr.isSpecial ? [140, 55, 100] : [40, 80, 200]; 
-  if (!canAfford || onCooldown) bgColor = [40, 40, 40]; 
-  
-  fill(bgColor[0], bgColor[1], bgColor[2], alpha);
-  ellipse(0, 0, size);
-  
-  fill(255, 255, 255, alpha * 0.1);
-  ellipse(0, 0, size * 0.8);
-
-  const baseAssetKey = TYPE_MAP[key];
-  const sprite = state.assets[`img_${baseAssetKey}_front`];
-  if (sprite) {
-    imageMode(CENTER);
-    if (!canAfford || onCooldown) tint(100, 100, 100, alpha);
-    else if (alpha < 255) tint(255, alpha);
-    image(sprite, 0, 0, 60, 60);
-    noTint();
-  }
-
-  if (onCooldown) {
-    fill(0, 0, 0, alpha * 0.5);
-    ellipse(0, 0, size);
-    stroke(255, 255, 255, alpha * 0.8);
-    strokeWeight(4);
-    noFill();
-    const endAngle = -HALF_PI + TWO_PI * cooldownProgress;
-    arc(0, 0, size - 4, size - 4, -HALF_PI, endAngle);
-  }
-
-  // Cost Pill or Owned Count
-  if (!isOwned) {
-    const priceW = 46;
-    const priceH = 20;
-    const pY = size / 2;
-    rectMode(CENTER);
-    fill(canAfford ? [30, 60, 150] : [40, 40, 40], alpha);
-    noStroke();
-    rect(0, pY, priceW, priceH, 10);
-    
-    imageMode(CENTER);
-    if (!canAfford) tint(100, 100, 100, alpha);
-    const iconKey = costType === 'soil' ? 'img_icon_soil' : 'img_icon_sun';
-    image(state.assets[iconKey], -12, pY, 22, 22);
-    noTint();
-    
-    fill(255, alpha);
-    textAlign(LEFT, CENTER);
-    textSize(12);
-    text(`${tr.cost}`, 0, pY + 1);
-  } else {
-    // Show count on top-right panel
-    push();
-    translate(size/2 - 5, -size/2 + 5);
-    fill(20, 20, 40, alpha);
-    noStroke();
-    ellipse(0, 0, 22, 22);
-    fill(255, alpha);
-    textAlign(CENTER, CENTER);
-    textSize(11);
-    text(ownedCount, 0, 0);
-    pop();
-  }
-  pop();
-
-  if (hov && mouseIsPressed && state.isStationary) {
-    if (!onCooldown && canAfford && !state.draggedTurretType) {
-      state.draggedTurretType = key;
-      state.dragOrigin = { x: mouseX, y: mouseY };
-      state.isCurrentlyDragging = false;
-    }
-  }
-  // BUGFIX: Inject 'type' so tooltip can find assets
-  if (hov) return { ...tr, type: key };
-  return null;
 }
 
 function drawClock(x: number, y: number, alpha: number) {
@@ -459,20 +361,42 @@ export function drawUI(spawnFromBudget: Function) {
   const shopAlpha = state.uiAlpha;
 
   const stdList: any[] = [];
-  const specList: any[] = [];
+  const invList: any[] = [];
+  
+  // 1. Identify Standard (Infinite/Starting) Turrets
   for (let key in turretTypes) {
     let tr = turretTypes[key];
-    const owned = (state.inventory[key] || 0) > 0;
-    
-    // Tier 1 and 2 standard list
     const isUnlocked = state.unlockedTurrets.includes(key);
-    if (tr.tier > 0 && tr.tier <= 1.2 && !tr.isSpecial && isUnlocked) {
-      stdList.push({key, tr});
-    } else if (tr.isSpecial || tr.tier === 0) {
-      // Special turrets (like t_lilypad) only available if owned via NPC trade/inventory
-      if (owned) {
-        specList.push({key, tr});
-      }
+    if (!isUnlocked) continue;
+
+    // Standard Tier 1
+    const isTier1 = tr.tier > 0 && tr.tier <= 1.2 && !tr.isSpecial;
+    // Starting Specials (Sunflower, Lilypad, etc.) - exclude consumables
+    const isStartingSpecial = tr.isSpecial && !key.startsWith('t0_');
+
+    const isHiddenFromStd = key === 't_lilypad' || key.startsWith('t_farm_');
+    if ((isTier1 || isStartingSpecial) && !isHiddenFromStd) {
+      stdList.push({key, tr, isInstance: false});
+    }
+  }
+
+  // 2. Identify Owned Inventory Items (Stacked)
+  // We iterate through turretTypes to maintain a consistent order (e.g. by tier/alphabetical)
+  for (let key in turretTypes) {
+    let tr = turretTypes[key];
+    const count = state.inventory.items[key] || 0;
+    if (count <= 0) continue;
+
+    // Check if it's already in stdList
+    const isUnlocked = state.unlockedTurrets.includes(key);
+    const isTier1 = tr.tier > 0 && tr.tier <= 1.2 && !tr.isSpecial;
+    const isStartingSpecial = tr.isSpecial && isUnlocked && !key.startsWith('t0_');
+    const isHiddenFromStd = key === 't_lilypad' || key.startsWith('t_farm_');
+
+    const isStandard = (isTier1 || isStartingSpecial) && !isHiddenFromStd;
+
+    if (!isStandard) {
+      invList.push({key, tr, isInstance: false});
     }
   }
 
@@ -488,10 +412,10 @@ export function drawUI(spawnFromBudget: Function) {
   let itemsInCol = 0;
 
   // Draw Combined Column(s)
-  const combinedList = [...stdList, ...specList];
+  const combinedList = [...stdList, ...invList];
   let hoveredTooltipData = null;
   for (let item of combinedList) {
-    const hovData = drawTurretIcon(item.tr, item.key, currentX, currentY, shopAlpha);
+    const hovData = drawTurretIcon(item.tr, item.key, currentX, currentY, shopAlpha, item.isInstance);
     if (hovData) hoveredTooltipData = hovData;
     currentY += spacing;
     itemsInCol++;
@@ -523,6 +447,159 @@ export function drawUI(spawnFromBudget: Function) {
   drawNPCPanel();
   drawWorldGenPreview();
   drawFooter();
+
+  // Night Warning
+  const t = getTime();
+  const nightWarningStartFrame = 19.5 * HOUR_FRAMES;
+  const currentDayFrames = state.frames % (24 * HOUR_FRAMES);
+  
+  if (currentDayFrames >= nightWarningStartFrame && currentDayFrames < nightWarningStartFrame + 300) {
+    const elapsed = currentDayFrames - nightWarningStartFrame;
+    let alpha = 0;
+    let yOffset = 0;
+    
+    if (elapsed < 30) { // Intro (1s)
+      alpha = map(elapsed, 0, 30, 0, 255);
+      yOffset = map(elapsed, 0, 30, 20, 0);
+    } else if (elapsed < 240) { // Wait (3s)
+      alpha = 255;
+      yOffset = 0;
+    } else { // Fade out (1s)
+      alpha = map(elapsed, 240, 300, 255, 0);
+      yOffset = map(elapsed, 240, 300, 0, -20);
+    }
+
+    // Dramatic VFX: Red Vignette
+    push();
+    noFill();
+    stroke(255, 0, 0, (alpha / 255) * (30 + 10 * sin(state.frames * 0.1)));
+    strokeWeight(120);
+    rectMode(CORNER);
+    rect(0, 0, width, height);
+    pop();
+
+    push();
+    textAlign(CENTER, CENTER);
+    textSize(44);
+    fill(255, 50, 50, alpha);
+    stroke(0, alpha);
+    strokeWeight(4);
+    text("THE NIGHT IS APPROACHING", width / 2, height / 3 + yOffset);
+    
+    pop();
+  }
+
+  // NPC Indicator
+  if (state.npcs && state.npcs.length > 0) {
+    for (let npc of state.npcs) {
+      if (!state.player) continue;
+      const wPos = npc.pos;
+      const pPos = state.player.pos;
+      const d = dist(pPos.x, pPos.y, wPos.x, wPos.y);
+      const d_tiles = d / GRID_SIZE;
+      
+      // Dynamic Safezone: intersection of HUD_SAFEZONE circle and screen rectangle
+      const screenMargin = 40;
+      const maxDistCircle = HUD_SAFEZONE * GRID_SIZE;
+      const maxDistX = width / 2 - screenMargin;
+      const maxDistY = height / 2 - screenMargin;
+      
+      // For alpha/fading, we use the minimum screen dimension to ensure it appears when off-screen in any direction
+      const screenSafeTiles = (Math.min(width, height) / 2 - screenMargin) / GRID_SIZE;
+
+      // Distance-based scaling and fading
+      // tileDistance=[0, d_safe-2, d_safe, 32, 48, 52], size=[0,0,1,1,0.5,0.5], alpha=[0,0,255,255,255,0]
+      let indSize = 0;
+      let indAlpha = 0;
+
+      if (d_tiles < screenSafeTiles - 2) {
+        indSize = 0;
+        indAlpha = 0;
+      } else if (d_tiles < screenSafeTiles) {
+        indSize = map(d_tiles, screenSafeTiles - 2, screenSafeTiles, 0, 1);
+        indAlpha = map(d_tiles, screenSafeTiles - 2, screenSafeTiles, 0, 255);
+      } else if (d_tiles < 32) {
+        indSize = 1;
+        indAlpha = 255;
+      } else if (d_tiles < 48) {
+        indSize = map(d_tiles, 32, 48, 1, 0.5);
+        indAlpha = 255;
+      } else if (d_tiles < 52) {
+        indSize = 0.5;
+        indAlpha = map(d_tiles, 48, 52, 255, 0);
+      } else {
+        indSize = 0.5;
+        indAlpha = 0;
+      }
+
+      if (indAlpha <= 0) continue;
+
+      // Calculate screen position relative to camera
+      const screenX = wPos.x - state.cameraPos.x + width / 2;
+      const screenY = wPos.y - state.cameraPos.y + height / 2;
+
+      // Constrain to dynamic safezone
+      const dx = screenX - width / 2;
+      const dy = screenY - height / 2;
+      const distToNpc = dist(0, 0, dx, dy);
+      
+      let indX, indY;
+      let isPointing = false;
+      
+      const constraintScale = Math.min(1, maxDistCircle / distToNpc, maxDistX / Math.abs(dx), maxDistY / Math.abs(dy));
+      
+      if (constraintScale < 1) {
+        indX = width / 2 + dx * constraintScale;
+        indY = height / 2 + dy * constraintScale;
+        isPointing = true;
+      } else {
+        indX = screenX;
+        indY = screenY;
+        isPointing = false;
+      }
+      
+      push();
+      translate(indX, indY);
+      
+      // Pulse effect + distance scaling
+      const pulse = 1.0 + 0.05 * sin(state.frames * 0.1);
+      scale(pulse * indSize);
+
+      // Box
+      rectMode(CENTER);
+      fill(30, 25, 60, (indAlpha / 255) * 200);
+      stroke(255, 200, 0, indAlpha);
+      strokeWeight(2);
+      rect(0, 0, 36, 36, 8);
+
+      if (npc.discovered) {
+        // Draw NPC asset image
+        const sprite = state.assets[`img_${npc.config.assetKey}_front`];
+        if (sprite) {
+          imageMode(CENTER);
+          tint(255, indAlpha);
+          image(sprite, 0, -10, 60, 60);
+          noTint();
+        }
+      } else {
+        // draw "?""
+        fill(255, indAlpha);
+        noStroke();
+        textAlign(CENTER, CENTER);
+        textSize(18);
+        text("?", 0, 0);
+      }
+
+      // Arrow pointing to NPC (if constrained to safezone edge)
+      if (isPointing) {
+        const angle = atan2(wPos.y - pPos.y, wPos.x - pPos.x);
+        rotate(angle);
+        fill(255, 200, 0, indAlpha);
+        triangle(25, 0, 18, -6, 18, 6);
+      }
+      pop();
+    }
+  }
 
   if (hoveredTooltipData) {
     drawTurretTooltip(hoveredTooltipData, mouseX, mouseY);

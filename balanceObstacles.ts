@@ -26,7 +26,8 @@ export const overlayTypes: any = {
     minHealth: -1, 
     isValuable: true, 
     obstacleOverlayVfx: 'v_sun_tiny',
-    isConcealedAlongWithObstacle: false,
+    isConcealedAlongWithObstacle: true,
+    concealedSparkleVfx: 'v_sparkle_white',
     lootConfigOnDeath: 'lc_sun_tiny',
     assetImgConfig: { idleAssetImg: ['img_sun_1_a', 'img_sun_1_b'], randomRotation: true, randomFlip: true }
   },
@@ -35,7 +36,8 @@ export const overlayTypes: any = {
     minHealth: -1, 
     isValuable: true, 
     obstacleOverlayVfx: 'v_sun_ore',
-    isConcealedAlongWithObstacle: false,
+    isConcealedAlongWithObstacle: true,
+    concealedSparkleVfx: 'v_sparkle_white',
     lootConfigOnDeath: 'lc_sun_ore',
     assetImgConfig: { idleAssetImg: ['img_sun_3_a', 'img_sun_3_b'], randomRotation: true, randomFlip: true }
   },
@@ -44,7 +46,8 @@ export const overlayTypes: any = {
     minHealth: -1, 
     isValuable: true, 
     obstacleOverlayVfx: 'v_sun_clump',
-    isConcealedAlongWithObstacle: false,
+    isConcealedAlongWithObstacle: true,
+    concealedSparkleVfx: 'v_sparkle_white',
     lootConfigOnDeath: 'lc_sun_clump',
     assetImgConfig: { idleAssetImg: ['img_sun_10_a'], randomRotation: true, randomFlip: true }
   },
@@ -55,6 +58,7 @@ export const overlayTypes: any = {
     obstacleOverlayVfx: 'v_tnt',
     isConcealedAlongWithObstacle: true,
     concealedSparkleVfx: 'v_sparkle_white',
+    lootConfigOnDeath: 'ov_tnt',
     bulletToSpawnOnDeath: ['b_tnt_explosion'],
     isDanger: true,
     assetImgConfig: { idleAssetImg: ['img_tnt_a'], randomRotation: false, randomFlip: true }

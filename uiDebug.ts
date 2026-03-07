@@ -373,7 +373,17 @@ export function drawDebugPanel(spawnFromBudget: Function) {
       { l: "INSTANT CD", v: state.instantRechargeTurrets, a: () => state.instantRechargeTurrets = !state.instantRechargeTurrets, type: 'toggle', grid: true },
       { l: "Touch Gizmo", v: state.showTouchGizmo, a: () => state.showTouchGizmo = !state.showTouchGizmo, type: 'toggle', grid: true },
       { l: "WORLD PREV", v: state.showWorldGenPreview, a: () => { state.showWorldGenPreview = !state.showWorldGenPreview; state.worldPreviewNeedsUpdate = true; }, type: 'toggle', grid: true },
-      { l: "+1k ALL", a: () => { state.sunCurrency += 1000; state.soilCurrency += 1000; state.elixirCurrency += 1000; state.raisinCurrency += 1000; }, grid: true },
+      { l: "+1k ALL", a: () => { 
+        state.sunCurrency += 1000; 
+        state.soilCurrency += 1000; 
+        state.elixirCurrency += 1000; 
+        state.raisinCurrency += 1000; 
+        state.leafCurrency += 1000;
+        state.shardCurrency += 1000;
+        state.shellCurrency += 1000;
+        state.fuelCurrency += 1000;
+        state.iceCurrency += 1000;
+      }, grid: true },
       { l: "WARP 12H", a: () => state.timeWarpRemaining = 60, grid: true },
       { l: "CLEAR BLOCK", a: () => {
         const b = new Bullet(state.player.pos.x, state.player.pos.y, state.player.pos.x, state.player.pos.y, 'b_cheat_blocks', 'none');
@@ -399,6 +409,9 @@ export function drawDebugPanel(spawnFromBudget: Function) {
           if (!state.unlockedTurrets.includes(t.type)) state.unlockedTurrets.push(t.type);
         });
         state.lockedTurrets = [];
+        AlmanacProgression.UnlockedByDiscoverTurret.forEach((key: string) => {
+          if (!state.unlockedTurrets.includes(key)) state.unlockedTurrets.push(key);
+        });
       }, grid: true },
       { l: "Turret Gizmo", v: state.debugGizmosTurrets, a: () => state.debugGizmosTurrets = !state.debugGizmosTurrets, type: 'toggle', grid: true },
       { l: "CLEAR TURRET", a: () => {

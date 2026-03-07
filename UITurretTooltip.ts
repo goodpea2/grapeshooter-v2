@@ -267,6 +267,18 @@ export const TURRET_DISPLAY_STATS: Record<string, TurretDisplayStat[]> = {
     't3_triberg': [
         { label: 'Health', value: '50' }, { label: 'Stun gas radius', value: '1 tile x3' }, { label: 'Stun gas duration', value: '3h' },
         { label: 'Target', value: 'Mobs' }, { label: 'Arming rate', value: '2h' }, { label: ' ', value: ' ' }
+    ],
+    't_farm_bush': [
+        { label: 'Health', value: '100' }, { label: 'Harvest', value: 'Leaf*3' }, { label: 'Growth', value: '6h' },
+        { label: 'Requirement', value: 'Elixir' }, { label: 'Attract range', value: '4 tiles' }, { label: ' ', value: ' ' }
+    ],
+    't_farm_crystal': [
+        { label: 'Health', value: '100' }, { label: 'Harvest', value: 'Shard*3' }, { label: 'Growth', value: '6h' },
+        { label: 'Requirement', value: 'Elixir' }, { label: 'Attract range', value: '4 tiles' }, { label: ' ', value: ' ' }
+    ],
+    't_farm_mob': [
+        { label: 'Health', value: '100' }, { label: 'Enemy Spawn', value: 'Basic/Armor1' }, { label: 'Growth', value: '1.5h' },
+        { label: 'Requirement', value: 'None' }, { label: ' ', value: ' ' }, { label: ' ', value: ' ' }
     ]
 };
 

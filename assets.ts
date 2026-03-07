@@ -151,6 +151,11 @@ export const ASSETS = {
   img_icon_soil: "https://i.ibb.co/TBj66xWX/icon-soil.png",
   img_icon_sun: "https://i.ibb.co/vx8rqK71/icon-sun.png",
   img_icon_raisin: "https://i.ibb.co/mCvqks7R/icon-raisin.png",
+  img_icon_ice: "https://i.ibb.co/d0r3JwMz/icon-ice.png",
+  img_icon_fuel: "https://i.ibb.co/WNDqFS9n/icon-fuel.png",
+  img_icon_shell: "https://i.ibb.co/60nr9bvZ/icon-shell.png",
+  img_icon_shard: "https://i.ibb.co/d4T0krDw/icon-shard.png",
+  img_icon_leaf: "https://i.ibb.co/qYcq5yBT/icon-leaf.png",
   img_icon_almanac: "https://i.ibb.co/tMXJCXb3/icon-almanac.png",
   img_icon_almanac_glow: "https://i.ibb.co/hJSczhtX/icon-almanac-glow.png",
 
@@ -176,5 +181,29 @@ export const ASSETS = {
   img_t_minespawner_front: "https://i.ibb.co/Ndx7mb38/t-minespawner-front-right.png",
   img_t_minespawner_unarmed: "https://i.ibb.co/jPW6vVL9/t-minespawner-unarmed.png",
   img_t_pulse_front: "https://i.ibb.co/LhhTZDQm/t-pulse-front-right.png",
-  img_t_stun_unarmed: "https://i.ibb.co/ccTtHHLc/t-stun-unarmed.png"
+  img_t_stun_unarmed: "https://i.ibb.co/ccTtHHLc/t-stun-unarmed.png",
+
+  // Farm Turrets
+  img_t_farm_bush_front: "https://i.ibb.co/5g1Yjdz2/t-farm-bush-stage5-front-right.png",
+  img_t_farm_bush_stage0: "https://i.ibb.co/BVzQxf9q/t-farm-bush-stage0-front-right.png",
+  img_t_farm_bush_stage1: "https://i.ibb.co/Q3BbgtQ9/t-farm-bush-stage1-front-right.png",
+  img_t_farm_bush_stage2: "https://i.ibb.co/k2Wv1m21/t-farm-bush-stage2-front-right.png",
+  img_t_farm_bush_stage3: "https://i.ibb.co/LzKtBKjq/t-farm-bush-stage3-front-right.png",
+  img_t_farm_bush_stage4: "https://i.ibb.co/s95STbrt/t-farm-bush-stage4-front-right.png",
+  img_t_farm_bush_stage5: "https://i.ibb.co/5g1Yjdz2/t-farm-bush-stage5-front-right.png",
+  img_t_farm_crystal_front: "https://i.ibb.co/d03dVHqk/t-farm-crystal-stage5-front-right.png",
+  img_t_farm_crystal_stage0: "https://i.ibb.co/RGRzVHrP/t-farm-crystal-stage0-front-right.png",
+  img_t_farm_crystal_stage1: "https://i.ibb.co/tTFhkdxC/t-farm-crystal-stage1-front-right.png",
+  img_t_farm_crystal_stage2: "https://i.ibb.co/d0RLQc2Y/t-farm-crystal-stage2-front-right.png",
+  img_t_farm_crystal_stage3: "https://i.ibb.co/F4M8QWgK/t-farm-crystal-stage3-front-right.png",
+  img_t_farm_crystal_stage4: "https://i.ibb.co/QjkZzC26/t-farm-crystal-stage4-front-right.png",
+  img_t_farm_crystal_stage5: "https://i.ibb.co/d03dVHqk/t-farm-crystal-stage5-front-right.png",
+  img_t_farm_mob_front: "https://i.ibb.co/k2sTckyd/t-farm-mob-stage3-front-right.png",
+  img_t_farm_mob_stage0: "https://i.ibb.co/s42x8WC/t-farm-mob-stage0-front-right.png",
+  img_t_farm_mob_stage1: "https://i.ibb.co/hptz7Qs/t-farm-mob-stage1-front-right.png",
+  img_t_farm_mob_stage2: "https://i.ibb.co/MkB3Thvc/t-farm-mob-stage2-front-right.png",
+  img_t_farm_mob_stage3: "https://i.ibb.co/k2sTckyd/t-farm-mob-stage3-front-right.png",
+  img_t_farm_mob_stage4: "https://i.ibb.co/k2sTckyd/t-farm-mob-stage3-front-right.png"
 };
+
+

@@ -18,8 +18,16 @@ export const state: any = {
   elixirCurrency: 0,
   soilCurrency: 0,
   raisinCurrency: 0,
+  leafCurrency: 0,
+  shardCurrency: 0,
+  shellCurrency: 0,
+  fuelCurrency: 0,
+  iceCurrency: 0,
   flyingRaisins: [], // { startX, startY, targetX, targetY, progress, value }
-  inventory: {}, // Map of itemKey -> count
+  inventory: {
+    items: {}, // Map of itemKey -> count
+    specList: [] // List of special items (turrets)
+  },
   unlockedTurrets: [...AlmanacProgression.StartingTurret],
   lockedTurrets: [...AlmanacProgression.LockedTurret],
   unlockCount: 0,
@@ -80,7 +88,7 @@ export const state: any = {
   accumulatedStrayPot: 0,
   accumulatedSunflowerPot: 1.0, 
   accumulatedSniperPot: 0,
-  accumulatedSpawnerPot: 0,
+  accumulatedSpawnerPot: 1.0,
 
   // Total spawned trackers for debug
   totalSunSpawned: 0,
@@ -132,6 +140,7 @@ export const state: any = {
   pressedTradeId: null, // Tracks currently clicked shop item
   npcShopScrollY: 0,
   npcShopScrollVelocity: 0,
+  npcShopPressPos: null,
   
   // Touch Input
   touchInputVec: { x: 0, y: 0 },
@@ -155,6 +164,7 @@ export const state: any = {
 
   // Time Warp
   timeWarpRemaining: 0,
+  nightWarningTimer: 0,
 
   // Room Director Discovery Tracking
   roomDirectorData: "",

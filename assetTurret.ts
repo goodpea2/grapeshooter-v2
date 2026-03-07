@@ -80,6 +80,10 @@ export const TYPE_MAP: Record<string, string> = {
   't0_starfruit': 't0_starfruit',
   't0_iceshroom': 't0_iceshroom',
   't0_cherrybomb': 't0_cherrybomb',
+  // Farm Turrets
+  't_farm_bush': 't_farm_bush',
+  't_farm_crystal': 't_farm_crystal',
+  't_farm_mob': 't_farm_mob',
   // Test
   't_dummy': 't_wall'
 };
@@ -88,6 +92,7 @@ export const TYPE_MAP: Record<string, string> = {
 const NO_BACK_UNITS = new Set([
   't_wall', 't2_tall', 't2_pulse', 't2_spike', 't_sunflower', 't_seed', 't_seed2', 't_lilypad',
   't0_jalapeno', 't0_firecherry', 't0_starfruit', 't0_iceshroom', 't0_cherrybomb',
+  't_farm_bush', 't_farm_crystal', 't_farm_mob',
   't_dummy',
   // T3 additions that have no back asset provided
   't3_repulser', 't3_skymortar', 't3_miningbomb', 't3_tesla', 't3_densnut', 't3_durian',
@@ -136,7 +141,7 @@ export function drawTurretSprite(t: any) {
   const config = t.config;
   const actionConfig = config.actionConfig;
 
-  if (actionConfig.hasUnarmedAsset) {
+  if (actionConfig?.hasUnarmedAsset) {
     const primaryActions = ['pulse', 'shoot', 'shootMultiTarget', 'launch', 'spawnBulletAtRandom'];
     const applyTo = config.unarmedAssetApplyToAction || primaryActions;
     
@@ -160,7 +165,9 @@ export function drawTurretSprite(t: any) {
   }
 
   let spriteKey = `img_${baseKey}_front`;
-  if (onCooldown) {
+  if (config.actionType.includes('farm')) {
+    spriteKey = config.farmConfig.assetImg[t.farmStage];
+  } else if (onCooldown) {
     spriteKey = `img_${baseKey}_unarmed`;
   } else if (!NO_BACK_UNITS.has(t.type) && isBack) {
     spriteKey = `img_${baseKey}_back`;

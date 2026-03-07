@@ -38,6 +38,9 @@ declare const textSize: any;
 declare const text: any;
 declare const floor: any;
 declare const radians: any;
+declare const triangle: any;
+declare const imageMode: any;
+declare const image: any;
 
 export function drawTurret(t: any) {
   let wPos = t.getWorldPos();
@@ -125,6 +128,15 @@ export function drawTurret(t: any) {
   push();
   translate(wPos.x + animX, wPos.y + animY);
   rotate(animRot);
+
+  if (t.isHarvestReady) {
+    push();
+    noFill();
+    stroke(255, 200, 0, 150 + 50 * sin(state.frames * 0.1));
+    strokeWeight(4);
+    ellipse(0, 0, t.size + 10);
+    pop();
+  }
   
   if (state.debugGizmosTurrets && state.isStationary) {
     push();
@@ -302,7 +314,7 @@ export function drawTurret(t: any) {
     const maxG = t.config.actionConfig.maxGrowth || 32;
     const gRatio = t.growthProgress / maxG;
     const barW = t.size + 10;
-    const barH = 5;
+    const barH = 4;
     const glowAlpha = t.isWaterlogged ? 150 + 100 * sin(state.frames * 0.2) : 180;
 
     push();
@@ -358,4 +370,59 @@ export function drawTurret(t: any) {
   }
 
   pop();
+}
+
+export function drawTurretUI(t: any) {
+  const wPos = t.getWorldPos();
+  const config = t.config;
+  
+  if (config.actionType.includes('farm')) {
+    const fCfg = config.farmConfig;
+    const isHarvestStage = t.farmStage === fCfg.assetImg.length - 1;
+    
+    // Draw elixir requirement bubble if not at harvest stage
+    if (!isHarvestStage && !fCfg.isMobFarm) {
+      const elixirNeeded = fCfg.elixirRequired[t.farmStage] || 0;
+      const isRequirementMet = t.farmElixirCount >= elixirNeeded;
+      
+      if (elixirNeeded > 0 && !isRequirementMet) {
+        push();
+        translate(wPos.x, wPos.y - t.size/2 - 10);
+        
+        // Chat bubble tail
+        fill(255);
+        noStroke();
+        triangle(-5, 0, 5, 0, 0, 8);
+        
+        // Bubble background
+        rectMode(CENTER);
+        fill(255);
+        rect(0, 0, 16, 16, 8);
+        
+        // Elixir icon
+        const elixirSprite = state.assets['img_icon_elixir'];
+        if (elixirSprite) {
+          imageMode(CENTER);
+          image(elixirSprite, 0, 0, 24, 24);
+        }
+        pop();
+      }
+    }
+    
+    // Draw harvest HP bar if at harvest stage
+    if (isHarvestStage && !fCfg.isMobFarm) {
+      const hpHRatio = t.farmHarvestHp / (fCfg.harvestStageHp || 100);
+      push();
+      translate(wPos.x, wPos.y - t.size/2 - 15);
+      const barW = t.size + 10;
+      const barH = 4;
+      fill(20, 180);
+      rectMode(CENTER);
+      rect(0, 0, barW, barH, 2);
+      fill(255, 200, 0); // Gold for harvest
+      rectMode(CORNER);
+      rect(-barW/2, -barH/2, barW * hpHRatio, barH, 2);
+      pop();
+    }
+  }
 }

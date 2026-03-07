@@ -7,8 +7,9 @@ import { liquidTypes } from '../balanceLiquids';
 import { overlayTypes } from '../balanceObstacles';
 import { MuzzleFlash, Explosion, SparkVFX, BlockDebris, ConditionVFX, MergeVFX, MagicLinkVFX, WeldingHitVFX, FirstStrikeVFX, FrostFieldAuraVFX, DamageNumberVFX } from '../vfx/index';
 import { Bullet } from './bullet';
-import { SunLoot } from './loot';
-import { drawTurret } from '../visualTurrets';
+import { LootEntity, SunLoot } from './loot';
+import { Enemy } from './enemy';
+import { drawTurret, drawTurretUI } from '../visualTurrets';
 import { TURRET_RECIPES } from '../dictionaryTurretMerging';
 
 declare const p5: any;
@@ -63,6 +64,12 @@ export class AttachedTurret {
   // T3 First Strike tracking
   firstStrikeCount: number = 0;
 
+  // Farm tracking
+  farmStage: number = 0;
+  farmGrowthTimer: number = 0;
+  farmElixirCount: number = 0;
+  farmHarvestHp: number = 0;
+
   // Staggered target scan
   targetScanTimer: number;
 
@@ -107,6 +114,12 @@ export class AttachedTurret {
         }
       }
     }
+
+    if (this.config.actionType.includes('farm')) {
+      this.farmStage = 0;
+      this.farmGrowthTimer = this.config.farmConfig.growthTimer[0];
+      this.farmHarvestHp = this.config.farmConfig.harvestStageHp || 100;
+    }
   }
   
   getWorldPos() { return p5.Vector.add(this.parent.pos, this.offset); }
@@ -135,6 +148,12 @@ export class AttachedTurret {
     }
 
     if (!state.vfx.some((v: any) => v instanceof ConditionVFX && v.target === this && v.type === cKey)) state.vfx.push(new ConditionVFX(this, cKey));
+  }
+
+  get isHarvestReady(): boolean {
+    if (!this.config.actionType.includes('farm')) return false;
+    const fCfg = this.config.farmConfig;
+    return this.farmStage === fCfg.assetImg.length - 1 && !fCfg.isMobFarm;
   }
 
   update() {
@@ -216,7 +235,67 @@ export class AttachedTurret {
           if (index !== -1) {
             const nt = new AttachedTurret(chosen, this.parent, this.hq, this.hr);
             this.parent.attachments[index] = nt;
-            state.vfx.push(new MergeVFX(wPos.x, wPos.y, 255));
+            state.vfx.push(new MergeVFX(wPos.x, wPos.y, [255, 255, 255]));
+          }
+        }
+      }
+    }
+
+    if (this.config.actionType.includes('farm')) {
+      const fCfg = this.config.farmConfig;
+      const isHarvestStage = this.farmStage === fCfg.assetImg.length - 1;
+      
+      if (!isHarvestStage) {
+        const elixirNeeded = fCfg.elixirRequired[this.farmStage] || 0;
+        const hasRequirement = this.farmElixirCount >= elixirNeeded;
+
+        if (hasRequirement) {
+          if (this.farmGrowthTimer > 0) {
+            this.farmGrowthTimer--;
+          } else {
+            // Grow to next stage
+            this.farmStage++;
+            this.farmElixirCount = 0;
+            if (this.farmStage < fCfg.assetImg.length) {
+              this.farmGrowthTimer = fCfg.growthTimer[this.farmStage];
+            }
+          }
+        } else {
+          // Attract elixir
+          const range = fCfg.attractRange || GRID_SIZE * 4;
+          const rangeSq = range * range;
+          
+          // Count how many loots are already being attracted to this farm
+          let currentlyAttractedCount = 0;
+          for (let l of state.loot) {
+            if (l.isBeingAttractedByFarm && l.farmAttractor === this) {
+              currentlyAttractedCount++;
+            }
+          }
+
+          if (this.farmElixirCount + currentlyAttractedCount < elixirNeeded) {
+            for (let l of state.loot) {
+              if (l.typeKey === 'elixir' && l.life > 0 && !l.isBeingAttractedByFarm) {
+                const dSq = (wPos.x - l.pos.x)**2 + (wPos.y - l.pos.y)**2;
+                if (dSq < rangeSq) {
+                  l.isBeingAttractedByFarm = true;
+                  l.farmAttractor = this;
+                  currentlyAttractedCount++;
+                  if (this.farmElixirCount + currentlyAttractedCount >= elixirNeeded) break;
+                }
+              }
+            }
+          }
+        }
+      } else {
+        // Harvest stage
+        if (fCfg.isMobFarm) {
+          this.spawnMobFarmEnemy();
+          
+          if (fCfg.resetAfterHarvest) {
+            this.farmStage = 0;
+            this.farmGrowthTimer = fCfg.growthTimer[0];
+            this.farmElixirCount = 0;
           }
         }
       }
@@ -823,7 +902,41 @@ export class AttachedTurret {
   }
 
   takeDamage(d: number) { 
-    if (this.isFrosted) { this.iceCubeHealth -= d; if (this.iceCubeHealth <= 0) { this.isFrosted = false; this.frostLevel = 0; state.vfx.push(new BlockDebris(this.getWorldPos().x, this.getWorldPos().y, [180, 240, 255])); for (let a of this.parent.attachments) if (a.target === this) a.target = null; if (state.player.target === this) state.player.target = null; } return; }
+    if (this.isFrosted) { 
+      this.iceCubeHealth -= d; 
+      if (this.iceCubeHealth <= 0) { 
+        this.isFrosted = false; 
+        this.frostLevel = 0; 
+        state.vfx.push(new BlockDebris(this.getWorldPos().x, this.getWorldPos().y, [180, 240, 255])); 
+        for (let a of this.parent.attachments) if (a.target === this) a.target = null; 
+        if (state.player.target === this) state.player.target = null; 
+      } 
+      return; 
+    }
+
+    if (this.config.actionType.includes('farm')) {
+      const fCfg = this.config.farmConfig;
+      const isHarvestStage = this.farmStage === fCfg.assetImg.length - 1;
+      if (isHarvestStage && !fCfg.isMobFarm) {
+        if (d > 0) {
+          this.farmHarvestHp -= d;
+          this.flashTimer = 8;
+          this.flashType = 'damage';
+          this.hurtAnimTimer = 10;
+          if (this.farmHarvestHp <= 0) {
+            this.performHarvest();
+          }
+        } else if (d < 0) {
+          this.farmHarvestHp = Math.min(fCfg.harvestStageHp || 100, this.farmHarvestHp - d);
+          this.flashTimer = 8;
+          this.flashType = 'heal';
+        }
+        return;
+      }
+      // Farm turrets are invulnerable while growing to prevent accidental player destruction
+      if (!isHarvestStage) return;
+    }
+
     if (d < 0) { this.health = Math.min(this.maxHealth, this.health - d); this.flashTimer = 8; this.flashType = 'heal'; return; } 
     else if (d > 0) { this.flashTimer = 8; this.flashType = 'damage'; this.hurtAnimTimer = 10; }
     this.health = Math.max(0, this.health - d); 
@@ -831,11 +944,63 @@ export class AttachedTurret {
       let wPos = this.getWorldPos(); let b = new Bullet(wPos.x, wPos.y, wPos.x, wPos.y, this.config.actionConfig.pulseBulletTypeKey, 'none'); b.life = 0; state.bullets.push(b); 
     }
   }
+
+  spawnMobFarmEnemy() {
+    const fCfg = this.config.farmConfig;
+    const mCfg = fCfg.mobSpawnConfig;
+    const enemyType = mCfg.enemies[floor(random(mCfg.enemies.length))];
+    const wPos = this.getWorldPos();
+    const pPos = state.player.pos;
+    const dirToPlayer = atan2(pPos.y - wPos.y, pPos.x - wPos.x);
+    const spawnAngle = dirToPlayer + Math.PI; 
+    const spawnDist = mCfg.spawnDist || GRID_SIZE * 2;
+    const sx = wPos.x + cos(spawnAngle) * spawnDist;
+    const sy = wPos.y + sin(spawnAngle) * spawnDist;
+    state.enemies.push(new Enemy(sx, sy, enemyType));
+    state.vfx.push(new MergeVFX(sx, sy, [255, 255, 255]));
+  }
+
+  performHarvest() {
+    const fCfg = this.config.farmConfig;
+    const wPos = this.getWorldPos();
+    if (fCfg.lootOnHarvest) {
+      for (const [res, range] of Object.entries(fCfg.lootOnHarvest)) {
+        if (res === 'extra') continue;
+        const r = range as [number, number];
+        const amount = floor(random(r[0], r[1] + 1));
+        for (let i = 0; i < amount; i++) {
+          state.loot.push(new LootEntity(wPos.x, wPos.y, res));
+        }
+      }
+      if (fCfg.lootOnHarvest.extra && random() < fCfg.lootOnHarvest.extra.chance) {
+        const extraRes = fCfg.lootOnHarvest.extra.items[floor(random(fCfg.lootOnHarvest.extra.items.length))];
+        state.loot.push(new LootEntity(wPos.x, wPos.y, extraRes));
+      }
+    }
+    
+    if (fCfg.resetAfterHarvest) {
+      this.farmStage = 0;
+      this.farmGrowthTimer = fCfg.growthTimer[0];
+      this.farmElixirCount = 0;
+      this.farmHarvestHp = fCfg.harvestStageHp || 100;
+    }
+    
+    state.vfx.push(new MergeVFX(wPos.x, wPos.y, [255, 255, 255]));
+  }
+
   display() {
     const wPos = this.getWorldPos(); const margin = 100;
     const left = state.cameraPos.x - width/2 - margin; const right = state.cameraPos.x + width/2 + margin;
     const top = state.cameraPos.y - height/2 - margin; const bottom = state.cameraPos.y + height/2 + margin;
     if (wPos.x < left || wPos.x > right || wPos.y < top || wPos.y > bottom) return;
     drawTurret(this);
+  }
+
+  displayUI() {
+    const wPos = this.getWorldPos(); const margin = 100;
+    const left = state.cameraPos.x - width/2 - margin; const right = state.cameraPos.x + width/2 + margin;
+    const top = state.cameraPos.y - height/2 - margin; const bottom = state.cameraPos.y + height/2 + margin;
+    if (wPos.x < left || wPos.x > right || wPos.y < top || wPos.y > bottom) return;
+    if (drawTurretUI) drawTurretUI(this);
   }
 }

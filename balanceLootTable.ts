@@ -49,6 +49,41 @@ export const lootTypes: Record<string, LootType> = {
     idleAssetImg: 'img_icon_raisin',
     idleAssetImgSize: [40, 40]
   },
+  leaf: {
+    type: 'currency',
+    item: 'leaf',
+    itemValue: 1,
+    idleAssetImg: 'img_icon_leaf',
+    idleAssetImgSize: [40, 40]
+  },
+  shard: {
+    type: 'currency',
+    item: 'shard',
+    itemValue: 1,
+    idleAssetImg: 'img_icon_shard',
+    idleAssetImgSize: [40, 40]
+  },
+  shell: {
+    type: 'currency',
+    item: 'shell',
+    itemValue: 1,
+    idleAssetImg: 'img_icon_shell',
+    idleAssetImgSize: [40, 40]
+  },
+  fuel: {
+    type: 'currency',
+    item: 'fuel',
+    itemValue: 1,
+    idleAssetImg: 'img_icon_fuel',
+    idleAssetImgSize: [40, 40]
+  },
+  ice: {
+    type: 'currency',
+    item: 'ice',
+    itemValue: 1,
+    idleAssetImg: 'img_icon_ice',
+    idleAssetImgSize: [40, 40]
+  },
   t_seed: {
     type: 'turret',
     item: 't_seed',
@@ -128,6 +163,10 @@ export const lootTypes: Record<string, LootType> = {
   t0_puffshroom: { type: 'turretAsItem', item: 't0_puffshroom', idleAssetImg: 'img_t0_puffshroom_front', idleAssetImgSize: [35, 35] },
   t0_grapeshot: { type: 'turretAsItem', item: 't0_grapeshot', idleAssetImg: 'img_t0_grapeshot_front', idleAssetImgSize: [45, 45] },
 
+  t_farm_bush: { type: 'turret', item: 't_farm_bush', idleAssetImg: 'img_t_farm_bush_stage0', idleAssetImgSize: [45, 45] },
+  t_farm_crystal: { type: 'turret', item: 't_farm_crystal', idleAssetImg: 'img_t_farm_crystal_stage0', idleAssetImgSize: [45, 45] },
+  t_farm_mob: { type: 'turret', item: 't_farm_mob', idleAssetImg: 'img_t_farm_mob_stage0', idleAssetImgSize: [45, 45] },
+
   // Test Units
   t_dummy: { type: 'turret', item: 't_dummy', idleAssetImg: 'img_t_wall_front', idleAssetImgSize: [50, 50] }
 };
@@ -145,9 +184,31 @@ export const lootTableTypes: Record<string, LootTableEntry[]> = {
     { weight: 1, lootTypeKey: ['elixir'], itemCount: [0, 2] },
     { weight: 1 }
   ],
-  lt_elixir_10: [{ weight: 100, lootTypeKey: ['elixir'], itemCount: [0, 2] }], // avg 1.0
+  lt_elixir_10: [{ weight: 100, lootTypeKey: ['elixir'], itemCount: [1,1] }], // avg 1.0
   lt_elixir_20: [
     { weight: 1, lootTypeKey: ['elixir'], itemCount: [1, 3] }
+  ],
+
+  lt_shell_05: [ // avg 0.5
+    { weight: 1, lootTypeKey: ['shell'], itemCount: [1, 1] },
+    { weight: 1 }
+  ],
+  lt_shell_10: [
+    { weight: 1, lootTypeKey: ['shell'], itemCount: [1, 1] }
+  ],
+  lt_fuel_05: [ // avg 0.5
+    { weight: 1, lootTypeKey: ['fuel'], itemCount: [1, 1] },
+    { weight: 1 }
+  ],
+  lt_fuel_10: [ 
+    { weight: 1, lootTypeKey: ['fuel'], itemCount: [1, 1] }
+  ],
+  lt_ice_05: [ // avg 0.5
+    { weight: 1, lootTypeKey: ['ice'], itemCount: [1, 1] },
+    { weight: 1 }
+  ],
+  lt_ice_10: [
+    { weight: 1, lootTypeKey: ['ice'], itemCount: [1, 1] }
   ],
 
   // --- Soil Tables (Based on Block Average Drops) ---
@@ -168,7 +229,10 @@ export const lootTableTypes: Record<string, LootTableEntry[]> = {
     { weight: 6, lootTypeKey: ['sun'], itemCount: [1, 2] },
     { weight: 3, lootTypeKey: ['elixir'], itemCount: [1, 2] },
     { weight: 1, lootTypeKey: ['t_seed'], itemCount: [1, 1] },
-    { weight: 20 } // Nothing
+    { weight: 6, lootTypeKey: ['shell'], itemCount: [1, 1] },
+    { weight: 1, lootTypeKey: ['leaf'], itemCount: [1, 1] },
+    { weight: 1, lootTypeKey: ['fuel'], itemCount: [1, 1] },
+    { weight: 15 } // Nothing
   ],
 
   // --- Treasure Chest Tables ---
@@ -272,27 +336,28 @@ export const lootConfigs: Record<string, ExternalLootConfigEntry[]> = {
   e_armor1: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 2 }],
   e_armor2: [{ weight: 1, lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 4 },{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 2 }],
   e_armor3: [{ weight: 1, lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 8 },{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 3 }],
-  e_shooting: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 3 }],
+  e_shooting: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 3 },{ lootTableTypeKey: 'lt_shell_05', lootTableRollCount: 3 }],
   e_swarm: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 3 }],
-  e_breast: [{ lootTableTypeKey: 'lt_elixir_01', lootTableRollCount: 1 }],
-  e_giant: [{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 3 },{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 5 }],
-  e_shooting_giant: [{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 3 },{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 5 }],
+  e_giant: [{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 3 },{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 5 },{ lootTableTypeKey: 'lt_shell_10', lootTableRollCount: 2 },{ lootTableTypeKey: 'lt_shell_05', lootTableRollCount: 3 }],
+  e_shooting_giant: [{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 3 },{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 5 },{ lootTableTypeKey: 'lt_shell_10', lootTableRollCount: 4 },{ lootTableTypeKey: 'lt_shell_05', lootTableRollCount: 2 }],
   e_fly: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 3 }],
   e_fly_armor1: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 5 }],
   e_fly_armor2: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 8 }],
-  e_snowthrower: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 7 }],
-  e_snowthrower_giant: [{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 3 },{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 5 }],
-  e_poison: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 5 }],
-  e_bomb: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 5 }],
-  e_rockpuncher: [{ lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 1 }],
-  e_suneater: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 8 }],
+  e_snowthrower: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 7 },{ lootTableTypeKey: 'lt_ice_05', lootTableRollCount: 2 }],
+  e_snowthrower_giant: [{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 3 },{ weight: 1, lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 5 },{ lootTableTypeKey: 'lt_ice_10', lootTableRollCount: 6 },{ lootTableTypeKey: 'lt_ice_05', lootTableRollCount: 4 }],
+  e_poison: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 5 },{ lootTableTypeKey: 'lt_fuel_05', lootTableRollCount: 1 }],
+  e_bomb: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 5 },{ lootTableTypeKey: 'lt_fuel_05', lootTableRollCount: 1 }],
+  e_rockpuncher: [{ lootTableTypeKey: 'lt_elixir_20', lootTableRollCount: 1 },{ lootTableTypeKey: 'lt_shell_10', lootTableRollCount: 1 }],
+  e_suneater: [{ lootTableTypeKey: 'lt_elixir_05', lootTableRollCount: 8 },{ lootTableTypeKey: 'lt_sun_node', lootTableRollCount: 1 }],
 
   // Blocks
   o_dirt: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 5 }],
   o_clay: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 6 }],
   o_stone: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 7 }],
   o_slate: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 8 }],
-  o_black: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 10 }]
+  o_black: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 10 }],
+
+  ov_tnt: [{ lootTableTypeKey: 'lt_fuel_05', lootTableRollCount: 1 }]
 };
 
 

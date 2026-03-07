@@ -233,9 +233,11 @@ export class Enemy {
         speedMult *= this.actionConfig.stealSunSpeedMultiplier;
       }
       if (dSqToSun < (this.size * 0.5 + 20)**2) {
-          // Steal it
-          this.stealSunTarget.life = 0;
-          this.takeDamage(-(this.actionConfig.healPerSun || 80));
+          if (this.stealSunTarget.life > 0) {
+            // Steal it
+            this.stealSunTarget.life = 0;
+            this.takeDamage(-(this.actionConfig.healPerSun || 80));
+          }
           this.stealSunTarget = null;
         }
       }
@@ -499,7 +501,7 @@ export class Enemy {
         this.target.takeDamage(this.actionConfig.damage);
         if (frameCount % 5 === 0) state.vfx.push(new HitSpark(strikePos.x, strikePos.y, [255, 50, 50]));
         
-        if (this.type === 'e_giant') {
+        if (this.type === 'e_giant' || this.type === 'e_shooting_giant' || this.type === 'e_snowthrower_giant') {
             state.cameraShake = Math.max(state.cameraShake, 10);
             state.cameraShakeFalloff = 0.9;
             state.vfx.push(new Explosion(strikePos.x, strikePos.y, this.size * 2, color(255, 100, 0)));
@@ -704,7 +706,7 @@ export class Enemy {
       if (this.actionType.includes('spawnObstacle') && this.actionConfig.spawnTriggerOnHealthRatio?.includes(0)) {
         this.performSpawnObstacle();
       }
-      if (this.type === 'e_giant') {
+      if (this.type === 'e_giant' || this.type === 'e_shooting_giant' || this.type === 'e_snowthrower_giant') {
         state.vfx.push(new GiantDeathVFX(this.pos.x, this.pos.y, this.size, this.col));
         this.markedForDespawn = true; 
       } else {

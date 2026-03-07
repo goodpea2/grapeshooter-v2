@@ -192,19 +192,6 @@ export class Block {
       
       const oCfg = this.overlay ? overlayTypes[this.overlay] : null;
 
-      if (this.overlay && !isExposed && oCfg?.concealedSparkleVfx) {
-        let nVal = noise(this.gx * 0.5, this.gy * 0.5, frameCount * 0.02);
-        if (nVal > 0.82) {
-          const sparkleP = 0.5 + 0.5 * sin(frameCount * 0.2 + (this.gx + this.gy));
-          noStroke();
-          let sCol = [255, 255, 255];
-          if (oCfg.concealedSparkleVfx === 'v_sparkle_yellow') sCol = [255, 255, 100];
-          if (oCfg.concealedSparkleVfx === 'v_sparkle_purple') sCol = [200, 100, 255];
-          fill(sCol[0], sCol[1], sCol[2], opacity * sparkleP * 0.8);
-          ellipse(GRID_SIZE / 2 + sin(frameCount * 0.1) * 4, GRID_SIZE / 2 + cos(frameCount * 0.1) * 4, 6 * sparkleP);
-        }
-      }
-
       let base = [...this.config.color];
       let bord = [...this.config.borderColor];
       
@@ -217,7 +204,7 @@ export class Block {
       if (!isExposed) fill(base[0] * 0.3, base[1] * 0.3, base[2] * 0.3, opacity); else fill(base[0], base[1], base[2], opacity);
       noStroke();
       const tl = (n || w) ? 0 : rad; const tr = (n || e) ? 0 : rad; const br = (s || e) ? 0 : rad; const bl = (s || w) ? 0 : rad;
-      rect(0, 0, renderSize, renderSize, tl, tr, br, bl);
+      rect(0, 0, renderSize+1, renderSize+1, tl, tr, br, bl); //+1 size to not show jittered outlines when moving
 
       if (isExposed) {
         stroke(bord[0], bord[1], bord[2], opacity); strokeWeight(3); noFill();
@@ -232,13 +219,26 @@ export class Block {
         if (!s && !w) arc(rad, renderSize - rad, rad * 2, rad * 2, HALF_PI, PI);
       }
 
+      if (this.overlay && !isExposed && oCfg?.concealedSparkleVfx) {
+        let nVal = noise(this.gx * 0.5, this.gy * 0.5, frameCount * 0.02);
+        if (nVal > 0.5) {
+          const sparkleP = 0.5 + 0.2 * sin(frameCount * 0.05 + (this.gx + this.gy));
+          noStroke();
+          let sCol = [255, 255, 255];
+          if (oCfg.concealedSparkleVfx === 'v_sparkle_yellow') sCol = [255, 255, 100];
+          if (oCfg.concealedSparkleVfx === 'v_sparkle_purple') sCol = [200, 100, 255];
+          fill(sCol[0], sCol[1], sCol[2], opacity * sparkleP * 0.8);
+          ellipse(GRID_SIZE / 2 + sin(frameCount * 0.05) * 4, GRID_SIZE / 2 + cos(frameCount * 0.05) * 4, 8 * sparkleP);
+        }
+      }
+
       if (this.feature && isExposed) {
         drawDecoration(this.feature, this.gx, this.gy, opacity);
       }
 
       if (this.damageGlow > 0) {
         fill(255, 255, 255, this.damageGlow * opacity / 255); noStroke(); rect(0, 0, renderSize, renderSize, tl, tr, br, bl);
-        this.damageGlow = lerp(this.damageGlow, 0, 0.12);
+        this.damageGlow = lerp(this.damageGlow, 0, 0.1);
       }
       pop();
     }

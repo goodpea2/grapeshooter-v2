@@ -41,6 +41,8 @@ export class LootEntity {
   typeKey: string;
   config: LootType;
   renderSize: number;
+  isBeingAttractedByFarm: boolean = false;
+  farmAttractor: any = null;
 
   constructor(x: number, y: number, typeKey: string) {
     this.typeKey = typeKey;
@@ -54,11 +56,30 @@ export class LootEntity {
     this.renderSize = random(this.config.idleAssetImgSize[0], this.config.idleAssetImgSize[1]);
   }
 
-  update(playerPos: any): 'none' | 'collected' | 'missed' {
+  update(playerPos: any): 'none' | 'collected' | 'missed' | 'consumed' {
     const dx = this.pos.x - playerPos.x;
     const dy = this.pos.y - playerPos.y;
     const dSq = dx*dx + dy*dy;
     
+    if (this.isBeingAttractedByFarm && this.farmAttractor) {
+      if (this.farmAttractor.health <= 0) {
+        this.isBeingAttractedByFarm = false;
+        this.farmAttractor = null;
+      } else {
+        const attractorPos = this.farmAttractor.getWorldPos();
+        const dToFarmSq = (this.pos.x - attractorPos.x)**2 + (this.pos.y - attractorPos.y)**2;
+        
+        this.vel.add(p5.Vector.sub(attractorPos, this.pos).normalize().mult(1.2));
+        this.vel.limit(10);
+        
+        if (dToFarmSq < (this.farmAttractor.size * 0.5 + 10)**2) {
+          this.farmAttractor.farmElixirCount++;
+          this.life = 0;
+          return 'consumed';
+        }
+      }
+    }
+
     const canBeAttracted = (state.frames - this.spawnFrame > 60);
     const attractRangeSq = ECONOMY_CONFIG.sunLootAttractionRange * ECONOMY_CONFIG.sunLootAttractionRange;
     

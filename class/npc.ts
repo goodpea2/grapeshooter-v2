@@ -1,7 +1,7 @@
 
 import { state } from '../state';
 import { GRID_SIZE } from '../constants';
-import { npcTypes, NPCTrade, T2_TURRET_POOL } from '../balanceNPC';
+import { npcTypes, NPCTrade, T2_TURRET_POOL, T3_TURRET_POOL } from '../balanceNPC';
 import { lootTypes } from '../balanceLootTable';
 import { turretTypes } from '../balanceTurrets';
 import { LootEntity } from './loot';
@@ -48,6 +48,7 @@ export class NPCEntity {
   rot: number = 0;
   uid: string;
   purchaseAnimTimer: number = 0;
+  discovered: boolean = false;
 
   constructor(x: number, y: number, typeKey: string) {
     this.pos = createVector(x, y);
@@ -56,21 +57,39 @@ export class NPCEntity {
     this.uid = Math.random().toString(36).substr(2, 9);
     
     // Resolve Randomized Shop Trades
+    const rolledTurrets = new Set<string>();
     this.shop = this.config.shop.map((trade: NPCTrade) => {
       const newTrade = { ...trade };
-      if (newTrade.tradeType === 'randomT2') {
-        const roll = T2_TURRET_POOL[floor(random(T2_TURRET_POOL.length))];
+      
+      // Handle Random Turret Types
+      if (newTrade.tradeType === 'randomT2' || newTrade.tradeType === 'randomT3') {
+        const pool = newTrade.tradeType === 'randomT2' ? T2_TURRET_POOL : T3_TURRET_POOL;
+        
+        // Try to find a turret not already rolled for this NPC
+        let roll = pool[floor(random(pool.length))];
+        let attempts = 0;
+        while (rolledTurrets.has(roll) && attempts < 20) {
+          roll = pool[floor(random(pool.length))];
+          attempts++;
+        }
+        rolledTurrets.add(roll);
+
         const tCfg = turretTypes[roll];
         newTrade.itemKey = roll;
-        // User requested: just give the turret name, don't mention the "Mystery T2" part
         newTrade.itemName = tCfg?.name || '??';
-        
-        // Dynamic cost range: 25..40
-        const rolledSun = floor(random(25, 41));
-        if (newTrade.cost.sun !== undefined) newTrade.cost.sun = rolledSun;
-        else if (newTrade.cost.soil !== undefined) newTrade.cost.soil = floor(rolledSun * 0.7);
-        else if (newTrade.cost.elixir !== undefined) newTrade.cost.elixir = floor(rolledSun * 0.5);
       }
+
+      // Handle Random Cost Ranges
+      const newCost: any = {};
+      for (const [key, val] of Object.entries(newTrade.cost)) {
+        if (Array.isArray(val)) {
+          newCost[key] = floor(random(val[0], val[1] + 1));
+        } else {
+          newCost[key] = val;
+        }
+      }
+      newTrade.cost = newCost;
+
       return newTrade;
     });
   }
@@ -78,6 +97,7 @@ export class NPCEntity {
   update(playerPos: any) {
     const d = dist(this.pos.x, this.pos.y, playerPos.x, playerPos.y);
     this.isInteractable = d < GRID_SIZE * 2.5;
+    if (this.isInteractable) this.discovered = true;
     
     const targetAngle = atan2(playerPos.y - this.pos.y, playerPos.x - this.pos.x);
     this.angleToPlayer = targetAngle;

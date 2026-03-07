@@ -27,7 +27,7 @@ export class Player {
   pos: any; prevPos: any; size = 30; attachments: AttachedTurret[] = []; health = 100; maxHealth = 100; speed = 3.6; flash = 0; autoTurretAngle = 0; autoTurretLastShot = 0; autoTurretRange = GRID_SIZE * 6; autoTurretFireRate = 22; recoil = 0; target: any = null;
   hurtAnimTimer = 0;
   isClickHolding: boolean = false;
-  autoTurretClickMiningBoost = 3; // +300% mining speed
+  autoTurretClickMiningBoost = 1; // +300% mining speed
   autoTurretClickAttackBoost = 0; // No boost for attacking
   pulseAnimTimer = 0;
   conditions: Map<string, number> = new Map();
@@ -122,17 +122,36 @@ export class Player {
       state.trails.push(new LiquidTrailVFX(this.pos.x, this.pos.y, lData.playerTrailVfx, atan2(this.pos.y - this.prevPos.y, this.pos.x - this.prevPos.x)));
     }
 
-    for (let i = this.attachments.length - 1; i >= 0; i--) { const a = this.attachments[i]; a.update(); if (a.health <= 0) { state.vfx.push(new Explosion(a.getWorldPos().x, a.getWorldPos().y, a.size * 2, color(...a.config.color))); this.attachments.splice(i, 1); } }
+    for (let i = this.attachments.length - 1; i >= 0; i--) { 
+      const a = this.attachments[i]; 
+      a.update(); 
+      if (a.health <= 0) { 
+        state.vfx.push(new Explosion(a.getWorldPos().x, a.getWorldPos().y, a.size * 2, color(...a.config.color))); 
+        
+        // Drop loot on death
+        if (a.config.drops) {
+          for (const [res, amount] of Object.entries(a.config.drops)) {
+            for (let j = 0; j < (amount as number); j++) {
+              state.loot.push(new LootEntity(a.getWorldPos().x, a.getWorldPos().y, res));
+            }
+          }
+        }
+        
+        this.attachments.splice(i, 1); 
+      } 
+    }
     
     for (let i = state.loot.length - 1; i >= 0; i--) {
       const loot = state.loot[i] as LootEntity;
       const res = loot.update(this.pos);
       if (res === 'collected') {
+        loot.life = 0; // Mark as dead so enemies stop targeting it
         if (loot.config.type === 'turret') {
            this.addStrayTurret(loot.config.itemValue !== undefined ? String(loot.config.itemValue) : loot.config.item);
         } else if (loot.config.type === 'turretAsItem') {
            const itemKey = loot.config.item;
-           state.inventory[itemKey] = (state.inventory[itemKey] || 0) + 1;
+           state.inventory.items[itemKey] = (state.inventory.items[itemKey] || 0) + 1;
+           state.inventory.specList.push({ key: itemKey, type: 'turret', timestamp: Date.now() });
            state.totalTurretsAcquired++;
            state.uiAlpha = 255; 
         } else {
@@ -149,11 +168,21 @@ export class Player {
               state.soilCurrency += val;
               state.totalSoilLootCollected += val;
               state.uiSoilScale = 1.6;
+           } else if (loot.config.item === 'leaf') {
+              state.leafCurrency += val;
+           } else if (loot.config.item === 'shard') {
+              state.shardCurrency += val;
+           } else if (loot.config.item === 'shell') {
+              state.shellCurrency += val;
+           } else if (loot.config.item === 'fuel') {
+              state.fuelCurrency += val;
+           } else if (loot.config.item === 'ice') {
+              state.iceCurrency += val;
            }
         }
         state.loot.splice(i, 1);
-      } else if (res === 'missed') { 
-        if (loot.config.type === 'currency' && loot.config.item === 'sun') state.sunMissedTotal += (loot.config.itemValue || 1); 
+      } else if (res === 'missed' || res === 'consumed') { 
+        if (res === 'missed' && loot.config.type === 'currency' && loot.config.item === 'sun') state.sunMissedTotal += (loot.config.itemValue || 1); 
         state.loot.splice(i, 1); 
       }
     }
@@ -250,7 +279,8 @@ export class Player {
       // CRAMPED FALLBACK: 
       // If no physically clear spot exists adjacent to the base, 
       // automatically add the turret to the inventory so the player doesn't lose it.
-      state.inventory[type] = (state.inventory[type] || 0) + 1;
+      state.inventory.items[type] = (state.inventory.items[type] || 0) + 1;
+      state.inventory.specList.push({ key: type, type: 'turret', timestamp: Date.now() });
       state.totalTurretsAcquired++;
       state.uiAlpha = 255; // Flash UI to show item acquisition
     }
@@ -269,6 +299,21 @@ export class Player {
     // If holding click, force switch to mining (skip enemy/icecube targeting)
     // ALLOW mining while moving if click is held
     if (this.isClickHolding && state.isStationary) {
+      let ht = this.findHarvestTarget(this.pos, this.autoTurretRange);
+      if (ht) {
+        let bc = ht.getWorldPos();
+        this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x);
+        if (frameCount - this.autoTurretLastShot > effectiveMiningFireRate) {
+          state.bullets.push(new Bullet(this.pos.x, this.pos.y, bc.x, bc.y, 'b_player_mining', 'none'));
+          state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 14, 4, color(255, 255, 100)));
+          if (miningBoost > 0) this.applyCondition('c_raged', 10);
+          this.autoTurretLastShot = frameCount;
+          this.recoil = 3;
+          this.pulseAnimTimer = 10;
+        }
+        return;
+      }
+
       let t = this.findBlockTarget(this.pos, this.autoTurretRange); 
       if (t) { 
         let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; 
@@ -332,6 +377,22 @@ export class Player {
       return nPri || nGen;
   }
 
+  findHarvestTarget(origin: any, range: number) {
+    let best = null;
+    let minDist = range;
+    for (let a of this.attachments) {
+      if (a.isHarvestReady) {
+        const wPos = a.getWorldPos();
+        const d = dist(origin.x, origin.y, wPos.x, wPos.y);
+        if (d < minDist) {
+          minDist = d;
+          best = a;
+        }
+      }
+    }
+    return best;
+  }
+
   moveWithSliding(move: any) {
     let tx = this.pos.x + move.x; 
     let cx = state.world.checkCollision(tx, this.pos.y, this.size/2.1); 
@@ -371,6 +432,14 @@ export class Player {
     filtered.sort((a, b) => {
         const posA = a.getWorldPos();
         const posB = b.getWorldPos();
+        
+        // If they are at the same position, prioritize ground layer to be rendered first (underneath)
+        if (Math.abs(posA.x - posB.x) < 1 && Math.abs(posA.y - posB.y) < 1) {
+          const layerA = a.config.turretLayer === 'ground' ? 0 : 1;
+          const layerB = b.config.turretLayer === 'ground' ? 0 : 1;
+          if (layerA !== layerB) return layerA - layerB;
+        }
+
         if (posB.y !== posA.y) return posB.y - posA.y;
         return posA.x - posB.x;
     });

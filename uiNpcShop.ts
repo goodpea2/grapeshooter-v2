@@ -5,6 +5,7 @@ import { TYPE_MAP } from './assetTurret';
 import { ShopFlyVFX } from './vfx/index';
 
 declare const floor: any;
+declare const dist: any;
 declare const push: any;
 declare const pop: any;
 declare const translate: any;
@@ -47,6 +48,33 @@ const SHOP_Y_START = 160;
 const CARD_HEIGHT = 60;  
 const CARD_SPACING = 68; 
 
+export function handleNpcUiPress() {
+  if (!state.activeNPC || state.isAlmanacOpen || state.showUnlockPopup) return false;
+  
+  const currentX = lerp(width, width - PANEL_WIDTH, state.npcUiPanelPos);
+  if (mouseX < currentX) return false;
+
+  const npc = state.activeNPC;
+
+  if (mouseY < SHOP_Y_START - 20) {
+    return true;
+  }
+
+  if (mouseY >= SHOP_Y_START) {
+    let curY = SHOP_Y_START + state.npcShopScrollY;
+    for (const trade of npc.shop) {
+      if (mouseX > currentX + 20 && mouseX < width - 20 && mouseY > curY && mouseY < curY + CARD_HEIGHT) {
+        state.pressedTradeId = trade.id;
+        state.npcShopPressPos = { x: mouseX, y: mouseY };
+        state.npcShopScrollVelocity = 0; 
+        return true;
+      }
+      curY += CARD_SPACING;
+    }
+  }
+  return false;
+}
+
 export function handleNpcUiClick() {
   if (!state.activeNPC || state.isAlmanacOpen || state.showUnlockPopup) return false;
   
@@ -57,13 +85,17 @@ export function handleNpcUiClick() {
   const cfg = npc.config;
   const npcUid = npc.uid;
 
-  if (mouseY < SHOP_Y_START - 20) {
+  // Check if it was a drag or a click
+  const dragDist = state.npcShopPressPos ? dist(state.npcShopPressPos.x, state.npcShopPressPos.y, mouseX, mouseY) : 0;
+  const isClick = dragDist < 10 && Math.abs(state.npcShopScrollVelocity) < 3;
+
+  if (mouseY < SHOP_Y_START - 20 && isClick) {
     state.activeNpcDialogueIdx = (state.activeNpcDialogueIdx + 1) % cfg.dialogue.length;
     state.npcDialogueJump = 10; 
     return true;
   }
 
-  if (mouseY >= SHOP_Y_START) {
+  if (mouseY >= SHOP_Y_START && isClick) {
     if (!state.npcStock[npcUid]) state.npcStock[npcUid] = {};
     const stockMap = state.npcStock[npcUid];
 
@@ -71,23 +103,39 @@ export function handleNpcUiClick() {
 
     // Use NPC instance shop instead of global config shop
     for (const trade of npc.shop) {
-      if (mouseX > currentX + 20 && mouseX < width - 20 && mouseY > curY && mouseY < curY + CARD_HEIGHT) {
-        state.pressedTradeId = trade.id;
-
+      if (state.pressedTradeId === trade.id && mouseX > currentX + 20 && mouseX < width - 20 && mouseY > curY && mouseY < curY + CARD_HEIGHT) {
         const purchasedCount = stockMap[trade.id] || 0;
         const stockRemaining = trade.stockCount === -1 ? 999 : (trade.stockCount - purchasedCount);
 
         if (stockRemaining <= 0) return true;
 
         let canAfford = true;
-        if (trade.cost.sun && state.sunCurrency < trade.cost.sun) canAfford = false;
-        if (trade.cost.soil && state.soilCurrency < trade.cost.soil) canAfford = false;
-        if (trade.cost.elixir && state.elixirCurrency < trade.cost.elixir) canAfford = false;
+        for (const [currency, amount] of Object.entries(trade.cost)) {
+          const costVal = amount as number;
+          if (currency === 'sun' && state.sunCurrency < costVal) canAfford = false;
+          if (currency === 'soil' && state.soilCurrency < costVal) canAfford = false;
+          if (currency === 'elixir' && state.elixirCurrency < costVal) canAfford = false;
+          if (currency === 'raisin' && state.raisinCurrency < costVal) canAfford = false;
+          if (currency === 'leaf' && state.leafCurrency < costVal) canAfford = false;
+          if (currency === 'shard' && state.shardCurrency < costVal) canAfford = false;
+          if (currency === 'shell' && state.shellCurrency < costVal) canAfford = false;
+          if (currency === 'fuel' && state.fuelCurrency < costVal) canAfford = false;
+          if (currency === 'ice' && state.iceCurrency < costVal) canAfford = false;
+        }
 
         if (canAfford) {
-          if (trade.cost.sun) state.sunCurrency -= trade.cost.sun;
-          if (trade.cost.soil) state.soilCurrency -= trade.cost.soil;
-          if (trade.cost.elixir) state.elixirCurrency -= trade.cost.elixir;
+          for (const [currency, amount] of Object.entries(trade.cost)) {
+            const costVal = amount as number;
+            if (currency === 'sun') state.sunCurrency -= costVal;
+            if (currency === 'soil') state.soilCurrency -= costVal;
+            if (currency === 'elixir') state.elixirCurrency -= costVal;
+            if (currency === 'raisin') state.raisinCurrency -= costVal;
+            if (currency === 'leaf') state.leafCurrency -= costVal;
+            if (currency === 'shard') state.shardCurrency -= costVal;
+            if (currency === 'shell') state.shellCurrency -= costVal;
+            if (currency === 'fuel') state.fuelCurrency -= costVal;
+            if (currency === 'ice') state.iceCurrency -= costVal;
+          }
 
           stockMap[trade.id] = purchasedCount + 1;
           npc.triggerPurchaseAnim();
@@ -95,12 +143,21 @@ export function handleNpcUiClick() {
           if (trade.outputBehavior === 'giveItem') {
             const amount = trade.itemAmount || 1;
             if (trade.itemType === 'turret') {
-              state.inventory[trade.itemKey] = (state.inventory[trade.itemKey] || 0) + amount;
+              state.inventory.items[trade.itemKey] = (state.inventory.items[trade.itemKey] || 0) + amount;
+              for (let i = 0; i < amount; i++) {
+                state.inventory.specList.push({ key: trade.itemKey, type: 'turret', timestamp: Date.now() });
+              }
               state.totalTurretsAcquired += amount;
             } else if (trade.itemType === 'resource') {
               if (trade.itemKey === 'sun') state.sunCurrency += amount;
               if (trade.itemKey === 'soil') state.soilCurrency += amount;
               if (trade.itemKey === 'elixir') state.elixirCurrency += amount;
+              if (trade.itemKey === 'raisin') state.raisinCurrency += amount;
+              if (trade.itemKey === 'leaf') state.leafCurrency += amount;
+              if (trade.itemKey === 'shard') state.shardCurrency += amount;
+              if (trade.itemKey === 'shell') state.shellCurrency += amount;
+              if (trade.itemKey === 'fuel') state.fuelCurrency += amount;
+              if (trade.itemKey === 'ice') state.iceCurrency += amount;
             }
 
             state.uiAlpha = 255;
@@ -258,28 +315,41 @@ export function drawNPCPanel() {
         noTint();
       }
 
-      fill(outOfStock ? 120 : 255);
-      textAlign(LEFT, TOP);
-      textSize(13);
-      const amountPrefix = (trade.itemAmount && trade.itemAmount > 1) ? `${trade.itemAmount}x ` : "";
       const tCfg = turretTypes[trade.itemKey];
-      text(amountPrefix + (trade.itemName || tCfg?.name || trade.itemKey), 70, 10);
+      const amountPrefix = (trade.itemAmount && trade.itemAmount > 1) ? `${trade.itemAmount}x ` : "";
+      let displayName = trade.itemName || tCfg?.name || trade.itemKey;
+      if (trade.tradeType === 'randomT2' && !trade.itemKey) displayName = "? T2 Turret";
+      if (trade.tradeType === 'randomT3' && !trade.itemKey) displayName = "? T3 Turret";
+      fill(outOfStock ? 90 : 255);
+      textSize(14);
+      text(amountPrefix + displayName, 70, 10);
 
       fill(outOfStock ? 90 : 200);
       textSize(10);
       // User requested: don't mention "(drop)" in item description
-      text(trade.itemDescription || tCfg?.tooltip || "", 70, 26, CARD_WIDTH - 150);
+      text(trade.itemDescription || tCfg?.tooltip || "", 70, 26, CARD_WIDTH - 130);
 
       if (!outOfStock) {
         textAlign(RIGHT, CENTER);
         let costOff = 0;
+        // Get original trade config to see if it was a range
+        const originalTrade = npc.config.shop.find((t: any) => t.id === trade.id);
+
         for (const [currency, amount] of Object.entries(trade.cost)) {
           const iconKey = `img_icon_${currency}`;
           const icon = state.assets[iconKey];
           let canAfford = true;
-          if (currency === 'sun' && state.sunCurrency < (amount as number)) canAfford = false;
-          if (currency === 'soil' && state.soilCurrency < (amount as number)) canAfford = false;
-          if (currency === 'elixir' && state.elixirCurrency < (amount as number)) canAfford = false;
+          const costVal = amount as number;
+          
+          if (currency === 'sun' && state.sunCurrency < costVal) canAfford = false;
+          if (currency === 'soil' && state.soilCurrency < costVal) canAfford = false;
+          if (currency === 'elixir' && state.elixirCurrency < costVal) canAfford = false;
+          if (currency === 'raisin' && state.raisinCurrency < costVal) canAfford = false;
+          if (currency === 'leaf' && state.leafCurrency < costVal) canAfford = false;
+          if (currency === 'shard' && state.shardCurrency < costVal) canAfford = false;
+          if (currency === 'shell' && state.shellCurrency < costVal) canAfford = false;
+          if (currency === 'fuel' && state.fuelCurrency < costVal) canAfford = false;
+          if (currency === 'ice' && state.iceCurrency < costVal) canAfford = false;
 
           if (icon) {
             imageMode(CENTER);
@@ -287,9 +357,11 @@ export function drawNPCPanel() {
             noTint();
           }
           fill(canAfford ? [255, 235, 90] : [255, 100, 100]);
-          textSize(12);
-          text(amount as number, CARD_WIDTH - 12 - costOff, 20);
-          costOff += 40;
+          textSize(14);
+          
+          let costText = costVal.toString();
+          text(costText, CARD_WIDTH - 12 - costOff, 20);
+          costOff += 40; // Reverted spacing since we don't show ranges
         }
       }
 

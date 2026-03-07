@@ -16,7 +16,7 @@ export const turretTypes: any = {
 
   // --- TIER 0 SPECIAL ---
   t0_cherrybomb: {
-    name: 'Cherry Bomb', cost: 15, health: 50, color: [255, 50, 50], size: 22, tier: 0, isSpecial: true,
+    name: 'Cherry Bomb', costs: { elixir: 20 }, health: 50, color: [255, 50, 50], size: 22, tier: 0, isSpecial: true,
     tooltip: "Explodes after 3s, damaging obstacles in a wide area",
     explosiveGrowth: true, animationBodyType: 'soft',
     isActiveWhileMoving: false,
@@ -25,7 +25,7 @@ export const turretTypes: any = {
     targetType: [], targetConfig: {}
   },
   t0_firecherry: {
-    name: 'Fire Cherry', cost: 25, health: 50, color: [255, 100, 0], size: 22, tier: 0, isSpecial: true,
+    name: 'Fire Cherry', costs: { elixir: 30 }, health: 50, color: [255, 100, 0], size: 22, tier: 0, isSpecial: true,
     tooltip: "Explodes after 3s, leaving multiple fire puddles for 2h",
     explosiveGrowth: true, animationBodyType: 'soft',
     isActiveWhileMoving: false,
@@ -34,7 +34,7 @@ export const turretTypes: any = {
     targetType: [], targetConfig: {}
   },
   t0_iceshroom: {
-    name: 'Ice Shroom', cost: 25, health: 50, color: [180, 240, 255], size: 22, tier: 0, isSpecial: true,
+    name: 'Ice Shroom', costs: { elixir: 40 }, health: 50, color: [180, 240, 255], size: 22, tier: 0, isSpecial: true,
     tooltip: "Explodes after 6s, freezes enemies in a huge area for 4h",
     explosiveGrowth: true, animationBodyType: 'soft',
     isActiveWhileMoving: false,
@@ -43,7 +43,7 @@ export const turretTypes: any = {
     targetType: [], targetConfig: {}
   },
   t0_starfruit: {
-    name: 'Healing Starfruit', cost: 20, health: 100, color: [150, 255, 100], size: 22, tier: 0, isSpecial: true,
+    name: 'Healing Starfruit', costs: { elixir: 30 }, health: 100, color: [150, 255, 100], size: 22, tier: 0, isSpecial: true,
     tooltip: "Heal surrounding turrets over 2h", animationBodyType: 'soft',
     isActiveWhileMoving: false,
     actionType: ['pulse', 'die'],
@@ -58,7 +58,7 @@ export const turretTypes: any = {
     targetType: ['turret'], targetConfig: {}
   },
   t0_jalapeno: {
-    name: 'Rage Chili', cost: 30, health: 50, color: [255, 50, 50], size: 22, tier: 0, isSpecial: true,
+    name: 'Rage Chili', costs: { elixir: 20 }, health: 50, color: [255, 50, 50], size: 22, tier: 0, isSpecial: true,
     tooltip: "Allows the player to shoot while moving and gain x4 fire rate for 2h",
     isActiveWhileMoving: true, animationBodyType: 'soft',
     actionType: ['boostPlayer', 'die'],
@@ -66,7 +66,7 @@ export const turretTypes: any = {
     targetType: [], targetConfig: {}
   },
   t0_puffshroom: {
-    name: 'Puffshroom', cost: 5, health: 30, color: [200, 100, 255], size: 16, tier: 0, isSpecial: true,
+    name: 'Puffshroom', costs: { soil: 8 }, health: 30, color: [200, 100, 255], size: 16, tier: 0, isSpecial: true,
     tooltip: "Shoots enemies at closer range, disappears after 12h",
     isActiveWhileMoving: false, animationBodyType: 'soft',
     actionType: ['shoot', 'die'],
@@ -75,7 +75,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t0_grapeshot: {
-    name: 'Grapeshot', cost: 40, health: 50, color: [180, 80, 255], size: 22, tier: 0, isSpecial: true,
+    name: 'Grapeshot', costs: { elixir: 50 }, health: 50, color: [180, 80, 255], size: 22, tier: 0, isSpecial: true,
     tooltip: "Has 16 powerful projectiles to shoot at enemies.",
     isActiveWhileMoving: true, animationBodyType: 'soft',
     actionType: ['shoot', 'die'],
@@ -86,7 +86,7 @@ export const turretTypes: any = {
 
   // --- TIER 1 ---
   t_pea: { 
-    name: 'Peashooter', cost: 10, health: 50, color: [100, 255, 100], size: 22, tier: 1, cooldownHours: 1,
+    name: 'Peashooter', costs: { sun: 10 }, costAlmanac: { leaf: 3 }, drops: { leaf: 1 }, health: 50, color: [100, 255, 100], size: 22, tier: 1, cooldownHours: 1,
     tooltip: "Shoots bullets at enemies", animationBodyType: 'soft',
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_pea', shootRange: GRID_SIZE * 8, shootFireRate: 60 },
@@ -94,7 +94,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t_laser: { 
-    name: 'Mining Laser', cost: 10, health: 50, color: [50, 200, 255], size: 22, tier: 1, cooldownHours: 1,
+    name: 'Mining Laser', costs: { sun: 10 }, costAlmanac: { shard: 3 }, drops: { shard: 1 }, health: 50, color: [50, 200, 255], size: 22, tier: 1, cooldownHours: 1,
     tooltip: "Fires laser to break obstacles", animationBodyType: 'tough',
     actionType: ['laserBeam'],
     actionConfig: { beamDamage: 5, beamDamageRate: 3, beamWidth: 4, beamDuration: 1, beamFireRate: 6, beamDamageWidth: 0, beamAutoLength: true, beamMaxLength: GRID_SIZE * 8 },
@@ -102,12 +102,12 @@ export const turretTypes: any = {
     targetConfig: { obstaclePriority: 'valuable' }
   },
   t_wall: { 
-    name: 'Wallnut', cost: 5, health: 300, color: [200, 200, 220], size: 22, tier: 1, cooldownHours: 2,
+    name: 'Wallnut', costs: { sun: 5 }, costAlmanac: { shell: 2 }, drops: { shell: 1 }, health: 300, color: [200, 200, 220], size: 22, tier: 1, cooldownHours: 2,
     tooltip: "Simple defensive wall", animationBodyType: 'tough',
     actionType: [], actionConfig: {}, targetType: [], targetConfig: {}
   },
   t_mine: {
-    name: 'Landmine', cost: 5, health: 50, color: [255, 100, 20], size: 22, tier: 1, cooldownHours: 3,
+    name: 'Landmine', costs: { sun: 5 }, costAlmanac: { fuel: 2 }, drops: { fuel: 1 }, health: 50, color: [255, 100, 20], size: 22, tier: 1, cooldownHours: 3,
     tooltip: "Mine explodes on contact, armed every 2h", animationBodyType: 'soft',
     actionType: ['pulse'],
     actionConfig: { 
@@ -123,7 +123,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t_ice: {
-    name: 'Iceberg', cost: 5, health: 50, color: [150, 240, 255], size: 22, tier: 1, cooldownHours: 3,
+    name: 'Iceberg', costs: { sun: 5 }, costAlmanac: { ice: 2 }, drops: { ice: 1 }, health: 50, color: [150, 240, 255], size: 22, tier: 1, cooldownHours: 3,
     tooltip: "Freezes an enemy on contact for 2h, armed every 1h", animationBodyType: 'soft',
     actionType: ['pulse'],
     actionConfig: { 
@@ -165,16 +165,89 @@ export const turretTypes: any = {
     targetType: [], targetConfig: {}
   },
   t_lilypad: {
-    name: 'Lilypad', cost: 5, costType: 'soil', isSpecial: true, health: 100, color: [50, 200, 50], size: 24, tier: 1.2,
+    name: 'Lilypad', costs: { soil: 8 }, isSpecial: true, health: 100, color: [50, 200, 50], size: 24, tier: 1.2,
     turretLayer: 'ground', randomRotation: true, randomFlip: true, animationBodyType: 'soft',
     isActiveWhileMoving: false,
     tooltip: "Enables plants to work on water. Placed under plants",
     actionType: [], actionConfig: {}, targetType: [], targetConfig: {}
   },
+  t_farm_bush: {
+    name: 'Fern Pot', costs: { sun: 40 }, costAlmanac: { soil: 30 }, drops: { leaf: 2 }, health: 100, color: [50, 150, 50], size: 22, tier: 1,
+    tooltip: "Grows a bush that drop leaves on harvest, attracts and consumes elixir",
+    animationBodyType: 'soft',
+    actionType: ['farm'],
+    actionConfig: {},
+    farmConfig: {
+      assetImg: [
+        'img_t_farm_bush_stage0',
+        'img_t_farm_bush_stage1',
+        'img_t_farm_bush_stage2',
+        'img_t_farm_bush_stage3',
+        'img_t_farm_bush_stage4',
+        'img_t_farm_bush_stage5'
+      ],
+      elixirRequired: [1, 0, 1, 0, 1, 0],
+      growthTimer: [HOUR_FRAMES * 1, HOUR_FRAMES * 2, HOUR_FRAMES * 1, HOUR_FRAMES * 2, HOUR_FRAMES * 1, 0],
+      harvestStageHp: 100,
+      lootOnHarvest: { leaf: [3, 4], extra: { chance: 0.5, items: ['leaf', 'shell'] } },
+      resetAfterHarvest: true,
+      attractRange: GRID_SIZE * 4
+    },
+    targetType: [], targetConfig: {}
+  },
+  t_farm_crystal: {
+    name: 'Crystal Pot', costs: { sun: 40 }, costAlmanac: { soil: 30 }, drops: { shard: 2 }, health: 100, color: [100, 200, 255], size: 22, tier: 1,
+    tooltip: "Grows a bulb that drops shards on harvest, attracts and consumes elixir",
+    animationBodyType: 'tough',
+    actionType: ['farm'],
+    actionConfig: {},
+    farmConfig: {
+      assetImg: [
+        'img_t_farm_crystal_stage0',
+        'img_t_farm_crystal_stage1',
+        'img_t_farm_crystal_stage2',
+        'img_t_farm_crystal_stage3',
+        'img_t_farm_crystal_stage4',
+        'img_t_farm_crystal_stage5'
+      ],
+      elixirRequired: [1, 0, 1, 0, 1, 0],
+      growthTimer: [HOUR_FRAMES * 1, HOUR_FRAMES * 2, HOUR_FRAMES * 1, HOUR_FRAMES * 2, HOUR_FRAMES * 1, 0],
+      harvestStageHp: 100,
+      lootOnHarvest: { shard: [3, 4], extra: { chance: 0.5, items: ['shard', 'shell'] } },
+      resetAfterHarvest: true,
+      attractRange: GRID_SIZE * 4
+    },
+    targetType: [], targetConfig: {}
+  },
+  t_farm_mob: {
+    name: 'Raisin Mold', costs: { sun: 30 }, costAlmanac: { elixir: 10, raisin: 1 }, drops: { shell: 2 }, health: 100, color: [150, 50, 200], size: 22, tier: 1,
+    tooltip: "Occasionally spawns an enemy nearby",
+    animationBodyType: 'soft',
+    actionType: ['farm'],
+    actionConfig: {},
+    farmConfig: {
+      assetImg: [
+        'img_t_farm_mob_stage0',
+        'img_t_farm_mob_stage1',
+        'img_t_farm_mob_stage2',
+        'img_t_farm_mob_stage3',
+        'img_t_farm_mob_stage4'
+      ],
+      elixirRequired: [0, 0, 0, 0, 0],
+      growthTimer: [HOUR_FRAMES * 0.5, HOUR_FRAMES * 0.5, HOUR_FRAMES * 0.5, HOUR_FRAMES * 0.5, 0],
+      isMobFarm: true,
+      mobSpawnConfig: {
+        enemies: ['e_basic', 'e_armor1'],
+        spawnDist: GRID_SIZE * 2
+      },
+      resetAfterHarvest: true
+    },
+    targetType: [], targetConfig: {}
+  },
 
   // --- TIER 2 ---
   t2_repeater: {
-    name: 'Repeater', cost: 25, health: 50, color: [0, 180, 80], size: 22, tier: 2,
+    name: 'Repeater', costs: { sun: 25 }, costAlmanac: { leaf: 8 }, drops: { leaf: 2 }, health: 50, color: [0, 180, 80], size: 22, tier: 2,
     tooltip: "Shoots 2 bullets at once", animationBodyType: 'soft',
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_pea', shootRange: GRID_SIZE * 8, shootFireRate: [50, 10] },
@@ -182,7 +255,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t2_firepea: {
-    name: 'Firepea', cost: 30, health: 50, color: [255, 60, 40], size: 22, tier: 2,
+    name: 'Firepea', costs: { sun: 30 }, costAlmanac: { leaf: 4, shard: 6 }, drops: { leaf: 1, shard: 1 }, health: 50, color: [255, 60, 40], size: 22, tier: 2,
     tooltip: "Shoots at both enemy and obstacles, leaves a flaming puddle", animationBodyType: 'soft',
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_firepea', shootRange: GRID_SIZE * 8, shootFireRate: 60 },
@@ -190,7 +263,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest', obstaclePriority: 'valuable' }
   },
   t2_laser2: {
-    name: 'Laser MK2', cost: 25, health: 50, color: [100, 100, 255], size: 22, tier: 2,
+    name: 'Laser MK2', costs: { sun: 25 }, costAlmanac: { shard: 8 }, drops: { shard: 2 }, health: 50, color: [100, 100, 255], size: 22, tier: 2,
     tooltip: "Laser breaks obstacles faster", animationBodyType: 'tough',
     actionType: ['laserBeam'],
     actionConfig: { beamDamage: 10, beamDamageRate: 3, beamWidth: 6, beamDuration: 1, beamFireRate: 6, beamDamageWidth: 0, beamAutoLength: true, beamMaxLength: GRID_SIZE * 10 },
@@ -198,7 +271,7 @@ export const turretTypes: any = {
     targetConfig: { obstaclePriority: 'valuable' }
   },
   t2_peanut: {
-    name: 'Peanut', cost: 25, health: 300, color: [220, 200, 150], size: 22, tier: 2,
+    name: 'Peanut', costs: { sun: 25 }, costAlmanac: { leaf: 3, shell: 5 }, drops: { leaf: 1, shell: 1 }, health: 300, color: [220, 200, 150], size: 22, tier: 2,
     tooltip: "Wall that shoots with high inaccuracy", animationBodyType: 'tough',
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_pea', shootRange: GRID_SIZE * 10, shootFireRate: 15, inaccuracy: 45 },
@@ -206,7 +279,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t2_puncher: {
-    name: 'Puncher', cost: 20, health: 300, color: [120, 120, 255], size: 22, tier: 2,
+    name: 'Puncher', costs: { sun: 20 }, costAlmanac: { shard: 2, shell: 5 }, drops: { shard: 1, shell: 1 }, health: 300, color: [120, 120, 255], size: 22, tier: 2,
     tooltip: "Fires close laser at both obstacles and enemies", animationBodyType: 'tough',
     actionType: ['laserBeam'],
     actionConfig: { beamDamage: 8, beamDamageRate: 6, beamWidth: 10, beamDuration: 1, beamFireRate: 15, beamDamageWidth: 0, beamAutoLength: true, beamMaxLength: GRID_SIZE * 2.5 },
@@ -214,12 +287,12 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest', obstaclePriority: 'closest' }
   },
   t2_tall: {
-    name: 'Tallnut', cost: 15, health: 600, color: [140, 140, 150], size: 26, tier: 2,
+    name: 'Tallnut', costs: { sun: 15 }, costAlmanac: { shell: 5 }, drops: { shell: 2 }, health: 600, color: [140, 140, 150], size: 26, tier: 2,
     tooltip: "Tough defensive wall", animationBodyType: 'tough',
     actionType: [], actionConfig: {}, targetType: [], targetConfig: {}
   },
   t2_mortar: {
-    name: 'Mortar', cost: 25, health: 50, color: [180, 100, 40], size: 22, tier: 2,
+    name: 'Mortar', costs: { sun: 25 }, costAlmanac: { leaf: 4, fuel: 4 }, drops: { leaf: 1, fuel: 1 }, health: 50, color: [180, 100, 40], size: 22, tier: 2,
     tooltip: "Shoots at enemy, bullet explodes with splash damage", animationBodyType: 'tough',
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_mortar_shell', shootRange: GRID_SIZE * 12, shootFireRate: 120 },
@@ -227,7 +300,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t2_pulse: {
-    name: 'Pulser', cost: 30, health: 50, color: [100, 255, 100], size: 22, tier: 2,
+    name: 'Pulser', costs: { sun: 30 }, costAlmanac: { shell: 4, fuel: 6 }, drops: { shell: 1, fuel: 1 }, health: 50, color: [100, 255, 100], size: 22, tier: 2,
     tooltip: "Pulses surrounding damage waves at enemies", animationBodyType: 'soft',
     actionType: ['pulse'],
     actionConfig: { pulseBulletTypeKey: 'b_pulse_tier2', pulseTriggerRadius: GRID_SIZE * 2.0, pulseTriggerBy: ['enemy', 'obstacle'], pulseCooldown: 120, pulseCenteredAtTriggerSource: false },
@@ -235,7 +308,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest', obstaclePriority: 'closest' }
   },
   t2_laserexplode: {
-    name: 'Exploding Laser', cost: 30, health: 50, color: [150, 40, 40], size: 22, tier: 2,
+    name: 'Exploding Laser', costs: { sun: 30 }, costAlmanac: { shard: 4, fuel: 6 }, drops: { shard: 1, fuel: 1 }, health: 50, color: [150, 40, 40], size: 22, tier: 2,
     tooltip: "Broken obstacle explodes, damaging nearby enemies and obstacles", animationBodyType: 'tough',
     actionType: ['laserBeam'],
     actionConfig: { 
@@ -246,7 +319,7 @@ export const turretTypes: any = {
     targetConfig: { obstaclePriority: 'valuable' }
   },
   t2_minespawner: {
-    name: 'Mine Launcher', cost: 25, health: 50, color: [255, 20, 20], size: 22, tier: 2,
+    name: 'Mine Launcher', costs: { sun: 25 }, costAlmanac: { fuel: 8 }, drops: { fuel: 2 }, health: 50, color: [255, 20, 20], size: 22, tier: 2,
     tooltip: "Launches a mine every 2h to a random direction", animationBodyType: 'soft',
     unarmedAssetApplyToAction: ['pulse'],
     actionType: ['pulse', 'spawnBulletAtRandom'],
@@ -269,7 +342,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t2_snowpea: {
-    name: 'Snowpea', cost: 25, health: 50, color: [200, 250, 255], size: 22, tier: 2,
+    name: 'Snowpea', costs: { sun: 25 }, costAlmanac: { leaf: 5, ice: 3 }, drops: { leaf: 1, ice: 1 }, health: 50, color: [200, 250, 255], size: 22, tier: 2,
     tooltip: "Shoots snow at random enemies, slowing them down", animationBodyType: 'soft',
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_snowpea', shootRange: GRID_SIZE * 8, shootFireRate: 60 },
@@ -277,7 +350,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'random' }
   },
   t2_iceray: {
-    name: 'Ice Laser', cost: 20, health: 50, color: [150, 255, 255], size: 22, tier: 2,
+    name: 'Ice Laser', costs: { sun: 20 }, costAlmanac: { shard: 2, ice: 5 }, drops: { shard: 1, ice: 1 }, health: 50, color: [150, 255, 255], size: 22, tier: 2,
     tooltip: "Slows down enemies contacting the laser beam", animationBodyType: 'tough',
     actionType: ['laserBeam'],
     actionConfig: { 
@@ -295,7 +368,7 @@ export const turretTypes: any = {
     targetConfig: { obstaclePriority: 'valuable', enemyPriority: 'closest' }
   },
   t2_spike: {
-    name: 'Spikerock', cost: 20, health: 5, color: [220, 220, 240], size: 24, tier: 2,
+    name: 'Spikerock', costs: { sun: 20 }, costAlmanac: { shell: 4, ice: 3 }, drops: { shell: 1, ice: 1 }, health: 5, color: [220, 220, 240], size: 24, tier: 2,
     tooltip: "Stay underground and damages enemies stepping over it", animationBodyType: 'tough',
     collideWithEnemy: false,
     renderBehindEnemy: true,
@@ -306,7 +379,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t2_icebomb: {
-    name: 'Ice Bomb', cost: 20, health: 50, color: [180, 240, 255], size: 22, tier: 2,
+    name: 'Ice Bomb', costs: { sun: 20 }, costAlmanac: { fuel: 2, ice: 5 }, drops: { fuel: 1, ice: 1 }, health: 50, color: [180, 240, 255], size: 22, tier: 2,
     tooltip: "Explodes on contact, damaging and freezing enemies for 1h, armed every 2h", animationBodyType: 'soft',
     actionType: ['pulse'],
     actionConfig: { 
@@ -322,7 +395,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t2_stun: {
-    name: 'Stunner', cost: 15, health: 50, color: [240, 240, 255], size: 22, tier: 2,
+    name: 'Stunner', costs: { sun: 15 }, costAlmanac: { ice: 5 }, drops: { ice: 2 }, health: 50, color: [240, 240, 255], size: 22, tier: 2,
     tooltip: "Leaves a gas puddle on contact, stunning enemies that touches it, armed every 1h", animationBodyType: 'soft',
     actionType: ['pulse'],
     actionConfig: { 
@@ -340,7 +413,7 @@ export const turretTypes: any = {
 
   // --- TIER 3 ---
   t3_triplepea: { 
-    name: 'Tripeater', cost: 50, health: 150, color: [0, 200, 50], size: 24, tier: 3,
+    name: 'Tripeater', costs: { sun: 50 }, costAlmanac: { leaf: 18 }, drops: { leaf: 3 }, health: 150, color: [0, 200, 50], size: 24, tier: 3,
     tooltip: "Shoots at 4 targets at once.", animationBodyType: 'soft',
     actionType: ['shootMultiTarget'],
     actionConfig: {
@@ -355,7 +428,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t3_firepea2: { 
-    name: 'Firepea MK2', cost: 60, health: 100, color: [255, 100, 0], size: 22, tier: 3,
+    name: 'Firepea MK2', costs: { sun: 60 }, costAlmanac: { leaf: 8, shard: 12 }, drops: { leaf: 2, shard: 1 }, health: 100, color: [255, 100, 0], size: 22, tier: 3,
     tooltip: "Shoots and leaves a bigger-longer lasting flame puddle", animationBodyType: 'soft',
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_firepea_t3', shootRange: GRID_SIZE * 10, shootFireRate: 60 },
@@ -363,7 +436,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest', obstaclePriority: 'valuable' }
   },
   t3_spinnut: { 
-    name: 'Spin Nut', cost: 50, health: 400, color: [200, 200, 100], size: 26, tier: 3,
+    name: 'Spin Nut', costs: { sun: 50 }, costAlmanac: { leaf: 8, shell: 10 }, drops: { leaf: 2, shell: 1 }, health: 400, color: [200, 200, 100], size: 26, tier: 3,
     tooltip: "Spins itself and shoots bullets when there's an enemy within range", animationBodyType: 'tough',
     actionType: ['shoot'],
     actionConfig: { 
@@ -378,7 +451,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t3_mortar2: { 
-    name: 'Mortar MK2', cost: 55, health: 100, color: [200, 50, 0], size: 22, tier: 3,
+    name: 'Mortar MK2', costs: { sun: 55 }, costAlmanac: { leaf: 10, fuel: 10 }, drops: { leaf: 2, fuel: 1 }, health: 100, color: [200, 50, 0], size: 22, tier: 3,
     tooltip: "Shoots at enemy, bullet explodes with greater splash damage", animationBodyType: 'tough',
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_mortar_shell_t3', shootRange: GRID_SIZE * 14, shootFireRate: 240 },
@@ -386,7 +459,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t3_snowpea2: { 
-    name: 'Snowpea MK2', cost: 45, health: 100, color: [100, 200, 255], size: 22, tier: 3,
+    name: 'Snowpea MK2', costs: { sun: 45 }, costAlmanac: { leaf: 9, ice: 6 }, drops: { leaf: 2, ice: 1 }, health: 100, color: [100, 200, 255], size: 22, tier: 3,
     tooltip: "Rapidly shoots snow at random enemies, slowing them down", animationBodyType: 'soft',
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_snowpea', shootRange: GRID_SIZE * 10, shootFireRate: 30 },
@@ -394,7 +467,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'random' }
   },
   t3_inferno: { 
-    name: 'Inferno Ray', cost: 40, health: 300, color: [255, 50, 50], size: 24, tier: 3,
+    name: 'Inferno Ray', costs: { sun: 40 }, costAlmanac: { leaf: 4, shard: 6, shell: 2 }, drops: { leaf: 1, shard: 1, shell: 1 }, health: 300, color: [255, 50, 50], size: 24, tier: 3,
     tooltip: "Laser increases damage over time if not interrupted, prioritize highest health", animationBodyType: 'tough',
     actionType: ['laserBeam'],
     actionConfig: { 
@@ -413,7 +486,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'highestHealth', obstaclePriority: 'highestHealth' }
   },
   t3_flamethrower: { 
-    name: 'Flamethrower', cost: 55, health: 100, color: [255, 100, 0], size: 22, tier: 3,
+    name: 'Flamethrower', costs: { sun: 55 }, costAlmanac: { leaf: 6, shard: 8, fuel: 6 }, drops: { leaf: 1, shard: 1, fuel: 1 }, health: 100, color: [255, 100, 0], size: 22, tier: 3,
     tooltip: "Shoots and spread flaming puddles along the way", animationBodyType: 'soft',
     actionType: ['shoot'],
     actionConfig: { bulletTypeKey: 'b_flame_shot', shootRange: GRID_SIZE * 5, shootFireRate: [30,90] },
@@ -421,7 +494,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'random', obstaclePriority: 'valuable' }
   },
   t3_bowling: { 
-    name: 'Bowling Bulb', cost: 55, health: 150, color: [180, 255, 50], size: 24, tier: 3,
+    name: 'Bowling Bulb', costs: { sun: 55 }, costAlmanac: { leaf: 10, shard: 4, ice: 6 }, drops: { leaf: 1, shard: 1, ice: 1 }, health: 150, color: [180, 255, 50], size: 24, tier: 3,
     tooltip: "Shoots heavy rolling projectiles that pushes enemies out of the way", animationBodyType: 'tough',
     actionType: ['shoot'],
     actionConfig: { 
@@ -433,7 +506,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t3_repulser: { 
-    name: 'Repulser', cost: 50, health: 150, color: [100, 255, 150], size: 22, tier: 3,
+    name: 'Repulser', costs: { sun: 50 }, costAlmanac: { leaf: 4, shell: 6, fuel: 8 }, drops: { leaf: 1, shell: 1, fuel: 1 }, health: 150, color: [100, 255, 150], size: 22, tier: 3,
     tooltip: "Pulses surrounding damage waves at enemies, knocking them back", animationBodyType: 'soft',
     actionType: ['pulse'],
     actionConfig: { 
@@ -447,7 +520,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest', obstaclePriority: 'closest' }
   },
   t3_snowpeanut: { 
-    name: 'Snow Peanut', cost: 50, health: 400, color: [180, 220, 255], size: 22, tier: 3,
+    name: 'Snow Peanut', costs: { sun: 50 }, costAlmanac: { leaf: 4, shell: 8, ice: 6 }, drops: { leaf: 1, shell: 1, ice: 1 }, health: 400, color: [180, 220, 255], size: 22, tier: 3,
     tooltip: "Wall that shoots with high inaccuracy, slowing enemies down", animationBodyType: 'tough',
     actionType: ['shoot'],
     actionConfig: { 
@@ -460,7 +533,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t3_skymortar: { 
-    name: 'Sky Mortar', cost: 70, health: 50, color: [50, 100, 255], size: 22, tier: 3,
+    name: 'Sky Mortar', costs: { sun: 70 }, costAlmanac: { leaf: 10, fuel: 10, ice: 4 }, drops: { leaf: 1, fuel: 1, ice: 1 }, health: 50, color: [50, 100, 255], size: 22, tier: 3,
     tooltip: "Fling mortar shells to the sky, slamming down on the toughest enemies", animationBodyType: 'tough',
     actionType: ['launch'],
     actionConfig: { 
@@ -473,28 +546,28 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'highestHealth' }
   },
   t3_laser3: { 
-    name: 'Mining Laser MK3', cost: 50, health: 50, tier: 3, color: [50, 200, 255], size: 22, tooltip: "Laser breaks obstacles super fast", animationBodyType: 'tough',
+    name: 'Mining Laser MK3', costs: { sun: 50 }, costAlmanac: { shard: 18 }, drops: { shard: 3 }, health: 50, tier: 3, color: [50, 200, 255], size: 22, tooltip: "Laser breaks obstacles super fast", animationBodyType: 'tough',
     actionType: ['laserBeam'],
     actionConfig: { beamDamage: 20, beamDamageRate: 3, beamWidth: 8, beamDuration: 1, beamFireRate: 6, beamDamageWidth: 0, beamAutoLength: true, beamMaxLength: GRID_SIZE * 10 },
     targetType: ['obstacle'],
     targetConfig: { obstaclePriority: 'valuable' }
   },
   t3_puncher2: { 
-    name: 'Puncher MK2', cost: 40, health: 400, color: [140, 140, 255], size: 24, tier: 3, tooltip: "Fires stronger close-range laser at both enemies and obstacles", animationBodyType: 'tough',
+    name: 'Puncher MK2', costs: { sun: 40 }, costAlmanac: { shard: 4, shell: 8 }, drops: { shard: 2, shell: 1 }, health: 400, color: [140, 140, 255], size: 24, tier: 3, tooltip: "Fires stronger close-range laser at both enemies and obstacles", animationBodyType: 'tough',
     actionType: ['laserBeam'],
     actionConfig: { beamDamage: 15, beamDamageRate: 6, beamWidth: 12, beamDuration: 1, beamFireRate: 15, beamDamageWidth: 0, beamAutoLength: true, beamMaxLength: GRID_SIZE * 2.5 },
     targetType: ['enemy', 'obstacle'],
     targetConfig: { enemyPriority: 'closest', obstaclePriority: 'closest' }
   },
   t3_aoelaser: { 
-    name: 'Melting Laser', cost: 60, health: 50, color: [255, 200, 100], size: 22, tier: 3, tooltip: "Fires laser that also damages nearby obstacles", animationBodyType: 'tough',
+    name: 'Melting Laser', costs: { sun: 60 }, costAlmanac: { shard: 8, fuel: 12 }, drops: { shard: 2, fuel: 1 }, health: 50, color: [255, 200, 100], size: 22, tier: 3, tooltip: "Fires laser that also damages nearby obstacles", animationBodyType: 'tough',
     actionType: ['laserBeam'],
     actionConfig: { beamDamage: 10, beamDamageRate: 3, beamWidth: 6, beamDuration: 1, beamFireRate: 6, beamDamageWidth: 0, beamAutoLength: true, beamMaxLength: GRID_SIZE * 8, beamBulletTypeKey: 'b_aoelaser_hit' },
     targetType: ['obstacle'],
     targetConfig: { obstaclePriority: 'valuable' }
   },
   t3_iceray2: { 
-    name: 'Ice Laser MK2', cost: 45, health: 50, color: [180, 255, 255], size: 22, tier: 3, tooltip: "Freezes the enemies contacting the laser beam", animationBodyType: 'tough',
+    name: 'Ice Laser MK2', costs: { sun: 45 }, costAlmanac: { shard: 6, ice: 9 }, drops: { shard: 2, ice: 1 }, health: 50, color: [180, 255, 255], size: 22, tier: 3, tooltip: "Freezes the enemies contacting the laser beam", animationBodyType: 'tough',
     actionType: ['laserBeam'],
     actionConfig: { 
         beamDamage: 10, 
@@ -511,14 +584,14 @@ export const turretTypes: any = {
     targetConfig: { obstaclePriority: 'valuable', enemyPriority: 'closest' }
   },
   t3_miningbomb: { 
-    name: 'Mining Bomb', cost: 60, health: 150, color: [255, 100, 50], size: 24, tier: 3, tooltip: "Pulses when close to obstacles, damaging obstacles in a much wider area", animationBodyType: 'tough',
+    name: 'Mining Bomb', costs: { sun: 60 }, costAlmanac: { shard: 8, shell: 4, fuel: 8 }, drops: { shard: 1, shell: 1, fuel: 1 }, health: 150, color: [255, 100, 50], size: 24, tier: 3, tooltip: "Pulses when close to obstacles, damaging obstacles in a much wider area", animationBodyType: 'tough',
     actionType: ['pulse'],
     actionConfig: { pulseBulletTypeKey: 'b_miningbomb_explosion', pulseTriggerRadius: GRID_SIZE * 1.5, pulseTriggerBy: ['obstacle'], pulseCooldown: 120, pulseCenteredAtTriggerSource: false },
     targetType: ['obstacle'],
     targetConfig: { obstaclePriority: 'closest' }
   },
   t3_tesla: { 
-    name: 'Tesla Laser', cost: 40, health: 300, color: [100, 200, 255], size: 24, tier: 3, tooltip: "Creates electric chains between other Teslas, damaging everything on the way", animationBodyType: 'tough',
+    name: 'Tesla Laser', costs: { sun: 40 }, costAlmanac: { shard: 4, shell: 6, ice: 2 }, drops: { shard: 1, shell: 1, ice: 1 }, health: 300, color: [100, 200, 255], size: 24, tier: 3, tooltip: "Creates electric chains between other Teslas, damaging everything on the way", animationBodyType: 'tough',
     actionType: ['generateElectricChain', 'shoot'],
     actionConfig: { 
       electricChainDamageRate: 15, electricChainDamage: 5, electricChainDamageWidth: GRID_SIZE,
@@ -529,18 +602,18 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t3_icepuncher: { 
-    name: 'Ice Puncher', cost: 50, health: 50, color: [150, 200, 255], size: 24, tier: 3, tooltip: "Fires close-range laser that also slows down enemies", animationBodyType: 'tough',
+    name: 'Ice Puncher', costs: { sun: 50 }, costAlmanac: { shard: 8, fuel: 2, ice: 8 }, drops: { shard: 1, fuel: 1, ice: 1 }, health: 50, color: [150, 200, 255], size: 24, tier: 3, tooltip: "Fires close-range laser that also slows down enemies", animationBodyType: 'tough',
     actionType: ['laserBeam'],
     actionConfig: { beamDamage: 10, beamDamageRate: 6, beamWidth: 10, beamDuration: 1, beamFireRate: 15, beamDamageWidth: 0, beamAutoLength: true, beamMaxLength: GRID_SIZE * 2.5, beamBulletTypeKey: 'b_icepuncher_hit' },
     targetType: ['enemy', 'obstacle'],
     targetConfig: { enemyPriority: 'closest', obstaclePriority: 'closest' }
   },
   t3_densnut: { 
-    name: 'Densenut', cost: 35, health: 1200, tier: 3, color: [200, 200, 220], size: 24, tooltip: "Super tough defensive wall", animationBodyType: 'tough',
+    name: 'Densenut', costs: { sun: 35 }, costAlmanac: { shell: 12 }, drops: { shell: 3 }, health: 1200, tier: 3, color: [200, 200, 220], size: 24, tooltip: "Super tough defensive wall", animationBodyType: 'tough',
     actionType: [], actionConfig: {}, targetType: [], targetConfig: {}
   },
   t3_durian: { 
-    name: 'Endurian', cost: 40, health: 400, tier: 3, color: [200, 180, 50], size: 22, tooltip: "Defensive wall that also damages contacting enemies", animationBodyType: 'tough',
+    name: 'Endurian', costs: { sun: 40 }, costAlmanac: { shell: 8, fuel: 4 }, drops: { shell: 2, fuel: 1 }, health: 400, tier: 3, color: [200, 180, 50], size: 22, tooltip: "Defensive wall that also damages contacting enemies", animationBodyType: 'tough',
     actionType: ['pulse'],
     actionConfig: { 
         pulseBulletTypeKey: 'b_durian_pulse', 
@@ -553,7 +626,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest', obstaclePriority: 'closest' }
   },
   t3_spike2: { 
-    name: 'Speed Spike', cost: 40, health: 10, tier: 3, color: [180, 180, 200], size: 24, tooltip: "Stay underground, damages contacting enemies with faster rate", animationBodyType: 'tough',
+    name: 'Speed Spike', costs: { sun: 40 }, costAlmanac: { shell: 6, ice: 6 }, drops: { shell: 2, ice: 1 }, health: 10, tier: 3, color: [180, 180, 200], size: 24, tooltip: "Stay underground, damages contacting enemies with faster rate", animationBodyType: 'tough',
     collideWithEnemy: false,
     renderBehindEnemy: true,
     isActiveWhileMoving: false,
@@ -569,7 +642,7 @@ export const turretTypes: any = {
     targetConfig: { enemyPriority: 'closest' }
   },
   t3_holonut: { 
-    name: 'Holonut', cost: 35, health: 600, tier: 3, color: [150, 150, 255], size: 22, tooltip: "Has a force field to protect surrounding plants", animationBodyType: 'tough',
+    name: 'Holonut', costs: { sun: 35 }, costAlmanac: { shell: 8, fuel: 2, ice: 2 }, drops: { shell: 1, fuel: 1, ice: 1 }, health: 600, tier: 3, color: [150, 150, 255], size: 22, tooltip: "Has a force field to protect surrounding plants", animationBodyType: 'tough',
     actionType: ['shield', 'pulse'],
     actionConfig: { 
         shieldRadius: GRID_SIZE * 2.8,
@@ -582,7 +655,7 @@ export const turretTypes: any = {
     targetType: ['turret'], targetConfig: {}
   },
   t3_minefield: { 
-    name: 'Mine Field', cost: 45, health: 150, color: [255, 60, 0], size: 22, tier: 3, tooltip: "Launches 8 mini mines upon planting, then keeps launching mines and exploding", animationBodyType: 'soft',
+    name: 'Mine Field', costs: { sun: 45 }, costAlmanac: { fuel: 15 }, drops: { fuel: 3 }, health: 150, color: [255, 60, 0], size: 22, tier: 3, tooltip: "Launches 8 mini mines upon planting, then keeps launching mines and exploding", animationBodyType: 'soft',
     unarmedAssetApplyToAction: ['pulse'],
     actionType: ['pulse', 'spawnBulletAtRandom', 'firstStrike'],
     actionConfig: { 
@@ -604,7 +677,7 @@ export const turretTypes: any = {
     targetType: ['enemy'], targetConfig: { enemyPriority: 'closest' }
   },
   t3_frostfield: { 
-    name: 'Frost Field', cost: 50, health: 150, color: [180, 240, 255], size: 22, tier: 3, tooltip: "Emits a chilling field while armed. Explodes on contact and freezes enemies", animationBodyType: 'soft',
+    name: 'Frost Field', costs: { sun: 50 }, costAlmanac: { fuel: 6, ice: 12 }, drops: { fuel: 2, ice: 1 }, health: 150, color: [180, 240, 255], size: 22, tier: 3, tooltip: "Emits a chilling field while armed. Explodes on contact and freezes enemies", animationBodyType: 'soft',
     actionType: ['pulse', 'aura'],
     actionConfig: { 
       pulseBulletTypeKey: 'b_frostfield_explosion', 
@@ -619,7 +692,7 @@ export const turretTypes: any = {
     targetType: ['enemy'], targetConfig: { enemyPriority: 'closest' }
   },
   t3_triberg: { 
-    name: 'Iceberg Chain', cost: 35, health: 150, color: [150, 240, 255], size: 22, tier: 3, tooltip: "Leaves up to 3 gas puddles on enemies within range", animationBodyType: 'soft',
+    name: 'Iceberg Chain', costs: { sun: 35 }, costAlmanac: { ice: 12 }, drops: { ice: 3 }, health: 150, color: [150, 240, 255], size: 22, tier: 3, tooltip: "Leaves up to 3 gas puddles on enemies within range", animationBodyType: 'soft',
     actionType: ['shootMultiTarget'],
     actionConfig: { 
       hasUnarmedAsset: true,

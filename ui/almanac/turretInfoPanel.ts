@@ -2,9 +2,11 @@
 import { state } from '../../state';
 import { turretTypes } from '../../balanceTurrets';
 import { TYPE_MAP, drawTurretSprite } from '../../assetTurret';
-import { GRID_SIZE } from '../../constants';
+import { GRID_SIZE, HOUR_FRAMES } from '../../constants';
 import { TURRET_RECIPES } from '../../dictionaryTurretMerging';
 import { CLASS_ICON_MAP, TURRET_DISPLAY_STATS, DEFAULT_STATS } from '../../UITurretTooltip';
+import { ShopFlyVFX } from '../../vfx/index';
+import { AlmanacProgression } from '../../lvDemo';
 
 declare const push: any;
 declare const pop: any;
@@ -35,6 +37,7 @@ declare const noTint: any;
 declare const constrain: any;
 declare const map: any;
 declare const ellipse: any;
+declare const mouseIsPressed: any;
 
 export function drawTurretInfoPanel(x: number, y: number, w: number, h: number, modalX: number, modalY: number) {
   const key = state.almanacSelectedTurret;
@@ -50,13 +53,6 @@ export function drawTurretInfoPanel(x: number, y: number, w: number, h: number, 
   fill(12, 45, 30);
   noStroke();
   rect(0, 0, w, h, 30);
-  
-  // Header: Name (Centered at top)
-  noStroke();
-  fill(255);
-  textAlign(CENTER, TOP);
-  textSize(24); // Smaller
-  text(tr.name, w / 2, 15);
 
   if (!isUnlocked) {
     // Locked State View
@@ -92,7 +88,8 @@ export function drawTurretInfoPanel(x: number, y: number, w: number, h: number, 
     fill(255);
     textAlign(CENTER, CENTER);
     textSize(16);
-    text("UNLOCK TO USE", 0, 100);
+    const isDiscover = AlmanacProgression.UnlockedByDiscoverTurret.includes(key);
+    text(isDiscover ? "DISCOVER TO UNLOCK" : "UNLOCK TO USE", 0, 100);
     pop();
     
     pop();
@@ -107,7 +104,7 @@ export function drawTurretInfoPanel(x: number, y: number, w: number, h: number, 
 
   // Left Column: Large Sprite Area
   push();
-  translate(leftColW / 2, topSectionY + 45);
+  translate(leftColW / 2, topSectionY + 40);
   
   // Shadow/Glow for the large turret
   noStroke();
@@ -136,62 +133,129 @@ export function drawTurretInfoPanel(x: number, y: number, w: number, h: number, 
   drawTurretSprite(dummyTurret);
   pop();
 
-  // Right Column: Cost, Recipe, Upgrade
+  // Right Column: Name, Buy, Upgrade
   push();
-  translate(rightColX, topSectionY + 20);
+  translate(rightColX + rightColW / 2, topSectionY-10);
   
-  // Sun Cost
-  noStroke();
-  fill(0, 0, 0, 50);
-  rect(6, 2, 75, 25, 12);
-  imageMode(CENTER);
-  image(state.assets['img_icon_sun'], 20, 15, 48, 48);
+  // Name
   fill(255);
-  textAlign(LEFT, CENTER);
-  textSize(20);
-  text(tr.cost, 45, 15);
-  
-  // Recipe icons
-  const recipe = TURRET_RECIPES.find(r => r.id === key);
-  const ingredientIcons: string[] = [];
-  if (recipe) {
-    recipe.ingredients.forEach(ing => ingredientIcons.push(CLASS_ICON_MAP[ing]));
-    for (let i = 0; i < recipe.duplicates; i++) ingredientIcons.push(CLASS_ICON_MAP['duplicate']);
-  } else if (tr.tier && floor(tr.tier) === 1) {
-    ingredientIcons.push(CLASS_ICON_MAP[key]);
-  }
+  textAlign(LEFT, TOP);
+  textSize(16);
+  text(tr.name, -80, 0);
 
-  const iconSize = 20;
-  const iconSpacing = 25;
-  ingredientIcons.forEach((iconKey, idx) => {
-    const ix = 110 + idx * iconSpacing;
-    const iy = 15;
-    
-    fill(0, 0, 0, 50);
-    noStroke();
-    ellipse(ix, iy, iconSize + 4);
+  // Buy Button (Green Pill with costs)
+  drawBuyButton(0, 40, rightColW - 20, 35, modalX + x + rightColX + rightColW / 2, modalY + y + topSectionY-12, key);
 
-    if (iconKey) {
-      const iconSprite = state.assets[iconKey];
-      if (iconSprite) {
-        image(iconSprite, ix, iy, iconSize, iconSize);
-      }
-    }
-  });
-
-  // Upgrade Button (Gold)
-  drawUpgradeButton(rightColW / 2 - 15, 60, rightColW, 38, modalX + x + rightColX, modalY + y + topSectionY);
+  // Upgrade Button (Gold Pill)
+  drawUpgradeButton(0, 85, rightColW -20 , 35, modalX + x + rightColX + rightColW / 2, modalY + y + topSectionY-12);
   pop();
 
   // Bottom Section: Stats Grid and Description
-  const statsY = 140; // Tighter
+  const statsY = 135; 
   drawStatsGrid(15, statsY, w - 30, key);
 
-  const descY = 215; // Tighter
+  const descY = 210; 
   const descH = h - descY - 15;
   drawDescriptionArea(15, descY, w - 30, descH, tr.tooltip || "");
 
   pop();
+}
+
+function drawBuyButton(x: number, y: number, w: number, h: number, parentX: number, parentY: number, key: string) {
+  const screenX = parentX + x;
+  const screenY = parentY + y;
+  const tr = turretTypes[key];
+  
+  // 1. Check for overrides
+  const override = AlmanacProgression.CraftingCostOverride.find((o: any) => o.type === key);
+  
+  if (override && override.canBePurchased === false) {
+    push();
+    translate(x, y);
+    rectMode(CENTER);
+    fill(0, 0, 0, 100);
+    rect(0, 4, w, h, 12);
+    fill(60, 60, 60);
+    rect(0, 0, w, h, 12);
+    fill(200);
+    textAlign(CENTER, CENTER);
+    textSize(14);
+    text("NOT FOR SALE", 0, 0);
+    pop();
+    return;
+  }
+
+  const costs = override?.cost || tr.costAlmanac || tr.costs || { sun: tr.cost || 0 };
+  
+  const hov = mouseX > screenX - w/2 && mouseX < screenX + w/2 && 
+              mouseY > screenY - h/2 && mouseY < screenY + h/2;
+
+  let canAfford = true;
+  for (const [res, amount] of Object.entries(costs)) {
+    const cur = (state as any)[res + 'Currency'];
+    if (cur < (amount as number)) canAfford = false;
+  }
+
+  push();
+  translate(x, y);
+  rectMode(CENTER);
+  
+  // Shadow
+  fill(0, 0, 0, 255);
+  rect(0, 4, w, h, 12);
+  
+  if (!canAfford) fill(80, 80, 80);
+  else fill(hov ? [0, 105, 65] : [20, 64, 47]);
+  rect(0, 0, w, h, 12);
+  
+  if (!canAfford) fill(100, 100, 100);
+  else fill(hov ? [20, 64, 47] : [0, 105, 65]);
+  rect(0, -4, w, h-4, 12);
+
+  // Draw costs inside button
+  const costKeys = Object.keys(costs);
+  const costSpacing = 45;
+  const totalW = costKeys.length * costSpacing;
+  const startX = -totalW / 2 + 15;
+
+  imageMode(CENTER);
+  textAlign(LEFT, CENTER);
+  textSize(16);
+
+  costKeys.forEach((resKey, idx) => {
+    const cx = startX + idx * costSpacing;
+    const iconKey = `img_icon_${resKey}`;
+    const icon = state.assets[iconKey];
+    if (icon) {
+      image(icon, cx, 0, 32, 32);
+    }
+    fill(canAfford ? 255 : [255,100,100]);
+    text(costs[resKey], cx + 10, 0);
+  });
+  
+  pop();
+
+  if (hov && mouseIsPressed && canAfford) {
+    // Deduct costs
+    for (const [res, amount] of Object.entries(costs)) {
+      (state as any)[res + 'Currency'] -= (amount as number);
+    }
+    
+    // Give item
+    state.inventory.items[key] = (state.inventory.items[key] || 0) + 1;
+    state.inventory.specList.push({ key, type: 'turret', timestamp: Date.now() });
+    state.totalTurretsAcquired += 1;
+    
+    // VFX
+    const startX = screenX;
+    const startY = screenY;
+    const targetX = 60;
+    const targetY = 160; 
+    const assetKey = `img_${TYPE_MAP[key]}_front`;
+    state.uiVfx.push(new ShopFlyVFX(startX, startY, targetX, targetY, assetKey));
+    
+    (window as any).mouseIsPressed = false;
+  }
 }
 
 function drawUpgradeButton(x: number, y: number, w: number, h: number, parentX: number, parentY: number) {
@@ -223,7 +287,7 @@ function drawUpgradeButton(x: number, y: number, w: number, h: number, parentX: 
   
   // Elixir Cost
   imageMode(CENTER);
-  image(state.assets['img_icon_elixir'], w/2 - 65, 0, 22, 22);
+  image(state.assets['img_icon_elixir'], w/2 - 65, 0, 32, 32);
   textAlign(LEFT, CENTER);
   textSize(14);
   text("26/600", w/2 - 50, 0);

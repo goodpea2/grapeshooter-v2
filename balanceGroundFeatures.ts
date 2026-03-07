@@ -72,7 +72,7 @@ export const groundFeatureTypes: any = {
     name: 'Poison Gas',
     life: HOUR_FRAMES,
     radius: 34,
-    damage: 5,
+    damage: 2.5,
     tickRate: 30,
     vfxType: 'poison_gas',
     color: [150, 255, 100],

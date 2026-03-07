@@ -4,7 +4,7 @@ export const HEX_DIST = 22;
 export const CHUNK_SIZE = 16;
 export const VISIBILITY_RADIUS = 14;
 export const CHUNK_GEN_RADIUS = 1; // Radius around player to generate/update chunks
-export const VERSION = "Grapeshooter - build 3/3 1:43am"; // absolute time from gmt+7, don't remove this comment
+export const VERSION = "Grapeshooter - build 7/3 4:03am"; // absolute time from gmt+7, don't remove this comment
 export const LEVEL_THRESHOLDS = [10, 22, 35, 50, 70, 90, 120, 150, 180, 200];
 export const HOUR_FRAMES = 600;
 export const MAX_VFX = 400;
@@ -21,6 +21,7 @@ export const FROST_LEVEL_CAP = 1.0;
 export const FROST_BUILDUP_RATE = 1 / 600;
 export const FROST_DECAY_RATE = 1 / 800;
 export const ICECUBE_MAX_HEALTH = 320;
+export const HUD_SAFEZONE = 16;
 
 export const WORLD_GEN_STATS: Record<string, { value: number, chance: number, budget?: number, dangerRange?: [number, number] }[]> = {
   sun: [
@@ -89,16 +90,16 @@ export const WORLD_GEN_STATS: Record<string, { value: number, chance: number, bu
     { value: 1.00, chance: 0.25 }
   ],
   spawner: [
-    { value: 0.1, chance: 0.05, budget: 30,  dangerRange: [1, 1] }, // Lvl 0
-    { value: 0.1, chance: 0.10, budget: 60,  dangerRange: [1, 2] }, // Lvl 1
-    { value: 0.2, chance: 0.10, budget: 60,  dangerRange: [1, 3] }, // Lvl 2
-    { value: 0.2, chance: 0.15, budget: 90,  dangerRange: [1, 3] }, // Lvl 3
-    { value: 0.3, chance: 0.15, budget: 90,  dangerRange: [2, 4] }, // Lvl 4
-    { value: 0.3, chance: 0.20, budget: 150, dangerRange: [2, 5] }, // Lvl 5
-    { value: 0.4, chance: 0.20, budget: 150, dangerRange: [3, 5] }, // Lvl 6
-    { value: 0.4, chance: 0.25, budget: 200, dangerRange: [3, 6] }, // Lvl 7
-    { value: 0.5, chance: 0.25, budget: 200, dangerRange: [3, 6] }, // Lvl 8
-    { value: 0.6, chance: 0.25, budget: 200, dangerRange: [4, 6] }, // Lvl 9
-    { value: 0.7, chance: 0.25, budget: 200, dangerRange: [5, 6] }  // Lvl 10
+    { value: 0.1, chance: 0.50, budget: 30,  dangerRange: [1, 1] }, // Lvl 0
+    { value: 0.2, chance: 0.10, budget: 60,  dangerRange: [1, 2] }, // Lvl 1
+    { value: 0.3, chance: 0.10, budget: 60,  dangerRange: [1, 3] }, // Lvl 2
+    { value: 0.4, chance: 0.15, budget: 90,  dangerRange: [1, 3] }, // Lvl 3
+    { value: 0.5, chance: 0.15, budget: 90,  dangerRange: [2, 4] }, // Lvl 4
+    { value: 0.6, chance: 0.20, budget: 150, dangerRange: [2, 5] }, // Lvl 5
+    { value: 0.7, chance: 0.20, budget: 150, dangerRange: [3, 5] }, // Lvl 6
+    { value: 0.8, chance: 0.25, budget: 200, dangerRange: [3, 6] }, // Lvl 7
+    { value: 0.9, chance: 0.25, budget: 200, dangerRange: [3, 6] }, // Lvl 8
+    { value: 1.0, chance: 0.25, budget: 200, dangerRange: [4, 6] }, // Lvl 9
+    { value: 1.5, chance: 0.25, budget: 200, dangerRange: [5, 6] }  // Lvl 10
   ]
 };

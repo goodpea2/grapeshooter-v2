@@ -14,16 +14,19 @@ declare const sin: any;
 declare const frameCount: any;
 declare const floor: any;
 
-export const customBudgetPerNight = [150, 300, 500, 800, 1400, 2400, 4000, 7000, 12000, 18000]; // new with roomDirector
+export const customBudgetPerNight = [100, 200, 400, 800, 1500, 2600, 4000, 7000, 10000, 13000]; // new with roomDirector
 export const customDayLightConfig = '000011222222222222110000'; // 0: Night, 1: Transition, 2: Day
 export const customStartingHour = 6;
 
 export const AlmanacProgression = {
   StartingTurret: [
     't_pea', 't_laser', 't_wall', 't_mine', 't_ice', // Tier 1
-    't_sunflower', 't_lilypad', 't_seed', 't_seed2', // Special
-    't0_cherrybomb','t0_firecherry', 't0_jalapeno', 't0_iceshroom', 't0_starfruit', 't0_grapeshot', 't0_puffshroom', // consumable
+    't_seed', 't_seed2', // Special
     't2_repeater', 't2_laser2', 't2_tall', 't2_minespawner', 't2_stun' // Specific Tier 2
+  ],
+  UnlockedByDiscoverTurret: [
+    't_sunflower', 't_lilypad','t0_cherrybomb','t0_firecherry', 't0_jalapeno', 't0_iceshroom', 't0_starfruit', 't0_grapeshot', 't0_puffshroom',
+    't_farm_bush', 't_farm_crystal', 't_farm_mob'
   ],
   LockedTurret: [
     { type: 't2_firepea', weight: 10 }, { type: 't2_peanut', weight: 10 }, { type: 't2_mortar', weight: 10 }, { type: 't2_snowpea', weight: 10 }, { type: 't2_puncher', weight: 10 }, { type: 't2_laserexplode', weight: 10 }, { type: 't2_iceray', weight: 10 }, { type: 't2_pulse', weight: 10 }, { type: 't2_spike', weight: 10 }, { type: 't2_icebomb', weight: 10 },
@@ -65,6 +68,11 @@ export const AlmanacProgression = {
     { raisin: 14 },
     { raisin: 17 },
     { raisin: 20 }
+  ],
+  CraftingCostOverride: [
+    { type: 't_sunflower', cost: { soil: 40 } },
+    { type: 't_seed', canBePurchased: false },
+    { type: 't_seed2', canBePurchased: false }
   ]
 };
 
@@ -289,5 +297,21 @@ export function updateGameSystems() {
   if (state.hourlyBudgetPool >= 2) {
     const spent = spawnFromBudget(state.hourlyBudgetPool);
     state.hourlyBudgetPool -= spent;
+  }
+
+  // Turret Discovery Check
+  for (const key of AlmanacProgression.UnlockedByDiscoverTurret) {
+    if (!state.unlockedTurrets.includes(key)) {
+      // Check inventory
+      if ((state.inventory.items[key] || 0) > 0) {
+        state.unlockedTurrets.push(key);
+        continue;
+      }
+      // Check attachments
+      if (state.player && state.player.attachments.some((a: any) => a.type === key)) {
+        state.unlockedTurrets.push(key);
+        continue;
+      }
+    }
   }
 }

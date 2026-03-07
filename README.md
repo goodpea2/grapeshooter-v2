@@ -52,3 +52,14 @@ Base expansion is built on a **Hex-Axial Coordinate System** (q, r).
     - **First Strike**: The `t3_minefield` performs a rapid-fire sequence of 8 mine launches immediately upon placement, accompanied by a power-up visual effect.
     - **Aura**: The `t3_frostfield` emits a continuous chilling field that slows all enemies within a 2.8 tile radius, providing constant crowd control regardless of arming state.
     - **Gas Barrage**: The `t3_triberg` has been upgraded from a trap to a multi-target ranged lobber, capable of dropping 3 high-duration stun gas puddles on different enemies simultaneously.
+
+---
+
+## 📖 The Almanac & Progression
+The Almanac (v4.0) serves as the central hub for discovery, purchasing, and recipe management.
+- **Discovery-Based Unlocks**: Certain turrets (e.g., Sunflower, Lilypad, and various consumables) start locked and are only revealed once "discovered" by the player—either by finding them in the world, receiving them from NPCs, or attaching them to the base.
+- **Integrated Shop**: Players can purchase unlocked turrets directly from the Almanac using a combination of Sun, Elixir, Soil, and rare resources. Purchased items are delivered to the player's inventory via a visual fly-VFX.
+- **Multi-Resource Economy**: The game features a tiered resource system:
+    - **Primary**: Sun (Mining), Elixir (Combat), Soil (Exploration), Raisins (Special).
+    - **Rare Components**: Leaf, Shard, Shell, Fuel, and Ice. These are required for crafting and purchasing higher-tier turrets.
+- **Dynamic UI**: The Almanac features a left-aligned navigation system and a real-time resource monitor, providing a clear overview of the player's current assets and progression.

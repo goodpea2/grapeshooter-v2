@@ -44,6 +44,7 @@ export function drawTurretList(x: number, y: number, w: number, h: number, modal
 
   const validTurrets = new Set([
     ...AlmanacProgression.StartingTurret,
+    ...AlmanacProgression.UnlockedByDiscoverTurret,
     ...AlmanacProgression.LockedTurret.map(t => t.type)
   ]);
 
@@ -129,7 +130,7 @@ export function drawTurretList(x: number, y: number, w: number, h: number, modal
     const headerY = layout[0].y - itemH/2 - 15;
     fill(255, 200);
     textAlign(LEFT, TOP);
-    textSize(18);
+    textSize(16);
     text(tierName, 0, headerY);
     
     layout.forEach(item => {
@@ -212,6 +213,14 @@ function drawTurretGridItem(x: number, y: number, key: string, parentX: number, 
     });
     pop();
   }
+  if (hov) {
+    noFill();
+    translate(0, -15);
+    stroke(isSelected? [255, 235, 90] : [255, 255, 255, 100]);
+    strokeWeight(4);
+    rectMode(CENTER);
+    rect(0, 0, 95, 95, 20);
+  } else
 
   // Selection Highlight
   if (isSelected) {
@@ -270,6 +279,7 @@ export function getTurretY(targetKey: string): number {
 
   const validTurrets = new Set([
     ...AlmanacProgression.StartingTurret,
+    ...AlmanacProgression.UnlockedByDiscoverTurret,
     ...AlmanacProgression.LockedTurret.map(t => t.type)
   ]);
 

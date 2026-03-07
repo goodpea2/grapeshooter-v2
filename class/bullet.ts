@@ -85,7 +85,7 @@ export class Bullet {
     
     if (this.damageTargets.includes('icecube')) {
       for (let a of state.player.attachments) {
-        if (a.isFrosted && !this.hitTargets.has(a.uid)) {
+        if ((a.isFrosted || a.isHarvestReady) && !this.hitTargets.has(a.uid)) {
           const awPos = a.getWorldPos();
           const dSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
           const minDist = a.size / 2 + 6;
