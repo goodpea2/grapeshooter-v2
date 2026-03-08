@@ -82,7 +82,7 @@ export const bulletTypes: any = {
     bulletDamage: 50, bulletSpeed: 6, bulletColor: [200, 100, 255], bulletLifeTime: 60, bulletSize: 20, bulletLength: 20,
     aoeConfig: { isAoe: true, aoeRadiusGradient: [GRID_SIZE*1,GRID_SIZE*1.5], aoeDamageGradient: [100,10], dealAoeOnObstacle: false, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 0 },
     cameraShakeOnDeath: [10, 12, 0.8],
-    damageTargets: ['enemy', 'obstacle']
+    damageTargets: ['enemy', 'obstacle', 'icecube']
   },
   b_enemy_basic: {
     bulletDamage: 8, bulletSpeed: 3, bulletColor: [255, 100, 100], bulletLifeTime: 180, bulletSize: 8, bulletLength: 8,
@@ -370,7 +370,7 @@ export const bulletTypes: any = {
     bulletAssetImg: 'img_b_skymortar',
     highArcConfig: { arcHeight: 300, arcTravelTime: 90 },
     aoeConfig: { 
-      isAoe: true, aoeRadiusGradient: [GRID_SIZE * 1.5,GRID_SIZE * 2.0,GRID_SIZE * 3.5], aoeDamageGradient: [300,30,10], dealAoeOnObstacle: true, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 0.5,
+      isAoe: true, aoeRadiusGradient: [GRID_SIZE * 1,GRID_SIZE * 1.5,GRID_SIZE * 2.5], aoeDamageGradient: [300,30,10], dealAoeOnObstacle: true, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 0.5,
       aoeKnockbackStrength: 4.0 
     },
     cameraShakeOnDeath: [6, 8, 0.98],

@@ -127,6 +127,7 @@ export const state: any = {
   worldPreviewBuffer: null, // Buffer to store the noise map to prevent lag
   worldPreviewNeedsUpdate: true,
   showChunkBorders: false,
+  showObstacleOutline: false,
   debugGizmosTurrets: false,
   debugGizmosEnemies: false,
   debugHP: false,

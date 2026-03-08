@@ -203,7 +203,21 @@ export const ASSETS = {
   img_t_farm_mob_stage1: "https://i.ibb.co/hptz7Qs/t-farm-mob-stage1-front-right.png",
   img_t_farm_mob_stage2: "https://i.ibb.co/MkB3Thvc/t-farm-mob-stage2-front-right.png",
   img_t_farm_mob_stage3: "https://i.ibb.co/k2sTckyd/t-farm-mob-stage3-front-right.png",
-  img_t_farm_mob_stage4: "https://i.ibb.co/k2sTckyd/t-farm-mob-stage3-front-right.png"
+  img_t_farm_mob_stage4: "https://i.ibb.co/k2sTckyd/t-farm-mob-stage3-front-right.png",
+
+  // Tileset Assets
+  img_tileset_dirt: "https://i.ibb.co/4gRpsVjq/tileset-dirt.png",
+  img_tileset_dirt_v2: "https://i.ibb.co/DgknKSh5/tileset-dirt-v2.png",
+  img_tileset_clay: "https://i.ibb.co/nqmQLnCP/tileset-clay.png",
+  img_tileset_clay_v2: "https://i.ibb.co/FqhKX97r/tileset-clay-v2.png",
+  img_tileset_stone: "https://i.ibb.co/d4nVZjCM/tileset-stone.png",
+  img_tileset_stone_v2: "https://i.ibb.co/WWvs8fT0/tileset-stone-v2.png",
+  img_tileset_slate: "https://i.ibb.co/spKwcB1Y/tileset-slate.png",
+  img_tileset_slate_v2: "https://i.ibb.co/S44v0W1M/tileset-slate-v2.png",
+  img_tileset_black: "https://i.ibb.co/1fZ3DfjG/tileset-black.png",
+  img_tileset_black_v2: "https://i.ibb.co/tTG6W6dL/tileset-black-v2.png",
+  img_tileset_concealed: "https://i.ibb.co/bRzH3dnK/tileset-conceal.png",
+  img_tileset_fallback: "https://i.ibb.co/qLB5W60y/tileset-clay.png"
 };
 
 

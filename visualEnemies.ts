@@ -113,44 +113,6 @@ export function drawEnemy(e: any) {
       line(e.pos.x, e.pos.y, tp.x, tp.y);
     }
 
-    // Draw path
-    if (e.path && e.path.length > 1) {
-      stroke(0, 255, 255, 150); // Cyan for path
-      strokeWeight(2);
-      noFill();
-      beginShape();
-      for (const p of e.path) {
-        vertex(p.x, p.y);
-      }
-      endShape();
-    }
-
-    // Draw look-ahead position (green line)
-    const lookAheadDist = GRID_SIZE; // Consistent with enemy's detection distance
-    const lookAheadX = e.pos.x + cos(e.rot) * lookAheadDist;
-    const lookAheadY = e.pos.y + sin(e.rot) * lookAheadDist;
-
-    stroke(e.isDummyDetectedInLookAhead ? 255 : 0, e.isDummyDetectedInLookAhead ? 0 : 255, 0, 200); // Red if dummy detected, else green
-    strokeWeight(2);
-    line(e.pos.x, e.pos.y, lookAheadX, lookAheadY);
-
-    // Draw a marker at the look-ahead position
-    push();
-    translate(lookAheadX, lookAheadY);
-    rotate(e.rot);
-    // Display dummyDetectedTimer
-    if (e.dummyDetectedTimer > 0) {
-      fill(255, 255, 255);
-      noStroke();
-      textSize(10);
-      textAlign(CENTER, BOTTOM);
-      text(floor(e.dummyDetectedTimer), 0, -15);
-    }
-    fill(0, 255, 0, 200);
-    noStroke();
-    triangle(0, 0, -5, -10, 5, -10); // Arrow pointing forward
-    pop();
-
     pop();
   }
 

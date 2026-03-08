@@ -46,9 +46,6 @@ export class Enemy {
   triggeredSpawnThresholds: Set<number> = new Set(); // Tracks already fired health ratios
   kbVel: any; // Knockback velocity
   kbTimer: number = 0; // Knockback duration (interrupts movement)
-  dummyDetectedTimer: number = 0; // Timer for o_dummy debug behavior
-  preferredSteeringDirection: number = 0; // -1 for left, 1 for right, 0 for undecided
-  isDummyDetectedInLookAhead: boolean = false; // For debug visualization in gizmos
   isFlying: boolean = false;
   stealSunTarget: any = null;
   stealCooldown: number = 0;
@@ -57,13 +54,6 @@ export class Enemy {
   attackAnimTimer: number = 0;
   attackAnimDuration: number = 0;
   attackOffset: any;
-
-  // Steering behavior
-  steeringDirection: number = 0; // -1 for left, 1 for right, 0 for no steering
-  steeringTarget: any = null;
-  steeringFrames: number = 0;
-  path: any[] = []; // For debug visualization
-  movingIntention: any = null; // For debug visualization
 
   constructor(x: number, y: number, typeKey: string) {
     this.uid = Math.random().toString(36).substr(2, 9);
@@ -98,7 +88,6 @@ export class Enemy {
     if (this.isDying) return;
     if (this.flash > 0) this.flash--;
     this.prevPos.set(this.pos);
-    this.isDummyDetectedInLookAhead = false; // Reset for current frame
 
 
     // Apply knockback
@@ -248,195 +237,46 @@ export class Enemy {
     const dSq = dx*dx + dy*dy;
     const d = Math.sqrt(dSq);
     const dirHeading = atan2(dy, dx);
-    if (this.dummyDetectedTimer === 0) {
-      this.rot = lerpAngle(this.rot, dirHeading, 0.12);
-    }
+    this.rot = lerpAngle(this.rot, dirHeading, 0.12);
 
-    // Enemy Steering Behavior
-    let currentMoveAngle = dirHeading;
-
-    // Check if chunk is loaded for steering behavior
-    const currentChunk = state.world.getChunk(floor(this.pos.x / (GRID_SIZE * CHUNK_SIZE)), floor(this.pos.y / (GRID_SIZE * CHUNK_SIZE)));
-    if (!currentChunk) {
-      this.steeringDirection = 0;
-      this.steeringFrames = 0;
-      this.steeringTarget = null;
-      this.path = [];
-      this.movingIntention = null;
-    } else {
-      // Check for dangerous tiles ahead
-      const lookAheadDist = GRID_SIZE * 1.5;
-      const lookAheadPos = p5.Vector.fromAngle(dirHeading).mult(lookAheadDist).add(this.pos);
-
-      const isFrontDangerous = state.world.isTileDangerous(lookAheadPos.x, lookAheadPos.y);
-
-      if (isFrontDangerous && this.steeringDirection === 0) {
-        // Randomly decide to steer left or right
-        this.steeringDirection = random() < 0.5 ? -1 : 1; // -1 for left, 1 for right
-        this.steeringFrames = floor(random(60, 180)); // Steer for 1-3 seconds
-        this.steeringTarget = null; // Clear steering target
-      } else if (!isFrontDangerous && this.steeringDirection !== 0) {
-        // If path is clear, reduce steering frames and potentially stop steering
-        this.steeringFrames--;
-        if (this.steeringFrames <= 0) {
-          this.steeringDirection = 0;
-          this.steeringTarget = null;
-        }
-      }
-
-      if (this.steeringDirection !== 0) {
-        // Apply steering: rotate the desired movement vector
-        currentMoveAngle = dirHeading + (this.steeringDirection * HALF_PI * 0.5); // Steer 45 degrees
-        targetMoveVec = p5.Vector.fromAngle(currentMoveAngle).mult(this.speed * speedMult);
-        this.movingIntention = p5.Vector.fromAngle(currentMoveAngle).mult(this.size * 2).add(this.pos);
-      } else {
-        targetMoveVec = createVector(dx/d, dy/d).mult(this.speed * speedMult);
-        this.movingIntention = p5.Vector.fromAngle(dirHeading).mult(this.size * 2).add(this.pos);
-      }
-
-      // Update path for debug visualization
-      this.path.push(this.pos.copy());
-      if (this.path.length > 30) this.path.shift();
-    }
-
+    // Enemy-Enemy collision avoidance
     for (let i = -1; i <= 1; i++) {
       for (let j = -1; j <= 1; j++) {
         const neighbors = state.spatialHash.get(`${hgx+i},${hgy+j}`);
         if (neighbors) {
           for (const other of neighbors) {
             if (other === this || other.isDying) continue;
-            const dx = this.pos.x - other.pos.x;
-            const dy = this.pos.y - other.pos.y;
-            const distSq = dx*dx + dy*dy;
+            const odx = this.pos.x - other.pos.x;
+            const ody = this.pos.y - other.pos.y;
+            const distSq = odx*odx + ody*ody;
             
             if (distSq > checkLimitSq) continue;
             
             const md = (this.size + other.size)*0.55;
             if (distSq < md*md && distSq > 0) {
-              const d = Math.sqrt(distSq);
-              this.moveWithCollisions(createVector(dx/d * 0.2, dy/d * 0.2));
+              const od = Math.sqrt(distSq);
+              this.moveWithCollisions(createVector(odx/od * 0.2, ody/od * 0.2));
             }
           }
         }
       }
     }
-    
-
-    
-
 
     let targetRadius = (this.target.size || 32) * 0.5;
     if (this.target instanceof AttachedTurret && this.target.config.actionType.includes('shield')) {
         targetRadius = this.target.config.actionConfig.shieldRadius || targetRadius;
     }
 
-    // Check for o_dummy in sight range (debug behavior)
-    const sightRange = 34; // Define a sight range for the dummy obstacle
-    for (const chunk of state.world.chunks.values()) {
-      for (const obstacle of chunk.blocks as Obstacle[]) {
-        if (obstacle.type === 'o_dummy') { // only keep as o_dummy for now, we'll integrate this to all obstacles later
-          const obsPos = createVector(obstacle.gx * GRID_SIZE + GRID_SIZE / 2, obstacle.gy * GRID_SIZE + GRID_SIZE / 2);
-          const dToDummy = dist(this.pos.x, this.pos.y, obsPos.x, obsPos.y);
-          const lookAheadPos = createVector(this.pos.x + cos(this.rot) * GRID_SIZE, this.pos.y + sin(this.rot) * GRID_SIZE);
-          // Check for collision with the full o_dummy block at the look-ahead position
-          const obstacleRectX = obstacle.gx * GRID_SIZE;
-          const obstacleRectY = obstacle.gy * GRID_SIZE;
-          const obstacleRectWidth = GRID_SIZE;
-          const obstacleRectHeight = GRID_SIZE;
-          // Use a small radius for the lookAheadPos to represent the enemy's 'head'
-          const lookAheadRadius = this.size * 0.25; 
-          if (dToDummy < sightRange && checkCircleRectCollision(lookAheadPos.x, lookAheadPos.y, lookAheadRadius, obstacleRectX, obstacleRectY, obstacleRectWidth, obstacleRectHeight) && state.world.checkLOS(this.pos.x, this.pos.y, obsPos.x, obsPos.y)) {
-            this.isDummyDetectedInLookAhead = true;
-            if (this.dummyDetectedTimer === 0) {
-              if (this.preferredSteeringDirection === 0) {
-                this.preferredSteeringDirection = random() < 0.5 ? -1 : 1; // Randomly decide once
-              }
-              this.steeringDirection = this.preferredSteeringDirection;
-            }
-            this.dummyDetectedTimer = 15; // Reset timer to keep steering active
-            break;
-          }
-        }
-      }
-    }
-
-    if (this.dummyDetectedTimer > 0) {
-      // Get target position for LOS check
-      let targetWorldPos = this.target.getWorldPos ? this.target.getWorldPos() : this.target.pos;
-      if (!targetWorldPos && this.target.gx !== undefined) { // Handle case where target is a grid object
-        targetWorldPos = createVector(this.target.gx * GRID_SIZE + GRID_SIZE / 2, this.target.gy * GRID_SIZE + GRID_SIZE / 2);
-      }
-
-      // Only count down if no dummy is detected AND path to target is clear
-      if (!this.isDummyDetectedInLookAhead && targetWorldPos && state.world.checkLOS(this.pos.x, this.pos.y, targetWorldPos.x, targetWorldPos.y)) {
-        this.dummyDetectedTimer--; // Only count down if no dummy is detected in look-ahead
-      }
-
-      if (this.isDummyDetectedInLookAhead) {
-        // Rotate based on preferredSteeringDirection until path is clear
-        const targetRot = this.rot + (this.preferredSteeringDirection * HALF_PI * 0.05); // Target 4.5 degrees left/right
-        this.rot = lerpAngle(this.rot, targetRot, 0.15); // Smooth rotation
-
-        // Check if path is clear after rotation
-        const steeredLookAheadPos = createVector(this.pos.x + cos(this.rot) * GRID_SIZE, this.pos.y + sin(this.rot) * GRID_SIZE);
-        const isSteeredPathClear = !state.world.isTileDangerous(steeredLookAheadPos.x, steeredLookAheadPos.y);
-
-        if (isSteeredPathClear) {
-          // Move towards the lookAheadPos once path is clear
-          targetMoveVec = createVector(cos(this.rot), sin(this.rot)).mult(this.speed * speedMult);
-          shouldMove = true; // Ensure enemy moves
-        } else {
-          // If still blocked after rotation, just rotate in place
-          targetMoveVec = createVector(0, 0);
-          shouldMove = false;
-        }
-      } else {
-        // If dummy is NOT detected, move straight in current heading direction
-        targetMoveVec = createVector(cos(this.rot), sin(this.rot)).mult(this.speed * speedMult);
-        shouldMove = true;
-      }
-    } else {
-      // Original Steering behavior
-      const lookAheadDist = GRID_SIZE; // Look 1 tile ahead
-      const lookAheadPos = createVector(this.pos.x + cos(this.rot) * lookAheadDist, this.pos.y + sin(this.rot) * lookAheadDist);
-      const isFrontDangerous = state.world.isTileDangerous(lookAheadPos.x, lookAheadPos.y);
-
-      if (isFrontDangerous && this.steeringDirection === 0) {
-        // Decide to steer left or right (using preferred direction if set)
-          if (this.preferredSteeringDirection === 0) {
-            this.preferredSteeringDirection = random() < 0.5 ? -1 : 1; // Randomly decide once
-          }
-          this.steeringDirection = this.preferredSteeringDirection;
-        this.steeringTarget = this.target; // Store current target to check LOS later
-      } else if (!isFrontDangerous && this.steeringDirection !== 0) {
-        // If path is clear AND we can see the original target, stop steering
-        if (this.steeringTarget && state.world.checkLOS(this.pos.x, this.pos.y, this.steeringTarget.pos.x, this.steeringTarget.pos.y)) {
-          this.steeringDirection = 0; // Reset steering
-          this.steeringTarget = null;
-        }
-      }
-
-      if (this.steeringDirection !== 0) {
-        // Apply steering force
-        const steerAngle = this.rot + (this.steeringDirection * HALF_PI * 0.05); // Steer 4.5 degrees left/right
-        targetMoveVec = createVector(cos(steerAngle), sin(steerAngle)).mult(this.speed * speedMult);
-        shouldMove = true; // Ensure enemy moves while steering
-      }
-    }
-
     const inMeleeRange = d < (this.size * 0.5 + targetRadius + 15);
     const isShooter = this.type === 'e_shooting' || this.type === 'e_shooting_giant';
     const canShootInRange = this.actionType.includes('shoot') && d < this.actionConfig.shootRange && (isShooter || state.world.checkLOS(this.pos.x, this.pos.y, tp.x, tp.y));
 
-    if (canShootInRange && this.dummyDetectedTimer === 0) shouldMove = false;
-
-    if (this.steeringDirection === 0 && this.dummyDetectedTimer === 0) {
-        targetMoveVec = createVector(dx/d, dy/d).mult(this.speed * speedMult);
-    }
+    if (canShootInRange) shouldMove = false;
 
     if (shouldMove && this.actionType.includes('moveDefault')) {
       let rThresh = this.actionType.includes('shoot') ? this.actionConfig.shootRange * 0.75 : this.size * 0.6;
-      if (d > rThresh || this.steeringDirection !== 0) {
+      if (d > rThresh) {
+        targetMoveVec = createVector(dx/d, dy/d).mult(this.speed * speedMult);
         this.moveWithCollisions(targetMoveVec);
       }
     }

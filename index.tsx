@@ -1,7 +1,8 @@
 
 import { state } from './state';
 import { 
-  GRID_SIZE, HEX_DIST, MAX_VFX, HOUR_FRAMES, CHUNK_SIZE, PLAYER_DRAG_MIN_DISTANCE_TILES, PLAYER_DRAG_MAX_DISTANCE_TILES
+  GRID_SIZE, HEX_DIST, MAX_VFX, HOUR_FRAMES, CHUNK_SIZE, PLAYER_DRAG_MIN_DISTANCE_TILES, PLAYER_DRAG_MAX_DISTANCE_TILES,
+  VISIBILITY_RADIUS
 } from './constants';
 import { turretTypes } from './balanceTurrets';
 import { findMergeResult } from './dictionaryTurretMerging';
@@ -80,6 +81,7 @@ declare const imageMode: any;
 declare const floor: any;
 declare const noise: any;
 declare const keyCode: any;
+declare const drawingContext: any;
 
 function rebuildSpatialHash() {
   state.spatialHash.clear();
@@ -127,6 +129,40 @@ function drawGlobalLighting() {
   }
 
   if (a > 1) { push(); noStroke(); fill(r, g, b, a); rect(0, 0, width, height); pop(); }
+}
+
+function drawVisibilityOverlay() {
+  const px = width / 2;
+  const py = height / 2;
+  const innerRadius = (VISIBILITY_RADIUS - 2) * GRID_SIZE;
+  const outerRadius = (VISIBILITY_RADIUS) * GRID_SIZE;
+
+  push();
+  drawingContext.save();
+  // Use a radial gradient to create the cutout effect
+  const grad = drawingContext.createRadialGradient(px, py, 0, px, py, outerRadius);
+  grad.addColorStop(0, 'rgba(12,12,27,0)');
+  grad.addColorStop(innerRadius / outerRadius, 'rgba(12,12,27,0)');
+  grad.addColorStop(1, 'rgba(12,12,27,1)');
+  
+  drawingContext.fillStyle = grad;
+  // Draw a large enough rectangle to cover the screen even when zoomed/shaken
+  drawingContext.fillRect(0, 0, width, height);
+  
+  // Also fill the rest of the screen outside the gradient radius if necessary
+  // But since we are drawing in screen space (not world space), width/height is enough
+  // unless the gradient is smaller than the screen.
+  // If the gradient is smaller than the screen, we need to fill the rest with black.
+  if (outerRadius < Math.max(width, height)) {
+    drawingContext.strokeStyle = 'rgba(12,12,27,1)';
+    drawingContext.lineWidth = Math.max(width, height) * 2;
+    drawingContext.beginPath();
+    drawingContext.arc(px, py, outerRadius + drawingContext.lineWidth / 2, 0, Math.PI * 2);
+    drawingContext.stroke();
+  }
+  
+  drawingContext.restore();
+  pop();
 }
 
 function executePlacement() {
@@ -668,6 +704,7 @@ function tick() {
   }
 
   drawGlobalLighting();
+  drawVisibilityOverlay();
   drawTouchVisuals();
   drawGameSpeedButtons();
   drawUI(spawnFromBudget);

@@ -5,7 +5,7 @@ import {
 } from './constants';
 import { obstacleTypes, overlayTypes, BLOCK_WEIGHTS } from './balanceObstacles';
 import { liquidTypes, LIQUID_WEIGHTS, LIQUID_KEYS } from './balanceLiquids';
-import { MuzzleFlash, BlockDebris } from './vfx/index';
+import { MuzzleFlash, BlockDebris, BlockHitVFX } from './vfx/index';
 import { Enemy, Bullet, NPCEntity } from './entities';
 import { spawnLootAt, ECONOMY_CONFIG } from './economy';
 import { worldGenConfig, requestSpawn, spawnFromBudget } from './lvDemo';
@@ -15,6 +15,7 @@ import { drawDecoration } from './visualDecoration';
 // Added RoomPrefab interface to imports
 import { ROOM_PREFABS, RoomPrefab } from './dictionaryRoomPrefab';
 import { generateRoomDirectorData } from './debug/roomDirectorGenerator';
+import { drawAutotile } from './visualAutotiling';
 
 declare const createVector: any;
 declare const dist: any;
@@ -55,6 +56,8 @@ declare const TWO_PI: any;
 declare const atan2: any;
 declare const createGraphics: any;
 declare const image: any;
+declare const imageMode: any;
+declare const CORNER: any;
 declare const width: any;
 declare const height: any;
 
@@ -219,19 +222,6 @@ export class Block {
         if (!s && !w) arc(rad, renderSize - rad, rad * 2, rad * 2, HALF_PI, PI);
       }
 
-      if (this.overlay && !isExposed && oCfg?.concealedSparkleVfx) {
-        let nVal = noise(this.gx * 0.5, this.gy * 0.5, frameCount * 0.02);
-        if (nVal > 0.5) {
-          const sparkleP = 0.5 + 0.2 * sin(frameCount * 0.05 + (this.gx + this.gy));
-          noStroke();
-          let sCol = [255, 255, 255];
-          if (oCfg.concealedSparkleVfx === 'v_sparkle_yellow') sCol = [255, 255, 100];
-          if (oCfg.concealedSparkleVfx === 'v_sparkle_purple') sCol = [200, 100, 255];
-          fill(sCol[0], sCol[1], sCol[2], opacity * sparkleP * 0.8);
-          ellipse(GRID_SIZE / 2 + sin(frameCount * 0.05) * 4, GRID_SIZE / 2 + cos(frameCount * 0.05) * 4, 8 * sparkleP);
-        }
-      }
-
       if (this.feature && isExposed) {
         drawDecoration(this.feature, this.gx, this.gy, opacity);
       }
@@ -243,6 +233,29 @@ export class Block {
       pop();
     }
     pop();
+  }
+
+  renderSparkles(opacity: number) {
+    if (opacity <= 0 || this.isMined || !this.overlay) return;
+    const oCfg = overlayTypes[this.overlay];
+    if (!oCfg?.concealedSparkleVfx) return;
+    // update: always render even if not concealed
+
+    if (true) {
+      let nVal = noise(this.gx * 0.5, this.gy * 0.5, frameCount * 0.02);
+      if (nVal > 0.5) {
+        const sparkleP = 0.5 + 0.2 * sin(frameCount * 0.05 + (this.gx + this.gy));
+        push();
+        translate(this.pos.x, this.pos.y);
+        noStroke();
+        let sCol = [255, 255, 255];
+        if (oCfg.concealedSparkleVfx === 'v_sparkle_yellow') sCol = [255, 255, 100];
+        if (oCfg.concealedSparkleVfx === 'v_sparkle_purple') sCol = [200, 100, 255];
+        fill(sCol[0], sCol[1], sCol[2], opacity * sparkleP * 0.8);
+        ellipse(GRID_SIZE / 2 + sin(frameCount * 0.05) * 4, GRID_SIZE / 2 + cos(frameCount * 0.05) * 4, 8 * sparkleP);
+        pop();
+      }
+    }
   }
 
   /**
@@ -317,8 +330,13 @@ export class Block {
   takeDamage(dmg: number) {
     if (this.isMined) return false;
     this.health -= dmg; this.damageGlow = 180;
+    state.vfx.push(new BlockHitVFX(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2));
     if (this.health <= 0) {
       this.isMined = true;
+      const cx = floor(this.gx / CHUNK_SIZE);
+      const cy = floor(this.gy / CHUNK_SIZE);
+      state.world.dirtyChunkAndNeighbors(cx, cy);
+      
       state.vfx.push(new BlockDebris(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, this.config.color));
       
       const oCfg = this.overlay ? overlayTypes[this.overlay] : null;
@@ -395,6 +413,10 @@ export class Chunk {
   roomEnemyBudget: number = 0;
   isRoomBudgetTriggered: boolean = false;
   deathBuffer: any = null;
+  
+  // NEW: Dual-grid buffering
+  buffer: any = null;
+  needsRedraw: boolean = true;
 
   constructor(cx: number, cy: number, directorIdx: number, bonusData: any = {}) { 
     this.cx = cx; this.cy = cy; 
@@ -417,6 +439,7 @@ export class Chunk {
   // OPTIMIZATION: Cache blocks that need overlay rendering
   rebuildOverlayList() {
     this.overlayBlocks = this.blocks.filter(b => !!b.overlay || b.health < b.maxHealth);
+    this.needsRedraw = true;
   }
 
   generate(bonusData: any = {}, levelOverride?: number) {
@@ -737,6 +760,43 @@ export class Chunk {
 
     this.roomEnemyBudget = prefab.enemyBudget;
     this.rebuildOverlayList();
+    this.needsRedraw = true;
+  }
+
+  renderToBuffer() {
+    const chunkW = CHUNK_SIZE * GRID_SIZE;
+    if (!this.buffer) {
+      this.buffer = createGraphics(chunkW, chunkW);
+      this.buffer.pixelDensity(4);
+    }
+    const pg = this.buffer;
+    (pg as any)._chunkSeed = (this.cx * 131 + this.cy * 71);
+    pg.clear();
+    pg.noStroke();
+
+    const getBlockType = (gx: number, gy: number) => {
+      const b = state.world.getBlock(gx, gy);
+      if (!b || b.isMined) return null;
+      return b.type;
+    };
+
+    // We render a 17x17 visual grid to cover all junctions
+    // The visual grid is offset by -0.5 tiles from the world grid
+    for (let vy = 0; vy <= CHUNK_SIZE; vy++) {
+      for (let vx = 0; vx <= CHUNK_SIZE; vx++) {
+        const gx = this.cx * CHUNK_SIZE + vx - 1;
+        const gy = this.cy * CHUNK_SIZE + vy - 1;
+
+        // Junction neighbors
+        const tl = getBlockType(gx, gy);
+        const tr = getBlockType(gx + 1, gy);
+        const bl = getBlockType(gx, gy + 1);
+        const br = getBlockType(gx + 1, gy + 1);
+
+        drawAutotile(pg, vx, vy, gx, gy, tl, tr, bl, br);
+      }
+    }
+    this.needsRedraw = false;
   }
 
   ensureDeathBuffer() {
@@ -758,17 +818,47 @@ export class Chunk {
     const chunkY = this.cy * chunkW;
     if (chunkX + chunkW < left || chunkX > right || chunkY + chunkW < top || chunkY > bottom) return;
     
-    if (this.deathBuffer) {
-        image(this.deathBuffer, chunkX, chunkY);
-    }
-
     // SQUARED DISTANCE OPTIMIZATION
     const px = playerPos.x;
     const py = playerPos.y;
     const visRadSq = (VISIBILITY_RADIUS * GRID_SIZE)**2;
     const fadeStartSq = ((VISIBILITY_RADIUS - 1) * GRID_SIZE)**2;
 
-    // Pass 1: Renders bases (Ground/Liquids/Borders)
+    if (this.deathBuffer) {
+        push();
+        imageMode(CORNER);
+        image(this.deathBuffer, chunkX, chunkY);
+        pop();
+    }
+
+    // Pass 0: Liquids (UNDER blocks)
+    for (let b of this.blocks) {
+        const dx = b.pos.x + GRID_SIZE/2 - px;
+        const dy = b.pos.y + GRID_SIZE/2 - py;
+        const dSq = dx*dx + dy*dy;
+        
+        if (dSq > visRadSq) continue;
+        if (b.liquidType) {
+          let opacity = 255;
+          if (dSq > fadeStartSq) {
+            const d = Math.sqrt(dSq);
+            opacity = constrain(map(d, (VISIBILITY_RADIUS - 1) * GRID_SIZE, VISIBILITY_RADIUS * GRID_SIZE, 255, 0), 0, 255);
+          }
+          b.renderBase(opacity);
+        }
+    }
+
+    if (this.needsRedraw) {
+      this.renderToBuffer();
+    }
+    if (this.buffer) {
+      push();
+      imageMode(CORNER);
+      image(this.buffer, chunkX, chunkY);
+      pop();
+    }
+
+    // Pass 1: Renders bases (Ground/Liquids/Borders) - Now only logic and non-liquid bases if any
     for (let b of this.blocks) { 
         const dx = b.pos.x + GRID_SIZE/2 - px;
         const dy = b.pos.y + GRID_SIZE/2 - py;
@@ -782,7 +872,27 @@ export class Chunk {
           const d = Math.sqrt(dSq);
           opacity = constrain(map(d, (VISIBILITY_RADIUS - 1) * GRID_SIZE, VISIBILITY_RADIUS * GRID_SIZE, 255, 0), 0, 255);
         }
-        b.renderBase(opacity); 
+        // b.renderBase(opacity); // Now handled by buffer for generic blocks
+        // if (b.liquidType) b.renderBase(opacity); // MOVED TO PASS 0
+        b.renderSparkles(opacity);
+
+        if (state.showDebug && state.showObstacleOutline && !b.isMined) {
+          push();
+          noFill();
+          stroke(255, 0, 0, opacity * 0.5);
+          strokeWeight(1);
+          rect(b.pos.x, b.pos.y, GRID_SIZE, GRID_SIZE);
+          
+          // Debug: Show block coordinates
+          if (opacity > 200) {
+            fill(255, 0, 0, opacity);
+            noStroke();
+            textSize(8);
+            textAlign(CENTER, CENTER);
+            text(`${b.gx},${b.gy}`, b.pos.x + GRID_SIZE/2, b.pos.y + GRID_SIZE/2);
+          }
+          pop();
+        }
     }
     
     // Pass 2: Renders overlays (Assets/Pulsing effects) - OPTIMIZED LIST
@@ -799,6 +909,7 @@ export class Chunk {
           opacity = constrain(map(d, (VISIBILITY_RADIUS - 1) * GRID_SIZE, VISIBILITY_RADIUS * GRID_SIZE, 255, 0), 0, 255);
         }
         b.renderOverlay(opacity);
+        b.renderSparkles(opacity);
     }
   }
 }
@@ -834,6 +945,7 @@ export class WorldManager {
         } else { bonusData[fk] = 0; }
       }
       this.chunks.set(key, new Chunk(cx, cy, directorIdx, bonusData));
+      this.dirtyChunkAndNeighbors(cx, cy);
     }
     return this.chunks.get(key);
   }
@@ -843,6 +955,59 @@ export class WorldManager {
     this.chunks.delete(`${cx},${cy}`);
     this.getChunk(cx, cy);
   }
+
+  dirtyChunkAndNeighbors(cx: number, cy: number) {
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const chunk = this.chunks.get(`${cx + dx},${cy + dy}`);
+        if (chunk) chunk.needsRedraw = true;
+      }
+    }
+  }
+
+  display(playerPos: any) {
+    const rangeSq = (width + height + 600)**2;
+    this.chunks.forEach(chunk => { 
+      const chunkW = CHUNK_SIZE * GRID_SIZE;
+      const cX = chunk.cx * chunkW + chunkW/2; const cY = chunk.cy * chunkW + chunkW/2;
+      const dx = cX - playerPos.x; const dy = cY - playerPos.y;
+      if (dx*dx + dy*dy < rangeSq) chunk.display(playerPos); 
+    });
+  }
+
+  setBlock(gx: number, gy: number, typeKey: string | null) {
+    const cx = floor(gx / CHUNK_SIZE);
+    const cy = floor(gy / CHUNK_SIZE);
+    const chunk = this.getChunk(cx, cy);
+    if (!chunk) return;
+    if (typeKey === null) {
+      const b = chunk.blockMap.get(`${gx},${gy}`);
+      if (b) b.isMined = true;
+    } else {
+      let b = chunk.blockMap.get(`${gx},${gy}`);
+      if (!b) {
+        b = new Block(gx, gy, typeKey);
+        chunk.blocks.push(b);
+        chunk.blockMap.set(`${gx},${gy}`, b);
+      } else {
+        b.isMined = false;
+        b.type = typeKey;
+        b.config = obstacleTypes[typeKey];
+        b.health = b.config.health;
+        b.maxHealth = b.health;
+      }
+    }
+    this.dirtyChunkAndNeighbors(cx, cy);
+  }
+
+  takeDamage(gx: number, gy: number, dmg: number) {
+    const b = this.getBlock(gx, gy);
+    if (b) {
+      return b.takeDamage(dmg);
+    }
+    return false;
+  }
+
   update(playerPos: any) {
     let pcx = floor(playerPos.x / (GRID_SIZE * CHUNK_SIZE)); let pcy = floor(playerPos.y / (GRID_SIZE * CHUNK_SIZE));
     const exploredKey = `${pcx},${pcy}`;
@@ -927,34 +1092,6 @@ export class WorldManager {
   getLiquidAt(gx: number, gy: number) {
     let cx = floor(gx / CHUNK_SIZE); let cy = floor(gy / CHUNK_SIZE); let chunk = this.chunks.get(`${cx},${cy}`); if(!chunk) return null;
     const b = chunk.blockMap.get(`${gx},${gy}`); return b ? b.liquidType : null;
-  }
-  setBlock(gx: number, gy: number, typeKey: string) {
-    let cx = floor(gx / CHUNK_SIZE); let cy = floor(gy / CHUNK_SIZE);
-    let chunk = this.getChunk(cx, cy);
-    if (!chunk) return;
-    let b = chunk.blockMap.get(`${gx},${gy}`);
-    if (b) {
-      b.isMined = false;
-      b.type = typeKey;
-      b.config = obstacleTypes[typeKey] || obstacleTypes['o_dirt'];
-      b.health = b.config.health;
-      b.maxHealth = b.health;
-      b.overlay = null;
-    } else {
-      b = new Block(gx, gy, typeKey);
-      chunk.blocks.push(b);
-      chunk.blockMap.set(`${gx},${gy}`, b);
-    }
-    chunk.rebuildOverlayList();
-  }
-  display(playerPos: any) {
-    const rangeSq = (width + height + 600)**2;
-    this.chunks.forEach(chunk => { 
-      const chunkW = CHUNK_SIZE * GRID_SIZE;
-      const cX = chunk.cx * chunkW + chunkW/2; const cY = chunk.cy * chunkW + chunkW/2;
-      const dx = cX - playerPos.x; const dy = cY - playerPos.y;
-      if (dx*dx + dy*dy < rangeSq) chunk.display(playerPos); 
-    });
   }
   checkCollision(x: number, y: number, radius: number) {
     let gx = floor(x / GRID_SIZE); let gy = floor(y / GRID_SIZE);

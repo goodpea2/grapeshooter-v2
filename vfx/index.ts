@@ -18,4 +18,5 @@ export { PoisonGasVFX } from './PoisonGasVFX';
 export { ForcefieldVFX } from './ForcefieldVFX';
 export { MergeVFX } from './MergeVFX';
 export { DamageNumberVFX } from './DamageNumberVFX';
+export { BlockHitVFX } from './BlockHitVFX';
 export { drawPersistentDeathVisual } from './Utils';

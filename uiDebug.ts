@@ -440,6 +440,10 @@ export function drawDebugPanel(spawnFromBudget: Function) {
   if (!state.debugSectionsCollapsed.chunks) {
     allItems.push(
       { l: "Show Borders", v: state.showChunkBorders, a: () => state.showChunkBorders = !state.showChunkBorders, type: 'toggle', grid: true },
+      { l: "Show Outlines", v: state.showObstacleOutline, a: () => {
+        state.showObstacleOutline = !state.showObstacleOutline;
+        state.world.chunks.forEach((c: any) => c.needsRedraw = true);
+      }, type: 'toggle', grid: true },
       { l: "Regen Chunk", a: () => state.world.regenerateChunkAt(state.player.pos.x, state.player.pos.y), grid: true },
       { l: "Add Level", a: () => {
         const count = state.exploredChunks.size;
@@ -520,6 +524,7 @@ export function drawDebugPanel(spawnFromBudget: Function) {
           const newBlock = new Block(gx, gy, key);
           chunk.blocks.push(newBlock);
           chunk.blockMap.set(`${gx},${gy}`, newBlock);
+          state.world.dirtyChunkAndNeighbors(cx, cy);
         }
       });
     }
@@ -544,6 +549,7 @@ export function drawDebugPanel(spawnFromBudget: Function) {
           const oCfg = overlayTypes[key];
           if (oCfg.minHealth > 0 && oCfg.minHealth > b.health) { b.health = oCfg.minHealth; b.maxHealth = b.health; }
           if (oCfg.enemySpawnConfig) { b.spawnerBudget = oCfg.enemySpawnConfig.budget; }
+          state.world.dirtyChunkAndNeighbors(cx, cy);
         }
       });
     }

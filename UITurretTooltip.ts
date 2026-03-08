@@ -209,7 +209,7 @@ export const TURRET_DISPLAY_STATS: Record<string, TurretDisplayStat[]> = {
         { label: 'Target', value: 'Mobs' }, { label: 'Inaccuracy', value: '45 degree' }, { label: 'Chill duration', value: '0.5h' }
     ],
     't3_skymortar': [
-        { label: 'Health', value: '50' }, { label: 'AOE dmg', value: '300' }, { label: 'AOE radius', value: '1.5 tiles' },
+        { label: 'Health', value: '50' }, { label: 'AOE dmg', value: '300-30' }, { label: 'AOE radius', value: '1-1.5 tiles' },
         { label: 'Fire rate', value: '8 sec' }, { label: 'Target', value: 'Hi-HP Mobs' }, { label: ' ', value: ' ' }
     ],
     't3_laser3': [
