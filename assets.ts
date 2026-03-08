@@ -217,7 +217,7 @@ export const ASSETS = {
   img_tileset_black: "https://i.ibb.co/1fZ3DfjG/tileset-black.png",
   img_tileset_black_v2: "https://i.ibb.co/tTG6W6dL/tileset-black-v2.png",
   img_tileset_concealed: "https://i.ibb.co/bRzH3dnK/tileset-conceal.png",
-  img_tileset_fallback: "https://i.ibb.co/qLB5W60y/tileset-clay.png"
+  img_tileset_fallback: "https://i.ibb.co/nqmQLnCP/tileset-clay.png"
 };
 
 
