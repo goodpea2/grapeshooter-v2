@@ -208,8 +208,8 @@ export const ASSETS = {
   // Tileset Assets
   img_tileset_dirt: "https://i.ibb.co/4gRpsVjq/tileset-dirt.png",
   img_tileset_dirt_v2: "https://i.ibb.co/DgknKSh5/tileset-dirt-v2.png",
-  img_tileset_clay: "https://i.ibb.co/nqmQLnCP/tileset-clay.png",
-  img_tileset_clay_v2: "https://i.ibb.co/FqhKX97r/tileset-clay-v2.png",
+  img_tileset_clay: "https://i.ibb.co/xqkNnCcy/tileset-clay.png",
+  img_tileset_clay_v2: "https://i.ibb.co/FqVTmBxy/tileset-clay-v2.png",
   img_tileset_stone: "https://i.ibb.co/d4nVZjCM/tileset-stone.png",
   img_tileset_stone_v2: "https://i.ibb.co/WWvs8fT0/tileset-stone-v2.png",
   img_tileset_slate: "https://i.ibb.co/spKwcB1Y/tileset-slate.png",
@@ -217,7 +217,16 @@ export const ASSETS = {
   img_tileset_black: "https://i.ibb.co/1fZ3DfjG/tileset-black.png",
   img_tileset_black_v2: "https://i.ibb.co/tTG6W6dL/tileset-black-v2.png",
   img_tileset_concealed: "https://i.ibb.co/bRzH3dnK/tileset-conceal.png",
-  img_tileset_fallback: "https://i.ibb.co/nqmQLnCP/tileset-clay.png"
+  img_tileset_fallback: "https://i.ibb.co/xSYp1VBX/fallback.png",
+
+  // New Obstacle Assets
+  img_o_crate: "https://i.ibb.co/JWbXrGxB/o-crate.png",
+  img_o_crate_v2: "https://i.ibb.co/XfVNn4xS/o-crate-v2.png",
+  img_o_pot: "https://i.ibb.co/FL79vyVd/o-pot.png",
+  img_o_pot_v2: "https://i.ibb.co/vGTXxV5/o-pot-v2.png",
+
+  // Golden Grape Turret
+  img_tx_goldengrape_front: "https://i.ibb.co/J8V5DLW/t-goldengrape-front-right.png"
 };
 
 

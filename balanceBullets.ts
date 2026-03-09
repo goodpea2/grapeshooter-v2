@@ -461,5 +461,17 @@ export const bulletTypes: any = {
     },
     cameraShakeOnDeath: [3, 5, 0.8],
     damageTargets: ['turret']
+  },
+  b_goldengrape_firework: {
+    bulletDamage: 0, bulletSpeed: 0, bulletLifeTime: 1, bulletSize: 12, bulletLength: 12, bulletColor: [255, 215, 0],
+    bulletAssetImg: 'img_tx_goldengrape_front',
+    highArcConfig: { arcHeight: 400, arcTravelTime: 120 },
+    aoeConfig: { 
+      isAoe: true, aoeRadiusGradient: [GRID_SIZE * 1.5,GRID_SIZE * 3], aoeDamageGradient: [100,0], dealAoeOnObstacle: true, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 1.0,
+      aoeKnockbackStrength: 2.0 
+    },
+    cameraShakeOnDeath: [4, 6, 0.9],
+    damageTargets: ['enemy', 'obstacle', 'icecube'],
+    bulletDeathVfx: 'v_goldengrape_firework'
   }
 };

@@ -186,7 +186,7 @@ export const turretTypes: any = {
         'img_t_farm_bush_stage4',
         'img_t_farm_bush_stage5'
       ],
-      elixirRequired: [1, 0, 1, 0, 1, 0],
+      elixirRequired: [2, 0, 2, 0, 2, 0],
       growthTimer: [HOUR_FRAMES * 1, HOUR_FRAMES * 2, HOUR_FRAMES * 1, HOUR_FRAMES * 2, HOUR_FRAMES * 1, 0],
       harvestStageHp: 100,
       lootOnHarvest: { leaf: [3, 4], extra: { chance: 0.5, items: ['leaf', 'shell'] } },
@@ -210,7 +210,7 @@ export const turretTypes: any = {
         'img_t_farm_crystal_stage4',
         'img_t_farm_crystal_stage5'
       ],
-      elixirRequired: [1, 0, 1, 0, 1, 0],
+      elixirRequired: [2, 0, 2, 0, 2, 0],
       growthTimer: [HOUR_FRAMES * 1, HOUR_FRAMES * 2, HOUR_FRAMES * 1, HOUR_FRAMES * 2, HOUR_FRAMES * 1, 0],
       harvestStageHp: 100,
       lootOnHarvest: { shard: [3, 4], extra: { chance: 0.5, items: ['shard', 'shell'] } },
@@ -705,5 +705,21 @@ export const turretTypes: any = {
       inaccuracy: 15
     },
     targetType: ['enemy'], targetConfig: { enemyPriority: 'random' }
+  },
+  tx_goldengrape: { 
+    name: 'Golden Grape', costs: { elixir: 500 }, costAlmanac: { leaf: 100, shard: 100, shell: 100 }, drops: { leaf: 10, shard: 10, shell: 10 }, health: 400, color: [255, 215, 0], size: 24, isSpecial: true, tier: 0,
+    tooltip: "Buy the Golden Grape and win the game", animationBodyType: 'soft',
+    actionType: ['launchMultiTarget'],
+    actionConfig: { 
+      bulletTypeKey: 'b_goldengrape_firework', 
+      shootRange: GRID_SIZE * 12, 
+      shootFireRate: 240,
+      multiTargetMinCount: 8,
+      multiTargetMaxCount: 8,
+      multiTargetShootDelay: 12,
+      hasUnarmedAsset: false
+    },
+    targetType: ['enemy', 'obstacle', 'turret'],
+    targetConfig: { enemyPriority: 'random', obstaclePriority: 'random' }
   }
 };

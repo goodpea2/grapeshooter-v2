@@ -15,8 +15,14 @@ export const obstacleTypes: any = {
   o_slate: { name: 'Slate', health: 480, color: [40, 30, 80], borderColor: [70, 60, 140], blocksLOS: true, lootConfigOnDeath: 'o_slate' },
   o_black: { name: 'Obsidian', health: 900, color: [200, 20, 60], borderColor: [255, 60, 100], blocksLOS: true, lootConfigOnDeath: 'o_black' },
   // New Obstacles
-  o_crate: { name: 'Crate', health: 20, color: [160, 100, 60], borderColor: [200, 140, 80], blocksLOS: false, lootConfigOnDeath: 'lc_crate', connectToOtherBlock: false, canCarryOverlay: false, sizeMultiplier: 0.75 },
-  o_pot: { name: 'Pot', health: 50, color: [180, 80, 50], borderColor: [220, 120, 80], blocksLOS: false, lootConfigOnDeath: 'lc_pot', connectToOtherBlock: false, canCarryOverlay: false, sizeMultiplier: 0.75 },
+  o_crate: { 
+    name: 'Crate', health: 20, color: [160, 100, 60], borderColor: [200, 140, 80], blocksLOS: false, lootConfigOnDeath: 'lc_crate', connectToOtherBlock: false, canCarryOverlay: false, sizeMultiplier: 0.75,
+    assetImgConfig: { idleAssetImg: ['img_o_crate', 'img_o_crate_v2'], randomRotation: false, randomFlip: true }
+  },
+  o_pot: { 
+    name: 'Pot', health: 50, color: [180, 80, 50], borderColor: [220, 120, 80], blocksLOS: false, lootConfigOnDeath: 'lc_pot', connectToOtherBlock: false, canCarryOverlay: false, sizeMultiplier: 0.75,
+    assetImgConfig: { idleAssetImg: ['img_o_pot', 'img_o_pot_v2'], randomRotation: false, randomFlip: true }
+  },
   o_dummy: { name: 'Dummy Obstacle', health: 50000, color: [100, 100, 100], borderColor: [150, 150, 150], blocksLOS: true, lootConfigOnDeath: null }
 };
 

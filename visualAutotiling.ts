@@ -53,7 +53,7 @@ export function isBlockConcealed(gx: number, gy: number) {
 
 export function drawAutotile(pg: any, vx: number, vy: number, gx: number, gy: number, tl: string | null, tr: string | null, bl: string | null, br: string | null) {
   const neighbors = [tl, tr, bl, br];
-  const uniqueMaterials = Array.from(new Set(neighbors.filter(m => m !== null)));
+  const uniqueMaterials = Array.from(new Set(neighbors.filter((m): m is string => m !== null && MATERIAL_PRIORITY[m] !== undefined)));
 
   if (uniqueMaterials.length === 0) return;
 
@@ -82,7 +82,7 @@ export function drawAutotile(pg: any, vx: number, vy: number, gx: number, gy: nu
     // Determine asset
     let assetKey = 'img_tileset_fallback';
     if (mat === 'o_dirt') {
-      const nVal = noise((gx + 0.5) * 3, (gy + 0.5) * 3, 999);
+      const nVal = noise((gx + 0.5) * 3, (gy + 0.5) * 3, 999); // do not change these params
       assetKey = nVal > 0.5 ? 'img_tileset_dirt_v2' : 'img_tileset_dirt';
     } else if (mat === 'o_clay') {
       const nVal = noise((gx + 0.5) * 3, (gy + 0.5) * 3, 999);
@@ -101,8 +101,19 @@ export function drawAutotile(pg: any, vx: number, vy: number, gx: number, gy: nu
     
     const img = state.assets[assetKey];
     if (img && img.width > 0) {
-      pg.image(img, drawX, drawY, GRID_SIZE, GRID_SIZE, 
-               coords.x * tileSize, coords.y * tileSize, tileSize, tileSize);
+      if (mask === 15) {
+        const seed = (gx * 31 + gy * 7);
+        const rot = (Math.abs(seed) % 4) * (window as any).HALF_PI;
+        pg.push();
+        pg.translate(drawX + GRID_SIZE / 2, drawY + GRID_SIZE / 2);
+        pg.rotate(rot);
+        pg.image(img, -GRID_SIZE / 2, -GRID_SIZE / 2, GRID_SIZE, GRID_SIZE, 
+                 coords.x * tileSize, coords.y * tileSize, tileSize, tileSize);
+        pg.pop();
+      } else {
+        pg.image(img, drawX, drawY, GRID_SIZE, GRID_SIZE, 
+                 coords.x * tileSize, coords.y * tileSize, tileSize, tileSize);
+      }
     }
   }
 

@@ -22,7 +22,8 @@ export const AlmanacProgression = {
   StartingTurret: [
     't_pea', 't_laser', 't_wall', 't_mine', 't_ice', // Tier 1
     't_seed', 't_seed2', // Special
-    't2_repeater', 't2_laser2', 't2_tall', 't2_minespawner', 't2_stun' // Specific Tier 2
+    't2_repeater', 't2_laser2', 't2_tall', 't2_minespawner', 't2_stun', // Specific Tier 2
+    'tx_goldengrape'
   ],
   UnlockedByDiscoverTurret: [
     't_sunflower', 't_lilypad','t0_cherrybomb','t0_firecherry', 't0_jalapeno', 't0_iceshroom', 't0_starfruit', 't0_grapeshot', 't0_puffshroom',
@@ -72,7 +73,8 @@ export const AlmanacProgression = {
   CraftingCostOverride: [
     { type: 't_sunflower', cost: { soil: 40 } },
     { type: 't_seed', canBePurchased: false },
-    { type: 't_seed2', canBePurchased: false }
+    { type: 't_seed2', canBePurchased: false },
+    { type: 'tx_goldengrape', cost: { leaf: 100, shard: 100, shell: 100 } }
   ]
 };
 

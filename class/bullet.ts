@@ -2,7 +2,7 @@
 import { state } from '../state';
 import { GRID_SIZE, CHUNK_SIZE } from '../constants';
 import { bulletTypes } from '../balanceBullets';
-import { Explosion, MuzzleFlash, HitSpark } from '../vfx';
+import { Explosion, MuzzleFlash, HitSpark, FireworkVFX } from '../vfx';
 import { GroundFeature } from './groundFeature';
 import { drawBullet } from '../visualBullets';
 
@@ -300,7 +300,12 @@ export class Bullet {
     const aoe = this.config.aoeConfig; if (!aoe) return;
     const radii = aoe.aoeRadiusGradient;
     const maxR = radii[radii.length - 1] || 10;
-    state.vfx.push(new Explosion(this.pos.x, this.pos.y, maxR*2, color(this.col)));
+    
+    if (this.config.bulletDeathVfx === 'v_goldengrape_firework') {
+      state.vfx.push(new FireworkVFX(this.pos.x, this.pos.y));
+    } else {
+      state.vfx.push(new Explosion(this.pos.x, this.pos.y, maxR*2, color(this.col)));
+    }
     
     if (this.damageTargets.includes('enemy')) {
       for (let e of state.enemies) {

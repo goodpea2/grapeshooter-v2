@@ -19,4 +19,5 @@ export { ForcefieldVFX } from './ForcefieldVFX';
 export { MergeVFX } from './MergeVFX';
 export { DamageNumberVFX } from './DamageNumberVFX';
 export { BlockHitVFX } from './BlockHitVFX';
+export { FireworkVFX } from './FireworkVFX';
 export { drawPersistentDeathVisual } from './Utils';

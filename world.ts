@@ -57,6 +57,9 @@ declare const atan2: any;
 declare const createGraphics: any;
 declare const image: any;
 declare const imageMode: any;
+declare const scale: any;
+declare const tint: any;
+declare const noTint: any;
 declare const CORNER: any;
 declare const width: any;
 declare const height: any;
@@ -204,22 +207,49 @@ export class Block {
 
       push();
       translate(offset, offset);
-      if (!isExposed) fill(base[0] * 0.3, base[1] * 0.3, base[2] * 0.3, opacity); else fill(base[0], base[1], base[2], opacity);
-      noStroke();
+      
       const tl = (n || w) ? 0 : rad; const tr = (n || e) ? 0 : rad; const br = (s || e) ? 0 : rad; const bl = (s || w) ? 0 : rad;
-      rect(0, 0, renderSize+1, renderSize+1, tl, tr, br, bl); //+1 size to not show jittered outlines when moving
 
-      if (isExposed) {
-        stroke(bord[0], bord[1], bord[2], opacity); strokeWeight(3); noFill();
-        if (!n) line(tl, 0, renderSize - tr, 0); 
-        if (!s) line(bl, renderSize, renderSize - br, renderSize); 
-        if (!w) line(0, tl, 0, renderSize - bl); 
-        if (!e) line(renderSize, tr, renderSize, renderSize - br);
-        
-        if (!n && !w) arc(rad, rad, rad * 2, rad * 2, PI, PI + HALF_PI); 
-        if (!n && !e) arc(renderSize - rad, rad, rad * 2, rad * 2, PI + HALF_PI, TWO_PI); 
-        if (!s && !e) arc(renderSize - rad, renderSize - rad, rad * 2, rad * 2, 0, HALF_PI); 
-        if (!s && !w) arc(rad, renderSize - rad, rad * 2, rad * 2, HALF_PI, PI);
+      if (this.config.assetImgConfig) {
+        const cfg = this.config.assetImgConfig;
+        const pool = cfg.idleAssetImg;
+        const nVariant = noise(this.gx * 31, this.gy * 7, 1000);
+        const variantIdx = Math.floor(nVariant * pool.length);
+        const sprite = state.assets[pool[variantIdx]];
+        if (sprite) {
+          push();
+          translate(renderSize / 2, renderSize / 2);
+          if (cfg.randomRotation) { 
+            const nRot = noise(this.gx * 31, this.gy * 7, 1000);
+            rotate(Math.floor(nRot * 4) * HALF_PI); 
+          }
+          if (cfg.randomFlip) { 
+            const nFlip = noise(this.gx * 31, this.gy * 7, 1000);
+            scale(nFlip > 0.5 ? -1 : 1, 1); 
+          }
+          imageMode(CENTER);
+          if (opacity < 254) tint(255, opacity);
+          image(sprite, 0, 0, renderSize, renderSize);
+          if (opacity < 254) noTint();
+          pop();
+        }
+      } else {
+        if (!isExposed) fill(base[0] * 0.3, base[1] * 0.3, base[2] * 0.3, opacity); else fill(base[0], base[1], base[2], opacity);
+        noStroke();
+        rect(0, 0, renderSize+1, renderSize+1, tl, tr, br, bl); //+1 size to not show jittered outlines when moving
+
+        if (isExposed) {
+          stroke(bord[0], bord[1], bord[2], opacity); strokeWeight(3); noFill();
+          if (!n) line(tl, 0, renderSize - tr, 0); 
+          if (!s) line(bl, renderSize, renderSize - br, renderSize); 
+          if (!w) line(0, tl, 0, renderSize - bl); 
+          if (!e) line(renderSize, tr, renderSize, renderSize - br);
+          
+          if (!n && !w) arc(rad, rad, rad * 2, rad * 2, PI, PI + HALF_PI); 
+          if (!n && !e) arc(renderSize - rad, rad, rad * 2, rad * 2, PI + HALF_PI, TWO_PI); 
+          if (!s && !e) arc(renderSize - rad, renderSize - rad, rad * 2, rad * 2, 0, HALF_PI); 
+          if (!s && !w) arc(rad, renderSize - rad, rad * 2, rad * 2, HALF_PI, PI);
+        }
       }
 
       if (this.feature && isExposed) {
@@ -873,6 +903,7 @@ export class Chunk {
           opacity = constrain(map(d, (VISIBILITY_RADIUS - 1) * GRID_SIZE, VISIBILITY_RADIUS * GRID_SIZE, 255, 0), 0, 255);
         }
         // b.renderBase(opacity); // Now handled by buffer for generic blocks
+        if (b.config.assetImgConfig) b.renderBase(opacity);
         // if (b.liquidType) b.renderBase(opacity); // MOVED TO PASS 0
         b.renderSparkles(opacity);
 
@@ -1036,8 +1067,31 @@ export class WorldManager {
   }
   checkLOS(x1: number, y1: number, x2: number, y2: number) {
     let dx = x2 - x1; let dy = y2 - y1; let dSq = dx*dx + dy*dy;
-    let steps = floor(Math.sqrt(dSq) / (GRID_SIZE * 0.5));
-    for (let i = 1; i < steps; i++) { let px = lerp(x1, x2, i / steps); let py = lerp(y1, y2, i / steps); if (this.isBlockAt(px, py)) return false; }
+    if (dSq < 1) return true;
+    let d = Math.sqrt(dSq);
+    // Use smaller steps for better coverage, but not so small it's slow
+    let steps = floor(d / (GRID_SIZE * 0.4));
+    if (steps < 2) steps = 2; // Ensure at least one midpoint check for very close targets
+    
+    const startGx = floor(x1 / GRID_SIZE);
+    const startGy = floor(y1 / GRID_SIZE);
+    const targetGx = floor(x2 / GRID_SIZE);
+    const targetGy = floor(y2 / GRID_SIZE);
+
+    for (let i = 1; i < steps; i++) {
+      let t = i / steps;
+      let px = x1 + dx * t;
+      let py = y1 + dy * t;
+      
+      let gx = floor(px / GRID_SIZE);
+      let gy = floor(py / GRID_SIZE);
+      
+      // Ignore the block the ray starts in and the block it ends in
+      if (gx === startGx && gy === startGy) continue;
+      if (gx === targetGx && gy === targetGy) continue;
+      
+      if (this.isBlockAt(px, py)) return false;
+    }
     return true;
   }
   getNearestBlock(pos: any, range: number) {

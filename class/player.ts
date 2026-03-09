@@ -364,7 +364,7 @@ export class Player {
               const d = dist(origin.x, origin.y, bc.x, bc.y);
               if (d > range) continue;
               
-              if (!state.world.checkLOS(origin.x, origin.y, bc.x + (origin.x < bc.x ? -2 : 2), bc.y + (origin.y < bc.y ? -2 : 2))) continue;
+              if (!state.world.checkLOS(origin.x, origin.y, bc.x, bc.y)) continue;
               
               const oCfg = b.overlay ? overlayTypes[b.overlay] : null;
               if (oCfg?.isValuable || oCfg?.isEnemy) {

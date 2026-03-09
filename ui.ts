@@ -362,8 +362,8 @@ export function drawUI(spawnFromBudget: Function) {
 
     // Standard Tier 1
     const isTier1 = tr.tier > 0 && tr.tier <= 1.2 && !tr.isSpecial;
-    // Starting Specials (Sunflower, Lilypad, etc.) - exclude consumables
-    const isStartingSpecial = tr.isSpecial && !key.startsWith('t0_');
+    // Starting Specials (Sunflower, Lilypad, etc.) - exclude consumables and special tx_ turrets
+    const isStartingSpecial = tr.isSpecial && !key.startsWith('t0_') && !key.startsWith('tx_');
 
     const isHiddenFromStd = key === 't_lilypad' || key.startsWith('t_farm_');
     if ((isTier1 || isStartingSpecial) && !isHiddenFromStd) {

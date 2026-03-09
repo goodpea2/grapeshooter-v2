@@ -345,7 +345,7 @@ export class AttachedTurret {
           break;
         }
 
-        const frValue = (act === 'shoot' || act === 'shootMultiTarget' || act === 'launch') ? cfg.shootFireRate : ((act === 'laserBeam') ? cfg.beamFireRate : ((act === 'spawnBulletAtRandom') ? cfg.spawnBulletAtRandom.cooldown : (act === 'generateElectricChain' ? cfg.electricChainDamageRate : (act === 'shield' ? 1 : (act === 'firstStrike' ? cfg.firstStrikeConfig.triggerRate : cfg.pulseCooldown)))));
+        const frValue = (act === 'shoot' || act === 'shootMultiTarget' || act === 'launch' || act === 'launchMultiTarget') ? cfg.shootFireRate : ((act === 'laserBeam') ? cfg.beamFireRate : ((act === 'spawnBulletAtRandom') ? cfg.spawnBulletAtRandom.cooldown : (act === 'generateElectricChain' ? cfg.electricChainDamageRate : (act === 'shield' ? 1 : (act === 'firstStrike' ? cfg.firstStrikeConfig.triggerRate : cfg.pulseCooldown)))));
         const fr = Array.isArray(frValue) ? frValue[step % frValue.length] : frValue;
         if (state.frames - lastT > (fr / this.fireRateMultiplier)) {
           anyActionReady = true;
@@ -420,7 +420,7 @@ export class AttachedTurret {
         }
       }
 
-      const frValue = (act === 'shoot' || act === 'shootMultiTarget' || act === 'launch') ? config.shootFireRate : ((act === 'laserBeam') ? config.beamFireRate : ((act === 'spawnBulletAtRandom') ? config.spawnBulletAtRandom.cooldown : (act === 'generateElectricChain' ? config.electricChainDamageRate : (act === 'shield' ? 1 : (act === 'firstStrike' ? config.firstStrikeConfig.triggerRate : config.pulseCooldown)))));
+      const frValue = (act === 'shoot' || act === 'shootMultiTarget' || act === 'launch' || act === 'launchMultiTarget') ? config.shootFireRate : ((act === 'laserBeam') ? config.beamFireRate : ((act === 'spawnBulletAtRandom') ? config.spawnBulletAtRandom.cooldown : (act === 'generateElectricChain' ? config.electricChainDamageRate : (act === 'shield' ? 1 : (act === 'firstStrike' ? config.firstStrikeConfig.triggerRate : config.pulseCooldown)))));
       const fr = Array.isArray(frValue) ? frValue[step % frValue.length] : frValue;
       const effectiveFireRate = fr / this.fireRateMultiplier;
       
@@ -547,7 +547,7 @@ export class AttachedTurret {
             if (potentialTargets.length > 0) {
               const targetIdx = (subStep - 1) % potentialTargets.length;
               const target = potentialTargets[targetIdx];
-              const tc = target.pos || (target.getWorldPos ? target.getWorldPos() : null);
+              const tc = target.getWorldPos ? target.getWorldPos() : (target.pos ? createVector(target.pos.x + GRID_SIZE/2, target.pos.y + GRID_SIZE/2) : null);
               if (tc) {
                 const sa = atan2(tc.y - wPos.y, tc.x - wPos.x);
                 state.bullets.push(new Bullet(wPos.x, wPos.y, tc.x, tc.y, config.bulletTypeKey, 'enemy'));
@@ -562,6 +562,48 @@ export class AttachedTurret {
             if (nextStep > maxCnt) {
                this.actionSteps.set(subStepKey, 0);
                this.actionSteps.set(act, step + 1); // Sequence complete
+            }
+            else this.actionSteps.set(subStepKey, nextStep);
+          }
+        }
+      } else if (act === 'launchMultiTarget' && ready) {
+        const lastSubKey = act + '_lastSub';
+        const subStep = this.actionSteps.get(subStepKey) || 0;
+        const lastSub = this.actionTimers.get(lastSubKey) || 0;
+        
+        if (subStep === 0) {
+          const initialTargets = this.findAllTargetsWithin(config.shootRange);
+          if (initialTargets.length > 0) { 
+            this.actionSteps.set(subStepKey, 1); 
+            this.actionTimers.set(lastSubKey, state.frames); 
+            this.actionTimers.set(act, state.frames); 
+          }
+        }
+        
+        if (subStep > 0) {
+          const delay = config.multiTargetShootDelay || 6;
+          if (state.frames - lastSub >= delay) {
+            const potentialTargets = this.findAllTargetsWithin(config.shootRange);
+            if (potentialTargets.length > 0) {
+              const targetIdx = (subStep - 1) % potentialTargets.length;
+              const target = potentialTargets[targetIdx];
+              const tc = target.getWorldPos ? target.getWorldPos() : (target.pos ? createVector(target.pos.x + GRID_SIZE/2, target.pos.y + GRID_SIZE/2) : null);
+              if (tc) {
+                this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x);
+                let b = new Bullet(wPos.x, wPos.y, tc.x, tc.y, config.bulletTypeKey, 'enemy');
+                b.targetPos = tc.copy();
+                state.bullets.push(b);
+                state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, this.angle, 32, 10, color(...(config.color || [255,255,255]))));
+                this.recoil = 10;
+                this.pulseAnimTimer = 12;
+              }
+            }
+            this.actionTimers.set(lastSubKey, state.frames);
+            const nextStep = subStep + 1;
+            const maxCnt = config.multiTargetMaxCount || 3;
+            if (nextStep > maxCnt) {
+               this.actionSteps.set(subStepKey, 0);
+               this.actionSteps.set(act, step + 1);
             }
             else this.actionSteps.set(subStepKey, nextStep);
           }
@@ -777,8 +819,40 @@ export class AttachedTurret {
           }
         }
       }
+      // Also check spawner overlays which are treated as enemies
+      state.world.chunks.forEach((chunk: any) => {
+        const cw = CHUNK_SIZE * GRID_SIZE; const dx = (chunk.cx * cw + cw/2) - wPos.x; const dy = (chunk.cy * cw + cw/2) - wPos.y;
+        if (dx*dx + dy*dy > (range + cw)**2) return;
+        chunk.overlayBlocks.forEach((b: any) => {
+           if (b.isMined || !b.overlay) return;
+           const oCfg = overlayTypes[b.overlay];
+           if (oCfg?.isEnemy) {
+              const bx = b.pos.x + GRID_SIZE/2; const by = b.pos.y + GRID_SIZE/2;
+              const dSq = (wPos.x - bx)**2 + (wPos.y - by)**2;
+              if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, bx, by)) results.push(b);
+           }
+        });
+      });
     }
-    results.sort((a, b) => { const posA = a.pos; const posB = b.pos; const dSqA = (wPos.x - posA.x)**2 + (wPos.y - posA.y)**2; const dSqB = (wPos.x - posB.x)**2 + (wPos.y - posB.y)**2; return dSqA - dSqB; });
+    if (tTypes.includes('obstacle')) {
+      state.world.chunks.forEach((chunk: any) => {
+        const cw = CHUNK_SIZE * GRID_SIZE; const dx = (chunk.cx * cw + cw/2) - wPos.x; const dy = (chunk.cy * cw + cw/2) - wPos.y;
+        if (dx*dx + dy*dy > (range + cw)**2) return;
+        chunk.blocks.forEach((b: any) => {
+          if (b.isMined) return;
+          const bcx = b.pos.x + GRID_SIZE/2; const bcy = b.pos.y + GRID_SIZE/2;
+          const dSq = (wPos.x - bcx)**2 + (wPos.y - bcy)**2;
+          if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, bcx, bcy)) results.push(b);
+        });
+      });
+    }
+    results.sort((a, b) => { 
+      const posA = a.getWorldPos ? a.getWorldPos() : (a.gx !== undefined ? createVector(a.gx * GRID_SIZE + GRID_SIZE/2, a.gy * GRID_SIZE + GRID_SIZE/2) : a.pos); 
+      const posB = b.getWorldPos ? b.getWorldPos() : (b.gx !== undefined ? createVector(b.gx * GRID_SIZE + GRID_SIZE/2, b.gy * GRID_SIZE + GRID_SIZE/2) : b.pos); 
+      const dSqA = (wPos.x - posA.x)**2 + (wPos.y - posA.y)**2; 
+      const dSqB = (wPos.x - posB.x)**2 + (wPos.y - posB.y)**2; 
+      return dSqA - dSqB; 
+    });
     return results;
   }
 
@@ -855,7 +929,6 @@ export class AttachedTurret {
            const oCfg = overlayTypes[b.overlay];
            if (oCfg?.isEnemy) {
               const bx = b.pos.x + GRID_SIZE/2; const by = b.pos.y + GRID_SIZE/2;
-              // FIX: Changed 'bcy' to 'by' to resolve undefined name error
               const dSq = (wPos.x - bx)**2 + (wPos.y - by)**2;
               if (dSq <= rangeSq) candidates.push({ e: b, dSq });
            }
@@ -866,12 +939,12 @@ export class AttachedTurret {
         if (tCfg.enemyPriority === 'highestHealth') candidates.sort((a,b) => b.e.health - a.e.health);
         else if (tCfg.enemyPriority === 'random') {
             const chosen = candidates[floor(random(candidates.length))];
-            const tc = chosen.e.pos || chosen.e.getWorldPos?.();
+            const tc = chosen.e.getWorldPos ? chosen.e.getWorldPos() : (chosen.e.gx !== undefined ? createVector(chosen.e.gx * GRID_SIZE + GRID_SIZE/2, chosen.e.gy * GRID_SIZE + GRID_SIZE/2) : chosen.e.pos);
             if (tc && (this.config.actionType.includes('launch') || state.world.checkLOS(wPos.x, wPos.y, tc.x, tc.y))) { this.target = chosen.e; this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x); return; }
         } else candidates.sort((a, b) => a.dSq - b.dSq);
         
         for (const cand of candidates) {
-          const tc = cand.e.pos || cand.e.getWorldPos?.();
+          const tc = cand.e.getWorldPos ? cand.e.getWorldPos() : (cand.e.gx !== undefined ? createVector(cand.e.gx * GRID_SIZE + GRID_SIZE/2, cand.e.gy * GRID_SIZE + GRID_SIZE/2) : cand.e.pos);
           if (!tc) continue;
           if (this.config.actionType.includes('launch') || state.world.checkLOS(wPos.x, wPos.y, tc.x, tc.y)) { this.target = cand.e; this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x); return; }
         }

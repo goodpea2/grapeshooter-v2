@@ -85,7 +85,8 @@ export const TYPE_MAP: Record<string, string> = {
   't_farm_crystal': 't_farm_crystal',
   't_farm_mob': 't_farm_mob',
   // Test
-  't_dummy': 't_wall'
+  't_dummy': 't_wall',
+  'tx_goldengrape': 'tx_goldengrape'
 };
 
 // Units that do not have a back-facing asset
@@ -93,7 +94,7 @@ const NO_BACK_UNITS = new Set([
   't_wall', 't2_tall', 't2_pulse', 't2_spike', 't_sunflower', 't_seed', 't_seed2', 't_lilypad',
   't0_jalapeno', 't0_firecherry', 't0_starfruit', 't0_iceshroom', 't0_cherrybomb',
   't_farm_bush', 't_farm_crystal', 't_farm_mob',
-  't_dummy',
+  't_dummy', 'tx_goldengrape',
   // T3 additions that have no back asset provided
   't3_repulser', 't3_skymortar', 't3_miningbomb', 't3_tesla', 't3_densnut', 't3_durian',
   't3_spike2', 't3_holonut', 't3_minefield', 't3_frostfield', 't3_triberg'
