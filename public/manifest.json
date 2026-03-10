@@ -1,0 +1,18 @@
+{
+  "name": "Grapeshooter 2",
+  "short_name": "Grapeshooter",
+  "description": "Procedural 2D explorer survival game. Mine resources, expand your mobile base, and survive the dark.",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#040406",
+  "theme_color": "#040406",
+  "icons": [
+    {
+      "src": "https://i.ibb.co/S4YhXH19/player-front-right.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

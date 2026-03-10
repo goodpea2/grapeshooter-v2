@@ -4,6 +4,10 @@
 <head>
   <meta charset="UTF-8">
   <title>Grapeshooter 2: world</title>
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#040406">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link old href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap" rel="stylesheet">
@@ -20,5 +24,14 @@
 </head>
 <body style="margin: 0; overflow: hidden; background: #040406; font-family: 'Viga', cursive;">
   <script type="module" src="./index.tsx"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('SW registered'))
+          .catch(err => console.log('SW error', err));
+      });
+    }
+  </script>
 </body>
 </html>
