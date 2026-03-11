@@ -786,7 +786,7 @@ export abstract class Turret {
           const cell = state.spatialHash.get(`${gx + i},${gy + j}`);
           if (!cell) continue;
           for (const e of cell) {
-            if (!(e instanceof Enemy) || e.health <= 0 || e.isInvisible || e.isDying || e.conditions.has('c_hypnotized')) continue;
+            if (!(e instanceof Enemy) || e.health <= 0 || e.isDying || e.conditions.has('c_hypnotized')) continue;
             const dSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
             if (dSq <= rangeSq) candidates.push({ e, dSq });
           }

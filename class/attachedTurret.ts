@@ -378,7 +378,7 @@ export class AttachedTurret extends Turret {
           const neighbors = state.spatialHash.get(`${gx + i},${gy + j}`);
           if (!neighbors) continue;
           for (const e of neighbors) {
-            if (!(e instanceof Enemy) || e.health <= 0 || e.isInvisible || e.isDying || e.conditions.has('c_hypnotized')) continue;
+            if (!(e instanceof Enemy) || e.health <= 0 || e.isDying || e.conditions.has('c_hypnotized')) continue;
             const dSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
             if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, e.pos.x, e.pos.y)) results.push(e);
           }
