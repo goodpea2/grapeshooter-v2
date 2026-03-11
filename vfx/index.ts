@@ -1,3 +1,4 @@
+export { LootInFlightVFX } from './LootInFlightVFX';
 export { MagicLinkVFX } from './MagicLinkVFX';
 export { FirstStrikeVFX } from './FirstStrikeVFX';
 export { FrostFieldAuraVFX } from './FrostFieldAuraVFX';

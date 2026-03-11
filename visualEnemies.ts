@@ -135,6 +135,7 @@ export function drawEnemy(e: any) {
   const s = e.size;
   let imgKey = e.type === 'e_swarm' ? 'img_swarm_center' : 'img_' + e.type.slice(2);
   if (e.type === 'e_dummyTarget') imgKey = 'img_giant';
+  if (e.type === 'e_hypnotest') imgKey = 'img_armor1';
   const sprite = state.assets[imgKey];
 
   if (sprite) {

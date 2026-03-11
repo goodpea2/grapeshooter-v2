@@ -71,9 +71,9 @@ export class StunGasVFX {
     push(); translate(this.pos.x, this.pos.y);
     noStroke();
     for(let c of this.clouds) {
-      let drift = sin(frameCount * 0.03 + c.phase) * 8;
-      let swirlX = cos(frameCount * c.rotV) * c.off.x * expand;
-      let swirlY = sin(frameCount * c.rotV) * c.off.y * expand;
+      let drift = sin(state.frames * 0.03 + c.phase) * 8;
+      let swirlX = cos(state.frames * c.rotV) * c.off.x * expand;
+      let swirlY = sin(state.frames * c.rotV) * c.off.y * expand;
       
       fill(100, 255, 100, alpha * 0.7);
       ellipse(swirlX + drift, swirlY + drift, c.s * expand);

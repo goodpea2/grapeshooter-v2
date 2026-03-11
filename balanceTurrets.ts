@@ -42,6 +42,15 @@ export const turretTypes: any = {
     actionConfig: { dieAfterDuration: 360, pulseBulletTypeKey: 'b_iceshroom_explosion' },
     targetType: [], targetConfig: {}
   },
+  t0_hypnobomb: {
+    name: 'Hypno Bomb', costs: { elixir: 50 }, health: 50, color: [255, 0, 255], size: 22, tier: 0, isSpecial: true,
+    tooltip: "Explodes after 6s, hypnotizes enemies in a huge area for 2h",
+    explosiveGrowth: true, animationBodyType: 'soft',
+    isActiveWhileMoving: false,
+    actionType: ['die'],
+    actionConfig: { dieAfterDuration: 360, pulseBulletTypeKey: 'b_hypnobomb_explosion' },
+    targetType: [], targetConfig: {}
+  },
   t0_starfruit: {
     name: 'Healing Starfruit', costs: { elixir: 30 }, health: 100, color: [150, 255, 100], size: 22, tier: 0, isSpecial: true,
     tooltip: "Heal surrounding turrets over 2h", animationBodyType: 'soft',

@@ -6,6 +6,7 @@ import { conditionTypes } from '../balanceConditions';
 import { liquidTypes } from '../balanceLiquids';
 import { BugSplatVFX, GiantDeathVFX, HitSpark, LiquidTrailVFX, MuzzleFlash, ConditionVFX, drawPersistentDeathVisual, Explosion, DamageNumberVFX } from '../vfx/index';
 import { AttachedTurret } from './attachedTurret';
+import { WorldTurret } from './worldTurret';
 import { Bullet } from './bullet';
 import { GroundFeature } from './groundFeature';
 import { lerpAngle } from './utils';
@@ -49,6 +50,7 @@ export class Enemy {
   isFlying: boolean = false;
   stealSunTarget: any = null;
   stealCooldown: number = 0;
+  lastTargetScanFrame: number = -100;
 
   // Attack Animation State
   attackAnimTimer: number = 0;
@@ -62,6 +64,10 @@ export class Enemy {
     if (this.type === 'e_swarm') for(let i=0; i<10; i++) this.swarmParticles.push({ offset: p5.Vector.random2D().mult(random(12, 24)), size: random(5, 9), phase: random(TWO_PI) });
     this.kbVel = createVector(0, 0);
     this.attackOffset = createVector(0, 0);
+
+    if (this.config.spawnWithCondition) {
+      this.applyCondition(this.config.spawnWithCondition.condition, this.config.spawnWithCondition.duration);
+    }
   }
 
   applyCondition(cKey: string, duration: number, data?: any) {
@@ -84,7 +90,7 @@ export class Enemy {
     if (!state.vfx.some((v: any) => v instanceof ConditionVFX && v.target === this && v.type === cKey)) state.vfx.push(new ConditionVFX(this, cKey));
   }
 
-  update(playerPos: any, turrets: AttachedTurret[]) {
+  update(playerPos: any, turrets: (AttachedTurret | WorldTurret)[]) {
     if (this.isDying) return;
     if (this.flash > 0) this.flash--;
     this.prevPos.set(this.pos);
@@ -118,8 +124,8 @@ export class Enemy {
       
       if (cKey === 'c_burning') {
           const dmg = this.conditionData.get('c_burning_dmg') || cfg.damage || 0;
-          if (dmg > 0 && frameCount % (cfg.damageInterval || 6) === 0) this.takeDamage(dmg);
-      } else if (cfg.damage && frameCount % cfg.damageInterval === 0) {
+          if (dmg > 0 && state.frames % (cfg.damageInterval || 6) === 0) this.takeDamage(dmg);
+      } else if (cfg.damage && state.frames % cfg.damageInterval === 0) {
           this.takeDamage(cfg.damage);
       }
 
@@ -137,12 +143,12 @@ export class Enemy {
 
     if (lData) {
        speedMult *= lData.liquidConfig.enemyMovementSpeedMultiplier;
-       if (lData.trailVfxInterval && frameCount % floor(lData.trailVfxInterval / 2) === 0 && actualVelSq > 0.01) state.trails.push(new LiquidTrailVFX(this.pos.x, this.pos.y, lData.enemyTrailVfx, atan2(this.pos.y - this.prevPos.y, this.pos.x - this.prevPos.x)));
+       if (lData.trailVfxInterval && state.frames % floor(lData.trailVfxInterval / 2) === 0 && actualVelSq > 0.01) state.trails.push(new LiquidTrailVFX(this.pos.x, this.pos.y, lData.enemyTrailVfx, atan2(this.pos.y - this.prevPos.y, this.pos.x - this.prevPos.x)));
        
        if (lData.liquidConfig.liquidDamageConfig?.enemy) {
          const cfg = lData.liquidConfig.liquidDamageConfig.enemy;
          const interval = cfg.damageInterval || 10;
-         if (frameCount % interval === 0) {
+         if (state.frames % interval === 0) {
            if (cfg.damage) this.takeDamage(cfg.damage);
            if (cfg.condition) this.applyCondition(cfg.condition, cfg.conditionDuration || interval * 2, { damage: cfg.damage });
          }
@@ -183,35 +189,82 @@ export class Enemy {
     const checkLimitSq = EnemyCollideRadiusCheck * EnemyCollideRadiusCheck;
     let shouldMove = true;
     
-    let nearestT = null; let minDistTSq = 450*450;
-    for (let t of turrets) {
-        // ENEMY TARGETING REFINEMENT: Ignore retracted, waterlogged, or frosted turrets
-        const isRetracted = !state.isStationary && !t.config.isActiveWhileMoving;
-        const isInactive = isRetracted || t.isWaterlogged || t.isFrosted;
-        if (isInactive || t.config.collideWithEnemy === false) continue;
+    // TARGETING THROTTLE
+    if (state.frames - this.lastTargetScanFrame >= 30 || state.needsTargetReScan || !this.target) {
+      this.lastTargetScanFrame = state.frames;
+      let nearestT = null; 
+      let minDistTSq = 450*450;
+      const isHypnotized = this.conditions.has('c_hypnotized');
 
-        const twPos = t.getWorldPos();
-        const dSq = (this.pos.x - twPos.x)**2 + (this.pos.y - twPos.y)**2;
-        if (dSq < minDistTSq && state.world.checkLOS(this.pos.x, this.pos.y, twPos.x, twPos.y)) { 
-            nearestT = t; minDistTSq = dSq; 
-        } 
+      // Use spatial hash to find nearest target
+      for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+          const key = `${hgx + i},${hgy + j}`;
+          const cellEntities = state.spatialHash.get(key);
+          if (cellEntities) {
+            for (const ent of cellEntities) {
+              if (ent === this || ent.isDying) continue;
+
+              if (isHypnotized) {
+                // Hypnotized enemies target other enemies
+                if (!(ent instanceof Enemy) || ent.conditions.has('c_hypnotized')) continue;
+              } else {
+                // Normal enemies target hypnotized enemies, player, or turrets
+                if (ent instanceof Enemy) {
+                  if (!ent.conditions.has('c_hypnotized')) continue;
+                } else {
+                   // If it's a turret, check if it's active
+                   if (ent.config && ent.config.collideWithEnemy === false) continue;
+                   if (ent.isWaterlogged || ent.isFrosted) continue;
+                   if (ent.config && !state.isStationary && !ent.config.isActiveWhileMoving && ent.getWorldPos) continue;
+                }
+              }
+
+              const twPos = ent.getWorldPos ? ent.getWorldPos() : ent.pos;
+              const dSq = (this.pos.x - twPos.x)**2 + (this.pos.y - twPos.y)**2;
+              if (dSq < minDistTSq && state.world.checkLOS(this.pos.x, this.pos.y, twPos.x, twPos.y)) { 
+                  nearestT = ent; minDistTSq = dSq; 
+              }
+            }
+          }
+        }
+      }
+      
+      if (isHypnotized) {
+        this.target = nearestT; // Might be null if no other enemies nearby
+      } else {
+        this.target = nearestT || state.player;
+      }
     }
 
-    let tp = nearestT ? nearestT.getWorldPos() : playerPos; this.target = nearestT || state.player;
+    if (!this.target) {
+      // If no target, just wander or stay still (for hypnotized enemies with no targets)
+      this.rot += random(-0.05, 0.05);
+      return;
+    }
+
+    let tp = this.target.getWorldPos ? this.target.getWorldPos() : this.target.pos;
 
     if (this.actionType.includes('stealSun')) {
       if (!this.stealSunTarget || this.stealSunTarget.life <= 0) {
         let bestSun = null;
         let minDistSq = (this.actionConfig.stealRange || GRID_SIZE * 6)**2;
-        for (let l of state.loot) {
-          if (l.typeKey === 'sun') {
-            const dSq = (this.pos.x - l.pos.x)**2 + (this.pos.y - l.pos.y)**2;
-            if (dSq < minDistSq) {
-              minDistSq = dSq;
-              bestSun = l;
+        
+        // OPTIMIZATION: Only check loot in active chunks
+        state.activeChunkKeys.forEach((key: string) => {
+          const chunk = state.world.chunks.get(key);
+          if (chunk) {
+            for (let l of chunk.loot) {
+              if (l.typeKey === 'sun') {
+                const dSq = (this.pos.x - l.pos.x)**2 + (this.pos.y - l.pos.y)**2;
+                if (dSq < minDistSq) {
+                  minDistSq = dSq;
+                  bestSun = l;
+                }
+              }
             }
           }
-        }
+        });
         this.stealSunTarget = bestSun;
       }
 
@@ -245,7 +298,7 @@ export class Enemy {
         const neighbors = state.spatialHash.get(`${hgx+i},${hgy+j}`);
         if (neighbors) {
           for (const other of neighbors) {
-            if (other === this || other.isDying) continue;
+            if (other === this || other.isDying || !(other instanceof Enemy)) continue;
             const odx = this.pos.x - other.pos.x;
             const ody = this.pos.y - other.pos.y;
             const distSq = odx*odx + ody*ody;
@@ -319,10 +372,18 @@ export class Enemy {
     if (!this.target || this.isDying) return;
 
     // ENEMY DAMAGE REFINEMENT: Ignore damage to inactive turrets
-    if (this.target instanceof AttachedTurret) {
-        const isRetracted = !state.isStationary && !this.target.config.isActiveWhileMoving;
+    if (this.target instanceof AttachedTurret || this.target instanceof WorldTurret) {
+        const isRetracted = !state.isStationary && !this.target.config.isActiveWhileMoving && (this.target instanceof AttachedTurret);
         const isInactive = isRetracted || this.target.isWaterlogged || this.target.isFrosted;
         if (isInactive) return;
+    }
+
+    // Hypnotized logic: can damage other enemies
+    if (this.target instanceof Enemy) {
+      const isHypnotized = this.conditions.has('c_hypnotized');
+      const targetHypnotized = this.target.conditions.has('c_hypnotized');
+      // Only damage if one is hypnotized and the other is not
+      if (isHypnotized === targetHypnotized) return;
     }
 
     const strikePos = p5.Vector.add(this.pos, this.attackOffset);
@@ -339,7 +400,7 @@ export class Enemy {
 
     if (distToStrike < strikeRange) {
         this.target.takeDamage(this.actionConfig.damage);
-        if (frameCount % 5 === 0) state.vfx.push(new HitSpark(strikePos.x, strikePos.y, [255, 50, 50]));
+        if (state.frames % 5 === 0) state.vfx.push(new HitSpark(strikePos.x, strikePos.y, [255, 50, 50]));
         
         if (this.type === 'e_giant' || this.type === 'e_shooting_giant' || this.type === 'e_snowthrower_giant') {
             state.cameraShake = Math.max(state.cameraShake, 10);
@@ -389,9 +450,12 @@ export class Enemy {
     if (dSqToPlayer < minDSqToPlayer) return true; 
 
     // ENEMY COLLISION REFINEMENT: Only collide with ACTIVE turrets
-    for (let t of state.player.attachments) {
+    const worldTurrets = state.world.getAllTurrets();
+    const allTurrets = [...state.player.attachments, ...worldTurrets];
+    
+    for (let t of allTurrets) {
       if (t.config.collideWithEnemy !== false) {
-        const isRetracted = !state.isStationary && !t.config.isActiveWhileMoving;
+        const isRetracted = !state.isStationary && !t.config.isActiveWhileMoving && (t instanceof AttachedTurret);
         const isInactive = isRetracted || t.isWaterlogged || t.isFrosted;
         if (isInactive) continue;
 
@@ -470,10 +534,12 @@ export class Enemy {
 
       // Check for turrets
       const isTurretAt = (gx: number, gy: number) => {
-        return state.player.attachments.some((a: any) => {
+        const attached = state.player.attachments.some((a: any) => {
           const wPos = a.getWorldPos();
           return floor(wPos.x / GRID_SIZE) === gx && floor(wPos.y / GRID_SIZE) === gy;
         });
+        if (attached) return true;
+        return !!state.world.getTurretAt(gx, gy);
       };
 
       if (isTurretAt(gx, gy)) {

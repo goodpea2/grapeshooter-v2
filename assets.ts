@@ -73,6 +73,7 @@ export const ASSETS = {
   img_t_lilypad_front: "https://i.ibb.co/LXsjh9Q0/t-lilypad.png",
 
   // Special Turrets
+  img_t0_hypnobomb_front: "https://i.ibb.co/sdShyXN8/t-iceshroom-front-right.png",
   img_t0_puffshroom_back: "https://i.ibb.co/VGYhBp3/t-puffshroom-back-right.png",
   img_t0_puffshroom_front: "https://i.ibb.co/yn00YBFP/t-puffshroom-front-right.png",
   img_t0_grapeshot_back: "https://i.ibb.co/8g8tH2Zy/t-grapeshot-back-right.png",

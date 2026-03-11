@@ -7,7 +7,8 @@ import { overlayTypes } from '../balanceObstacles';
 import { turretTypes } from '../balanceTurrets';
 import { Explosion, LiquidTrailVFX, MuzzleFlash, ConditionVFX } from '../vfx';
 import { AttachedTurret } from './attachedTurret';
-import { LootEntity } from './loot';
+import { LootEntity, TurretLoot } from './loot';
+import { spawnLootAt } from '../economy';
 import { Bullet } from './bullet';
 import { drawPlayer } from '../visualPlayer';
 
@@ -118,7 +119,7 @@ export class Player {
       state.isStationary = false;
     }
     
-    if (lData && lData.trailVfxInterval && frameCount % floor(lData.trailVfxInterval / 3) === 0 && vel > 0.5) {
+    if (lData && lData.trailVfxInterval && state.frames % floor(lData.trailVfxInterval / 3) === 0 && vel > 0.5) {
       state.trails.push(new LiquidTrailVFX(this.pos.x, this.pos.y, lData.playerTrailVfx, atan2(this.pos.y - this.prevPos.y, this.pos.x - this.prevPos.x)));
     }
 
@@ -132,7 +133,7 @@ export class Player {
         if (a.config.drops) {
           for (const [res, amount] of Object.entries(a.config.drops)) {
             for (let j = 0; j < (amount as number); j++) {
-              state.loot.push(new LootEntity(a.getWorldPos().x, a.getWorldPos().y, res));
+              spawnLootAt(a.getWorldPos().x, a.getWorldPos().y, res);
             }
           }
         }
@@ -141,53 +142,44 @@ export class Player {
       } 
     }
     
-    for (let i = state.loot.length - 1; i >= 0; i--) {
-      const loot = state.loot[i] as LootEntity;
-      const res = loot.update(this.pos);
-      if (res === 'collected') {
-        loot.life = 0; // Mark as dead so enemies stop targeting it
-        if (loot.config.type === 'turret') {
-           this.addStrayTurret(loot.config.itemValue !== undefined ? String(loot.config.itemValue) : loot.config.item);
-        } else if (loot.config.type === 'turretAsItem') {
-           const itemKey = loot.config.item;
-           state.inventory.items[itemKey] = (state.inventory.items[itemKey] || 0) + 1;
-           state.inventory.specList.push({ key: itemKey, type: 'turret', timestamp: Date.now() });
-           state.totalTurretsAcquired++;
-           state.uiAlpha = 255; 
-        } else {
-           const val = loot.config.itemValue || 1;
-           if (loot.config.item === 'sun') {
-              state.sunCurrency += val;
-              state.totalSunLootCollected += val;
-              state.uiSunScale = 1.6;
-           } else if (loot.config.item === 'elixir') {
-              state.elixirCurrency += val;
-              state.totalElixirLootCollected += val;
-              state.uiElixirScale = 1.6;
-           } else if (loot.config.item === 'soil') {
-              state.soilCurrency += val;
-              state.totalSoilLootCollected += val;
-              state.uiSoilScale = 1.6;
-           } else if (loot.config.item === 'leaf') {
-              state.leafCurrency += val;
-           } else if (loot.config.item === 'shard') {
-              state.shardCurrency += val;
-           } else if (loot.config.item === 'shell') {
-              state.shellCurrency += val;
-           } else if (loot.config.item === 'fuel') {
-              state.fuelCurrency += val;
-           } else if (loot.config.item === 'ice') {
-              state.iceCurrency += val;
-           }
+    this.updateAutoTurret(fireRateMult);
+    this.checkWorldTurretCollisions();
+  }
+
+  checkWorldTurretCollisions() {
+    const worldTurrets = state.world.getAllTurrets();
+    const myRadius = this.size * 0.5;
+    
+    for (let i = worldTurrets.length - 1; i >= 0; i--) {
+      const wt = worldTurrets[i];
+      const wtPos = wt.getWorldPos();
+      const wtRadius = wt.size * 0.5;
+      
+      // Check collision with player core
+      const dPlayerSq = (this.pos.x - wtPos.x)**2 + (this.pos.y - wtPos.y)**2;
+      if (dPlayerSq < (myRadius + wtRadius)**2) {
+        this.dropWorldTurretAsLoot(wt);
+        continue;
+      }
+      
+      // Check collision with attachments
+      for (const a of this.attachments) {
+        const aPos = a.getWorldPos();
+        const aRadius = a.size * 0.5;
+        const dAttSq = (aPos.x - wtPos.x)**2 + (aPos.y - wtPos.y)**2;
+        if (dAttSq < (aRadius + wtRadius)**2) {
+          this.dropWorldTurretAsLoot(wt);
+          break;
         }
-        state.loot.splice(i, 1);
-      } else if (res === 'missed' || res === 'consumed') { 
-        if (res === 'missed' && loot.config.type === 'currency' && loot.config.item === 'sun') state.sunMissedTotal += (loot.config.itemValue || 1); 
-        state.loot.splice(i, 1); 
       }
     }
+  }
 
-    this.updateAutoTurret(fireRateMult);
+  dropWorldTurretAsLoot(wt: any) {
+    const wtPos = wt.getWorldPos();
+    spawnLootAt(wtPos.x, wtPos.y, wt.type, wt.health);
+    state.world.removeTurret(wt.gx, wt.gy);
+    state.vfx.push(new Explosion(wtPos.x, wtPos.y, 40, color(200, 200, 255)));
   }
 
   applyObstacleRepulsion() {
@@ -222,7 +214,7 @@ export class Player {
     }
   }
 
-  addStrayTurret(type: string) {
+  addStrayTurret(type: string, hp?: number) {
     const config = turretTypes[type];
     if (!config) return;
 
@@ -272,7 +264,9 @@ export class Player {
     }
 
     if (bestSlot) {
-      this.attachments.push(new AttachedTurret(type, this, bestSlot.q, bestSlot.r));
+      const newTurret = new AttachedTurret(type, this, bestSlot.q, bestSlot.r);
+      if (hp !== undefined) newTurret.health = hp;
+      this.attachments.push(newTurret);
       state.totalTurretsAcquired++;
       state.vfx.push(new Explosion(this.pos.x, this.pos.y, 60, color(255, 255, 100)));
     } else {
@@ -303,11 +297,11 @@ export class Player {
       if (ht) {
         let bc = ht.getWorldPos();
         this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x);
-        if (frameCount - this.autoTurretLastShot > effectiveMiningFireRate) {
+        if (state.frames - this.autoTurretLastShot > effectiveMiningFireRate) {
           state.bullets.push(new Bullet(this.pos.x, this.pos.y, bc.x, bc.y, 'b_player_mining', 'none'));
           state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 14, 4, color(255, 255, 100)));
           if (miningBoost > 0) this.applyCondition('c_raged', 10);
-          this.autoTurretLastShot = frameCount;
+          this.autoTurretLastShot = state.frames;
           this.recoil = 3;
           this.pulseAnimTimer = 10;
         }
@@ -318,14 +312,14 @@ export class Player {
       if (t) { 
         let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; 
         this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); 
-        if (frameCount - this.autoTurretLastShot > effectiveMiningFireRate) { 
+        if (state.frames - this.autoTurretLastShot > effectiveMiningFireRate) { 
           state.bullets.push(new Bullet(this.pos.x, this.pos.y, bc.x, bc.y, 'b_player_mining', 'none')); 
           state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 14, 4, color(255, 255, 100))); 
           // Play rage VFX on player when mining boost is active
           if (miningBoost > 0) {
             this.applyCondition('c_raged', 10);
           }
-          this.autoTurretLastShot = frameCount; 
+          this.autoTurretLastShot = state.frames; 
           this.recoil = 3; 
           this.pulseAnimTimer = 10; 
         } 
@@ -337,11 +331,11 @@ export class Player {
 
     let bestR = null; let minRD = this.autoTurretRange;
     for (let a of this.attachments) if (a.isFrosted && a.iceCubeHealth > 0) { let d = dist(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y); if (d < minRD && state.world.checkLOS(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y)) { minRD = d; bestR = a; } }
-    if (bestR) { this.target = bestR; const bp = bestR.getWorldPos(); this.autoTurretAngle = atan2(bp.y - this.pos.y, bp.x - this.pos.x); if (frameCount - this.autoTurretLastShot > effectiveFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, bp.x, bp.y, 'b_player', 'icecube')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 24, 6, color(100, 200, 255))); this.autoTurretLastShot = frameCount; this.recoil = 6; this.pulseAnimTimer = 15; } return; }
+    if (bestR) { this.target = bestR; const bp = bestR.getWorldPos(); this.autoTurretAngle = atan2(bp.y - this.pos.y, bp.x - this.pos.x); if (state.frames - this.autoTurretLastShot > effectiveFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, bp.x, bp.y, 'b_player', 'icecube')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 24, 6, color(100, 200, 255))); this.autoTurretLastShot = state.frames; this.recoil = 6; this.pulseAnimTimer = 15; } return; }
     let nearestE = null; let minDistE = this.autoTurretRange;
     for (let e of state.enemies) if (!e.isInvisible && e.health > 0 && !e.isDying) { let d = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y); if (d < minDistE && state.world.checkLOS(this.pos.x, this.pos.y, e.pos.x, e.pos.y)) { minDistE = d; nearestE = e; } }
-    if (nearestE) { this.autoTurretAngle = atan2(nearestE.pos.y - this.pos.y, nearestE.pos.x - this.pos.x); if (frameCount - this.autoTurretLastShot > effectiveFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, nearestE.pos.x, nearestE.pos.y, 'b_player', 'enemy')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 24, 6, color(100, 200, 255))); this.autoTurretLastShot = frameCount; this.recoil = 6; this.pulseAnimTimer = 15; } } else {
-      let t = this.findBlockTarget(this.pos, this.autoTurretRange); if (t) { let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); if (frameCount - this.autoTurretLastShot > effectiveMiningFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, bc.x, bc.y, 'b_player_mining', 'none')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 14, 4, color(255, 255, 100))); this.autoTurretLastShot = frameCount; this.recoil = 3; this.pulseAnimTimer = 10; } }
+    if (nearestE) { this.autoTurretAngle = atan2(nearestE.pos.y - this.pos.y, nearestE.pos.x - this.pos.x); if (state.frames - this.autoTurretLastShot > effectiveFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, nearestE.pos.x, nearestE.pos.y, 'b_player', 'enemy')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 24, 6, color(100, 200, 255))); this.autoTurretLastShot = state.frames; this.recoil = 6; this.pulseAnimTimer = 15; } } else {
+      let t = this.findBlockTarget(this.pos, this.autoTurretRange); if (t) { let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); if (state.frames - this.autoTurretLastShot > effectiveMiningFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, bc.x, bc.y, 'b_player_mining', 'none')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 14, 4, color(255, 255, 100))); this.autoTurretLastShot = state.frames; this.recoil = 3; this.pulseAnimTimer = 10; } }
     }
   }
 

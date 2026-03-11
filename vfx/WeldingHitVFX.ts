@@ -81,8 +81,8 @@ export class WeldingHitVFX {
     update() {
         this.life--;
         if (this.life > 5) {
-            if (frameCount % 6 === 0) this.addWisp();
-            if (frameCount % 4 === 0) this.addSpark();
+            if (state.frames % 6 === 0) this.addWisp();
+            if (state.frames % 4 === 0) this.addSpark();
         }
 
         for (let i = this.wisps.length - 1; i >= 0; i--) {
@@ -108,7 +108,7 @@ export class WeldingHitVFX {
         if (this.life > 0) {
             push();
             translate(this.pos.x, this.pos.y);
-            let s = 6 + sin(frameCount * 0.8) * 2;
+            let s = 6 + sin(state.frames * 0.8) * 2;
             
             noStroke();
             // Colored Halo

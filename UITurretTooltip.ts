@@ -45,6 +45,9 @@ export const DEFAULT_STATS = [
 ];
 
 export const TURRET_DISPLAY_STATS: Record<string, TurretDisplayStat[]> = {
+    'tx_goldengrape': [
+        { label: 'EZ', value: 'GG' }, { label: ' ', value: ' ' }, { label: ' ', value: ' ' }, { label: ' ', value: ' ' }, { label: ' ', value: ' ' }, { label: ' ', value: ' ' }
+    ],
     // TIER 0
     't0_cherrybomb': [
         { label: 'Health', value: '50' }, { label: 'AOE dmg', value: '90-60' }, { label: 'AOE radius', value: '2.5-5 tiles' },

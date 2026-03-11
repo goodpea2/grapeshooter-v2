@@ -5,7 +5,7 @@ import { enemyTypes } from './balanceEnemies';
 import { liquidTypes } from './balanceLiquids';
 import { getTime } from './ui';
 import { SunLoot, Enemy } from './entities';
-import { ECONOMY_CONFIG } from './economy';
+import { ECONOMY_CONFIG, spawnLootAt } from './economy';
 import { Bullet } from './entities';
 
 declare const random: any;
@@ -74,7 +74,7 @@ export const AlmanacProgression = {
     { type: 't_sunflower', cost: { soil: 40 } },
     { type: 't_seed', canBePurchased: false },
     { type: 't_seed2', canBePurchased: false },
-    { type: 'tx_goldengrape', cost: { leaf: 100, shard: 100, shell: 100 } }
+    { type: 'tx_goldengrape', cost: { sun: 800 } }
   ]
 };
 
@@ -263,8 +263,7 @@ export function updateGameSystems() {
     const y = state.player.pos.y + sin(ang) * distR;
     
     if (isLegibleSpot(x, y)) {
-      state.loot.push(new SunLoot(x, y, 1));
-      state.sunSpawnedTotal += 1;
+      spawnLootAt(x, y, 'sun');
     }
   }
 

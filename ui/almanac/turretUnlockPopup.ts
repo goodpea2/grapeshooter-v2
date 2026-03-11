@@ -29,7 +29,7 @@ function map(n: number, start1: number, stop1: number, start2: number, stop2: nu
   return ((n - start1) / (stop1 - start1)) * (stop2 - start2) + start2; 
 }
 
-export function drawUnlockPopup() {
+export function updateUnlockPopup() {
   if (!state.showUnlockPopup || !state.lastUnlockedTurret) return;
 
   state.unlockPopupTimer--;
@@ -44,6 +44,10 @@ export function drawUnlockPopup() {
     state.almanacScrollY = -Math.max(0, targetY - 100);
     state.almanacSelectedTurret = state.lastUnlockedTurret;
   }
+}
+
+export function drawUnlockPopup() {
+  if (!state.showUnlockPopup || !state.lastUnlockedTurret) return;
 
   const tr = turretTypes[state.lastUnlockedTurret];
   if (!tr) return;

@@ -2,7 +2,7 @@
 export interface LootType {
   type: 'currency' | 'turret' | 'turretAsItem';
   item: string; 
-  itemValue?: number; // Value added if currency, or turret key if turret
+  itemValue?: number | string; // Value added if currency, or turret key if turret
   idleAssetImg: string;
   idleAssetImgSize: [number, number]; // Random range for scaling
 }
@@ -163,13 +163,15 @@ export const lootTypes: Record<string, LootType> = {
   t0_jalapeno: { type: 'turretAsItem', item: 't0_jalapeno', idleAssetImg: 'img_t0_jalapeno_front', idleAssetImgSize: [45, 45] },
   t0_puffshroom: { type: 'turretAsItem', item: 't0_puffshroom', idleAssetImg: 'img_t0_puffshroom_front', idleAssetImgSize: [35, 35] },
   t0_grapeshot: { type: 'turretAsItem', item: 't0_grapeshot', idleAssetImg: 'img_t0_grapeshot_front', idleAssetImgSize: [45, 45] },
+  t0_hypnobomb: { type: 'turretAsItem', item: 't0_hypnobomb', idleAssetImg: 'img_t0_hypnobomb_front', idleAssetImgSize: [45, 45] },
 
   t_farm_bush: { type: 'turret', item: 't_farm_bush', idleAssetImg: 'img_t_farm_bush_stage0', idleAssetImgSize: [45, 45] },
   t_farm_crystal: { type: 'turret', item: 't_farm_crystal', idleAssetImg: 'img_t_farm_crystal_stage0', idleAssetImgSize: [45, 45] },
   t_farm_mob: { type: 'turret', item: 't_farm_mob', idleAssetImg: 'img_t_farm_mob_stage0', idleAssetImgSize: [45, 45] },
 
   // Test Units
-  t_dummy: { type: 'turret', item: 't_dummy', idleAssetImg: 'img_t_wall_front', idleAssetImgSize: [50, 50] }
+  t_dummy: { type: 'turret', item: 't_dummy', idleAssetImg: 'img_t_wall_front', idleAssetImgSize: [50, 50] },
+  turret: { type: 'turret', item: 'turret', idleAssetImg: 'img_seed_stray_t1', idleAssetImgSize: [40, 40] }
 };
 
 export const lootTableTypes: Record<string, LootTableEntry[]> = {

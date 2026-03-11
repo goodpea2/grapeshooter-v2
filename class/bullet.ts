@@ -4,6 +4,9 @@ import { GRID_SIZE, CHUNK_SIZE } from '../constants';
 import { bulletTypes } from '../balanceBullets';
 import { Explosion, MuzzleFlash, HitSpark, FireworkVFX } from '../vfx';
 import { GroundFeature } from './groundFeature';
+import { WorldTurret } from './worldTurret';
+import { AttachedTurret } from './attachedTurret';
+import { Enemy } from './enemy';
 import { drawBullet } from '../visualBullets';
 
 declare const p5: any;
@@ -84,7 +87,8 @@ export class Bullet {
     }
     
     if (this.damageTargets.includes('icecube')) {
-      for (let a of state.player.attachments) {
+      const allTurrets = [...state.player.attachments, ...state.world.getAllTurrets()];
+      for (let a of allTurrets) {
         if ((a.isFrosted || a.isHarvestReady) && !this.hitTargets.has(a.uid)) {
           const awPos = a.getWorldPos();
           const dSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
@@ -145,7 +149,7 @@ export class Bullet {
           const cell = state.spatialHash.get(`${hgx+i},${hgy+j}`);
           if (cell) {
             for (const e of cell) {
-              if (e.health <= 0 || e.isDying || this.hitTargets.has(e.uid)) continue;
+              if (!(e instanceof Enemy) || e.health <= 0 || e.isDying || this.hitTargets.has(e.uid)) continue;
               const dSq = (this.pos.x - e.pos.x)**2 + (this.pos.y - e.pos.y)**2;
               const minDist = e.size / 2;
               if (dSq < minDist*minDist) {
@@ -179,7 +183,8 @@ export class Bullet {
     }
 
     if (this.damageTargets.includes('turret')) {
-      for (let a of state.player.attachments) {
+      const allTurrets = [...state.player.attachments, ...state.world.getAllTurrets()];
+      for (let a of allTurrets) {
         if (!this.hitTargets.has(a.uid)) {
           const awPos = a.getWorldPos();
           const dSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
@@ -324,8 +329,8 @@ export class Bullet {
           }
 
           const lerpDmg = this.getLerpedAoeDamage(d, aoe);
-          if (lerpDmg > 0) {
-            this.applyBulletConditions(e);
+          this.applyBulletConditions(e);
+          if (lerpDmg !== 0) {
             e.takeDamage(lerpDmg);
           }
         }
@@ -342,7 +347,8 @@ export class Bullet {
     }
 
     if (this.damageTargets.includes('turret')) {
-      for (let a of state.player.attachments) {
+      const allTurrets = [...state.player.attachments, ...state.world.getAllTurrets()];
+      for (let a of allTurrets) {
         const awPos = a.getWorldPos();
         let adSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
         if (adSq < maxR*maxR) {
@@ -354,7 +360,8 @@ export class Bullet {
     }
 
     if (this.damageTargets.includes('icecube')) {
-       for (let a of state.player.attachments) {
+       const allTurrets = [...state.player.attachments, ...state.world.getAllTurrets()];
+       for (let a of allTurrets) {
         if (a.isFrosted) {
           const awPos = a.getWorldPos();
           let adSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;

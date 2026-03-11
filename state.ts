@@ -7,7 +7,6 @@ export const state: any = {
   world: null,
   bullets: [],
   groundFeatures: [],
-  loot: [],
   vfx: [],
   uiVfx: [], // New array for UI-space visual effects
   trails: [], // Dedicated array for liquid trails (rendered under entities)
@@ -23,7 +22,6 @@ export const state: any = {
   shellCurrency: 0,
   fuelCurrency: 0,
   iceCurrency: 0,
-  flyingRaisins: [], // { startX, startY, targetX, targetY, progress, value }
   inventory: {
     items: {}, // Map of itemKey -> count
     specList: [] // List of special items (turrets)
@@ -47,6 +45,8 @@ export const state: any = {
   cameraShake: 0, // Current camera shake intensity
   cameraShakeFalloff: 0.95, // Default decay rate
   exploredChunks: new Set(),
+  activeChunkKeys: new Set(),
+  chunkAccessOrder: [],
   currentChunkLevel: 0,
   spawnedNpcKeys: new Set(),
   frames: customStartingHour * HOUR_FRAMES,
@@ -63,6 +63,7 @@ export const state: any = {
   // Spatial Partitioning
   spatialHash: new Map(),
   spatialHashCellSize: SPATIAL_HASH_CELL_SIZE,
+  needsTargetReScan: false,
 
   // Loaded Assets
   assets: {},
@@ -133,6 +134,7 @@ export const state: any = {
   debugHP: false,
   hoveredTurretInstance: null, 
   previewSnapPos: null,
+  previewWorldSnap: null, // { gx, gy } if snapping to world grid
   activeNPC: null,
   npcUiPanelPos: 0, // Animation progress for NPC UI
   activeNpcDialogueIdx: 0,

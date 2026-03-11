@@ -90,7 +90,7 @@ export class MagicLinkVFX {
     
     display() {
         let alpha = map(this.life, 0, this.maxLife, 0, 200);
-        let pulse = 0.8 + 0.2 * sin(frameCount * 0.3 + this.seed);
+        let pulse = 0.8 + 0.2 * sin(state.frames * 0.3 + this.seed);
         
         // Outer Subtle Glow
         stroke(120, 220, 255, alpha * 0.2 * pulse);
@@ -110,7 +110,7 @@ export class MagicLinkVFX {
         // Directional Energy Flow (Tiny beads)
         noStroke();
         fill(255, alpha);
-        let flowT = (frameCount * 0.05 + this.seed) % 1;
+        let flowT = (state.frames * 0.05 + this.seed) % 1;
         let flowPos = p5.Vector.lerp(this.p1, this.p2, flowT);
         ellipse(flowPos.x, flowPos.y, 4);
     }

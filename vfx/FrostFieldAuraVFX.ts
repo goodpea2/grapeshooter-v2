@@ -65,7 +65,7 @@ export class FrostFieldAuraVFX {
   update() {
     for(let f of this.flakes) {
       f.y += f.v;
-      f.x += sin(frameCount * 0.05 + f.phase) * 0.5;
+      f.x += sin(state.frames * 0.05 + f.phase) * 0.5;
       if (f.y > this.radius) f.y = -this.radius;
       if (f.x > this.radius) f.x = -this.radius;
       if (f.x < -this.radius) f.x = this.radius;
@@ -78,7 +78,7 @@ export class FrostFieldAuraVFX {
     if (activity <= 0.01) return;
 
     push(); translate(p.x, p.y);
-    const pulse = 1.0 + 0.05 * sin(frameCount * 0.02);
+    const pulse = 1.0 + 0.05 * sin(state.frames * 0.02);
     const currentRadius = this.radius * activity;
     const currentAlpha = 255 * activity;
     

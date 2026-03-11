@@ -127,7 +127,7 @@ export function drawPlayer(p: any) {
     // CONDITION TINTS
     const isRaged = p.conditions.has('c_raged');
     if (p.flash > 0) tint(255, 100, 100);
-    else if (isRaged) tint(255, 100 + sin(frameCount * 0.4) * 100, 200); 
+    else if (isRaged) tint(255, 100 + sin(state.frames * 0.4) * 100, 200); 
     
     imageMode(CENTER);
     image(sprite, 0, 0, 80, 80);
@@ -143,7 +143,7 @@ export function drawPlayer(p: any) {
     strokeWeight(4);
     fill(c[0], c[1], c[2]);
     ellipse(0, 0, p.size, p.size);
-    const coreP = 0.5 + 0.5 * sin(frameCount * 0.1);
+    const coreP = 0.5 + 0.5 * sin(state.frames * 0.1);
     fill(50, 150, 255, 150 + coreP * 100);
     noStroke();
     ellipse(0, 0, 18, 18);

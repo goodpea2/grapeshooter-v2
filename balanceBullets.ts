@@ -188,6 +188,22 @@ export const bulletTypes: any = {
     cameraShakeOnDeath: [3, 5, 0.90],
     damageTargets: ['enemy']
   },
+  b_hypnobomb_explosion: {
+    bulletDamage: 0, bulletSpeed: 0, bulletColor: [255, 0, 255], bulletLifeTime: 1, bulletSize: 1, bulletLength: 1,
+    appliedConditions: [
+        { type: 'c_hypnotized', duration: HOUR_FRAMES * 2 }
+    ],
+    aoeConfig: { 
+      isAoe: true, 
+      aoeRadiusGradient: [GRID_SIZE * 12], 
+      aoeDamageGradient: [0], 
+      dealAoeOnObstacle: false, 
+      dealAoeAfterLifetime: true, 
+      aoeObstacleDamageMultiplier: 0 
+    },
+    cameraShakeOnDeath: [3, 5, 0.90],
+    damageTargets: ['enemy']
+  },
   b_healing_pulse: {
     bulletDamage: -5, bulletSpeed: 0, bulletColor: [100, 255, 100], bulletLifeTime: 1, bulletSize: 1, bulletLength: 1,
     aoeConfig: { 

@@ -54,7 +54,7 @@ export class FirstStrikeVFX {
   display() {
     const p = this.target.getWorldPos();
     push(); translate(p.x, p.y);
-    const pulse = 1.0 + 0.2 * sin(frameCount * 0.4);
+    const pulse = 1.0 + 0.2 * sin(state.frames * 0.4);
     const alpha = map(this.life, 0, 90, 0, 180);
     noFill();
     stroke(255, 255, 100, alpha);
@@ -65,8 +65,8 @@ export class FirstStrikeVFX {
     
     // Rising sparks
     for(let i=0; i<3; i++) {
-      const off = (frameCount * 2 + i * 30) % 60;
-      const x = sin(frameCount * 0.1 + i) * 20;
+      const off = (state.frames * 2 + i * 30) % 60;
+      const x = sin(state.frames * 0.1 + i) * 20;
       fill(255, 255, 150, alpha * (1 - off/60));
       noStroke();
       ellipse(x, -20 - off, 4);

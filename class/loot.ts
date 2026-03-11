@@ -94,27 +94,6 @@ export class LootEntity {
     
     const collectionRangeSq = ECONOMY_CONFIG.sunLootCollectionRange * ECONOMY_CONFIG.sunLootCollectionRange;
     if (dSq < collectionRangeSq) {
-      if (this.config.type === 'currency' && this.config.item === 'raisin') {
-        // Trigger flying raisin VFX
-        const val = (this.config.itemValue || 1);
-        const screenPos = {
-          x: this.pos.x - (state.cameraPos.x - width/2),
-          y: this.pos.y - (state.cameraPos.y - height/2)
-        };
-        const btnMargin = 10;
-        const almanacBtnSize = 80;
-        const targetX = width - btnMargin - almanacBtnSize / 2;
-        const targetY = height - btnMargin - almanacBtnSize / 2;
-        
-        state.flyingRaisins.push({
-          startX: screenPos.x,
-          startY: screenPos.y,
-          targetX: targetX,
-          targetY: targetY,
-          progress: 0,
-          value: val
-        });
-      }
       return 'collected';
     }
     if (this.life <= 0) return 'missed';
@@ -141,7 +120,7 @@ export class LootEntity {
     ctx.globalAlpha = alpha;
 
     // MATH SIMPLIFICATION: Combined pulse and state logic
-    const pulse = 1.0 + 0.1 * sin(frameCount * 0.15);
+    const pulse = 1.0 + 0.1 * sin(state.frames * 0.15);
     if (this.config.type === 'currency') rotate(state.frames * 0.02);
     
     imageMode(CENTER);
@@ -158,6 +137,24 @@ export class SunLoot extends LootEntity {
     super(x, y, 'sun');
     if (this.config) {
       this.config = { ...this.config, itemValue: amount };
+    }
+  }
+}
+
+export class TurretLoot extends LootEntity {
+  turretType: string;
+  turretHP: number;
+
+  constructor(x: number, y: number, turretType: string, hp: number) {
+    // Attempt to use the specific turret type key if it exists in lootTypes, otherwise fallback to 'turret'
+    const typeKey = lootTypes[turretType] ? turretType : 'turret';
+    super(x, y, typeKey); 
+    this.turretType = turretType;
+    this.turretHP = hp;
+    
+    // Ensure the config reflects the specific turret type for collection logic
+    if (this.config) {
+      this.config = { ...this.config, item: turretType, itemValue: turretType };
     }
   }
 }

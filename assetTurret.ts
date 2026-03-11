@@ -79,6 +79,7 @@ export const TYPE_MAP: Record<string, string> = {
   't0_firecherry': 't0_firecherry',
   't0_starfruit': 't0_starfruit',
   't0_iceshroom': 't0_iceshroom',
+  't0_hypnobomb': 't0_hypnobomb',
   't0_cherrybomb': 't0_cherrybomb',
   // Farm Turrets
   't_farm_bush': 't_farm_bush',
@@ -92,7 +93,7 @@ export const TYPE_MAP: Record<string, string> = {
 // Units that do not have a back-facing asset
 const NO_BACK_UNITS = new Set([
   't_wall', 't2_tall', 't2_pulse', 't2_spike', 't_sunflower', 't_seed', 't_seed2', 't_lilypad',
-  't0_jalapeno', 't0_firecherry', 't0_starfruit', 't0_iceshroom', 't0_cherrybomb',
+  't0_jalapeno', 't0_firecherry', 't0_starfruit', 't0_iceshroom', 't0_cherrybomb','t0_hypnobomb',
   't_farm_bush', 't_farm_crystal', 't_farm_mob',
   't_dummy', 'tx_goldengrape',
   // T3 additions that have no back asset provided

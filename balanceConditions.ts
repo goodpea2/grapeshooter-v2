@@ -37,5 +37,11 @@ export const conditionTypes: any = {
     conditionVfx: 'condition_raged',
     playerCombatBoost: 4.0,
     visualFlashColor: [255, 100, 200] // Pink flash
+  },
+  c_hypnotized: {
+    name: 'Hypnotized',
+    conditionVfx: 'condition_hypnotized',
+    enemyMovementSpeedMultiplier: 1.0,
+    visualFlashColor: [255, 0, 255] // Magenta/Purple flash
   }
 };

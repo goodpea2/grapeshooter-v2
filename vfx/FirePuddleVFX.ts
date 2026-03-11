@@ -104,7 +104,7 @@ export class FirePuddleVFX {
         scaleFactor = map(this.life, 0, 20, 0, 1.0);
     }
     
-    let pulse = 1.0 + 0.1 * sin(frameCount * 0.3);
+    let pulse = 1.0 + 0.1 * sin(state.frames * 0.3);
     push(); 
     translate(this.pos.x, this.pos.y);
     scale(scaleFactor);
@@ -117,7 +117,7 @@ export class FirePuddleVFX {
     
     for(let e of this.embers) {
       fill(255, 255, 150, alpha * 0.8); 
-      let drift = sin(frameCount * 0.1 + e.off) * 3;
+      let drift = sin(state.frames * 0.1 + e.off) * 3;
       ellipse(e.p.x + drift, e.p.y, e.s);
     }
     pop();

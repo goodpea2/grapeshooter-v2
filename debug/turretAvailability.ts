@@ -12,6 +12,6 @@ export const EnabledTurrets: string[] = [
 ];
 
 export const DisabledTurrets: string[] = [
-   't_dummy'
+   't_dummy','t0_hypnobomb'
   // do not delete this line, we use it to test new turrets
 ];

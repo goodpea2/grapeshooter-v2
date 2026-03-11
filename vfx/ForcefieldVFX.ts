@@ -56,7 +56,7 @@ export class ForcefieldVFX {
   display() {
     let alpha = map(this.life, 0, this.duration, 0, 100);
     if (this.life < 30) alpha = map(this.life, 0, 30, 0, 100);
-    let pulse = 1.0 + 0.02 * sin(frameCount * 0.01);
+    let pulse = 1.0 + 0.02 * sin(state.frames * 0.01);
     
     push(); translate(this.pos.x, this.pos.y);
     noFill();

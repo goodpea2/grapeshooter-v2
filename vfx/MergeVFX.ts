@@ -60,7 +60,7 @@ export class MergeVFX {
     let alpha = map(this.life, 0, this.duration, 0, 200);
     
     push(); translate(this.pos.x, this.pos.y);
-    rotate(frameCount * 0.1);
+    rotate(state.frames * 0.1);
     noFill();
     stroke(red(this.color), green(this.color), blue(this.color), alpha);
     strokeWeight(3);

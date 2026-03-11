@@ -39,9 +39,9 @@ export class PoisonGasVFX {
     push(); translate(this.pos.x, this.pos.y);
     (window as any).noStroke();
     for(let c of this.clouds) {
-      let drift = sin(frameCount * 0.04 + c.phase) * 6;
-      let swirlX = cos(frameCount * c.rotV) * c.off.x * expand;
-      let swirlY = sin(frameCount * c.rotV) * c.off.y * expand;
+      let drift = sin(state.frames * 0.04 + c.phase) * 6;
+      let swirlX = cos(state.frames * c.rotV) * c.off.x * expand;
+      let swirlY = sin(state.frames * c.rotV) * c.off.y * expand;
       
       // Poisonous green/purple mix
       fill(80, 200, 80, alpha * 0.6);

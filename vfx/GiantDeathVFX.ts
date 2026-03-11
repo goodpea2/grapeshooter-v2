@@ -58,7 +58,7 @@ export class GiantDeathVFX {
   }
   update() {
     this.life--;
-    if (this.life > 20 && frameCount % 3 === 0) {
+    if (this.life > 20 && state.frames % 3 === 0) {
       this.pos.add(random(-4, 4), random(-4, 4));
       state.vfx.push(new BugSplatVFX(this.pos.x + random(-30, 30), this.pos.y + random(-30, 30), 20, this.color));
     }

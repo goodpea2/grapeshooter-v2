@@ -11,6 +11,7 @@ import { npcTypes } from './balanceNPC';
 import { turretTypes } from './balanceTurrets';
 import { Explosion } from './vfx/index';
 import { Bullet, GroundFeature, NPCEntity, LootEntity } from './entities';
+import { spawnLootAt } from './economy';
 import { Block } from './world';
 import { ROOM_PREFABS } from './dictionaryRoomPrefab';
 import { generateRoomDirectorData } from './debug/roomDirectorGenerator';
@@ -430,7 +431,7 @@ export function drawDebugPanel(spawnFromBudget: Function) {
     });
     for (const key of sortedTurretKeys) {
         allItems.push({ l: key.toUpperCase(), grid: true, a: () => {
-            state.loot.push(new LootEntity(state.player.pos.x, state.player.pos.y, key));
+            spawnLootAt(state.player.pos.x, state.player.pos.y, key);
         }});
     }
   }

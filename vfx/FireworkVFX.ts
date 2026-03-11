@@ -153,7 +153,7 @@ for (let p of this.particles) {
 
   let pAlpha = alpha;
 
-  if (p.sparkle && frameCount % 10 < 2) {
+  if (p.sparkle && state.frames % 10 < 2) {
     pAlpha *= 0.3;
   }
 

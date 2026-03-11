@@ -32,7 +32,7 @@ export function drawSelectionHighlight(x: number, y: number, size: number, alpha
   push();
   translate(x, y);
   noStroke();
-  const pulse = 1.0 + 0.1 * sin(frameCount * 0.2);
+  const pulse = 1.0 + 0.1 * sin(state.frames * 0.2);
   // Outer glow
   fill(255, 255, 100, alpha * 0.5);
   ellipse(0, 0, size * 1.8);

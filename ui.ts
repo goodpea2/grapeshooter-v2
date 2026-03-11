@@ -299,39 +299,6 @@ function drawStats(alpha: number) {
   pop();
 }
 
-function drawFlyingRaisins() {
-  if (!state.flyingRaisins || state.flyingRaisins.length === 0) return;
-
-  push();
-  imageMode(CENTER);
-  const icon = state.assets['img_icon_raisin'];
-
-  for (let i = state.flyingRaisins.length - 1; i >= 0; i--) {
-    const fr = state.flyingRaisins[i];
-    fr.progress += 0.01; // Speed of flight
-
-    const curX = lerp(fr.startX, fr.targetX, fr.progress);
-    const curY = lerp(fr.startY, fr.targetY, fr.progress);
-    
-    // Arc effect
-    const arcHeight = 100 * sin(fr.progress * PI);
-    const drawY = curY - arcHeight;
-
-    if (icon) {
-      image(icon, curX, drawY, 60, 60);
-    }
-    
-    fill(100, 225, 100);
-    noStroke();
-
-    if (fr.progress >= 1) {
-      state.raisinCurrency += fr.value;
-      state.flyingRaisins.splice(i, 1);
-    }
-  }
-  pop();
-}
-
 function drawFooter() {
   push();
   textAlign(CENTER, BOTTOM);
@@ -345,9 +312,7 @@ function drawFooter() {
 export function drawUI(spawnFromBudget: Function) {
   drawClock(60, 60, 255);
   drawStats(255);
-  drawFlyingRaisins();
   
-
   state.uiAlpha = lerp(state.uiAlpha, state.isStationary ? 255 : 40, 0.3);
   const shopAlpha = state.uiAlpha;
 
@@ -381,7 +346,7 @@ export function drawUI(spawnFromBudget: Function) {
     // Check if it's already in stdList
     const isUnlocked = state.unlockedTurrets.includes(key);
     const isTier1 = tr.tier > 0 && tr.tier <= 1.2 && !tr.isSpecial;
-    const isStartingSpecial = tr.isSpecial && isUnlocked && !key.startsWith('t0_');
+    const isStartingSpecial = tr.isSpecial && isUnlocked && !key.startsWith('t0_') && !key.startsWith('tx_');
     const isHiddenFromStd = key === 't_lilypad' || key.startsWith('t_farm_');
 
     const isStandard = (isTier1 || isStartingSpecial) && !isHiddenFromStd;

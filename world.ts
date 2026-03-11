@@ -5,7 +5,7 @@ import {
 } from './constants';
 import { obstacleTypes, overlayTypes, BLOCK_WEIGHTS } from './balanceObstacles';
 import { liquidTypes, LIQUID_WEIGHTS, LIQUID_KEYS } from './balanceLiquids';
-import { MuzzleFlash, BlockDebris, BlockHitVFX } from './vfx/index';
+import { MuzzleFlash, BlockDebris, BlockHitVFX, LootInFlightVFX } from './vfx/index';
 import { Enemy, Bullet, NPCEntity } from './entities';
 import { spawnLootAt, ECONOMY_CONFIG } from './economy';
 import { worldGenConfig, requestSpawn, spawnFromBudget } from './lvDemo';
@@ -93,7 +93,7 @@ export class Block {
       }
       if (oCfg.enemySpawnConfig) {
         this.spawnerBudget = oCfg.enemySpawnConfig.budget;
-        this.lastSpawnTime = frameCount + floor(random(oCfg.enemySpawnConfig.spawnInterval));
+        this.lastSpawnTime = state.frames + floor(random(oCfg.enemySpawnConfig.spawnInterval));
       }
     }
 
@@ -133,7 +133,7 @@ export class Block {
     const dy = this.pos.y + GRID_SIZE/2 - state.player.pos.y;
     const dSq = dx*dx + dy*dy;
     if (dSq < sCfg.spawnTriggerRadius * sCfg.spawnTriggerRadius) {
-      if (frameCount - this.lastSpawnTime >= sCfg.spawnInterval) {
+      if (state.frames - this.lastSpawnTime >= sCfg.spawnInterval) {
         const eKey = sCfg.enemyTypeKey[floor(random(sCfg.enemyTypeKey.length))];
         const eCfg = enemyTypes[eKey];
         if (!sCfg.spawnIntervalConsumeBudget || this.spawnerBudget >= eCfg.cost) {
@@ -145,7 +145,7 @@ export class Block {
           if (!state.world.checkCollision(sx, sy, eCfg.size/2.2)) {
             requestSpawn(sx, sy, eKey);
             if (sCfg.spawnIntervalConsumeBudget) this.spawnerBudget -= eCfg.cost;
-            this.lastSpawnTime = frameCount;
+            this.lastSpawnTime = state.frames;
           }
         }
       }
@@ -162,7 +162,7 @@ export class Block {
 
     if (this.liquidType) {
       const lCfg = liquidTypes[this.liquidType];
-      const pulse = 0.5 + 0.5 * sin(frameCount * lCfg.pulseSpeed + (this.gx + this.gy) * 0.5);
+      const pulse = 0.5 + 0.5 * sin(state.frames * lCfg.pulseSpeed + (this.gx + this.gy) * 0.5);
       const ln = state.world.getLiquidAt(this.gx, this.gy - 1);
       const ls = state.world.getLiquidAt(this.gx, this.gy + 1);
       const lw = state.world.getLiquidAt(this.gx - 1, this.gy);
@@ -272,9 +272,9 @@ export class Block {
     // update: always render even if not concealed
 
     if (true) {
-      let nVal = noise(this.gx * 0.5, this.gy * 0.5, frameCount * 0.02);
+      let nVal = noise(this.gx * 0.5, this.gy * 0.5, state.frames * 0.02);
       if (nVal > 0.5) {
-        const sparkleP = 0.5 + 0.2 * sin(frameCount * 0.05 + (this.gx + this.gy));
+        const sparkleP = 0.5 + 0.2 * sin(state.frames * 0.05 + (this.gx + this.gy));
         push();
         translate(this.pos.x, this.pos.y);
         noStroke();
@@ -282,7 +282,7 @@ export class Block {
         if (oCfg.concealedSparkleVfx === 'v_sparkle_yellow') sCol = [255, 255, 100];
         if (oCfg.concealedSparkleVfx === 'v_sparkle_purple') sCol = [200, 100, 255];
         fill(sCol[0], sCol[1], sCol[2], opacity * sparkleP * 0.8);
-        ellipse(GRID_SIZE / 2 + sin(frameCount * 0.05) * 4, GRID_SIZE / 2 + cos(frameCount * 0.05) * 4, 8 * sparkleP);
+        ellipse(GRID_SIZE / 2 + sin(state.frames * 0.05) * 4, GRID_SIZE / 2 + cos(state.frames * 0.05) * 4, 8 * sparkleP);
         pop();
       }
     }
@@ -321,14 +321,14 @@ export class Block {
         const canSee = eCfg.seeThroughObstacles || state.world.checkLOS(bcx, bcy, state.player.pos.x, state.player.pos.y);
         
         if (dSq < eCfg.shootRange*eCfg.shootRange && canSee) {
-           const timeSinceLast = frameCount - this.lastSniperShot;
+           const timeSinceLast = state.frames - this.lastSniperShot;
            const inCharge = timeSinceLast > (eCfg.shootFireRate - 45);
            if (timeSinceLast >= eCfg.shootFireRate) {
              state.enemyBullets.push(new Bullet(bcx, bcy, state.player.pos.x, state.player.pos.y, eCfg.bulletTypeKey, 'core'));
              state.vfx.push(new MuzzleFlash(bcx, bcy, atan2(state.player.pos.y - bcy, state.player.pos.x - bcx), 30, 8, color(255, 50, 50)));
-             this.lastSniperShot = frameCount;
+             this.lastSniperShot = state.frames;
            }
-           const laserAlpha = inCharge ? 180 + 75 * sin(frameCount * 0.5) : 50;
+           const laserAlpha = inCharge ? 180 + 75 * sin(state.frames * 0.5) : 50;
            const laserWeight = inCharge ? 2 : 1;
            stroke(255, 0, 0, laserAlpha * (opacity / 255)); strokeWeight(laserWeight); 
            line(GRID_SIZE/2, GRID_SIZE/2, state.player.pos.x - this.pos.x, state.player.pos.y - this.pos.y);
@@ -438,6 +438,8 @@ const BLOCK_KEYS = ['o_dirt', 'o_clay', 'o_stone', 'o_slate', 'o_black'];
 export class Chunk {
   cx: number; cy: number; blocks: Block[] = []; blockMap: Map<string, Block> = new Map();
   overlayBlocks: Block[] = []; // OPTIMIZATION: Keep track of blocks with overlays
+  turrets: any[] = []; // NEW: Store world turrets in chunks
+  loot: any[] = []; // NEW: Store loot in chunks
   localChunkLevel: number = 0;
   prefabId: string | null = null;
   roomEnemyBudget: number = 0;
@@ -942,6 +944,11 @@ export class Chunk {
         b.renderOverlay(opacity);
         b.renderSparkles(opacity);
     }
+
+    // Pass 3: Render Loot
+    for (let l of this.loot) {
+      l.display();
+    }
   }
 }
 
@@ -957,7 +964,23 @@ export class WorldManager {
 
   getChunk(cx: number, cy: number) {
     let key = `${cx},${cy}`;
+    
+    // LRU Management
+    const orderIdx = state.chunkAccessOrder.indexOf(key);
+    if (orderIdx !== -1) {
+      state.chunkAccessOrder.splice(orderIdx, 1);
+    }
+    state.chunkAccessOrder.push(key);
+
     if (!this.chunks.has(key)) {
+      // Enforce 127 chunk limit
+      if (this.chunks.size >= 127) {
+        const oldestKey = state.chunkAccessOrder.shift();
+        if (oldestKey) {
+          this.chunks.delete(oldestKey);
+        }
+      }
+
       if (!state.chunkToDirectorIndex.has(key)) {
         state.chunkToDirectorIndex.set(key, state.nextDirectorIndex++);
       }
@@ -998,11 +1021,14 @@ export class WorldManager {
 
   display(playerPos: any) {
     const rangeSq = (width + height + 600)**2;
-    this.chunks.forEach(chunk => { 
+    this.chunks.forEach(chunk => {
       const chunkW = CHUNK_SIZE * GRID_SIZE;
       const cX = chunk.cx * chunkW + chunkW/2; const cY = chunk.cy * chunkW + chunkW/2;
       const dx = cX - playerPos.x; const dy = cY - playerPos.y;
-      if (dx*dx + dy*dy < rangeSq) chunk.display(playerPos); 
+      if (dx*dx + dy*dy < rangeSq) {
+        state.activeChunkKeys.add(`${chunk.cx},${chunk.cy}`);
+        chunk.display(playerPos); 
+      }
     });
   }
 
@@ -1059,6 +1085,107 @@ export class WorldManager {
       this.updateLevel(); 
     }
     for (let x = -CHUNK_GEN_RADIUS; x <= CHUNK_GEN_RADIUS; x++) for (let y = -CHUNK_GEN_RADIUS; y <= CHUNK_GEN_RADIUS; y++) this.getChunk(pcx + x, pcy + y);
+
+    // Update world turrets in loaded chunks
+    state.activeChunkKeys.clear();
+    const activeRadiusSq = (GRID_SIZE * CHUNK_SIZE * 2.5) ** 2;
+
+    this.chunks.forEach(chunk => {
+      const chunkW = CHUNK_SIZE * GRID_SIZE;
+      const cX = chunk.cx * chunkW + chunkW/2;
+      const cY = chunk.cy * chunkW + chunkW/2;
+      const dx = cX - playerPos.x;
+      const dy = cY - playerPos.y;
+      const dSq = dx*dx + dy*dy;
+
+      if (dSq < activeRadiusSq) {
+        state.activeChunkKeys.add(`${chunk.cx},${chunk.cy}`);
+        
+        // Update turrets
+        for (let i = chunk.turrets.length - 1; i >= 0; i--) {
+          chunk.turrets[i].update();
+        }
+        // Update loot
+        for (let i = chunk.loot.length - 1; i >= 0; i--) {
+          const res = chunk.loot[i].update(playerPos);
+          if (res === 'collected') {
+            const l = chunk.loot.splice(i, 1)[0];
+            const screenPos = {
+              x: l.pos.x - (state.cameraPos.x - width/2),
+              y: l.pos.y - (state.cameraPos.y - height/2)
+            };
+            
+            // Determine UI target position
+            let tx = 50, ty = 50;
+            if (l.config.item === 'sun') { tx = 40; ty = 40; }
+            else if (l.config.item === 'elixir') { tx = 40; ty = 80; }
+            else if (l.config.item === 'soil') { tx = 40; ty = 120; }
+            else if (l.config.item === 'raisin') {
+              const btnMargin = 10;
+              const almanacBtnSize = 80;
+              tx = width - btnMargin - almanacBtnSize / 2;
+              ty = height - btnMargin - almanacBtnSize / 2;
+            }
+            else if (l.config.type === 'turret' || l.config.type === 'item' || l.config.type === 'turretAsItem') {
+              tx = width - 50; ty = height - 50;
+            }
+
+            state.uiVfx.push(new LootInFlightVFX(
+              screenPos.x, screenPos.y, 
+              tx, ty, 
+              l.config.idleAssetImg, 
+              l.renderSize, 
+              l.config.itemValue || 1, 
+              l.config.item, 
+              l.config.type,
+              (l as any).turretHP // Pass HP if it's a TurretLoot
+            ));
+          } else if (res === 'missed' || res === 'consumed') {
+            const l = chunk.loot.splice(i, 1)[0];
+            if (res === 'missed' && l.config.item === 'sun') {
+              state.sunMissedTotal += l.config.itemValue || 1;
+            }
+          }
+        }
+      }
+    });
+  }
+
+  addTurret(turret: any) {
+    const cx = floor(turret.gx / CHUNK_SIZE);
+    const cy = floor(turret.gy / CHUNK_SIZE);
+    const chunk = this.getChunk(cx, cy);
+    if (chunk) {
+      // Avoid duplicates at the same position
+      chunk.turrets = chunk.turrets.filter(t => t.gx !== turret.gx || t.gy !== turret.gy);
+      chunk.turrets.push(turret);
+    }
+  }
+
+  removeTurret(gx: number, gy: number) {
+    const cx = floor(gx / CHUNK_SIZE);
+    const cy = floor(gy / CHUNK_SIZE);
+    const chunk = this.chunks.get(`${cx},${cy}`);
+    if (chunk) {
+      chunk.turrets = chunk.turrets.filter(t => t.gx !== gx || t.gy !== gy);
+    }
+  }
+
+  getAllTurrets() {
+    const all: any[] = [];
+    this.chunks.forEach(chunk => {
+      all.push(...chunk.turrets);
+    });
+    return all;
+  }
+  getTurretAt(gx: number, gy: number) {
+    const cx = floor(gx / CHUNK_SIZE);
+    const cy = floor(gy / CHUNK_SIZE);
+    const chunk = this.chunks.get(`${cx},${cy}`);
+    if (chunk) {
+      return chunk.turrets.find(t => t.gx === gx && t.gy === gy);
+    }
+    return null;
   }
   updateLevel() {
     let count = state.exploredChunks.size; state.currentChunkLevel = 0;

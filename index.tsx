@@ -9,10 +9,10 @@ import { findMergeResult } from './dictionaryTurretMerging';
 import { enemyTypes } from './balanceEnemies';
 import { bulletTypes } from './balanceBullets';
 import { WorldManager } from './world';
-import { Player, Enemy, AttachedTurret, SunLoot, NPCEntity } from './entities';
+import { Player, Enemy, AttachedTurret, WorldTurret, SunLoot, NPCEntity } from './entities';
 import { getTime, drawUI, drawTurretTooltip } from './ui';
 import { drawAlmanac, handleAlmanacClick } from './ui/almanac/mainLayout';
-import { drawUnlockPopup, handleUnlockPopupClick } from './ui/almanac/turretUnlockPopup';
+import { drawUnlockPopup, handleUnlockPopupClick, updateUnlockPopup } from './ui/almanac/turretUnlockPopup';
 import { drawGameOver, handleGameOverClick } from './uiGameOver';
 import { drawWorldGenPreview } from './uiDebug';
 import { handleNpcUiClick, handleNpcUiPress } from './uiNpcShop';
@@ -86,6 +86,8 @@ declare const drawingContext: any;
 function rebuildSpatialHash() {
   state.spatialHash.clear();
   const cs = state.spatialHashCellSize;
+  
+  // 1. Add Enemies
   for (const e of state.enemies) {
     if (e.isDying) continue;
     const gx = floor(e.pos.x / cs);
@@ -93,6 +95,38 @@ function rebuildSpatialHash() {
     const key = `${gx},${gy}`;
     if (!state.spatialHash.has(key)) state.spatialHash.set(key, []);
     state.spatialHash.get(key).push(e);
+  }
+
+  // 2. Add Player
+  const pgx = floor(state.player.pos.x / cs);
+  const pgy = floor(state.player.pos.y / cs);
+  const pKey = `${pgx},${pgy}`;
+  if (!state.spatialHash.has(pKey)) state.spatialHash.set(pKey, []);
+  state.spatialHash.get(pKey).push(state.player);
+
+  // 3. Add Turrets from Active Chunks
+  state.activeChunkKeys.forEach((key: string) => {
+    const chunk = state.world.chunks.get(key);
+    if (chunk) {
+      for (const t of chunk.turrets) {
+        const twPos = t.getWorldPos();
+        const tgx = floor(twPos.x / cs);
+        const tgy = floor(twPos.y / cs);
+        const tKey = `${tgx},${tgy}`;
+        if (!state.spatialHash.has(tKey)) state.spatialHash.set(tKey, []);
+        state.spatialHash.get(tKey).push(t);
+      }
+    }
+  });
+
+  // 4. Add Player Attachments
+  for (const t of state.player.attachments) {
+    const twPos = t.getWorldPos();
+    const tgx = floor(twPos.x / cs);
+    const tgy = floor(twPos.y / cs);
+    const tKey = `${tgx},${tgy}`;
+    if (!state.spatialHash.has(tKey)) state.spatialHash.set(tKey, []);
+    state.spatialHash.get(tKey).push(t);
   }
 }
 
@@ -165,10 +199,166 @@ function drawVisibilityOverlay() {
   pop();
 }
 
+function drawAllTurretConnections() {
+  push();
+  stroke(255, 255, 255, 60);
+  strokeWeight(1.5);
+  for (const t of state.player.attachments) {
+    if (t.hq === undefined) continue;
+    const neighbors = [[1,0], [-1,0], [0,1], [0,-1], [1,-1], [-1,1]];
+    const wPos = t.getWorldPos();
+    for (let [dq, dr] of neighbors) {
+      const nq = t.hq + dq;
+      const nr = t.hr + dr;
+      if (nq === 0 && nr === 0) {
+        line(wPos.x, wPos.y, state.player.pos.x, state.player.pos.y);
+      } else {
+        const neighbor = state.player.attachments.find((a: any) => a.hq === nq && a.hr === nr);
+        if (neighbor) {
+          const nwPos = neighbor.getWorldPos();
+          line(wPos.x, wPos.y, nwPos.x, nwPos.y);
+        }
+      }
+    }
+  }
+  pop();
+}
+
+function drawTurretConnections(t: any) {
+  if (t.hq === undefined) return; 
+  const neighbors = [[1,0], [-1,0], [0,1], [0,-1], [1,-1], [-1,1]];
+  const wPos = t.getWorldPos();
+  push();
+  stroke(255, 255, 255, 100);
+  strokeWeight(2);
+  for (let [dq, dr] of neighbors) {
+    const nq = t.hq + dq;
+    const nr = t.hr + dr;
+    if (nq === 0 && nr === 0) {
+      line(wPos.x, wPos.y, state.player.pos.x, state.player.pos.y);
+    } else {
+      const neighbor = state.player.attachments.find((a: any) => a.hq === nq && a.hr === nr);
+      if (neighbor) {
+        const nwPos = neighbor.getWorldPos();
+        line(wPos.x, wPos.y, nwPos.x, nwPos.y);
+      }
+    }
+  }
+  pop();
+}
+
 function executePlacement() {
   if (!state.previewSnapPos) return;
   const activePlacementType = state.isCurrentlyDragging ? state.draggedTurretType : state.selectedTurretType;
   if (!activePlacementType && !state.draggedTurretInstance) return;
+  
+  const type = state.draggedTurretInstance ? state.draggedTurretInstance.type : activePlacementType;
+  if (!type) return;
+  const config = turretTypes[type];
+  const isOwned = activePlacementType ? (state.inventory.items[activePlacementType] || 0) > 0 : false;
+  const sunCost = config.costs?.sun || config.cost || 0;
+  const elixirCost = config.costs?.elixir || 0;
+  const soilCost = config.costs?.soil || 0;
+
+  if (state.mergeTargetPreview) {
+    // Merging logic (Unified for both Attached and World Turrets)
+    const mergeCost = state.mergeTargetPreview.cost;
+    const purchaseCost = isOwned ? 0 : sunCost;
+    const totalSunReq = purchaseCost + mergeCost;
+    
+    let canAfford = state.sunCurrency >= totalSunReq &&
+                    state.elixirCurrency >= (isOwned ? 0 : elixirCost) &&
+                    state.soilCurrency >= (isOwned ? 0 : soilCost);
+    
+    if (canAfford) {
+      // Deduct costs
+      if (isOwned) {
+        state.inventory.items[activePlacementType]--;
+        const specIdx = state.inventory.specList.findIndex((item: any) => item.key === activePlacementType);
+        if (specIdx !== -1) state.inventory.specList.splice(specIdx, 1);
+        state.sunCurrency -= mergeCost;
+      } else {
+        state.sunCurrency -= totalSunReq;
+        state.elixirCurrency -= elixirCost;
+        state.soilCurrency -= soilCost;
+      }
+
+      // Find the target instance
+      let targetInstance = state.player.attachments.find((t: any) => t.uid === state.mergeTargetPreview.uid);
+      if (!targetInstance) {
+        targetInstance = state.world.getAllTurrets().find((t: any) => t.uid === state.mergeTargetPreview.uid);
+      }
+
+      if (targetInstance) {
+        const wPos = targetInstance.getWorldPos();
+        if (targetInstance instanceof AttachedTurret) {
+          const indexToReplace = state.player.attachments.indexOf(targetInstance);
+          const newTurret = new AttachedTurret(state.mergeTargetPreview.type, state.player, targetInstance.hq, targetInstance.hr);
+          newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
+          state.player.attachments[indexToReplace] = newTurret;
+        } else if (targetInstance instanceof WorldTurret) {
+          const newTurret = new WorldTurret(state.mergeTargetPreview.type, targetInstance.gx, targetInstance.gy);
+          newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
+          state.world.removeTurret(targetInstance.gx, targetInstance.gy);
+          state.world.addTurret(newTurret);
+        }
+        
+        state.totalTurretsAcquired++;
+        state.vfx.push(new MergeVFX(wPos.x, wPos.y, [255, 255, 255]));
+        if (activePlacementType) state.turretLastUsed[activePlacementType] = state.frames;
+        
+        // Clear selected state after merge
+        state.selectedTurretType = null;
+        
+        // If we were dragging an instance, it's now consumed
+        if (state.draggedTurretInstance) {
+          if (state.draggedTurretInstance instanceof AttachedTurret) {
+            const idx = state.player.attachments.indexOf(state.draggedTurretInstance);
+            if (idx !== -1) state.player.attachments.splice(idx, 1);
+          } else if (state.draggedTurretInstance instanceof WorldTurret) {
+            state.world.removeTurret(state.draggedTurretInstance.gx, state.draggedTurretInstance.gy);
+          }
+          state.draggedTurretInstance = null;
+        }
+      }
+    }
+    return;
+  }
+
+  if (state.previewWorldSnap) {
+    // Placement on WorldGrid (No Merge)
+    const { gx, gy } = state.previewWorldSnap;
+    
+    if (activePlacementType) {
+      if (isOwned || (state.sunCurrency >= sunCost && state.elixirCurrency >= elixirCost && state.soilCurrency >= soilCost)) {
+        if (isOwned) {
+          state.inventory.items[activePlacementType]--;
+          const specIdx = state.inventory.specList.findIndex((item: any) => item.key === activePlacementType);
+          if (specIdx !== -1) state.inventory.specList.splice(specIdx, 1);
+        } else {
+          state.sunCurrency -= sunCost;
+          state.elixirCurrency -= elixirCost;
+          state.soilCurrency -= soilCost;
+        }
+        state.world.addTurret(new WorldTurret(type, gx, gy));
+        state.totalTurretsAcquired++;
+        state.turretLastUsed[activePlacementType] = state.frames;
+        state.selectedTurretType = null; // Deselect after placement
+      }
+    } else if (state.draggedTurretInstance) {
+      // Moving from hex grid or world grid to world grid
+      if (state.draggedTurretInstance instanceof AttachedTurret) {
+        const idx = state.player.attachments.indexOf(state.draggedTurretInstance);
+        if (idx !== -1) state.player.attachments.splice(idx, 1);
+      } else if (state.draggedTurretInstance instanceof WorldTurret) {
+        state.world.removeTurret(state.draggedTurretInstance.gx, state.draggedTurretInstance.gy);
+      }
+      state.world.addTurret(new WorldTurret(type, gx, gy));
+      state.draggedTurretInstance = null;
+    }
+    return;
+  }
+
   const snapAxial = getHexAxial(state.previewSnapPos.x - state.player.pos.x, state.previewSnapPos.y - state.player.pos.y);
   
   if (activePlacementType) {
@@ -239,17 +429,31 @@ function executePlacement() {
         state.sunCurrency -= state.mergeTargetPreview.cost;
         const indexToReplace = state.player.attachments.indexOf(target);
         const indexToDelete = state.player.attachments.indexOf(state.draggedTurretInstance);
+        
+        // If it was a world turret, remove it from world
+        if (state.draggedTurretInstance instanceof WorldTurret) {
+          state.world.removeTurret(state.draggedTurretInstance.gx, state.draggedTurretInstance.gy);
+        } else {
+          state.player.attachments.splice(indexToDelete, 1);
+        }
+
         const newTurret = new AttachedTurret(state.mergeTargetPreview.type, state.player, target.hq, target.hr);
         newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
         state.player.attachments[indexToReplace] = newTurret;
-        state.player.attachments.splice(indexToDelete, 1);
         state.totalTurretsAcquired++;
         state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y, [255, 255, 255]));
       }
     } else if (!state.mergeTargetPreview) {
       // Only move if NOT attempting a merge (or if merge was impossible/unaffordable, we don't snap to the target)
-      state.draggedTurretInstance.hq = snapAxial.q; state.draggedTurretInstance.hr = snapAxial.r;
-      state.draggedTurretInstance.offset = axialToWorld(snapAxial.q, snapAxial.r);
+      if (state.draggedTurretInstance instanceof WorldTurret) {
+         state.world.removeTurret(state.draggedTurretInstance.gx, state.draggedTurretInstance.gy);
+         const nt = new AttachedTurret(state.draggedTurretInstance.type, state.player, snapAxial.q, snapAxial.r);
+         state.player.attachments.push(nt);
+      } else {
+         state.draggedTurretInstance.hq = snapAxial.q;
+         state.draggedTurretInstance.hr = snapAxial.r;
+         state.draggedTurretInstance.offset = axialToWorld(snapAxial.q, snapAxial.r);
+      }
       state.vfx.push(new MergeVFX(state.previewSnapPos.x, state.previewSnapPos.y, [255, 255, 255]));
     }
   }
@@ -365,6 +569,15 @@ export function autoPlaceTurret(type: string) {
   state.cameraPos = createVector(spawnX, spawnY);
 };
 
+function uiTick() {
+  // Update UI VFX even when paused
+  for (let i = state.uiVfx.length - 1; i >= 0; i--) { 
+    state.uiVfx[i].update(); 
+    if (state.uiVfx[i].isDone()) state.uiVfx.splice(i, 1); 
+  }
+  updateUnlockPopup();
+}
+
 function tick() {
   if (state.isPaused) return;
 
@@ -379,6 +592,11 @@ function tick() {
   state.cameraPos.x = lerp(state.cameraPos.x, state.player.pos.x, 0.08); 
   state.cameraPos.y = lerp(state.cameraPos.y, state.player.pos.y, 0.08);
   
+  if (isNaN(state.cameraPos.x) || isNaN(state.cameraPos.y)) {
+    console.error("Camera position is NaN! Resetting to player position.", state.player.pos);
+    state.cameraPos = createVector(state.player.pos.x, state.player.pos.y);
+  }
+  
   state.cameraShake = (state.cameraShake || 0) * (state.cameraShakeFalloff || 0.95);
   if (state.cameraShake < 0.1) state.cameraShake = 0;
 
@@ -386,11 +604,20 @@ function tick() {
   for (let i = state.trails.length - 1; i >= 0; i--) { state.trails[i].update(); if (state.trails[i].isDone()) state.trails.splice(i, 1); }
   for (let i = state.groundFeatures.length - 1; i >= 0; i--) { state.groundFeatures[i].update(); if (state.groundFeatures[i].life <= 0) state.groundFeatures.splice(i, 1); }
   for (let npc of state.npcs) npc.update(state.player.pos);
-  for (let i = state.enemies.length - 1; i >= 0; i--) { state.enemies[i].update(state.player.pos, state.player.attachments); if (state.enemies[i].health <= 0 || state.enemies[i].markedForDespawn) state.enemies.splice(i, 1); }
+  
+  for (let i = state.enemies.length - 1; i >= 0; i--) { 
+    state.enemies[i].update(state.player.pos); 
+    if (state.enemies[i].health <= 0 || state.enemies[i].markedForDespawn) state.enemies.splice(i, 1); 
+  }
   state.player.update();
   for (let i = state.bullets.length - 1; i >= 0; i--) { state.bullets[i].update(); if (state.bullets[i].life <= 0) state.bullets.splice(i, 1); }
   for (let i = state.enemyBullets.length - 1; i >= 0; i--) { state.enemyBullets[i].update(); if (state.enemyBullets[i].life <= 0) state.enemyBullets.splice(i, 1); }
   for (let i = state.vfx.length - 1; i >= 0; i--) { state.vfx[i].update(); if (state.vfx[i].isDone()) state.vfx.splice(i, 1); }
+  
+  // Update UI VFX in tick to be based on game tick rate
+  // Moved to uiTick
+  
+  // updateUnlockPopup(); // Moved to uiTick
 }
 
 (window as any).draw = () => {
@@ -417,6 +644,9 @@ function tick() {
     tick();
     state.accumulator -= currentFixedStep;
   }
+  
+  // Always run UI tick
+  uiTick();
 
   background(10, 10, 25); 
 
@@ -487,7 +717,8 @@ function tick() {
   // 0. Highlight effects behind hovered turrets
   state.hoveredTurretInstance = null;
   if (mouseX > state.uiWidth || !state.isStationary) {
-    const sortedForSelection = [...state.player.attachments].sort((a, b) => {
+    const worldTurrets = state.world.getAllTurrets();
+    const sortedForSelection = [...state.player.attachments, ...worldTurrets].sort((a, b) => {
         const la = a.config.turretLayer || 'normal'; const lb = b.config.turretLayer || 'normal';
         if (la !== lb) return la === 'normal' ? -1 : 1;
         const posA = a.getWorldPos(); const posB = b.getWorldPos();
@@ -496,19 +727,30 @@ function tick() {
     for (let t of sortedForSelection) { if (dist(mWorld.x, mWorld.y, t.getWorldPos().x, t.getWorldPos().y) < t.size/2 + 5) { state.hoveredTurretInstance = t; break; } }
   }
 
+  const showConnections = state.hoveredTurretInstance || state.isCurrentlyDragging || state.selectedTurretType;
+  if (showConnections) {
+    drawAllTurretConnections();
+  }
+
   if (state.hoveredTurretInstance && !state.isCurrentlyDragging) {
     const t = state.hoveredTurretInstance; const wPos = t.getWorldPos();
-    drawSelectionHighlight(wPos.x, wPos.y, t.size, 200 + sin(frameCount * 0.15) * 50);
+    drawSelectionHighlight(wPos.x, wPos.y, t.size, 200 + sin(state.frames * 0.15) * 50);
+    // drawTurretConnections(t); // Replaced by drawAllTurretConnections above
     const range = t.config.actionConfig?.shootRange || t.config.actionConfig?.beamMaxLength || t.config.actionConfig?.pulseTriggerRadius || 0;
     if (range > 0) { push(); noFill(); stroke(255, 200, 50, 120); strokeWeight(isScaling ? 2 / currentZoom : 2); ellipse(wPos.x, wPos.y, range * 2); pop(); }
   }
   
   // 1. Ground layer turrets (Lilypads etc)
   state.player.displayAttachments(true);
+  const worldTurrets = state.world.getAllTurrets();
+  for (const wt of worldTurrets) {
+    if (wt.config.turretLayer === 'ground') wt.display();
+  }
   
   // 2. Y-sorted entities pass (Turrets, Player, Enemies, NPCs)
   const ySorted: any[] = [
     ...state.player.attachments.filter((a: any) => a.config.turretLayer !== 'ground'),
+    ...worldTurrets.filter((wt: any) => wt.config.turretLayer !== 'ground'),
     state.player,
     ...state.enemies,
     ...state.npcs
@@ -525,7 +767,6 @@ function tick() {
     else e.display();
   }
 
-  for (let l of state.loot) l.display();
   for (let i = state.bullets.length - 1; i >= 0; i--) { state.bullets[i].display(); }
   for (let i = state.enemyBullets.length - 1; i >= 0; i--) { state.enemyBullets[i].display(); }
   for (let i = state.vfx.length - 1; i >= 0; i--) { state.vfx[i].display(); }
@@ -534,6 +775,9 @@ function tick() {
   for (let t of state.player.attachments) {
     if (t.displayUI) t.displayUI();
   }
+  for (let wt of worldTurrets) {
+    if (wt.displayUI) wt.displayUI();
+  }
 
   if ((state.draggedTurretType || state.draggedTurretInstance) && !state.isCurrentlyDragging) { if (dist(mouseX, mouseY, state.dragOrigin.x, state.dragOrigin.y) > 8) { state.isCurrentlyDragging = true; } }
   state.mergeTargetPreview = null; state.previewSnapPos = null;
@@ -541,7 +785,7 @@ function tick() {
   if (state.isStationary && (activePlacementType || state.draggedTurretInstance) && !state.isGameOver) {
     const ghostType = state.draggedTurretInstance ? state.draggedTurretInstance.type : activePlacementType;
     const ghostConfig = turretTypes[ghostType!]; const ghostLayer = ghostConfig.turretLayer || 'normal';
-    const draggingIngredients = state.draggedTurretInstance ? state.draggedTurretInstance.baseIngredients : (activePlacementType ? [activePlacementType] : []);
+    const draggingIngredients = state.draggedTurretInstance ? (state.draggedTurretInstance.baseIngredients || []) : (activePlacementType ? [activePlacementType] : []);
     
     // Purchase cost only applies if we are placing a NEW turret (not repositioning an instance)
     const isNewPlacement = !!activePlacementType;
@@ -552,6 +796,7 @@ function tick() {
     const rangeLimit = 8;
 
     // 1. Draw all available empty spots and find bestSnap
+    state.previewWorldSnap = null;
     for (let q = -rangeLimit; q <= rangeLimit; q++) {
       for (let r = -rangeLimit; r <= rangeLimit; r++) {
         if (abs(q) + abs(r) + abs(-q-r) <= rangeLimit * 2) {
@@ -591,15 +836,64 @@ function tick() {
       }
     }
 
+    // 1.1 WorldGrid available spots
+    const viewDist = 8;
+    const gxMin = floor((mWorld.x - viewDist * GRID_SIZE) / GRID_SIZE);
+    const gxMax = floor((mWorld.x + viewDist * GRID_SIZE) / GRID_SIZE);
+    const gyMin = floor((mWorld.y - viewDist * GRID_SIZE) / GRID_SIZE);
+    const gyMax = floor((mWorld.y + viewDist * GRID_SIZE) / GRID_SIZE);
+
+    for (let gx = gxMin; gx <= gxMax; gx++) {
+      for (let gy = gyMin; gy <= gyMax; gy++) {
+        const wx = gx * GRID_SIZE + GRID_SIZE / 2;
+        const wy = gy * GRID_SIZE + GRID_SIZE / 2;
+        const d = dist(mWorld.x, mWorld.y, wx, wy);
+        if (d < GRID_SIZE * 5) {
+          // Check if spot is too close to any attached turret or the player core
+          const safeDist = GRID_SIZE * 2; 
+          const isTooClose = state.player.attachments.some((att: any) => {
+            const attPos = att.getWorldPos();
+            return dist(wx, wy, attPos.x, attPos.y) < safeDist;
+          }) || dist(wx, wy, state.player.pos.x, state.player.pos.y) < safeDist;
+          
+          if (!isTooClose && !state.world.isBlockAt(wx, wy) && !state.world.getTurretAt(gx, gy)) {
+            const canAfford = state.sunCurrency >= purchaseCost;
+            push(); translate(wx, wy);
+            if (canAfford) {
+              fill(100, 200, 255, 40);
+              stroke(100, 200, 255, 120);
+            } else {
+              fill(255, 100, 100, 40);
+              stroke(255, 100, 100, 120);
+            }
+            strokeWeight(1.5);
+            rect(-GRID_SIZE/2 + 2, -GRID_SIZE/2 + 2, GRID_SIZE - 4, GRID_SIZE - 4, 6);
+            
+            // Draw a small plus icon in the center
+            strokeWeight(2);
+            line(-4, 0, 4, 0);
+            line(0, -4, 0, 4);
+            pop();
+            
+            if (d < closestDist && d < GRID_SIZE * 1.5) {
+               closestDist = d; bestSnap = createVector(wx, wy); bestMergeTarget = null; bestMergeInfo = null;
+               state.previewWorldSnap = { gx, gy };
+            }
+          }
+        }
+      }
+    }
+
     // 2. Find bestMergeTarget and bestSnap
     const mergeCandidates: any[] = [];
-    for (const att of state.player.attachments) {
+    const allMergeableTurrets = [...state.player.attachments, ...state.world.getAllTurrets()];
+    for (const att of allMergeableTurrets) {
       if (att === state.draggedTurretInstance) continue;
       const wPos = att.getWorldPos();
       const d = dist(mWorld.x, mWorld.y, wPos.x, wPos.y);
       const isMergeableLayer = (att.config.turretLayer || 'normal') === 'normal' && ghostLayer === 'normal';
       let mergeInfo = null;
-      if (isMergeableLayer && !att.isFrosted && draggingIngredients.length > 0 && att.baseIngredients.length > 0) {
+      if (isMergeableLayer && !att.isFrosted && (draggingIngredients?.length || 0) > 0 && (att.baseIngredients?.length || 0) > 0) {
         const combinedPool = [...draggingIngredients, ...att.baseIngredients];
         const resType = findMergeResult(combinedPool);
         const resConfig = resType ? turretTypes[resType] : null;
@@ -622,15 +916,8 @@ function tick() {
         if (isBestSnap) {
           closestDist = d; bestSnap = wPos; bestMergeTarget = att;
           bestMergeInfo = { resType: mergeInfo.resType, resConfig: mergeInfo.resConfig, combinedPool: mergeInfo.combinedPool, dynamicMergeCost: mergeInfo.combinedMergeCost };
+          state.previewWorldSnap = null; // Clear world snap if we are merging
         }
-      } else {
-        // Draw non-mergeable indicator/circle
-        push(); translate(wPos.x, wPos.y);
-        //noFill();
-        //stroke(255, 100, 100, 100);
-        //strokeWeight(2);
-        //ellipse(0, 0, att.size + 10);
-        pop();
       }
     }
 
@@ -725,13 +1012,12 @@ function tick() {
 
   // Draw UI VFX at the very end to ensure they are on top of everything (including Almanac)
   for (let i = state.uiVfx.length - 1; i >= 0; i--) { 
-    state.uiVfx[i].update(); 
     state.uiVfx[i].display(); 
-    if (state.uiVfx[i].isDone()) state.uiVfx.splice(i, 1); 
   }
 };
 
 (window as any).mousePressed = () => {
+  state.needsTargetReScan = true;
   const RIGHT: any = (window as any).RIGHT;
   const mouseButton: any = (window as any).mouseButton;
 
@@ -790,6 +1076,14 @@ function tick() {
       return;
     }
     if (state.draggedTurretInstance || state.selectedTurretType) { if (state.previewSnapPos) { executePlacement(); return; } }
+    
+    const worldTurrets = state.world.getAllTurrets();
+    for (let wt of worldTurrets) {
+      if (dist(mWorld.x, mWorld.y, wt.getWorldPos().x, wt.getWorldPos().y) < wt.size/2 + 5) {
+        state.draggedTurretInstance = wt; state.dragOrigin = { x: mouseX, y: mouseY }; state.isCurrentlyDragging = false; return;
+      }
+    }
+
     const sortedForPicking = [...state.player.attachments].sort((a, b) => {
         const la = a.config.turretLayer || 'normal'; const lb = b.config.turretLayer || 'normal';
         if (la !== lb) return la === 'normal' ? -1 : 1;
@@ -847,6 +1141,7 @@ function tick() {
 };
 
 (window as any).mouseReleased = () => {
+  state.needsTargetReScan = true;
   if (state.simulateTouchScreen) {
     handleTouchEnded();
   } else {
@@ -905,7 +1200,12 @@ function tick() {
   if (state.activeNPC && mouseX > width - 320) { state.npcShopScrollVelocity -= event.delta * 0.1; return false; }
 };
 
-(window as any).windowResized = () => { (window as any).resizeCanvas(windowWidth, windowHeight); };
+(window as any).windowResized = () => { 
+  console.log("Window resized:", windowWidth, windowHeight);
+  if (windowWidth > 0 && windowHeight > 0) {
+    (window as any).resizeCanvas(windowWidth, windowHeight); 
+  }
+};
 
 (window as any).touchStarted = (e: any) => {
   handleTouchStarted((window as any).touches);
@@ -925,6 +1225,7 @@ function tick() {
 };
 
 (window as any).keyPressed = () => {
+  state.needsTargetReScan = true;
   if (keyCode === 87 || keyCode === 65 || keyCode === 83 || keyCode === 68) { // W, A, S, D
     state.isWASDInput = true;
   }
@@ -934,6 +1235,7 @@ function tick() {
 };
 
 (window as any).keyReleased = () => {
+  state.needsTargetReScan = true;
   if (keyCode === 87 || keyCode === 65 || keyCode === 83 || keyCode === 68) { // W, A, S, D
     // Check if any WASD key is still pressed
     const keyIsDown: any = (window as any).keyIsDown;

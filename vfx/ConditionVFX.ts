@@ -59,8 +59,8 @@ export class ConditionVFX {
     if (this.type === 'c_burning') {
       let r = this.target.size / 2 || 15;
       for(let i=0; i<3; i++) {
-        let h = (frameCount * 0.5 + i * 10) % 20;
-        let xOff = sin(frameCount * 0.1 + i) * 5;
+        let h = (state.frames * 0.5 + i * 10) % 20;
+        let xOff = sin(state.frames * 0.1 + i) * 5;
         let s = map(h, 0, 20, 8, 2);
         fill(255, 120 - h * 5, 0, 180 - h * 8); noStroke();
         ellipse(random(-r * 0.5, r * 0.5) + xOff, -h - 5, s);
@@ -68,7 +68,7 @@ export class ConditionVFX {
     } else if (this.type === 'c_chilled') {
       let r = (this.target.size / 2 || 15) + 4;
       noFill(); 
-      let pulse = sin(frameCount * 0.04) * 2;
+      let pulse = sin(state.frames * 0.04) * 2;
       stroke(150, 220, 255, 120); strokeWeight(1.5);
       ellipse(0, 0, r * 2 + pulse);
       stroke(255, 255, 255, 60);
@@ -79,10 +79,10 @@ export class ConditionVFX {
       noFill();
       stroke(255, 255, 100, 220); strokeWeight(2);
       for (let i = 0; i < 3; i++) {
-        let ang = (frameCount * 0.15) + (i * TWO_PI / 3);
+        let ang = (state.frames * 0.15) + (i * TWO_PI / 3);
         let sx = cos(ang) * (r * 0.8);
         let sy = sin(ang) * (r * 0.4) - r - 10;
-        push(); translate(sx, sy); rotate(frameCount * 0.2);
+        push(); translate(sx, sy); rotate(state.frames * 0.2);
         line(-3, 0, 3, 0); line(0, -3, 0, 3);
         pop();
       }
@@ -90,7 +90,7 @@ export class ConditionVFX {
         let r = (this.target.size / 2 || 15) + 8;
         noFill();
         stroke(255, 100, 200, 180); strokeWeight(3);
-        ellipse(0, 0, r * 2 + sin(frameCount * 0.1) * 4);
+        ellipse(0, 0, r * 2 + sin(state.frames * 0.1) * 4);
     }
     pop();
   }

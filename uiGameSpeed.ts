@@ -47,13 +47,13 @@ export function drawGameSpeedButtons() {
   push();
   const btnMargin = 10;
   const btnSize = 40;
-  const almanacBtnSize = 60;
+  const almanacBtnSize = 80;
   const speedupBtnX = width - btnMargin - btnSize; // Right-align Speedup button
   const speedupBtnY = btnMargin;
   const pauseBtnX = width - btnMargin - btnSize * 2 - btnMargin; // Right-align Pause button
   const pauseBtnY = btnMargin;
-  const almanacBtnX = width - btnMargin - almanacBtnSize; // Bottom-right Almanac button
-  const almanacBtnY = height - btnMargin - almanacBtnSize;
+  const almanacBtnX = width - (btnMargin+10) - almanacBtnSize; // Bottom-right Almanac button
+  const almanacBtnY = height - (btnMargin+10) - almanacBtnSize;
 
   // Almanac Button
   const isHoveringAlmanac = dist(mouseX, mouseY, almanacBtnX + almanacBtnSize / 2, almanacBtnY + almanacBtnSize / 2) < almanacBtnSize / 2;
@@ -69,7 +69,7 @@ export function drawGameSpeedButtons() {
   if (isHoveringAlmanac || state.isAlmanacOpen) {
     glowAlpha = 255;
   } else if (canAfford) {
-    glowAlpha = map(sin(frameCount * 0.15), -1, 1, 50, 255);
+    glowAlpha = map(sin(state.frames * 0.15), -1, 1, 50, 255);
   }
   
   if (glowAlpha > 0 && glowIcon) {

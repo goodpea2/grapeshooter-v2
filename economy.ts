@@ -1,6 +1,6 @@
 
 import { state } from './state';
-import { HOUR_FRAMES } from './constants';
+import { HOUR_FRAMES, GRID_SIZE, CHUNK_SIZE } from './constants';
 import { LootEntity } from './entities';
 import { lootTypes, lootTableTypes, lootConfigs, LootTableEntry, ExternalLootConfigEntry } from './balanceLootTable';
 
@@ -48,13 +48,29 @@ export function spawnLootAt(x: number, y: number, key: string, configSource: any
   } else if (lootConfigs[key]) {
     config = lootConfigs[key];
   } else {
-    // Fallback for legacy direct value spawning
+    // Fallback for legacy direct value spawning or direct loot type
     const val = (ECONOMY_CONFIG.lootValues as any)[key] || 0;
     if (val > 0) {
       for(let i=0; i<val; i++) {
          state.sunSpawnedTotal += 1;
-         state.loot.push(new LootEntity(x + random(-10, 10), y + random(-10, 10), 'sun'));
+         const px = x + random(-10, 10);
+         const py = y + random(-10, 10);
+         const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
+         const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
+         const chunk = state.world.getChunk(cx, cy);
+         if (chunk) chunk.loot.push(new LootEntity(px, py, 'sun'));
       }
+      return;
+    }
+    
+    // If key matches a loot type directly, spawn it
+    if (lootTypes[key]) {
+      const px = x + random(-10, 10);
+      const py = y + random(-10, 10);
+      const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
+      const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
+      const chunk = state.world.getChunk(cx, cy);
+      if (chunk) chunk.loot.push(new LootEntity(px, py, key));
       return;
     }
     return;
@@ -87,7 +103,10 @@ export function spawnLootAt(x: number, y: number, key: string, configSource: any
         const py = y + random(-15, 15);
         
         const loot = new LootEntity(px, py, typeKey);
-        state.loot.push(loot);
+        const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
+        const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
+        const chunk = state.world.getChunk(cx, cy);
+        if (chunk) chunk.loot.push(loot);
         
         if (loot.config.type === 'currency') {
           if (loot.config.item === 'sun') {

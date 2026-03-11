@@ -5,6 +5,7 @@ import { npcTypes, NPCTrade, T2_TURRET_POOL, T3_TURRET_POOL } from '../balanceNP
 import { lootTypes } from '../balanceLootTable';
 import { turretTypes } from '../balanceTurrets';
 import { LootEntity } from './loot';
+import { spawnLootAt } from '../economy';
 
 declare const p5: any;
 declare const createVector: any;
@@ -128,10 +129,7 @@ export class NPCEntity {
     const typeToSpawn = lootTypes[itemKey] ? itemKey : 'sun';
 
     for (let i = 0; i < amount; i++) {
-      const loot = new LootEntity(this.pos.x, this.pos.y, typeToSpawn);
-      const ang = random(TWO_PI);
-      loot.vel = p5.Vector.fromAngle(ang).mult(random(3, 6));
-      state.loot.push(loot);
+      spawnLootAt(this.pos.x, this.pos.y, typeToSpawn);
     }
   }
 
@@ -162,11 +160,11 @@ export class NPCEntity {
     let animScaleY = 1.0;
     
     // Idle Hover (Subtle)
-    animY += sin(frameCount * 0.05) * 2;
+    animY += sin(state.frames * 0.05) * 2;
     
     // Panel Open Jump (Subtle)
     if (state.activeNPC === this) {
-        animY -= abs(sin(frameCount * 0.08)) * 4;
+        animY -= abs(sin(state.frames * 0.08)) * 4;
     }
 
     // Purchase Pulse
@@ -189,7 +187,7 @@ export class NPCEntity {
 
     if (this.isInteractable) {
       push();
-      translate(0, -45 + sin(frameCount * 0.1) * 3);
+      translate(0, -45 + sin(state.frames * 0.1) * 3);
       textAlign(CENTER, CENTER);
       textSize(14);
       fill(255, 255, 100);

@@ -48,7 +48,7 @@ export function drawTurret(t: any) {
   const actionConfig = config.actionConfig;
   
   // ANIMATION CALCULATION
-  const isMoving = !state.isStationary;
+  const isMoving = !state.isStationary && t.isAttachedToPlayer();
   const frames = state.frames;
 
   // Sync Lilypad body type with occupant
