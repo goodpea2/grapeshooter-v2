@@ -382,7 +382,6 @@ export class Block {
                 timer: 180,
                 maxTimer: 180
             });
-            return true;
         }
 
         // --- Death Rattle for Spawners ---

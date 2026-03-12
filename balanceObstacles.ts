@@ -65,7 +65,6 @@ export const overlayTypes: any = {
     isConcealedAlongWithObstacle: true,
     concealedSparkleVfx: 'v_sparkle_white',
     lootConfigOnDeath: 'ov_tnt',
-    bulletToSpawnOnDeath: ['b_tnt_explosion'],
     isDanger: true,
     assetImgConfig: { idleAssetImg: ['img_tnt_a'], randomRotation: false, randomFlip: true }
   },

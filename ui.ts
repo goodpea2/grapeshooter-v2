@@ -310,11 +310,16 @@ function drawFooter() {
 }
 
 export function drawUI(spawnFromBudget: Function) {
-  drawClock(60, 60, 255);
+  const isPlacing = !!(state.selectedTurretType || state.draggedTurretInstance || state.draggedTurretType);
+  const activeType = state.draggedTurretInstance ? state.draggedTurretInstance.type : (state.selectedTurretType || state.draggedTurretType);
+
+  if (!isPlacing) {
+    drawClock(60, 60, 255);
+  }
   drawStats(255);
   
   state.uiAlpha = lerp(state.uiAlpha, state.isStationary ? 255 : 40, 0.3);
-  const shopAlpha = state.uiAlpha;
+  const shopAlpha = isPlacing ? 255 : state.uiAlpha;
 
   const stdList: any[] = [];
   const invList: any[] = [];
@@ -371,6 +376,9 @@ export function drawUI(spawnFromBudget: Function) {
   const combinedList = [...stdList, ...invList];
   let hoveredTooltipData = null;
   for (let item of combinedList) {
+    const isSelected = item.key === activeType;
+    if (isPlacing && !isSelected) continue;
+
     const hovData = drawTurretIcon(item.tr, item.key, currentX, currentY, shopAlpha, item.isInstance);
     if (hovData) hoveredTooltipData = hovData;
     currentY += spacing;
@@ -385,175 +393,181 @@ export function drawUI(spawnFromBudget: Function) {
   // Update uiWidth so world interaction doesn't happen over UI
   // If itemsInCol is 0, it means we just moved currentX forward but haven't used it.
   state.uiWidth = (itemsInCol > 0) ? (currentX + 40) : (currentX - 35);
+  if (isPlacing && itemsInCol === 0 && currentX === hudXStart) {
+    // If we filtered everything out, uiWidth should be 0 unless we found the selected one
+    state.uiWidth = 0;
+  }
   pop();
 
-  push();
-  let dbgX = width - 110;
-  let dbgY = 65; // Moved down by 50px
-  let dbgW = 100;
-  let dbgH = 30;
-  let dbgHov = mouseX > dbgX && mouseX < dbgX + dbgW && mouseY > dbgY && mouseY < dbgY + dbgH;
-  fill(state.showDebug ? 80 : 30); if (dbgHov) fill(state.showDebug ? 100 : 50);
-  stroke(255, 100); rect(dbgX, dbgY, dbgW, dbgH, 5);
-  fill(255); textAlign(CENTER, CENTER); textSize(12); text("Debug", dbgX + dbgW/2, dbgY + dbgH/2);
-  if (dbgHov && mouseIsPressed && !state.isAlmanacOpen && !state.showUnlockPopup) { state.showDebug = !state.showDebug; (window as any).mouseIsPressed = false; }
-  pop();
+  if (!isPlacing) {
+    push();
+    let dbgX = width - 110;
+    let dbgY = 65; // Moved down by 50px
+    let dbgW = 100;
+    let dbgH = 30;
+    let dbgHov = mouseX > dbgX && mouseX < dbgX + dbgW && mouseY > dbgY && mouseY < dbgY + dbgH;
+    fill(state.showDebug ? 80 : 30); if (dbgHov) fill(state.showDebug ? 100 : 50);
+    stroke(255, 100); rect(dbgX, dbgY, dbgW, dbgH, 5);
+    fill(255); textAlign(CENTER, CENTER); textSize(12); text("Debug", dbgX + dbgW/2, dbgY + dbgH/2);
+    if (dbgHov && mouseIsPressed && !state.isAlmanacOpen && !state.showUnlockPopup) { state.showDebug = !state.showDebug; (window as any).mouseIsPressed = false; }
+    pop();
 
-  drawDebugPanel(spawnFromBudget);
-  drawNPCPanel();
-  drawWorldGenPreview();
-  drawFooter();
+    drawDebugPanel(spawnFromBudget);
+    drawNPCPanel();
+    drawWorldGenPreview();
+    drawFooter();
 
-  // Night Warning
-  const t = getTime();
-  const nightWarningStartFrame = 19.5 * HOUR_FRAMES;
-  const currentDayFrames = state.frames % (24 * HOUR_FRAMES);
-  
-  if (currentDayFrames >= nightWarningStartFrame && currentDayFrames < nightWarningStartFrame + 300) {
-    const elapsed = currentDayFrames - nightWarningStartFrame;
-    let alpha = 0;
-    let yOffset = 0;
+    // Night Warning
+    const t = getTime();
+    const nightWarningStartFrame = 19.5 * HOUR_FRAMES;
+    const currentDayFrames = state.frames % (24 * HOUR_FRAMES);
     
-    if (elapsed < 30) { // Intro (1s)
-      alpha = map(elapsed, 0, 30, 0, 255);
-      yOffset = map(elapsed, 0, 30, 20, 0);
-    } else if (elapsed < 240) { // Wait (3s)
-      alpha = 255;
-      yOffset = 0;
-    } else { // Fade out (1s)
-      alpha = map(elapsed, 240, 300, 255, 0);
-      yOffset = map(elapsed, 240, 300, 0, -20);
+    if (currentDayFrames >= nightWarningStartFrame && currentDayFrames < nightWarningStartFrame + 300) {
+      const elapsed = currentDayFrames - nightWarningStartFrame;
+      let alpha = 0;
+      let yOffset = 0;
+      
+      if (elapsed < 30) { // Intro (1s)
+        alpha = map(elapsed, 0, 30, 0, 255);
+        yOffset = map(elapsed, 0, 30, 20, 0);
+      } else if (elapsed < 240) { // Wait (3s)
+        alpha = 255;
+        yOffset = 0;
+      } else { // Fade out (1s)
+        alpha = map(elapsed, 240, 300, 255, 0);
+        yOffset = map(elapsed, 240, 300, 0, -20);
+      }
+
+      // Dramatic VFX: Red Vignette
+      push();
+      noFill();
+      stroke(255, 0, 0, (alpha / 255) * (30 + 10 * sin(state.frames * 0.1)));
+      strokeWeight(120);
+      rectMode(CORNER);
+      rect(0, 0, width, height);
+      pop();
+
+      push();
+      textAlign(CENTER, CENTER);
+      textSize(44);
+      fill(255, 50, 50, alpha);
+      stroke(0, alpha);
+      strokeWeight(4);
+      text("THE NIGHT IS APPROACHING", width / 2, height / 3 + yOffset);
+      
+      pop();
     }
 
-    // Dramatic VFX: Red Vignette
-    push();
-    noFill();
-    stroke(255, 0, 0, (alpha / 255) * (30 + 10 * sin(state.frames * 0.1)));
-    strokeWeight(120);
-    rectMode(CORNER);
-    rect(0, 0, width, height);
-    pop();
+    // NPC Indicator
+    if (state.npcs && state.npcs.length > 0) {
+      for (let npc of state.npcs) {
+        if (!state.player) continue;
+        const wPos = npc.pos;
+        const pPos = state.player.pos;
+        const d = dist(pPos.x, pPos.y, wPos.x, wPos.y);
+        const d_tiles = d / GRID_SIZE;
+        
+        // Dynamic Safezone: intersection of HUD_SAFEZONE circle and screen rectangle
+        const screenMargin = 40;
+        const maxDistCircle = HUD_SAFEZONE * GRID_SIZE;
+        const maxDistX = width / 2 - screenMargin;
+        const maxDistY = height / 2 - screenMargin;
+        
+        // For alpha/fading, we use the minimum screen dimension to ensure it appears when off-screen in any direction
+        const screenSafeTiles = (Math.min(width, height) / 2 - screenMargin) / GRID_SIZE;
 
-    push();
-    textAlign(CENTER, CENTER);
-    textSize(44);
-    fill(255, 50, 50, alpha);
-    stroke(0, alpha);
-    strokeWeight(4);
-    text("THE NIGHT IS APPROACHING", width / 2, height / 3 + yOffset);
-    
-    pop();
-  }
+        // Distance-based scaling and fading
+        // tileDistance=[0, d_safe-2, d_safe, 32, 48, 52], size=[0,0,1,1,0.5,0.5], alpha=[0,0,255,255,255,0]
+        let indSize = 0;
+        let indAlpha = 0;
 
-  // NPC Indicator
-  if (state.npcs && state.npcs.length > 0) {
-    for (let npc of state.npcs) {
-      if (!state.player) continue;
-      const wPos = npc.pos;
-      const pPos = state.player.pos;
-      const d = dist(pPos.x, pPos.y, wPos.x, wPos.y);
-      const d_tiles = d / GRID_SIZE;
-      
-      // Dynamic Safezone: intersection of HUD_SAFEZONE circle and screen rectangle
-      const screenMargin = 40;
-      const maxDistCircle = HUD_SAFEZONE * GRID_SIZE;
-      const maxDistX = width / 2 - screenMargin;
-      const maxDistY = height / 2 - screenMargin;
-      
-      // For alpha/fading, we use the minimum screen dimension to ensure it appears when off-screen in any direction
-      const screenSafeTiles = (Math.min(width, height) / 2 - screenMargin) / GRID_SIZE;
-
-      // Distance-based scaling and fading
-      // tileDistance=[0, d_safe-2, d_safe, 32, 48, 52], size=[0,0,1,1,0.5,0.5], alpha=[0,0,255,255,255,0]
-      let indSize = 0;
-      let indAlpha = 0;
-
-      if (d_tiles < screenSafeTiles - 2) {
-        indSize = 0;
-        indAlpha = 0;
-      } else if (d_tiles < screenSafeTiles) {
-        indSize = map(d_tiles, screenSafeTiles - 2, screenSafeTiles, 0, 1);
-        indAlpha = map(d_tiles, screenSafeTiles - 2, screenSafeTiles, 0, 255);
-      } else if (d_tiles < 32) {
-        indSize = 1;
-        indAlpha = 255;
-      } else if (d_tiles < 48) {
-        indSize = map(d_tiles, 32, 48, 1, 0.5);
-        indAlpha = 255;
-      } else if (d_tiles < 52) {
-        indSize = 0.5;
-        indAlpha = map(d_tiles, 48, 52, 255, 0);
-      } else {
-        indSize = 0.5;
-        indAlpha = 0;
-      }
-
-      if (indAlpha <= 0) continue;
-
-      // Calculate screen position relative to camera
-      const screenX = wPos.x - state.cameraPos.x + width / 2;
-      const screenY = wPos.y - state.cameraPos.y + height / 2;
-
-      // Constrain to dynamic safezone
-      const dx = screenX - width / 2;
-      const dy = screenY - height / 2;
-      const distToNpc = dist(0, 0, dx, dy);
-      
-      let indX, indY;
-      let isPointing = false;
-      
-      const constraintScale = Math.min(1, maxDistCircle / distToNpc, maxDistX / Math.abs(dx), maxDistY / Math.abs(dy));
-      
-      if (constraintScale < 1) {
-        indX = width / 2 + dx * constraintScale;
-        indY = height / 2 + dy * constraintScale;
-        isPointing = true;
-      } else {
-        indX = screenX;
-        indY = screenY;
-        isPointing = false;
-      }
-      
-      push();
-      translate(indX, indY);
-      
-      // Pulse effect + distance scaling
-      const pulse = 1.0 + 0.05 * sin(state.frames * 0.1);
-      scale(pulse * indSize);
-
-      // Box
-      rectMode(CENTER);
-      fill(30, 25, 60, (indAlpha / 255) * 200);
-      stroke(255, 200, 0, indAlpha);
-      strokeWeight(2);
-      rect(0, 0, 36, 36, 8);
-
-      if (npc.discovered) {
-        // Draw NPC asset image
-        const sprite = state.assets[`img_${npc.config.assetKey}_front`];
-        if (sprite) {
-          imageMode(CENTER);
-          tint(255, indAlpha);
-          image(sprite, 0, -10, 60, 60);
-          noTint();
+        if (d_tiles < screenSafeTiles - 2) {
+          indSize = 0;
+          indAlpha = 0;
+        } else if (d_tiles < screenSafeTiles) {
+          indSize = map(d_tiles, screenSafeTiles - 2, screenSafeTiles, 0, 1);
+          indAlpha = map(d_tiles, screenSafeTiles - 2, screenSafeTiles, 0, 255);
+        } else if (d_tiles < 32) {
+          indSize = 1;
+          indAlpha = 255;
+        } else if (d_tiles < 48) {
+          indSize = map(d_tiles, 32, 48, 1, 0.5);
+          indAlpha = 255;
+        } else if (d_tiles < 52) {
+          indSize = 0.5;
+          indAlpha = map(d_tiles, 48, 52, 255, 0);
+        } else {
+          indSize = 0.5;
+          indAlpha = 0;
         }
-      } else {
-        // draw "?""
-        fill(255, indAlpha);
-        noStroke();
-        textAlign(CENTER, CENTER);
-        textSize(18);
-        text("?", 0, 0);
-      }
 
-      // Arrow pointing to NPC (if constrained to safezone edge)
-      if (isPointing) {
-        const angle = atan2(wPos.y - pPos.y, wPos.x - pPos.x);
-        rotate(angle);
-        fill(255, 200, 0, indAlpha);
-        triangle(25, 0, 18, -6, 18, 6);
+        if (indAlpha <= 0) continue;
+
+        // Calculate screen position relative to camera
+        const screenX = wPos.x - state.cameraPos.x + width / 2;
+        const screenY = wPos.y - state.cameraPos.y + height / 2;
+
+        // Constrain to dynamic safezone
+        const dx = screenX - width / 2;
+        const dy = screenY - height / 2;
+        const distToNpc = dist(0, 0, dx, dy);
+        
+        let indX, indY;
+        let isPointing = false;
+        
+        const constraintScale = Math.min(1, maxDistCircle / distToNpc, maxDistX / Math.abs(dx), maxDistY / Math.abs(dy));
+        
+        if (constraintScale < 1) {
+          indX = width / 2 + dx * constraintScale;
+          indY = height / 2 + dy * constraintScale;
+          isPointing = true;
+        } else {
+          indX = screenX;
+          indY = screenY;
+          isPointing = false;
+        }
+        
+        push();
+        translate(indX, indY);
+        
+        // Pulse effect + distance scaling
+        const pulse = 1.0 + 0.05 * sin(state.frames * 0.1);
+        scale(pulse * indSize);
+
+        // Box
+        rectMode(CENTER);
+        fill(30, 25, 60, (indAlpha / 255) * 200);
+        stroke(255, 200, 0, indAlpha);
+        strokeWeight(2);
+        rect(0, 0, 36, 36, 8);
+
+        if (npc.discovered) {
+          // Draw NPC asset image
+          const sprite = state.assets[`img_${npc.config.assetKey}_front`];
+          if (sprite) {
+            imageMode(CENTER);
+            tint(255, indAlpha);
+            image(sprite, 0, -10, 60, 60);
+            noTint();
+          }
+        } else {
+          // draw "?""
+          fill(255, indAlpha);
+          noStroke();
+          textAlign(CENTER, CENTER);
+          textSize(18);
+          text("?", 0, 0);
+        }
+
+        // Arrow pointing to NPC (if constrained to safezone edge)
+        if (isPointing) {
+          const angle = atan2(wPos.y - pPos.y, wPos.x - pPos.x);
+          rotate(angle);
+          fill(255, 200, 0, indAlpha);
+          triangle(25, 0, 18, -6, 18, 6);
+        }
+        pop();
       }
-      pop();
     }
   }
 
@@ -565,6 +579,13 @@ export function drawUI(spawnFromBudget: Function) {
 export function isMouseOverUI() {
   // Almanac UI blocks everything
   if (state.isAlmanacOpen || state.showUnlockPopup) return true;
+
+  const isPlacing = !!(state.selectedTurretType || state.draggedTurretInstance || state.draggedTurretType);
+  if (isPlacing) {
+    // Only block if over the selected icon (which is at hudXStart, startY)
+    if (mouseX < state.uiWidth) return true;
+    return false;
+  }
 
   // Turret selection/inventory (left panel)
   if (mouseX < state.uiWidth) return true;

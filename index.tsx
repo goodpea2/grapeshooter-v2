@@ -263,7 +263,8 @@ function executePlacement() {
   if (state.mergeTargetPreview) {
     // Merging logic (Unified for both Attached and World Turrets)
     const mergeCost = state.mergeTargetPreview.cost;
-    const purchaseCost = isOwned ? 0 : sunCost;
+    const isNewPlacement = !!activePlacementType;
+    const purchaseCost = (isNewPlacement && !isOwned) ? sunCost : 0;
     const totalSunReq = purchaseCost + mergeCost;
     
     let canAfford = state.sunCurrency >= totalSunReq &&
