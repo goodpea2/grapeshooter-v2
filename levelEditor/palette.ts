@@ -83,7 +83,6 @@ export function getAllPaletteItems(): PaletteItem[] {
   });
 
   for (const key of Object.keys(enemyTypes)) {
-    if (key === 'e_bomb_mainmenu') continue;
     items.push({
       key,
       name: key.replace(/^e_/, '').toUpperCase(),

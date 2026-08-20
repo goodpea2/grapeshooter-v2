@@ -88,7 +88,6 @@ export const state: any = {
   // Game Over state
   isGameOver: false,
   isLevelCompleted: false,
-  gameOverDelayTimer: 0,
   clearedLevels: (() => {
     try {
       const saved = localStorage.getItem('grapeshooter_cleared_levels');
@@ -100,7 +99,6 @@ export const state: any = {
   winConditionActive: false,
   showGameOverPopup: false,
   gameOverProgress: 0, // Used for lighting and modal animation
-  ignoreGameplayClickUntilRelease: false,
   totalElixirLootCollected: 0,
   totalSoilLootCollected: 0,
   totalTurretsAcquired: 0,

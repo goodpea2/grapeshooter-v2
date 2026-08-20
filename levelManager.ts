@@ -20,16 +20,16 @@ export interface LevelConfig {
 
 export const DEFAULT_LEVELS: LevelConfig[] = [
   {
-    id: 'dev_test',
-    name: 'Sandbox',
+    id: 'sbw',
+    name: 'Sandbox World',
     tag: 'Dev',
-    description: 'For testing'
+    description: 'Full world for testing.'
   },
   {
-    id: 'sandbox',
+    id: 'mpty',
     name: 'Empty',
     tag: 'Dev',
-    description: 'For testing',
+    description: 'Empty ground for testing.',
     customLayoutData: {
       enableWorldGen: false
     }
@@ -104,29 +104,10 @@ export function addImportedLevel(data: any): LevelConfig {
 }
 
 export function triggerImportLevelJson(onLoaded?: (data: any, cfg: LevelConfig) => void) {
-  if (state.levelEditor) {
-    state.levelEditor.isWorldDragActive = false;
-    state.levelEditor.worldDragButton = null;
-    state.levelEditor.isRightDragActive = false;
-    state.levelEditor.isRightDragOverlayOnly = false;
-    state.levelEditor.toolbarSpawnerTooltip = null;
-    state.levelEditor.activeSpawnerInput = null;
-    state.levelEditor.spawnAreaLassoPoints = [];
-  }
-  (window as any).mouseIsPressed = false;
-  state.ignoreGameplayClickUntilRelease = true;
-
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.json,application/json';
   input.onchange = (e: any) => {
-    if (state.levelEditor) {
-      state.levelEditor.isWorldDragActive = false;
-      state.levelEditor.worldDragButton = null;
-    }
-    (window as any).mouseIsPressed = false;
-    state.ignoreGameplayClickUntilRelease = true;
-
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -147,14 +128,6 @@ export function triggerImportLevelJson(onLoaded?: (data: any, cfg: LevelConfig) 
       }
     };
     reader.readAsText(file);
-  };
-  input.oncancel = () => {
-    if (state.levelEditor) {
-      state.levelEditor.isWorldDragActive = false;
-      state.levelEditor.worldDragButton = null;
-    }
-    (window as any).mouseIsPressed = false;
-    state.ignoreGameplayClickUntilRelease = true;
   };
   input.click();
 }
@@ -188,11 +161,9 @@ export function startLevel(levelId: string, customLayoutData?: any) {
   }
   state.isGameOver = false;
   state.isLevelCompleted = false;
-  state.gameOverDelayTimer = 0;
   state.winConditionActive = false;
   state.showGameOverPopup = false;
   state.gameOverProgress = 0;
-  state.ignoreGameplayClickUntilRelease = false;
   state.isPaused = false;
   state.activeNPC = null;
   state.selectedTurretType = null;

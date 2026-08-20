@@ -231,7 +231,7 @@ const CHUNK_LEVEL_WEIGHTS: number[][] = [
   [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 10
 ];
 
-export const ENEMY_KEYS = Object.keys(enemyTypes).filter(k => k !== 'e_bomb_mainmenu');
+export const ENEMY_KEYS = Object.keys(enemyTypes);
 
 export function getWeightsForCurrentTime() {
   const t = getTime();

@@ -69,8 +69,7 @@ export class Player {
     // Game Over check
     if (this.health <= 0 && !state.isGameOver) {
       state.isGameOver = true;
-      state.showGameOverPopup = false;
-      state.gameOverDelayTimer = 60; // 1 second delay at 60fps
+      state.showGameOverPopup = true;
     }
 
     if (state.isGameOver) return;

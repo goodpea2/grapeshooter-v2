@@ -654,16 +654,6 @@ function tick() {
   state.frames++;
 
   if (state.isGameOver) {
-    if (!state.showGameOverPopup) {
-      if (state.gameOverDelayTimer > 0) {
-        state.gameOverDelayTimer--;
-        if (state.gameOverDelayTimer <= 0) {
-          state.showGameOverPopup = true;
-        }
-      } else {
-        state.showGameOverPopup = true;
-      }
-    }
     state.gameOverProgress = lerp(state.gameOverProgress, state.showGameOverPopup ? 1 : 0, 0.05);
   }
 
@@ -702,8 +692,7 @@ function tick() {
       const aliveWinEnemies = winEnemies.filter((e: any) => e.health > 0 && !e.isDying).length;
       if (aliveWinEnemies === 0 && state.player && state.player.health > 0) {
         state.isGameOver = true;
-        state.showGameOverPopup = false;
-        state.gameOverDelayTimer = 60; // 1s delay before popup
+        state.showGameOverPopup = true;
         state.isLevelCompleted = true;
         if (state.currentLevelId) {
           state.clearedLevels.add(state.currentLevelId);
@@ -1176,29 +1165,6 @@ function tick() {
   // If Almanac is open during gameplay, route input strictly to Almanac and block canvas interaction
   if (state.isAlmanacOpen) {
     handleAlmanacClick();
-    state.ignoreGameplayClickUntilRelease = true;
-    return;
-  }
-
-  if (state.isGameOver) {
-    if (handleGameOverClick()) return;
-  }
-
-  if (handleGameSpeedButtonClick()) {
-    state.ignoreGameplayClickUntilRelease = true;
-    return;
-  }
-
-  if (state.activeNPC && handleNpcUiPress()) {
-    state.ignoreGameplayClickUntilRelease = true;
-    return;
-  }
-
-  if (isMouseOverUI()) {
-    return;
-  }
-
-  if (state.ignoreGameplayClickUntilRelease) {
     return;
   }
 
@@ -1222,6 +1188,15 @@ function tick() {
     state.playerSpeedMultiplier = 0; // Reset speed multiplier on new click
   }
 
+  if (state.isGameOver) {
+    if (handleGameOverClick()) return;
+  }
+
+  if (handleGameSpeedButtonClick()) return; // Handle game speed buttons first
+
+  if (state.activeNPC && handleNpcUiPress()) {
+    return;
+  }
   if (mouseX > state.uiWidth && state.isStationary) {
     const activePlacementType = state.isCurrentlyDragging ? state.draggedTurretType : state.selectedTurretType;
     const isScaling = !!(activePlacementType || state.draggedTurretInstance);
@@ -1272,9 +1247,6 @@ function tick() {
 }
 
 (window as any).mouseDragged = () => {
-  if (state.currentScreen === 'level_editor') return;
-  if (state.ignoreGameplayClickUntilRelease) return;
-
   if (state.isAlmanacOpen) {
     if (state.isAlmanacEditorMode && state.almanacTab === 'Upgrades' && state.activePlayerUpgradeInput?.isDragging) {
       handlePlayerUpgradeMouseDrag(mouseX, mouseY);
@@ -1323,28 +1295,13 @@ function tick() {
 };
 
 (window as any).mouseReleased = () => {
-  const wasIgnored = state.ignoreGameplayClickUntilRelease;
-  state.ignoreGameplayClickUntilRelease = false;
-
-  if (state.currentScreen === 'level_editor') {
-    handleLevelEditorMouseRelease();
-    return;
-  }
-
   if (state.isAlmanacOpen) {
     handlePlayerUpgradeMouseRelease();
     return;
   }
 
-  if (wasIgnored) {
-    if (state.simulateTouchScreen) {
-      handleTouchEnded();
-    } else {
-      state.touchStartPos = null;
-      state.touchInputVec = { x: 0, y: 0 };
-      state.playerSpeedMultiplier = 0;
-    }
-    if (state.player) state.player.isClickHolding = false;
+  if (state.currentScreen === 'level_editor') {
+    handleLevelEditorMouseRelease();
     return;
   }
 
