@@ -7,6 +7,8 @@ import { overlayTypes } from '../balanceObstacles';
 import { turretTypes } from '../balanceTurrets';
 import { Explosion, LiquidTrailVFX, MuzzleFlash, ConditionVFX } from '../vfx';
 import { AttachedTurret } from './attachedTurret';
+import { WorldTurret } from './worldTurret';
+import { getPlayerUpgradeStat } from '../src/playerUpgrades';
 import { LootEntity, TurretLoot } from './loot';
 import { spawnLootAt } from '../economy';
 import { Bullet } from './bullet';
@@ -22,13 +24,14 @@ declare const random: any;
 declare const cos: any;
 declare const sin: any;
 declare const color: any;
+declare const radians: any;
 declare const TWO_PI: any;
 
 export class Player {
   pos: any; prevPos: any; size = 30; attachments: AttachedTurret[] = []; health = 100; maxHealth = 100; speed = 3.6; flash = 0; autoTurretAngle = 0; autoTurretLastShot = 0; autoTurretRange = GRID_SIZE * 6; autoTurretFireRate = 22; recoil = 0; target: any = null;
   hurtAnimTimer = 0;
   isClickHolding: boolean = false;
-  autoTurretClickMiningBoost = 1; // +300% mining speed
+  autoTurretClickMiningBoost = 3; // +300% mining speed
   autoTurretClickAttackBoost = 0; // No boost for attacking
   pulseAnimTimer = 0;
   conditions: Map<string, number> = new Map();
@@ -36,6 +39,13 @@ export class Player {
   // Input tracking for orientation and state locking
   moveInputVec: any;
   isMovingIntent: boolean = false;
+  activeStats: any = {
+    damageMult: 1.0,
+    speedMult: 1.0,
+    healthMult: 1.0,
+    damageAdd: 0,
+    healthAdd: 0,
+  };
 
   constructor(x: number, y: number) { 
     this.pos = createVector(x, y); 
@@ -59,7 +69,8 @@ export class Player {
     // Game Over check
     if (this.health <= 0 && !state.isGameOver) {
       state.isGameOver = true;
-      state.showGameOverPopup = true;
+      state.showGameOverPopup = false;
+      state.gameOverDelayTimer = 60; // 1 second delay at 60fps
     }
 
     if (state.isGameOver) return;
@@ -67,13 +78,15 @@ export class Player {
     const isTurretSelected = !!(state.selectedTurretType || state.draggedTurretInstance || state.draggedTurretType);
 
     // Process Conditions
-    let fireRateMult = 1.0;
+    let fireRateBonus = 0;
     for (let [cKey, life] of this.conditions) {
       const cfg = conditionTypes[cKey];
-      if (cfg.playerCombatBoost) fireRateMult *= cfg.playerCombatBoost;
+      if (cfg.playerCombatBoost) fireRateBonus += (cfg.playerCombatBoost - 1);
+      if (cfg.firerateBoost) fireRateBonus += cfg.firerateBoost;
       this.conditions.set(cKey, life - 1);
       if (life <= 0) this.conditions.delete(cKey);
     }
+    let fireRateMult = 1.0 + fireRateBonus;
 
     const gx = floor(this.pos.x / GRID_SIZE); const gy = floor(this.pos.y / GRID_SIZE);
     const liquidType = state.world.getLiquidAt(gx, gy); const lData = liquidType ? liquidTypes[liquidType] : null;
@@ -98,8 +111,20 @@ export class Player {
     // 2. Perform Movement
     if (this.isMovingIntent && !isTurretSelected) { 
       let effectiveSpeedMultiplier = state.isWASDInput ? 1.0 : state.playerSpeedMultiplier;
-      const move = this.moveInputVec.copy().normalize().mult(this.speed * lMult * effectiveSpeedMultiplier); 
-      this.moveWithSliding(move); 
+      const move = this.moveInputVec.copy().normalize().mult(this.speed * lMult * effectiveSpeedMultiplier * (state.playerBonuses.speedMult || 1.0)); 
+      this.moveWithSliding(move);
+
+      // Update Breadcrumb Trail
+      const lastPoint = state.playerTrail[state.playerTrail.length - 1];
+      if (!lastPoint || dist(this.pos.x, this.pos.y, lastPoint.x, lastPoint.y) > 20) {
+        state.playerTrail.push(this.pos.copy());
+        if (state.playerTrail.length > state.maxTrailLength) {
+          state.playerTrail.shift();
+          if (state.trailStartIndexOnMove > 0) {
+            state.trailStartIndexOnMove--;
+          }
+        }
+      }
     } else {
       state.playerSpeedMultiplier = 0; // Reset multiplier if no movement intent
     }
@@ -113,10 +138,53 @@ export class Player {
     
     if (isActuallyStationary) {
       state.stationaryTimer++;
-      if (state.stationaryTimer > 15) state.isStationary = true;
+      if (state.stationaryTimer > 15) {
+        state.isStationary = true;
+      }
+      // When stationary, prune breadcrumbs to only the last 20 points
+      if (state.playerTrail.length > 20) {
+        const excess = state.playerTrail.length - 20;
+        state.playerTrail = state.playerTrail.slice(excess);
+        state.trailStartIndexOnMove = Math.max(0, state.trailStartIndexOnMove - excess);
+        // Adjust pathTargetIndex for trailing turrets so they don't jump indices
+        for (const a of this.attachments) {
+          if (a.isFollowingTrail) {
+            a.pathTargetIndex = Math.max(0, a.pathTargetIndex - excess);
+          }
+        }
+      }
+
+      // Count down 4 seconds (240 frames @ 60fps) before clearing remaining breadcrumbs
+      if (state.playerTrail.length > 0) {
+        if (state.trailFadeTimer <= 0) {
+          state.trailFadeTimer = 240; // 4 seconds
+        } else {
+          state.trailFadeTimer--;
+          if (state.trailFadeTimer <= 0) {
+            state.playerTrail = [];
+            state.trailStartIndexOnMove = 0;
+            for (const a of this.attachments) {
+              a.isFollowingTrail = false;
+            }
+          }
+        }
+      } else {
+        state.trailFadeTimer = 0;
+        state.trailStartIndexOnMove = 0;
+      }
     } else {
+      if (state.isStationary) {
+        // Just started moving again: mark current trail end as the start of new movement
+        state.trailStartIndexOnMove = state.playerTrail.length;
+        for (const a of this.attachments) {
+          a.isFollowingTrail = false;
+          a.reactionTimer = 0;
+          a.pathTargetIndex = state.playerTrail.length;
+        }
+      }
       state.stationaryTimer = 0;
       state.isStationary = false;
+      state.trailFadeTimer = 0;
     }
     
     if (lData && lData.trailVfxInterval && state.frames % floor(lData.trailVfxInterval / 3) === 0 && vel > 0.5) {
@@ -146,7 +214,17 @@ export class Player {
     this.checkWorldTurretCollisions();
   }
 
+  getAttachedCount(): number {
+    return this.attachments.filter(a => a.config?.countTowardAttachedCapacity !== false && a.config?.CountTowardAttachedCapacity !== false).length;
+  }
+
   checkWorldTurretCollisions() {
+    const maxCapacity = getPlayerUpgradeStat('turretAttachCapacity') || 0;
+    if (this.getAttachedCount() >= maxCapacity) {
+      // Ignore WorldTurret and do not collide when capacity is reached
+      return;
+    }
+
     const worldTurrets = state.world.getAllTurrets();
     const myRadius = this.size * 0.5;
     
@@ -218,6 +296,45 @@ export class Player {
     const config = turretTypes[type];
     if (!config) return;
 
+    const doesCount = config.countTowardAttachedCapacity !== false && config.CountTowardAttachedCapacity !== false;
+    const maxCapacity = getPlayerUpgradeStat('turretAttachCapacity') || 6;
+    if (doesCount && this.getAttachedCount() >= maxCapacity) {
+      // When TurretAttachCapacity is reached, spawn the turret on the nearest grid (WorldTurret)
+      const baseGx = floor(this.pos.x / GRID_SIZE);
+      const baseGy = floor(this.pos.y / GRID_SIZE);
+      let bestGx = baseGx;
+      let bestGy = baseGy;
+      let minDist = Infinity;
+      const searchRadius = 12;
+
+      for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+        for (let dy = -searchRadius; dy <= searchRadius; dy++) {
+          const gx = baseGx + dx;
+          const gy = baseGy + dy;
+          const wx = gx * GRID_SIZE + GRID_SIZE / 2;
+          const wy = gy * GRID_SIZE + GRID_SIZE / 2;
+          
+          if (!state.world.isBlockAt(wx, wy) && !state.world.getTurretAt(gx, gy)) {
+            const d = dist(this.pos.x, this.pos.y, wx, wy);
+            if (d < minDist) {
+              minDist = d;
+              bestGx = gx;
+              bestGy = gy;
+            }
+          }
+        }
+      }
+
+      const worldX = bestGx * GRID_SIZE + GRID_SIZE / 2;
+      const worldY = bestGy * GRID_SIZE + GRID_SIZE / 2;
+      const newTurret = new WorldTurret(type, bestGx, bestGy);
+      if (hp !== undefined) newTurret.health = hp;
+      state.world.addTurret(newTurret);
+      state.totalTurretsAcquired++;
+      state.vfx.push(new Explosion(worldX, worldY, 40, color(100, 255, 200)));
+      return;
+    }
+
     let bestSlot = null; 
     let minDist = Infinity;
     const rangeLimit = 8;
@@ -281,14 +398,36 @@ export class Player {
   }
 
   updateAutoTurret(fireRateMult: number) {
-    const isRaged = this.conditions.has('c_raged');
+    const isRaged = this.conditions.has('c_raged') || this.conditions.has('c_raged_visualonly');
     // do not delete this line - effectiveFireRate is a stackable percentage, not exponential, for example: "4x fire rate" translates to +300% fire rate, so 2 sources of 4x fire rate gives the output of +600%. 
-    let effectiveFireRateMultiplier = fireRateMult;
-    if (this.isClickHolding) effectiveFireRateMultiplier += this.autoTurretClickAttackBoost;
+    let attackBonus = (fireRateMult - 1.0) + ((state.playerBonuses.attackFirerateMult || 1.0) - 1.0);
+    let miningBonus = (fireRateMult - 1.0) + ((state.playerBonuses.miningFirerateMult || 1.0) - 1.0);
+    
+    if (this.isClickHolding) {
+      attackBonus += this.autoTurretClickAttackBoost;
+      miningBonus += this.autoTurretClickMiningBoost;
+    }
 
-    const effectiveFireRate = this.autoTurretFireRate / fireRateMult;
-    const miningBoost = (this.isClickHolding && state.isStationary) ? this.autoTurretClickMiningBoost : 0;
-    const effectiveMiningFireRate = this.autoTurretFireRate / (fireRateMult + miningBoost);
+    let attackFirerateMultiplier = 1.0 + attackBonus;
+    let miningFirerateMultiplier = 1.0 + miningBonus;
+
+    let effectiveAttackFireRate = this.autoTurretFireRate / attackFirerateMultiplier;
+    let attackBulletsToSpawn = 1;
+    if (effectiveAttackFireRate > 0) {
+      while (effectiveAttackFireRate < 4) {
+        effectiveAttackFireRate *= 2;
+        attackBulletsToSpawn *= 2;
+      }
+    }
+
+    let effectiveMiningFireRate = this.autoTurretFireRate / miningFirerateMultiplier;
+    let miningBulletsToSpawn = 1;
+    if (effectiveMiningFireRate > 0) {
+      while (effectiveMiningFireRate < 4) {
+        effectiveMiningFireRate *= 2;
+        miningBulletsToSpawn *= 2;
+      }
+    }
 
     // If holding click, force switch to mining (skip enemy/icecube targeting)
     // ALLOW mining while moving if click is held
@@ -298,9 +437,22 @@ export class Player {
         let bc = ht.getWorldPos();
         this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x);
         if (state.frames - this.autoTurretLastShot > effectiveMiningFireRate) {
-          state.bullets.push(new Bullet(this.pos.x, this.pos.y, bc.x, bc.y, 'b_player_mining', 'none'));
-          state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 14, 4, color(255, 255, 100)));
-          if (miningBoost > 0) this.applyCondition('c_raged', 10);
+          for (let i = 0; i < miningBulletsToSpawn; i++) {
+            let sa = this.autoTurretAngle;
+            let startX = this.pos.x;
+            let startY = this.pos.y;
+            let targetX = bc.x;
+            let targetY = bc.y;
+            if (i > 0) {
+              const offX = random(-10, 10);
+              const offY = random(-10, 10);
+              startX += offX; startY += offY;
+              targetX += offX; targetY += offY;
+            }
+            state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player_mining', 'none', this));
+            if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 14, 4, color(255, 255, 100)));
+          }
+          if (this.isClickHolding && this.autoTurretClickMiningBoost > 0) this.applyCondition('c_raged_visualonly', 10);
           this.autoTurretLastShot = state.frames;
           this.recoil = 3;
           this.pulseAnimTimer = 10;
@@ -313,10 +465,23 @@ export class Player {
         let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; 
         this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); 
         if (state.frames - this.autoTurretLastShot > effectiveMiningFireRate) { 
-          state.bullets.push(new Bullet(this.pos.x, this.pos.y, bc.x, bc.y, 'b_player_mining', 'none')); 
-          state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 14, 4, color(255, 255, 100))); 
+          for (let i = 0; i < miningBulletsToSpawn; i++) {
+            let sa = this.autoTurretAngle;
+            let startX = this.pos.x;
+            let startY = this.pos.y;
+            let targetX = bc.x;
+            let targetY = bc.y;
+            if (i > 0) {
+              const offX = random(-10, 10);
+              const offY = random(-10, 10);
+              startX += offX; startY += offY;
+              targetX += offX; targetY += offY;
+            }
+            state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player_mining', 'none', this)); 
+            if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 14, 4, color(255, 255, 100))); 
+          }
           // Play rage VFX on player when mining boost is active
-          if (miningBoost > 0) {
+          if (this.isClickHolding && this.autoTurretClickMiningBoost > 0) {
             this.applyCondition('c_raged', 10);
           }
           this.autoTurretLastShot = state.frames; 
@@ -331,11 +496,70 @@ export class Player {
 
     let bestR = null; let minRD = this.autoTurretRange;
     for (let a of this.attachments) if (a.isFrosted && a.iceCubeHealth > 0) { let d = dist(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y); if (d < minRD && state.world.checkLOS(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y)) { minRD = d; bestR = a; } }
-    if (bestR) { this.target = bestR; const bp = bestR.getWorldPos(); this.autoTurretAngle = atan2(bp.y - this.pos.y, bp.x - this.pos.x); if (state.frames - this.autoTurretLastShot > effectiveFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, bp.x, bp.y, 'b_player', 'icecube')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 24, 6, color(100, 200, 255))); this.autoTurretLastShot = state.frames; this.recoil = 6; this.pulseAnimTimer = 15; } return; }
+    if (bestR) { 
+      this.target = bestR; 
+      const bp = bestR.getWorldPos(); 
+      this.autoTurretAngle = atan2(bp.y - this.pos.y, bp.x - this.pos.x); 
+      if (state.frames - this.autoTurretLastShot > effectiveAttackFireRate) { 
+        for (let i = 0; i < attackBulletsToSpawn; i++) {
+          let sa = this.autoTurretAngle;
+          let startX = this.pos.x;
+          let startY = this.pos.y;
+          let targetX = bp.x;
+          let targetY = bp.y;
+          if (i > 0) {
+            const offX = random(-15, 15);
+            const offY = random(-15, 15);
+            startX += offX; startY += offY;
+            targetX += offX; targetY += offY;
+          }
+          state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player', 'icecube', this)); 
+          if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 24, 6, color(100, 200, 255))); 
+        }
+        this.autoTurretLastShot = state.frames; this.recoil = 6; this.pulseAnimTimer = 15; 
+      } 
+      return; 
+    }
     let nearestE = null; let minDistE = this.autoTurretRange;
     for (let e of state.enemies) if (e.health > 0 && !e.isDying) { let d = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y); if (d < minDistE && state.world.checkLOS(this.pos.x, this.pos.y, e.pos.x, e.pos.y)) { minDistE = d; nearestE = e; } }
-    if (nearestE) { this.autoTurretAngle = atan2(nearestE.pos.y - this.pos.y, nearestE.pos.x - this.pos.x); if (state.frames - this.autoTurretLastShot > effectiveFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, nearestE.pos.x, nearestE.pos.y, 'b_player', 'enemy')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 24, 6, color(100, 200, 255))); this.autoTurretLastShot = state.frames; this.recoil = 6; this.pulseAnimTimer = 15; } } else {
-      let t = this.findBlockTarget(this.pos, this.autoTurretRange); if (t) { let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); if (state.frames - this.autoTurretLastShot > effectiveMiningFireRate) { state.bullets.push(new Bullet(this.pos.x, this.pos.y, bc.x, bc.y, 'b_player_mining', 'none')); state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, this.autoTurretAngle, 14, 4, color(255, 255, 100))); this.autoTurretLastShot = state.frames; this.recoil = 3; this.pulseAnimTimer = 10; } }
+    if (nearestE) { 
+      this.autoTurretAngle = atan2(nearestE.pos.y - this.pos.y, nearestE.pos.x - this.pos.x); 
+      if (state.frames - this.autoTurretLastShot > effectiveAttackFireRate) { 
+        for (let i = 0; i < attackBulletsToSpawn; i++) {
+          let sa = this.autoTurretAngle;
+          let startX = this.pos.x;
+          let startY = this.pos.y;
+          let targetX = nearestE.pos.x;
+          let targetY = nearestE.pos.y;
+          if (i > 0) {
+            const offX = random(-15, 15);
+            const offY = random(-15, 15);
+            startX += offX; startY += offY;
+            targetX += offX; targetY += offY;
+          }
+          state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player', 'enemy', this)); 
+          if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 24, 6, color(100, 200, 255))); 
+        }
+        this.autoTurretLastShot = state.frames; this.recoil = 6; this.pulseAnimTimer = 15; 
+      } 
+    } else {
+      let t = this.findBlockTarget(this.pos, this.autoTurretRange); if (t) { let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); if (state.frames - this.autoTurretLastShot > effectiveMiningFireRate) { 
+        for (let i = 0; i < miningBulletsToSpawn; i++) {
+          let sa = this.autoTurretAngle;
+          let startX = this.pos.x;
+          let startY = this.pos.y;
+          let targetX = bc.x;
+          let targetY = bc.y;
+          if (i > 0) {
+            const offX = random(-10, 10);
+            const offY = random(-10, 10);
+            startX += offX; startY += offY;
+            targetX += offX; targetY += offY;
+          }
+          state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player_mining', 'none', this)); 
+          if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 14, 4, color(255, 255, 100))); 
+        }
+        this.autoTurretLastShot = state.frames; this.recoil = 3; this.pulseAnimTimer = 10; } }
     }
   }
 
@@ -353,7 +577,7 @@ export class Player {
           
           const blocks = chunk.blocks as any[];
           for (const b of blocks) {
-              if (b.isMined || !b.pos) continue;
+              if (b.isMined || !b.pos || b.type === 'o_barrier' || b.config?.isValidTarget === false || b.isValidTarget === false) continue;
               const bc = { x: b.pos.x + GRID_SIZE/2, y: b.pos.y + GRID_SIZE/2 };
               const d = dist(origin.x, origin.y, bc.x, bc.y);
               if (d > range) continue;
@@ -393,13 +617,6 @@ export class Player {
     const ltx = state.world.getLiquidAt(floor(tx / GRID_SIZE), floor(this.pos.y / GRID_SIZE)); 
     if (ltx && liquidTypes[ltx]?.liquidConfig?.blocksMovement) cx = true;
     
-    const atts = this.attachments as AttachedTurret[];
-    for(let a of atts) {
-      if(state.world.checkCollision(tx + a.offset.x, this.pos.y + a.offset.y, a.config.size/2.1)) {
-        cx = true;
-        break;
-      }
-    }
     if (!cx) this.pos.x = tx;
 
     let ty = this.pos.y + move.y; 
@@ -407,12 +624,6 @@ export class Player {
     const lty = state.world.getLiquidAt(floor(this.pos.x / GRID_SIZE), floor(ty / GRID_SIZE)); 
     if (lty && liquidTypes[lty]?.liquidConfig?.blocksMovement) cy = true;
     
-    for(let a of atts) {
-      if(state.world.checkCollision(this.pos.x + a.offset.x, ty + a.offset.y, a.config.size/2.1)) {
-        cy = true;
-        break;
-      }
-    }
     if (!cy) this.pos.y = ty;
   }
   takeDamage(dmg: number) { this.health -= dmg; this.flash = 6; this.hurtAnimTimer = 10; if (this.health <= 0) this.health = 0; }

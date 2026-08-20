@@ -86,11 +86,44 @@ export function drawOverlay(type: string, block: any, opacity: number) {
 
   if (type === 'v_sniper_tower') {
     const wPos = { x: block.pos.x + GRID_SIZE/2, y: block.pos.y + GRID_SIZE/2 };
-    const ang = atan2(state.player.pos.y - wPos.y, state.player.pos.x - wPos.x);
+    const ang = block.lockedAngle !== undefined && block.lockedAngle !== null ? block.lockedAngle : atan2(state.player.pos.y - wPos.y, state.player.pos.x - wPos.x);
     fill(40, 40, 60, opacity); noStroke(); rect(4, 4, GRID_SIZE-8, GRID_SIZE-8, 4);
     push(); translate(GRID_SIZE/2, GRID_SIZE/2); rotate(ang);
-    fill(20, 20, 40, opacity); rect(0, -4, 18, 8, 2);
+    fill(20, 20, 40, opacity); rect(0, -4, 20, 8, 2);
     fill(255, 50, 50, opacity * (0.6 + 0.4 * sin(frameCount * 0.2))); ellipse(0, 0, 8);
+    pop();
+  } else if (type === 'v_mortar_tower') {
+    const wPos = { x: block.pos.x + GRID_SIZE/2, y: block.pos.y + GRID_SIZE/2 };
+    const ang = block.lockedAngle !== undefined && block.lockedAngle !== null ? block.lockedAngle : atan2(state.player.pos.y - wPos.y, state.player.pos.x - wPos.x);
+    fill(55, 45, 40, opacity); noStroke(); rect(4, 4, GRID_SIZE-8, GRID_SIZE-8, 4);
+    push(); translate(GRID_SIZE/2, GRID_SIZE/2); rotate(ang);
+    fill(30, 25, 20, opacity); rect(-2, -6, 16, 12, 3);
+    fill(255, 140, 0, opacity * (0.7 + 0.3 * sin(frameCount * 0.15))); ellipse(0, 0, 10);
+    pop();
+  } else if (type === 'v_minigun_tower') {
+    const wPos = { x: block.pos.x + GRID_SIZE/2, y: block.pos.y + GRID_SIZE/2 };
+    const ang = block.lockedAngle !== undefined && block.lockedAngle !== null ? block.lockedAngle : atan2(state.player.pos.y - wPos.y, state.player.pos.x - wPos.x);
+    fill(60, 50, 35, opacity); noStroke(); rect(4, 4, GRID_SIZE-8, GRID_SIZE-8, 4);
+    push(); translate(GRID_SIZE/2, GRID_SIZE/2); rotate(ang);
+    fill(35, 30, 20, opacity); rect(0, -5, 18, 10, 2);
+    fill(200, 150, 50, opacity); rect(6, -6, 8, 12, 1);
+    fill(255, 200, 50, opacity * (0.8 + 0.2 * sin(frameCount * 0.3))); ellipse(0, 0, 8);
+    pop();
+  } else if (type === 'v_healing_tower') {
+    fill(30, 60, 45, opacity); noStroke(); rect(4, 4, GRID_SIZE-8, GRID_SIZE-8, 4);
+    push(); translate(GRID_SIZE/2, GRID_SIZE/2);
+    fill(40, 220, 120, opacity * (0.7 + 0.3 * sin(frameCount * 0.1)));
+    rect(-3, -10, 6, 20, 2);
+    rect(-10, -3, 20, 6, 2);
+    ellipse(0, 0, 12);
+    pop();
+  } else if (type === 'v_firewall_tower') {
+    fill(65, 30, 30, opacity); noStroke(); rect(4, 4, GRID_SIZE-8, GRID_SIZE-8, 4);
+    push(); translate(GRID_SIZE/2, GRID_SIZE/2);
+    fill(255, 80, 40, opacity * (0.7 + 0.3 * sin(frameCount * 0.2)));
+    ellipse(0, 0, 18);
+    stroke(255, 120, 50, opacity * 0.8); strokeWeight(2); noFill();
+    ellipse(0, 0, 24 + 4 * sin(frameCount * 0.15));
     pop();
   }
 }

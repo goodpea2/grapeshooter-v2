@@ -1,5 +1,6 @@
 
 import { state } from '../state';
+import { getPlayerUpgradeStat } from '../src/playerUpgrades';
 
 declare const p5: any;
 declare const createVector: any;
@@ -51,16 +52,20 @@ export class LootInFlightVFX {
     if (this.progress >= 1) {
       // Apply the value to state
       if (this.type === 'currency') {
-        (state as any)[this.itemKey + 'Currency'] += this.value;
         if (this.itemKey === 'sun') {
+          const sunCap = getPlayerUpgradeStat('sunBankCapacity') || 20;
+          state.sunCurrency = Math.min(sunCap, state.sunCurrency + this.value);
           state.totalSunLootCollected += this.value;
           state.uiSunScale = 1.6;
-        } else if (this.itemKey === 'elixir') {
-          state.totalElixirLootCollected += this.value;
-          state.uiElixirScale = 1.6;
-        } else if (this.itemKey === 'soil') {
-          state.totalSoilLootCollected += this.value;
-          state.uiSoilScale = 1.6;
+        } else {
+          (state as any)[this.itemKey + 'Currency'] += this.value;
+          if (this.itemKey === 'elixir') {
+            state.totalElixirLootCollected += this.value;
+            state.uiElixirScale = 1.6;
+          } else if (this.itemKey === 'soil') {
+            state.totalSoilLootCollected += this.value;
+            state.uiSoilScale = 1.6;
+          }
         }
       } else if (this.type === 'item') {
         state.inventory.items[this.itemKey] = (state.inventory.items[this.itemKey] || 0) + 1;
@@ -68,7 +73,7 @@ export class LootInFlightVFX {
         state.player.addStrayTurret(this.itemKey, this.turretHP);
       } else if (this.type === 'turretAsItem') {
         state.inventory.items[this.itemKey] = (state.inventory.items[this.itemKey] || 0) + 1;
-        state.inventory.specList.push({ key: this.itemKey, type: 'turret', timestamp: Date.now() });
+        state.inventory.specList.push({ key: this.itemKey, type: 'turret', hp: this.turretHP, timestamp: Date.now() });
         state.totalTurretsAcquired += 1;
         state.uiAlpha = 255;
       }

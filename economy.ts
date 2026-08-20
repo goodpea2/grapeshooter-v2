@@ -1,8 +1,9 @@
 
 import { state } from './state';
 import { HOUR_FRAMES, GRID_SIZE, CHUNK_SIZE } from './constants';
-import { LootEntity } from './entities';
+import { LootEntity, TurretLoot } from './entities';
 import { lootTypes, lootTableTypes, lootConfigs, LootTableEntry, ExternalLootConfigEntry } from './balanceLootTable';
+import { turretTypes } from './balanceTurrets';
 
 declare const random: any;
 declare const floor: any;
@@ -63,6 +64,18 @@ export function spawnLootAt(x: number, y: number, key: string, configSource: any
       return;
     }
     
+    // If key matches a turret type directly, spawn TurretLoot with preserved HP
+    if (turretTypes[key] || lootTypes[key]?.type === 'turret' || lootTypes[key]?.type === 'turretAsItem') {
+      const px = x + random(-10, 10);
+      const py = y + random(-10, 10);
+      const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
+      const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
+      const chunk = state.world.getChunk(cx, cy);
+      const hp = (typeof configSource === 'number') ? configSource : (turretTypes[key]?.health || 100);
+      if (chunk) chunk.loot.push(new TurretLoot(px, py, key, hp));
+      return;
+    }
+
     // If key matches a loot type directly, spawn it
     if (lootTypes[key]) {
       const px = x + random(-10, 10);

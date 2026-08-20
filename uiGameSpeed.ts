@@ -52,6 +52,9 @@ export function drawGameSpeedButtons() {
   const speedupBtnY = btnMargin;
   const pauseBtnX = width - btnMargin - btnSize * 2 - btnMargin; // Right-align Pause button
   const pauseBtnY = btnMargin;
+  const menuBtnX = width - btnMargin - btnSize * 3 - btnMargin * 2 - 12; // Menu button
+  const menuBtnY = btnMargin;
+  const menuBtnW = 52;
   const almanacBtnX = width - (btnMargin+10) - almanacBtnSize; // Bottom-right Almanac button
   const almanacBtnY = height - (btnMargin+10) - almanacBtnSize;
 
@@ -113,6 +116,18 @@ export function drawGameSpeedButtons() {
   rect(pauseBtnX + btnSize / 2 - 8, pauseBtnY + btnSize / 2 - 10, 6, 20, 2);
   rect(pauseBtnX + btnSize / 2 + 2, pauseBtnY + btnSize / 2 - 10, 6, 20, 2);
 
+  // Menu Button
+  const isHoveringMenu = mouseX > menuBtnX && mouseX < menuBtnX + menuBtnW && mouseY > menuBtnY && mouseY < menuBtnY + btnSize;
+  noStroke();
+  fill(0,0,0,100);
+  rect(menuBtnX, menuBtnY + 4, menuBtnW, btnSize, 12);
+  fill(isHoveringMenu ? [80, 95, 180] : [40, 47, 96]);
+  rect(menuBtnX, menuBtnY, menuBtnW, btnSize, 12);
+  fill(255);
+  textSize(11);
+  textAlign(CENTER, CENTER);
+  text("MENU", menuBtnX + menuBtnW / 2, menuBtnY + btnSize / 2);
+
   pop();
 }
 
@@ -124,11 +139,23 @@ export function handleGameSpeedButtonClick(): boolean {
   const speedupBtnY = btnMargin;
   const pauseBtnX = width - btnMargin - btnSize * 2 - btnMargin;
   const pauseBtnY = btnMargin;
+  const menuBtnX = width - btnMargin - btnSize * 3 - btnMargin * 2 - 12;
+  const menuBtnY = btnMargin;
+  const menuBtnW = 52;
   const almanacBtnX = width - btnMargin - almanacBtnSize;
   const almanacBtnY = height - btnMargin - almanacBtnSize;
 
+  // Check Menu button
+  if (mouseX > menuBtnX && mouseX < menuBtnX + menuBtnW &&
+      mouseY > menuBtnY && mouseY < menuBtnY + btnSize) {
+    state.currentScreen = 'main_menu';
+    return true;
+  }
+
   // Check Almanac button
-  if (mouseX > almanacBtnX && mouseX < almanacBtnX + almanacBtnSize &&
+  const isDebugBlocking = state.showDebug && mouseX > width - 280;
+  if (!state.upgradeSelection && !isDebugBlocking && 
+      mouseX > almanacBtnX && mouseX < almanacBtnX + almanacBtnSize &&
       mouseY > almanacBtnY && mouseY < almanacBtnY + almanacBtnSize) {
     state.isAlmanacOpen = !state.isAlmanacOpen;
     if (state.isAlmanacOpen) {

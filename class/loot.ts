@@ -1,7 +1,9 @@
 
 import { state } from '../state';
 import { ECONOMY_CONFIG } from '../economy';
+import { GRID_SIZE } from '../constants';
 import { lootTypes, LootType } from '../balanceLootTable';
+import { getPlayerUpgradeStat } from '../src/playerUpgrades';
 
 declare const p5: any;
 declare const createVector: any;
@@ -80,8 +82,13 @@ export class LootEntity {
       }
     }
 
-    const canBeAttracted = (state.frames - this.spawnFrame > 60);
-    const attractRangeSq = ECONOMY_CONFIG.sunLootAttractionRange * ECONOMY_CONFIG.sunLootAttractionRange;
+    const isSun = (this.config?.item === 'sun' || this.typeKey === 'sun');
+    const sunCap = getPlayerUpgradeStat('sunBankCapacity') || 20;
+    const isSunCapped = isSun && state.sunCurrency >= sunCap;
+
+    const canBeAttracted = (state.frames - this.spawnFrame > 60) && !isSunCapped;
+    const magnetRadius = getPlayerUpgradeStat('magnetRadius') || (GRID_SIZE * 2.5);
+    const attractRangeSq = magnetRadius * magnetRadius;
     
     if (canBeAttracted && dSq < attractRangeSq) {
       this.vel.add(p5.Vector.sub(playerPos, this.pos).normalize().mult(0.8));
@@ -94,6 +101,9 @@ export class LootEntity {
     
     const collectionRangeSq = ECONOMY_CONFIG.sunLootCollectionRange * ECONOMY_CONFIG.sunLootCollectionRange;
     if (dSq < collectionRangeSq) {
+      if (isSunCapped) {
+        return 'none';
+      }
       return 'collected';
     }
     if (this.life <= 0) return 'missed';

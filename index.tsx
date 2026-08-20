@@ -10,14 +10,16 @@ import { enemyTypes } from './balanceEnemies';
 import { bulletTypes } from './balanceBullets';
 import { WorldManager } from './world';
 import { Player, Enemy, AttachedTurret, WorldTurret, SunLoot, NPCEntity } from './entities';
+import { createAttachedTurret, createWorldTurret } from './class/turret/TurretRegistry';
 import { getTime, drawUI, drawTurretTooltip } from './ui';
 import { drawAlmanac, handleAlmanacClick } from './ui/almanac/mainLayout';
 import { drawUnlockPopup, handleUnlockPopupClick, updateUnlockPopup } from './ui/almanac/turretUnlockPopup';
 import { drawGameOver, handleGameOverClick } from './uiGameOver';
-import { drawWorldGenPreview } from './uiDebug';
+import { drawWorldGenPreview, drawTurretPathDebug } from './uiDebug';
 import { handleNpcUiClick, handleNpcUiPress } from './uiNpcShop';
 import { updateGameSystems, spawnFromBudget, getLightLevel, customDayLightConfig } from './lvDemo';
 import { MergeVFX, ShopFlyVFX } from './vfx/index';
+import { triggerUpgradeHook } from './src/upgrades';
 import { ASSETS } from './assets';
 import { getHexAxial, axialToWorld, isAdjacent } from './utils/hex';
 import { handleTouchStarted, handleTouchMoved, handleTouchEnded, drawTouchVisuals } from './touchScreen';
@@ -28,6 +30,12 @@ import { drawSelectionHighlight, drawMergeBubble } from './ui/overlay/TurretMerg
 import { drawPendingSpawn } from './visualEnemies';
 import { drawTickingExplosive } from './visualObstacles';
 import { DisabledTurrets } from './debug/turretAvailability';
+import { drawMainMenu, handleMainMenuClick } from './uiMainMenu';
+import { drawLevelEditor, handleLevelEditorClick, handleLevelEditorScroll, handleLevelEditorMouseRelease, handleSpawnerKeyInput } from './levelEditor';
+import { getPlayerUpgradeStat } from './src/playerUpgrades';
+import { handlePlayerUpgradeKeyInput, handlePlayerUpgradeMouseDrag, handlePlayerUpgradeMouseRelease } from './ui/almanac/playerUpgradesPanel';
+import { handleLevelConfigKeyInput, handleLevelConfigScroll } from './ui/almanac/levelConfigPanel';
+import { flowField } from './pathfinding';
 
 declare const p5: any;
 declare const createCanvas: any;
@@ -67,6 +75,7 @@ declare const rect: any;
 declare const textAlign: any;
 declare const textSize: any;
 declare const text: any;
+declare const key: any;
 declare const CENTER: any;
 declare const LEFT: any;
 declare const TOP: any;
@@ -294,11 +303,11 @@ function executePlacement() {
         const wPos = targetInstance.getWorldPos();
         if (targetInstance instanceof AttachedTurret) {
           const indexToReplace = state.player.attachments.indexOf(targetInstance);
-          const newTurret = new AttachedTurret(state.mergeTargetPreview.type, state.player, targetInstance.hq, targetInstance.hr);
+          const newTurret = createAttachedTurret(state.mergeTargetPreview.type, state.player, targetInstance.hq, targetInstance.hr);
           newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
           state.player.attachments[indexToReplace] = newTurret;
         } else if (targetInstance instanceof WorldTurret) {
-          const newTurret = new WorldTurret(state.mergeTargetPreview.type, targetInstance.gx, targetInstance.gy);
+          const newTurret = createWorldTurret(state.mergeTargetPreview.type, targetInstance.gx, targetInstance.gy);
           newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
           state.world.removeTurret(targetInstance.gx, targetInstance.gy);
           state.world.addTurret(newTurret);
@@ -313,6 +322,7 @@ function executePlacement() {
         
         // If we were dragging an instance, it's now consumed
         if (state.draggedTurretInstance) {
+          triggerUpgradeHook('onMerge', state.draggedTurretInstance, {});
           if (state.draggedTurretInstance instanceof AttachedTurret) {
             const idx = state.player.attachments.indexOf(state.draggedTurretInstance);
             if (idx !== -1) state.player.attachments.splice(idx, 1);
@@ -332,29 +342,38 @@ function executePlacement() {
     
     if (activePlacementType) {
       if (isOwned || (state.sunCurrency >= sunCost && state.elixirCurrency >= elixirCost && state.soilCurrency >= soilCost)) {
+        let preservedHp = undefined;
         if (isOwned) {
           state.inventory.items[activePlacementType]--;
           const specIdx = state.inventory.specList.findIndex((item: any) => item.key === activePlacementType);
-          if (specIdx !== -1) state.inventory.specList.splice(specIdx, 1);
+          if (specIdx !== -1) {
+            preservedHp = state.inventory.specList[specIdx].hp;
+            state.inventory.specList.splice(specIdx, 1);
+          }
         } else {
           state.sunCurrency -= sunCost;
           state.elixirCurrency -= elixirCost;
           state.soilCurrency -= soilCost;
         }
-        state.world.addTurret(new WorldTurret(type, gx, gy));
+        const wt = createWorldTurret(type, gx, gy);
+        if (preservedHp !== undefined) wt.health = preservedHp;
+        state.world.addTurret(wt);
         state.totalTurretsAcquired++;
         state.turretLastUsed[activePlacementType] = state.frames;
         state.selectedTurretType = null; // Deselect after placement
       }
     } else if (state.draggedTurretInstance) {
       // Moving from hex grid or world grid to world grid
+      const preservedHp = state.draggedTurretInstance.health;
       if (state.draggedTurretInstance instanceof AttachedTurret) {
         const idx = state.player.attachments.indexOf(state.draggedTurretInstance);
         if (idx !== -1) state.player.attachments.splice(idx, 1);
       } else if (state.draggedTurretInstance instanceof WorldTurret) {
         state.world.removeTurret(state.draggedTurretInstance.gx, state.draggedTurretInstance.gy);
       }
-      state.world.addTurret(new WorldTurret(type, gx, gy));
+      const wt = createWorldTurret(type, gx, gy);
+      if (preservedHp !== undefined) wt.health = preservedHp;
+      state.world.addTurret(wt);
       state.draggedTurretInstance = null;
     }
     return;
@@ -379,6 +398,7 @@ function executePlacement() {
                         state.soilCurrency >= (isOwned ? 0 : soilCost);
         
         if (canAfford) {
+          triggerUpgradeHook('onMerge', target, {});
           if (isOwned) {
              state.inventory.items[activePlacementType]--;
              // Also remove one instance from specList
@@ -391,7 +411,7 @@ function executePlacement() {
              state.soilCurrency -= soilCost;
           }
           const indexToReplace = state.player.attachments.indexOf(target);
-          const newTurret = new AttachedTurret(state.mergeTargetPreview.type, state.player, target.hq, target.hr);
+          const newTurret = createAttachedTurret(state.mergeTargetPreview.type, state.player, target.hq, target.hr);
           newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
           state.player.attachments[indexToReplace] = newTurret;
           state.totalTurretsAcquired++;
@@ -400,22 +420,36 @@ function executePlacement() {
         }
       }
     } else {
+      const maxCapacity = getPlayerUpgradeStat('turretAttachCapacity');
+      const doesCount = config?.countTowardAttachedCapacity !== false && config?.CountTowardAttachedCapacity !== false;
+      if (doesCount && state.player.getAttachedCount() >= maxCapacity) {
+        state.selectedTurretType = null;
+        state.draggedTurretType = null;
+        state.draggedTurretInstance = null;
+        state.isCurrentlyDragging = false;
+        return;
+      }
       const canAfford = isOwned || (
         state.sunCurrency >= sunCost &&
         state.elixirCurrency >= elixirCost &&
         state.soilCurrency >= soilCost
       );
       if (canAfford) {
+        let preservedHp = undefined;
         if (isOwned) {
           state.inventory.items[activePlacementType]--;
           const specIdx = state.inventory.specList.findIndex((item: any) => item.key === activePlacementType);
-          if (specIdx !== -1) state.inventory.specList.splice(specIdx, 1);
+          if (specIdx !== -1) {
+            preservedHp = state.inventory.specList[specIdx].hp;
+            state.inventory.specList.splice(specIdx, 1);
+          }
         } else {
           state.sunCurrency -= sunCost;
           state.elixirCurrency -= elixirCost;
           state.soilCurrency -= soilCost;
         }
-        const nt = new AttachedTurret(activePlacementType, state.player, snapAxial.q, snapAxial.r);
+        const nt = createAttachedTurret(activePlacementType, state.player, snapAxial.q, snapAxial.r);
+        if (preservedHp !== undefined) nt.health = preservedHp;
         state.player.attachments.push(nt);
         state.totalTurretsAcquired++;
         state.turretLastUsed[activePlacementType] = state.frames;
@@ -438,24 +472,31 @@ function executePlacement() {
           state.player.attachments.splice(indexToDelete, 1);
         }
 
-        const newTurret = new AttachedTurret(state.mergeTargetPreview.type, state.player, target.hq, target.hr);
+        const newTurret = createAttachedTurret(state.mergeTargetPreview.type, state.player, target.hq, target.hr);
         newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
         state.player.attachments[indexToReplace] = newTurret;
         state.totalTurretsAcquired++;
         state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y, [255, 255, 255]));
       }
-    } else if (!state.mergeTargetPreview) {
+    } else if (!state.mergeTargetPreview && state.previewSnapPos) {
       // Only move if NOT attempting a merge (or if merge was impossible/unaffordable, we don't snap to the target)
       if (state.draggedTurretInstance instanceof WorldTurret) {
-         state.world.removeTurret(state.draggedTurretInstance.gx, state.draggedTurretInstance.gy);
-         const nt = new AttachedTurret(state.draggedTurretInstance.type, state.player, snapAxial.q, snapAxial.r);
-         state.player.attachments.push(nt);
+         const maxCapacity = getPlayerUpgradeStat('turretAttachCapacity') || 6;
+         const doesCount = state.draggedTurretInstance.config?.countTowardAttachedCapacity !== false && state.draggedTurretInstance.config?.CountTowardAttachedCapacity !== false;
+         if (!doesCount || state.player.getAttachedCount() < maxCapacity) {
+           const preservedHp = state.draggedTurretInstance.health;
+           state.world.removeTurret(state.draggedTurretInstance.gx, state.draggedTurretInstance.gy);
+           const nt = createAttachedTurret(state.draggedTurretInstance.type, state.player, snapAxial.q, snapAxial.r);
+           if (preservedHp !== undefined) nt.health = preservedHp;
+           state.player.attachments.push(nt);
+           state.vfx.push(new MergeVFX(state.previewSnapPos.x, state.previewSnapPos.y, [255, 255, 255]));
+         }
       } else {
          state.draggedTurretInstance.hq = snapAxial.q;
          state.draggedTurretInstance.hr = snapAxial.r;
          state.draggedTurretInstance.offset = axialToWorld(snapAxial.q, snapAxial.r);
+         state.vfx.push(new MergeVFX(state.previewSnapPos.x, state.previewSnapPos.y, [255, 255, 255]));
       }
-      state.vfx.push(new MergeVFX(state.previewSnapPos.x, state.previewSnapPos.y, [255, 255, 255]));
     }
   }
   state.draggedTurretInstance = null; state.draggedTurretType = null; state.selectedTurretType = null; state.isCurrentlyDragging = false; state.mergeTargetPreview = null; state.previewSnapPos = null;
@@ -464,6 +505,10 @@ function executePlacement() {
 export function autoPlaceTurret(type: string) {
   const tr = turretTypes[type];
   if (!tr) return;
+
+  const maxCapacity = getPlayerUpgradeStat('turretAttachCapacity');
+  const doesCount = tr.countTowardAttachedCapacity !== false && tr.CountTowardAttachedCapacity !== false;
+  if (doesCount && state.player.getAttachedCount() >= maxCapacity) return;
 
   const isOwned = (state.inventory.items[type] || 0) > 0;
   const sunCost = tr.costs?.sun || tr.cost || 0;
@@ -501,24 +546,27 @@ export function autoPlaceTurret(type: string) {
         }
       }
     } else if (type === 't0_puffshroom') {
-      // Find nearest available spot
-      let minDist = Infinity;
-      const rangeLimit = 5;
-      for (let q = -rangeLimit; q <= rangeLimit; q++) {
-        for (let r = -rangeLimit; r <= rangeLimit; r++) {
-          if (abs(q) + abs(r) + abs(-q-r) <= rangeLimit * 2) {
-            if (q === 0 && r === 0) continue;
-            const wPos = axialToWorld(q, r).add(state.player.pos);
-            const d = dist(state.player.pos.x, state.player.pos.y, wPos.x, wPos.y);
-            
-            const occupant = state.player.attachments.find((a: any) => a.hq === q && a.hr === r && (a.config.turretLayer || 'normal') === 'normal');
-            if (!occupant && isAdjacent(q, r)) {
-              const isClear = !state.world.checkCollision(wPos.x, wPos.y, tr.size * 0.55);
-              if (isClear && d < minDist) {
-                minDist = d;
-                bestQ = q;
-                bestR = r;
-                found = true;
+      const maxCapacity = getPlayerUpgradeStat('turretAttachCapacity') || 6;
+      if (state.player.attachments.length < maxCapacity) {
+        // Find nearest available spot
+        let minDist = Infinity;
+        const rangeLimit = 5;
+        for (let q = -rangeLimit; q <= rangeLimit; q++) {
+          for (let r = -rangeLimit; r <= rangeLimit; r++) {
+            if (abs(q) + abs(r) + abs(-q-r) <= rangeLimit * 2) {
+              if (q === 0 && r === 0) continue;
+              const wPos = axialToWorld(q, r).add(state.player.pos);
+              const d = dist(state.player.pos.x, state.player.pos.y, wPos.x, wPos.y);
+              
+              const occupant = state.player.attachments.find((a: any) => a.hq === q && a.hr === r && (a.config.turretLayer || 'normal') === 'normal');
+              if (!occupant && isAdjacent(q, r)) {
+                const isClear = !state.world.checkCollision(wPos.x, wPos.y, tr.size * 0.55);
+                if (isClear && d < minDist) {
+                  minDist = d;
+                  bestQ = q;
+                  bestR = r;
+                  found = true;
+                }
               }
             }
           }
@@ -528,17 +576,22 @@ export function autoPlaceTurret(type: string) {
 
   if (found) {
     // Deduct cost
+    let preservedHp = undefined;
     if (isOwned) {
       state.inventory.items[type]--;
       const specIdx = state.inventory.specList.findIndex((item: any) => item.key === type);
-      if (specIdx !== -1) state.inventory.specList.splice(specIdx, 1);
+      if (specIdx !== -1) {
+        preservedHp = state.inventory.specList[specIdx].hp;
+        state.inventory.specList.splice(specIdx, 1);
+      }
     } else {
       state.sunCurrency -= sunCost;
       state.elixirCurrency -= elixirCost;
       state.soilCurrency -= soilCost;
     }
 
-    const nt = new AttachedTurret(type, state.player, bestQ, bestR);
+    const nt = createAttachedTurret(type, state.player, bestQ, bestR);
+    if (preservedHp !== undefined) nt.health = preservedHp;
     state.player.attachments.push(nt);
     state.totalTurretsAcquired++;
     state.turretLastUsed[type] = state.frames;
@@ -556,7 +609,21 @@ export function autoPlaceTurret(type: string) {
 
 (window as any).preload = () => {
   state.assets = {};
-  for (const [key, url] of Object.entries(ASSETS)) { state.assets[key] = loadImage(url); }
+  for (const [key, url] of Object.entries(ASSETS)) {
+    try {
+      state.assets[key] = loadImage(
+        url,
+        () => {},
+        (err: any) => {
+          console.warn(`Failed to load asset [${key}] from ${url}:`, err);
+          state.assets[key] = (window as any).createImage ? (window as any).createImage(32, 32) : null;
+        }
+      );
+    } catch (e) {
+      console.warn(`Error initializing asset [${key}]:`, e);
+      state.assets[key] = null;
+    }
+  }
 };
 
 (window as any).setup = () => {
@@ -579,12 +646,24 @@ function uiTick() {
   updateUnlockPopup();
 }
 
+import { recalculateAllStats } from './src/upgrades';
+
 function tick() {
   if (state.isPaused) return;
-
+  recalculateAllStats();
   state.frames++;
 
   if (state.isGameOver) {
+    if (!state.showGameOverPopup) {
+      if (state.gameOverDelayTimer > 0) {
+        state.gameOverDelayTimer--;
+        if (state.gameOverDelayTimer <= 0) {
+          state.showGameOverPopup = true;
+        }
+      } else {
+        state.showGameOverPopup = true;
+      }
+    }
     state.gameOverProgress = lerp(state.gameOverProgress, state.showGameOverPopup ? 1 : 0, 0.05);
   }
 
@@ -606,10 +685,36 @@ function tick() {
   for (let i = state.groundFeatures.length - 1; i >= 0; i--) { state.groundFeatures[i].update(); if (state.groundFeatures[i].life <= 0) state.groundFeatures.splice(i, 1); }
   for (let npc of state.npcs) npc.update(state.player.pos);
   
+  if (state.player) {
+    flowField.update(state.player.pos);
+  }
+
   for (let i = state.enemies.length - 1; i >= 0; i--) { 
     state.enemies[i].update(state.player.pos); 
     if (state.enemies[i].health <= 0 || state.enemies[i].markedForDespawn) state.enemies.splice(i, 1); 
   }
+
+  // WinCondition check
+  if (!state.isGameOver && state.currentScreen === 'game') {
+    const winEnemies = (state.enemies || []).filter((e: any) => e.isWinCondition);
+    if (state.winConditionActive || winEnemies.length > 0) {
+      state.winConditionActive = true;
+      const aliveWinEnemies = winEnemies.filter((e: any) => e.health > 0 && !e.isDying).length;
+      if (aliveWinEnemies === 0 && state.player && state.player.health > 0) {
+        state.isGameOver = true;
+        state.showGameOverPopup = false;
+        state.gameOverDelayTimer = 60; // 1s delay before popup
+        state.isLevelCompleted = true;
+        if (state.currentLevelId) {
+          state.clearedLevels.add(state.currentLevelId);
+          try {
+            localStorage.setItem('grapeshooter_cleared_levels', JSON.stringify([...state.clearedLevels]));
+          } catch (e) {}
+        }
+      }
+    }
+  }
+
   state.player.update();
   for (let i = state.bullets.length - 1; i >= 0; i--) { state.bullets[i].update(); if (state.bullets[i].life <= 0) state.bullets.splice(i, 1); }
   for (let i = state.enemyBullets.length - 1; i >= 0; i--) { state.enemyBullets[i].update(); if (state.enemyBullets[i].life <= 0) state.enemyBullets.splice(i, 1); }
@@ -622,6 +727,15 @@ function tick() {
 }
 
 (window as any).draw = () => {
+  if (state.currentScreen === 'main_menu') {
+    drawMainMenu();
+    return;
+  }
+  if (state.currentScreen === 'level_editor') {
+    drawLevelEditor();
+    return;
+  }
+
   const now = (window as any).performance.now();
   if (state.lastFrameTime === 0) state.lastFrameTime = now;
   const deltaTime = now - state.lastFrameTime;
@@ -768,6 +882,18 @@ function tick() {
     else e.display();
   }
 
+  if (state.showPlayerGizmos && state.player) {
+    push();
+    const magRadius = getPlayerUpgradeStat('magnetRadius') || 50;
+    noFill();
+    stroke(100, 200, 255, 180);
+    strokeWeight(1.5);
+    ellipse(state.player.pos.x, state.player.pos.y, magRadius * 2, magRadius * 2);
+    fill(100, 200, 255, 30);
+    ellipse(state.player.pos.x, state.player.pos.y, magRadius * 2, magRadius * 2);
+    pop();
+  }
+
   for (let i = state.bullets.length - 1; i >= 0; i--) { state.bullets[i].display(); }
   for (let i = state.enemyBullets.length - 1; i >= 0; i--) { state.enemyBullets[i].display(); }
   for (let i = state.vfx.length - 1; i >= 0; i--) { state.vfx[i].display(); }
@@ -796,40 +922,50 @@ function tick() {
     let closestDist = Infinity; let bestSnap = null; let bestMergeTarget = null; let bestMergeInfo = null;
     const rangeLimit = 8;
 
-    // 1. Draw all available empty spots and find bestSnap
+    const rawCap = getPlayerUpgradeStat('turretAttachCapacity');
+    const maxCapacity = (rawCap !== undefined && rawCap !== null) ? rawCap : 6;
+    const currentAttachedCount = state.player.getAttachedCount ? state.player.getAttachedCount() : state.player.attachments.length;
+    const doesCount = ghostConfig ? (ghostConfig.countTowardAttachedCapacity !== false && ghostConfig.CountTowardAttachedCapacity !== false) : true;
+    const canAttachNew = (!doesCount || currentAttachedCount < maxCapacity) && maxCapacity > 0;
+    const isRepositioningAttached = state.draggedTurretInstance instanceof AttachedTurret;
+    const allowAttachedSlots = isRepositioningAttached || canAttachNew;
+
+    // 1. Draw all available empty spots and find bestSnap (if capacity allows or repositioning)
     state.previewWorldSnap = null;
-    for (let q = -rangeLimit; q <= rangeLimit; q++) {
-      for (let r = -rangeLimit; r <= rangeLimit; r++) {
-        if (abs(q) + abs(r) + abs(-q-r) <= rangeLimit * 2) {
-          const wPos = axialToWorld(q, r).add(state.player.pos);
-          const d = dist(mWorld.x, mWorld.y, wPos.x, wPos.y);
-          let coreOccupant = (q === 0 && r === 0);
-          if (coreOccupant) continue;
-          
-          let normalOccupant = state.player.attachments.find((a: any) => a.hq === q && a.hr === r && (a.config.turretLayer || 'normal') === 'normal');
-          let groundOccupant = state.player.attachments.find((a: any) => a.hq === q && a.hr === r && a.config.turretLayer === 'ground');
-          let occupantOnSameLayer = ghostLayer === 'ground' ? groundOccupant : normalOccupant;
+    if (allowAttachedSlots) {
+      for (let q = -rangeLimit; q <= rangeLimit; q++) {
+        for (let r = -rangeLimit; r <= rangeLimit; r++) {
+          if (abs(q) + abs(r) + abs(-q-r) <= rangeLimit * 2) {
+            const wPos = axialToWorld(q, r).add(state.player.pos);
+            const d = dist(mWorld.x, mWorld.y, wPos.x, wPos.y);
+            let coreOccupant = (q === 0 && r === 0);
+            if (coreOccupant) continue;
+            
+            let normalOccupant = state.player.attachments.find((a: any) => a.hq === q && a.hr === r && (a.config.turretLayer || 'normal') === 'normal');
+            let groundOccupant = state.player.attachments.find((a: any) => a.hq === q && a.hr === r && a.config.turretLayer === 'ground');
+            let occupantOnSameLayer = ghostLayer === 'ground' ? groundOccupant : normalOccupant;
 
-          if (!occupantOnSameLayer || occupantOnSameLayer === state.draggedTurretInstance) {
-            if (isAdjacent(q, r, state.draggedTurretInstance)) {
-              const isClear = !state.world.checkCollision(wPos.x, wPos.y, ghostConfig.size * 0.55);
-              if (isClear) {
-                const canAfford = state.sunCurrency >= purchaseCost;
-                push(); translate(wPos.x, wPos.y);
-                noStroke();
-                fill(canAfford ? [100, 255, 150, 80] : [255, 100, 100, 80]);
-                ellipse(0, 0, 15, 15);
-                stroke(canAfford ? [100, 255, 150, 150] : [255, 100, 100, 150]);
-                strokeWeight(2);
-                noFill();
-                ellipse(0, 0, 20, 20);
-                pop();
+            if (!occupantOnSameLayer || occupantOnSameLayer === state.draggedTurretInstance) {
+              if (isAdjacent(q, r, state.draggedTurretInstance)) {
+                const isClear = !state.world.checkCollision(wPos.x, wPos.y, ghostConfig.size * 0.55);
+                if (isClear) {
+                  const canAfford = state.sunCurrency >= purchaseCost;
+                  push(); translate(wPos.x, wPos.y);
+                  noStroke();
+                  fill(canAfford ? [100, 255, 150, 80] : [255, 100, 100, 80]);
+                  ellipse(0, 0, 15, 15);
+                  stroke(canAfford ? [100, 255, 150, 150] : [255, 100, 100, 150]);
+                  strokeWeight(2);
+                  noFill();
+                  ellipse(0, 0, 20, 20);
+                  pop();
 
-                if (d < closestDist && d < GRID_SIZE * 3) {
-                  closestDist = d; bestSnap = wPos; bestMergeTarget = null; bestMergeInfo = null;
+                  if (d < closestDist && d < GRID_SIZE * 3) {
+                    closestDist = d; bestSnap = wPos; bestMergeTarget = null; bestMergeInfo = null;
+                  }
+                } else if (d < 30) {
+                  push(); translate(wPos.x, wPos.y); stroke(255, 50, 50, 180); strokeWeight(2); line(-5, -5, 5, 5); line(5, -5, -5, 5); pop();
                 }
-              } else if (d < 30) {
-                push(); translate(wPos.x, wPos.y); stroke(255, 50, 50, 180); strokeWeight(2); line(-5, -5, 5, 5); line(5, -5, -5, 5); pop();
               }
             }
           }
@@ -851,11 +987,11 @@ function tick() {
         const d = dist(mWorld.x, mWorld.y, wx, wy);
         if (d < GRID_SIZE * 5) {
           // Check if spot is too close to any attached turret or the player core
-          const safeDist = GRID_SIZE * 2; 
+          const safeDist = allowAttachedSlots ? GRID_SIZE * 2 : 0; 
           const isTooClose = state.player.attachments.some((att: any) => {
             const attPos = att.getWorldPos();
-            return dist(wx, wy, attPos.x, attPos.y) < safeDist;
-          }) || dist(wx, wy, state.player.pos.x, state.player.pos.y) < safeDist;
+            return dist(wx, wy, attPos.x, attPos.y) < (allowAttachedSlots ? safeDist : GRID_SIZE * 0.8);
+          }) || (allowAttachedSlots && dist(wx, wy, state.player.pos.x, state.player.pos.y) < safeDist) || dist(wx, wy, state.player.pos.x, state.player.pos.y) < (state.player.size * 0.35);
           
           if (!isTooClose && !state.world.isBlockAt(wx, wy) && !state.world.getTurretAt(gx, gy)) {
             const canAfford = state.sunCurrency >= purchaseCost;
@@ -982,6 +1118,14 @@ function tick() {
     const dragging = state.draggedTurretInstance; const wPos = dragging.getWorldPos();
     stroke(255, 127); strokeWeight(2); line(wPos.x, wPos.y, mWorld.x, mWorld.y);
   }
+
+  if (state.debugDrawTurretPath) {
+    drawTurretPathDebug();
+  }
+
+  if (state.debugGizmosEnemies) {
+    flowField.drawDebug();
+  }
   pop(); 
 
   // Apply speedup flash effect to global lighting
@@ -1018,6 +1162,46 @@ function tick() {
 };
 
 (window as any).mousePressed = () => {
+  if (handleUnlockPopupClick()) return;
+
+  if (state.currentScreen === 'main_menu') {
+    handleMainMenuClick();
+    return;
+  }
+  if (state.currentScreen === 'level_editor') {
+    handleLevelEditorClick();
+    return;
+  }
+
+  // If Almanac is open during gameplay, route input strictly to Almanac and block canvas interaction
+  if (state.isAlmanacOpen) {
+    handleAlmanacClick();
+    state.ignoreGameplayClickUntilRelease = true;
+    return;
+  }
+
+  if (state.isGameOver) {
+    if (handleGameOverClick()) return;
+  }
+
+  if (handleGameSpeedButtonClick()) {
+    state.ignoreGameplayClickUntilRelease = true;
+    return;
+  }
+
+  if (state.activeNPC && handleNpcUiPress()) {
+    state.ignoreGameplayClickUntilRelease = true;
+    return;
+  }
+
+  if (isMouseOverUI()) {
+    return;
+  }
+
+  if (state.ignoreGameplayClickUntilRelease) {
+    return;
+  }
+
   state.needsTargetReScan = true;
   const RIGHT: any = (window as any).RIGHT;
   const mouseButton: any = (window as any).mouseButton;
@@ -1038,19 +1222,6 @@ function tick() {
     state.playerSpeedMultiplier = 0; // Reset speed multiplier on new click
   }
 
-  if (handleUnlockPopupClick()) return;
-
-  if (handleAlmanacClick()) return;
-
-  if (state.isGameOver) {
-    if (handleGameOverClick()) return;
-  }
-
-  if (handleGameSpeedButtonClick()) return; // Handle game speed buttons first
-
-  if (state.activeNPC && handleNpcUiPress()) {
-    return;
-  }
   if (mouseX > state.uiWidth && state.isStationary) {
     const activePlacementType = state.isCurrentlyDragging ? state.draggedTurretType : state.selectedTurretType;
     const isScaling = !!(activePlacementType || state.draggedTurretInstance);
@@ -1101,6 +1272,16 @@ function tick() {
 }
 
 (window as any).mouseDragged = () => {
+  if (state.currentScreen === 'level_editor') return;
+  if (state.ignoreGameplayClickUntilRelease) return;
+
+  if (state.isAlmanacOpen) {
+    if (state.isAlmanacEditorMode && state.almanacTab === 'Upgrades' && state.activePlayerUpgradeInput?.isDragging) {
+      handlePlayerUpgradeMouseDrag(mouseX, mouseY);
+    }
+    return;
+  }
+
   if (state.simulateTouchScreen) {
     handleTouchMoved([{ x: mouseX, y: mouseY }]);
   } else if (state.touchStartPos) {
@@ -1142,6 +1323,31 @@ function tick() {
 };
 
 (window as any).mouseReleased = () => {
+  const wasIgnored = state.ignoreGameplayClickUntilRelease;
+  state.ignoreGameplayClickUntilRelease = false;
+
+  if (state.currentScreen === 'level_editor') {
+    handleLevelEditorMouseRelease();
+    return;
+  }
+
+  if (state.isAlmanacOpen) {
+    handlePlayerUpgradeMouseRelease();
+    return;
+  }
+
+  if (wasIgnored) {
+    if (state.simulateTouchScreen) {
+      handleTouchEnded();
+    } else {
+      state.touchStartPos = null;
+      state.touchInputVec = { x: 0, y: 0 };
+      state.playerSpeedMultiplier = 0;
+    }
+    if (state.player) state.player.isClickHolding = false;
+    return;
+  }
+
   state.needsTargetReScan = true;
   if (state.simulateTouchScreen) {
     handleTouchEnded();
@@ -1185,6 +1391,9 @@ function tick() {
 (window as any).mouseWheel = (event: any) => {
   if (state.isGameOver) return;
   if (state.isAlmanacOpen) {
+    if (state.almanacTab === 'LevelConfig') {
+      if (handleLevelConfigScroll(event.delta)) return false;
+    }
     const modalW = Math.min(1050, width * 0.9);
     const leftPanelW = modalW * 0.6;
     const x = (width - modalW) / 2;
@@ -1196,6 +1405,13 @@ function tick() {
       state.almanacScrollVelocity -= event.delta * 0.25;
     }
     return false;
+  }
+  if (state.currentScreen === 'main_menu') {
+    state.mainMenuScrollVelocity = (state.mainMenuScrollVelocity || 0) - event.delta * 0.25;
+    return false;
+  }
+  if (state.currentScreen === 'level_editor') {
+    if (handleLevelEditorScroll(event.delta)) return false;
   }
   if (state.showDebug && mouseX > width - 280) { state.debugScrollVelocity -= event.delta * 0.1; return false; }
   if (state.activeNPC && mouseX > width - 320) { state.npcShopScrollVelocity -= event.delta * 0.1; return false; }
@@ -1225,13 +1441,46 @@ function tick() {
   return false;
 };
 
-(window as any).keyPressed = () => {
+(window as any).keyPressed = (event: any) => {
+  if (state.isAlmanacOpen && state.almanacTab === 'LevelConfig' && state.activeLevelConfigInput) {
+    const k = event?.key || key;
+    const code = event?.keyCode || keyCode;
+    if (handleLevelConfigKeyInput(k, code, event)) {
+      return false;
+    }
+  }
+  if (state.isAlmanacOpen && state.almanacTab === 'Upgrades' && state.isAlmanacEditorMode && state.activePlayerUpgradeInput) {
+    const k = event?.key || key;
+    const code = event?.keyCode || keyCode;
+    if (handlePlayerUpgradeKeyInput(k, code, event)) {
+      return false;
+    }
+  }
+  if (state.currentScreen === 'level_editor' && state.levelEditor?.activeSpawnerInput) {
+    const k = event?.key || key;
+    const code = event?.keyCode || keyCode;
+    if (handleSpawnerKeyInput(k, code, event)) {
+      return false;
+    }
+  }
   state.needsTargetReScan = true;
   if (keyCode === 87 || keyCode === 65 || keyCode === 83 || keyCode === 68) { // W, A, S, D
     state.isWASDInput = true;
   }
   if (keyCode === 32) { // Spacebar
     state.player.isClickHolding = true;
+  }
+};
+
+(window as any).keyTyped = (event: any) => {
+  if (state.isAlmanacOpen && state.almanacTab === 'LevelConfig' && state.activeLevelConfigInput) {
+    return false;
+  }
+  if (state.isAlmanacOpen && state.almanacTab === 'Upgrades' && state.isAlmanacEditorMode && state.activePlayerUpgradeInput) {
+    return false;
+  }
+  if (state.currentScreen === 'level_editor' && state.levelEditor?.activeSpawnerInput) {
+    return false;
   }
 };
 

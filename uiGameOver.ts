@@ -1,6 +1,7 @@
 
 import { state } from './state';
 import { ENEMY_KEYS } from './lvDemo';
+import { restoreLevelFromCache } from './levelEditor';
 
 declare const floor: any;
 declare const push: any;
@@ -48,6 +49,23 @@ export function handleGameOverClick(): boolean {
     state.showGameOverPopup = false;
     return true;
   }
+
+  // Check Main Menu / Return Button Click
+  const btnW = 190;
+  const btnH = 38;
+  const btnY = my + MODAL_H/2 - 40;
+  if (Math.abs(mouseX - mx) < btnW/2 && Math.abs(mouseY - btnY) < btnH/2) {
+    if (state.isEditorPlaytest && state.levelEditorCache) {
+      restoreLevelFromCache(state.levelEditorCache);
+    } else {
+      state.currentScreen = 'main_menu';
+    }
+    state.isGameOver = false;
+    state.showGameOverPopup = false;
+    state.isLevelCompleted = false;
+    return true;
+  }
+
   return false;
 }
 
@@ -100,9 +118,9 @@ export function drawGameOver() {
   textSize(20);
   fill(255, 235, 90, p * 255);
   noStroke();
-  text("Game Over", 0, -MODAL_H/2+10 + 80);
+  const titleText = state.isLevelCompleted ? "LEVEL COMPLETED!" : "GAME OVER";
+  text(titleText, 0, -MODAL_H/2+10 + 80);
   
-  // Fixed 'Cannot find name stroke' error
   stroke(255, 235, 90, p * 100);
   strokeWeight(1);
   line(-MODAL_W/4, -MODAL_H/2 + 105, MODAL_W/4, -MODAL_H/2 + 105);
@@ -160,11 +178,27 @@ export function drawGameOver() {
     pop();
   }
   
-  // Footer
-  fill(255, 235, 90, p * 180);
+  // Return Button
+  const isPlaytest = !!state.isEditorPlaytest;
+  const btnText = isPlaytest ? "RETURN TO EDITOR" : "MAIN MENU";
+  const btnW = 190;
+  const btnH = 38;
+  const btnY = MODAL_H/2 - 40;
+  const hovBtn = Math.abs(mouseX - mx) < btnW/2 && Math.abs(mouseY - (my + btnY)) < btnH/2;
+
+  push();
+  translate(0, btnY);
+  fill(hovBtn ? [40, 180, 100] : [25, 120, 65], p * 255);
+  stroke(hovBtn ? [100, 255, 180] : [50, 200, 120], p * 255);
+  strokeWeight(2);
+  rect(0, 0, btnW, btnH, 19);
+
+  fill(255, p * 255);
   noStroke();
-  textSize(14);
-  text("Under construction, restart the browser to try again! Join my discord server if you have feedback :)", 0, MODAL_H/2 - 30);
-  
+  textAlign(CENTER, CENTER);
+  textSize(13);
+  text(btnText, 0, 0);
+  pop();
+
   pop();
 }

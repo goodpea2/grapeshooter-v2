@@ -2,7 +2,10 @@
 import { state } from '../../state';
 import { drawTurretList } from './turretList';
 import { drawTurretInfoPanel } from './turretInfoPanel';
-import { drawTurretUnlockButton } from './turretUnlockButton';
+import { drawTurretUnlockButton, isTurretUnlockAvailable } from './turretUnlockButton';
+import { drawUpgradeSelectionPopup } from './upgradeSelectionPopup';
+import { drawPlayerUpgradesPanel, handlePlayerUpgradesClick } from './playerUpgradesPanel';
+import { drawLevelConfigPanel, handleLevelConfigClick } from './levelConfigPanel';
 
 declare const push: any;
 declare const pop: any;
@@ -62,92 +65,124 @@ export function drawAlmanac() {
   fill(27, 31, 57);
   rect(0, 0, modalW, modalH, 40);
 
-  // --- Resource Bar (Top of Left Panel) ---
-const resBarY = 15;
-const resXStart = 40;
-
-const iconSize = 32;
-const padding = -2;     // space between icon and text, the resource img has a lot of spaces itself
-const itemGap = 4;     // space between resources
-
-const allResources = [
-  { key: 'sun', icon: 'img_icon_sun', val: state.sunCurrency },
-  { key: 'elixir', icon: 'img_icon_elixir', val: state.elixirCurrency },
-  { key: 'soil', icon: 'img_icon_soil', val: state.soilCurrency },
-  { key: 'raisin', icon: 'img_icon_raisin', val: state.raisinCurrency },
-  { key: 'leaf', icon: 'img_icon_leaf', val: state.leafCurrency },
-  { key: 'shard', icon: 'img_icon_shard', val: state.shardCurrency },
-  { key: 'shell', icon: 'img_icon_shell', val: state.shellCurrency },
-  { key: 'fuel', icon: 'img_icon_fuel', val: state.fuelCurrency },
-  { key: 'ice', icon: 'img_icon_ice', val: state.iceCurrency },
-];
-
-// Only show resources the player has at least one of
-const resources = allResources.filter(r => r.val > 0);
-
-push();
-imageMode(CENTER);
-textAlign(LEFT, CENTER);
-textSize(16);
-
-// Calculate total width first (for background pill)
-let totalW = 10;
-for (let res of resources) {
-  const valText = floor(res.val).toString();
-  const textW = textWidth(valText);
-  totalW += iconSize + padding + textW + itemGap;
-}
-
-// Draw pill
-if (resources.length > 0) {
-  fill(0);
-  noStroke();
-  rect(resXStart - 15, resBarY, totalW, 28, 12);
-
-  let cursorX = resXStart;
-
-  for (let res of resources) {
-    const ry = resBarY + 14;
-    const valText = floor(res.val).toString();
-    const textW = textWidth(valText);
-
-    image(state.assets[res.icon], cursorX, ry, iconSize, iconSize);
-
-    fill(255);
-    text(valText, cursorX + iconSize/2 + padding, ry + 2);
-
-    cursorX += iconSize + padding + textW + itemGap;
-  }
-}
-
-pop();
-  
   // Layout proportions
   const leftPanelW = modalW * 0.6;
   const rightPanelW = modalW - leftPanelW - 40;
-  
-  // Left Panel: Turret Grid Area
-  push();
-  translate(20, 50);
-  fill(15, 18, 35, 150);
-  noStroke();
-  rect(0, 0, leftPanelW - 20, modalH - 70, 25);
-  drawTurretList(10, 10, leftPanelW - 20, modalH - 80, x + 20, y + 60);
-  pop();
 
-  // Right Panel: Turret Details
-  const rightX = leftPanelW + 20;
-  const unlockH = 180; // Fixed height for unlock area
-  const infoH = (modalH) - unlockH - 20; // Remaining space minus padding
-  
-  drawTurretInfoPanel(rightX, 20, rightPanelW, infoH, x, y);
+  // --- Resource Bar / Editor Mode Title (Top of Left Panel) ---
+  const resBarY = 15;
+  const resXStart = 40;
 
-  // Bottom Right Unlock Area
-  drawTurretUnlockButton(rightX, 5 + infoH, rightPanelW, unlockH, x, y);
+  if (state.isAlmanacEditorMode) {
+    if (state.almanacTab !== 'Upgrades' && state.almanacTab !== 'LevelConfig') {
+      push();
+      fill(12, 15, 30, 220);
+      stroke(100, 70, 180);
+      strokeWeight(1.5);
+      rect(resXStart - 15, resBarY - 2, leftPanelW - 40, 32, 8);
+      noStroke();
+      fill(255, 230, 120);
+      textAlign(LEFT, CENTER);
+      textSize(11.5);
+      text("ALMANAC CONFIG: Available ➔ Locked ➔ NeedDiscovery [?] ➔ Banned [x]", resXStart, resBarY + 14);
+      pop();
+    }
+  } else {
+    const iconSize = 32;
+    const padding = -2;     // space between icon and text, the resource img has a lot of spaces itself
+    const itemGap = 4;     // space between resources
+
+    const allResources = [
+      { key: 'sun', icon: 'img_icon_sun', val: state.sunCurrency },
+      { key: 'elixir', icon: 'img_icon_elixir', val: state.elixirCurrency },
+      { key: 'soil', icon: 'img_icon_soil', val: state.soilCurrency },
+      { key: 'raisin', icon: 'img_icon_raisin', val: state.raisinCurrency },
+      { key: 'leaf', icon: 'img_icon_leaf', val: state.leafCurrency },
+      { key: 'shard', icon: 'img_icon_shard', val: state.shardCurrency },
+      { key: 'shell', icon: 'img_icon_shell', val: state.shellCurrency },
+      { key: 'fuel', icon: 'img_icon_fuel', val: state.fuelCurrency },
+      { key: 'ice', icon: 'img_icon_ice', val: state.iceCurrency },
+    ];
+
+    // Only show resources the player has at least one of
+    const resources = allResources.filter(r => r.val > 0);
+
+    push();
+    imageMode(CENTER);
+    textAlign(LEFT, CENTER);
+    textSize(16);
+
+    // Calculate total width first (for background pill)
+    let totalW = 10;
+    for (let res of resources) {
+      const valText = floor(res.val).toString();
+      const textW = textWidth(valText);
+      totalW += iconSize + padding + textW + itemGap;
+    }
+
+    // Draw pill
+    if (resources.length > 0) {
+      fill(0);
+      noStroke();
+      rect(resXStart - 15, resBarY, totalW, 28, 12);
+
+      let cursorX = resXStart;
+
+      for (let res of resources) {
+        const ry = resBarY + 14;
+        const valText = floor(res.val).toString();
+        const textW = textWidth(valText);
+
+        image(state.assets[res.icon], cursorX, ry, iconSize, iconSize);
+
+        fill(255);
+        text(valText, cursorX + iconSize/2 + padding, ry + 2);
+
+        cursorX += iconSize + padding + textW + itemGap;
+      }
+    }
+
+    pop();
+  }
+  
+  // Draw Content Based on Selected Tab
+  if (state.almanacTab === 'LevelConfig') {
+    drawLevelConfigPanel(20, 50, modalW - 40, modalH - 70, x, y);
+  } else if (state.almanacTab === 'Upgrades') {
+    drawPlayerUpgradesPanel(20, 50, modalW - 40, modalH - 70, x, y);
+  } else {
+    // Left Panel: Turret Grid Area
+    push();
+    translate(20, 50);
+    fill(15, 18, 35, 150);
+    noStroke();
+    rect(0, 0, leftPanelW - 20, modalH - 70, 25);
+    drawTurretList(10, 10, leftPanelW - 20, modalH - 80, x + 20, y + 60);
+    pop();
+
+    // Right Panel: Turret Details
+    const rightX = leftPanelW + 20;
+    const showUnlock = isTurretUnlockAvailable();
+    const unlockH = showUnlock ? 180 : 0;
+    const infoH = showUnlock ? ((modalH) - unlockH - 20) : (modalH - 70);
+    
+    drawTurretInfoPanel(rightX, 20, rightPanelW, infoH, x, y);
+
+    // Bottom Right Unlock Area
+    if (showUnlock) {
+      drawTurretUnlockButton(rightX, 5 + infoH, rightPanelW, unlockH, x, y);
+    }
+  }
 
   // Close Button
-  drawCloseButton(modalW - 40, 20, x, y);
+  if (!state.upgradeSelection) {
+    drawCloseButton(modalW - 40, 20, x, y);
+  }
 
+  // Upgrade Selection Popup (Overlays everything in Almanac)
+  if (state.upgradeSelection) {
+    drawUpgradeSelectionPopup(modalW, modalH);
+  }
 
   pop();
 }
@@ -157,14 +192,18 @@ function drawTabs(x: number, y: number, modalX: number, modalY: number) {
   const tabH = 60;
   const tabs = [
     { id: 'Turrets', icon: 'img_npc_farmer_front' },
-    { id: 'Enemies', icon: 'img_npc_shadie_front' },
+    // { id: 'Enemies', icon: 'img_npc_shadie_front' },
     { id: 'Upgrades', icon: 'img_player_front_right' }
   ];
+
+  if (state.isAlmanacEditorMode || state.currentScreen === 'level_editor') {
+    tabs.push({ id: 'LevelConfig', icon: 'img_icon_sun' });
+  }
 
   for (let i = 0; i < tabs.length; i++) {
     const tab = tabs[i];
     const tx = x;
-    const ty = y + i * (tabH + 30);
+    const ty = y + i * (tabH + 20);
     const isSel = state.almanacTab === tab.id;
     const hov = mouseX > modalX + tx && mouseX < modalX + tx + tabW && mouseY > modalY + ty && mouseY < modalY + ty + tabH;
 
@@ -191,17 +230,25 @@ function drawTabs(x: number, y: number, modalX: number, modalY: number) {
     
     rect(0, 0, tabW, tabH, 20);
     
-    const icon = state.assets[tab.icon] || state.assets['img_basic'];
-    if (icon) {
-      imageMode(CENTER);
-      if (!isSel) tint(255, 150);
-      image(icon, tabW/2-10, tabH/2-10, 104, 104);
-      noTint();
+    if (tab.id === 'LevelConfig') {
+      fill(255, 215, 60);
+      noStroke();
+      textAlign(CENTER, CENTER);
+      textSize(11);
+      text("LEVEL\nCONFIG", tabW / 2 - 10, tabH / 2);
+    } else {
+      const icon = state.assets[tab.icon] || state.assets['img_basic'];
+      if (icon) {
+        imageMode(CENTER);
+        if (!isSel) tint(255, 150);
+        image(icon, tabW/2-10, tabH/2-10, 104, 104);
+        noTint();
+      }
     }
     
     pop();
 
-    if (hov && mouseIsPressed) {
+    if (hov && mouseIsPressed && !state.upgradeSelection) {
       state.almanacTab = tab.id;
       (window as any).mouseIsPressed = false;
     }
@@ -226,22 +273,40 @@ function drawCloseButton(x: number, y: number, modalX: number, modalY: number) {
   if (hov && mouseIsPressed) {
     state.isAlmanacOpen = false;
     state.isPaused = false;
+    state.isAlmanacEditorMode = false;
     (window as any).mouseIsPressed = false;
   }
 }
 
 export function handleAlmanacClick(): boolean {
   if (!state.isAlmanacOpen) return false;
+  if (state.upgradeSelection) return true; // Block interaction if upgrade selection is open
   
   const modalW = Math.min(1050, width * 0.9);
   const modalH = Math.min(650, height * 0.9);
-  const x = (width - modalW) / 2-60;
+  const x = (width - modalW) / 2 + 30;
   const y = (height - modalH) / 2;
 
+  // Handle Level Config click
+  if (state.almanacTab === 'LevelConfig') {
+    if (handleLevelConfigClick(mouseX, mouseY, x, y, modalW, modalH)) {
+      return true;
+    }
+  }
+
+  // Handle Player Upgrades click
+  if (state.almanacTab === 'Upgrades') {
+    if (handlePlayerUpgradesClick(mouseX, mouseY, x, y, modalW, modalH)) {
+      return true;
+    }
+  }
+
   // Check if click is outside modal to close
-  if (mouseX < x || mouseX > x + modalW + 60 || mouseY < y || mouseY > y + modalH) {
+  const tabsX = x - 70;
+  if (mouseX < tabsX || mouseX > x + modalW || mouseY < y || mouseY > y + modalH) {
     state.isAlmanacOpen = false;
     state.isPaused = false;
+    state.isAlmanacEditorMode = false;
     return true;
   }
 

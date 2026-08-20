@@ -8,6 +8,8 @@ import { getLightLevel, customDayLightConfig } from './lvDemo';
 import { drawNPCPanel } from './uiNpcShop';
 import { drawTurretIcon } from './ui/inventory/turretIcon';
 import { drawNewTurretTooltip } from './UITurretTooltip';
+import { restoreLevelFromCache } from './levelEditor';
+import { getPlayerUpgradeStat } from './src/playerUpgrades';
 
 declare const floor: any;
 declare const nf: any;
@@ -221,6 +223,18 @@ function drawStats(alpha: number) {
   const hpRatio = (state.player?.health ?? 100) / (state.player?.maxHealth || 100);
   fill(155, 255, 0, alpha);
   rect(x + 30, y + 10, 115 * hpRatio, 6, 3);
+
+  // WinCondition Tracker Text next to health bar
+  const winConditionEnemies = (state.enemies || []).filter((e: any) => e.isWinCondition);
+  if (winConditionEnemies.length > 0) {
+    const remainingWinCount = winConditionEnemies.filter((e: any) => e.health > 0 && !e.isDying).length;
+    const trackerX = x + hpW + 15;
+    const txt = `Eliminate the marked Grapes (${remainingWinCount} left)`;
+    textSize(12);
+    fill(255);
+    textAlign(LEFT, CENTER);
+    text(txt, trackerX + 12, y + hpH / 2);
+  }
   
   // Currency Row
   const curY = y + 36;
@@ -229,24 +243,61 @@ function drawStats(alpha: number) {
   const gap = 14;
   const padding = 0;
 
+  const rawCap = getPlayerUpgradeStat('turretAttachCapacity');
+  const maxCapacity = (rawCap !== undefined && rawCap !== null) ? rawCap : 6;
+  const attachedCount = state.player?.getAttachedCount ? state.player.getAttachedCount() : (state.player?.attachments?.filter((a: any) => a.config?.countTowardAttachedCapacity !== false && a.config?.CountTowardAttachedCapacity !== false)?.length || 0);
+  const capacityText = `${attachedCount} / ${maxCapacity}`;
+
+  const sunCap = getPlayerUpgradeStat('sunBankCapacity') || 20;
+  const sunText = `${floor(state.sunCurrency)} / ${sunCap}`;
+  const isSunFull = state.sunCurrency >= sunCap;
+
+  const enabledCurrencies = state.currentLevelLayoutData?.enabledCurrency;
+  const isCurrencyEnabled = (key: string) => {
+    if (!enabledCurrencies || !Array.isArray(enabledCurrencies)) return true;
+    return enabledCurrencies.includes(key);
+  };
+
   const currencies = [
     {
+      key: 'sun',
       val: state.sunCurrency,
+      text: sunText,
       icon: 'img_icon_sun',
-      color: [255, 230, 50],
-      scale: state.uiSunScale
+      color: isSunFull ? [255, 180, 50] : [255, 230, 50],
+      scale: state.uiSunScale,
+      showAlways: true,
+      renderSize: 50
     },
     {
+      key: 'elixir',
       val: state.elixirCurrency,
+      text: floor(state.elixirCurrency).toString(),
       icon: 'img_icon_elixir',
       color: [200, 100, 255],
-      scale: state.uiElixirScale
+      scale: state.uiElixirScale,
+      showAlways: false,
+      renderSize: 50
     },
     {
+      key: 'soil',
       val: state.soilCurrency,
+      text: floor(state.soilCurrency).toString(),
       icon: 'img_icon_soil',
       color: [220, 160, 100],
-      scale: state.uiSoilScale
+      scale: state.uiSoilScale,
+      showAlways: false,
+      renderSize: 50
+    },
+    {
+      key: 'capacity',
+      val: maxCapacity,
+      text: capacityText,
+      icon: 'img_t_sunflower_front',
+      color: attachedCount >= maxCapacity ? [255, 130, 130] : [220, 240, 255],
+      scale: 1.0,
+      showAlways: true,
+      renderSize: 32
     }
   ];
 
@@ -254,16 +305,17 @@ function drawStats(alpha: number) {
   textSize(16);
   textAlign(LEFT, CENTER);
 
-  // Filter active currencies
-  const active = currencies.filter(c => c.val > 0);
+  // Filter active currencies (respecting enabledCurrency from level data)
+  const active = currencies.filter(c => {
+    if (c.key && c.key !== 'capacity' && !isCurrencyEnabled(c.key)) return false;
+    return c.showAlways || c.val > 0;
+  });
 
   // --- Calculate total width ---
   let totalW = padding;
 
   for (let cur of active) {
-    const valText = floor(cur.val).toString();
-    const textW = textWidth(valText);
-
+    const textW = textWidth(cur.text);
     totalW += iconSize + 6 + textW + gap;
   }
 
@@ -278,19 +330,20 @@ function drawStats(alpha: number) {
 
     // --- Draw currencies ---
     for (let cur of active) {
-      const valText = floor(cur.val).toString();
-      const textW = textWidth(valText);
+      const textW = textWidth(cur.text);
 
       // icon
-      push();
-      translate(cursorX + iconSize/2, curY + pillH/2);
-      scale(cur.scale);
-      image(state.assets[cur.icon], 0, 0, 50, 50);
-      pop();
+      if (state.assets && state.assets[cur.icon]) {
+        push();
+        translate(cursorX + iconSize/2, curY + pillH/2);
+        scale(cur.scale);
+        image(state.assets[cur.icon], 0, 0, cur.renderSize, cur.renderSize);
+        pop();
+      }
 
       // text
       fill(cur.color[0], cur.color[1], cur.color[2], alpha);
-      text(valText, cursorX + iconSize + 6, curY + pillH/2 + 2);
+      text(cur.text, cursorX + iconSize + 6, curY + pillH/2 + 2);
 
       cursorX += iconSize + 6 + textW + gap;
     }
@@ -411,6 +464,33 @@ export function drawUI(spawnFromBudget: Function) {
     fill(255); textAlign(CENTER, CENTER); textSize(12); text("Debug", dbgX + dbgW/2, dbgY + dbgH/2);
     if (dbgHov && mouseIsPressed && !state.isAlmanacOpen && !state.showUnlockPopup) { state.showDebug = !state.showDebug; (window as any).mouseIsPressed = false; }
     pop();
+
+    // Back To Edit Button (if in Level Editor Playtest Mode)
+    if (state.isEditorPlaytest && state.levelEditorCache) {
+      push();
+      const btnW = 130;
+      const btnH = 32;
+      const btnX = width / 2 - btnW / 2;
+      const btnY = 12;
+      const isHov = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
+
+      fill(isHov ? [220, 50, 50, 240] : [170, 35, 35, 220]);
+      stroke(255, 180, 180);
+      strokeWeight(1.5);
+      rect(btnX, btnY, btnW, btnH, 8);
+
+      fill(255);
+      noStroke();
+      textAlign(CENTER, CENTER);
+      textSize(12);
+      text("◀ BACK TO EDIT", btnX + btnW / 2, btnY + btnH / 2);
+
+      if (isHov && mouseIsPressed) {
+        (window as any).mouseIsPressed = false;
+        restoreLevelFromCache(state.levelEditorCache);
+      }
+      pop();
+    }
 
     drawDebugPanel(spawnFromBudget);
     drawNPCPanel();

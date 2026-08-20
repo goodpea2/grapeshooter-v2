@@ -3,6 +3,7 @@ import { state } from './state';
 import { HOUR_FRAMES, GRID_SIZE } from './constants';
 import { enemyTypes } from './balanceEnemies';
 import { liquidTypes } from './balanceLiquids';
+import { turretTypes } from './balanceTurrets';
 import { getTime } from './ui';
 import { SunLoot, Enemy } from './entities';
 import { ECONOMY_CONFIG, spawnLootAt } from './economy';
@@ -14,25 +15,39 @@ declare const sin: any;
 declare const frameCount: any;
 declare const floor: any;
 
-export const customBudgetPerNight = [100, 200, 400, 800, 1500, 2600, 4000, 7000, 10000, 13000]; // new with roomDirector
+export const customBudgetPerNight = [100, 200, 400, 800, 1500]; // default customBudgetPerNight
+export const defaultHourlyBudgetPerDay = [3, 10, 20, 30, 40];
+export const defaultHourlyBudgetPerNight = [20, 40, 80, 100, 120];
 export const customDayLightConfig = '000011222222222222110000'; // 0: Night, 1: Transition, 2: Day
 export const customStartingHour = 6;
 
-export const AlmanacProgression = {
+export interface AlmanacProgressionConfig {
+  StartingTurret: string[];
+  UnlockedByDiscoverTurret: string[];
+  LockedTurret: Array<{ type: string; weight?: number }>;
+  BannedTurrets: string[];
+  UnlockCost: Array<Record<string, number>>;
+  AllTurretCrafting?: boolean; // false hides the turret-buy button for ALL turrets
+  AllTurretUpgrade?: boolean; // false hides the turret-upgrade button for ALL turrets
+  CraftingCostOverride?: Array<{ type: string; cost?: Record<string, number>; canBePurchased?: boolean }>;
+}
+
+export const AlmanacProgression: AlmanacProgressionConfig = {
   StartingTurret: [
     't_pea', 't_laser', 't_wall', 't_mine', 't_ice', // Tier 1
     't_seed', 't_seed2', // Special
     't2_repeater', 't2_laser2', 't2_tall', 't2_minespawner', 't2_stun', // Specific Tier 2
-    'tx_goldengrape'
+    'tx_goldengrape','t0_starfruit'
   ],
   UnlockedByDiscoverTurret: [
-    't_sunflower', 't_lilypad','t0_cherrybomb','t0_firecherry', 't0_jalapeno', 't0_iceshroom', 't0_starfruit', 't0_grapeshot', 't0_puffshroom',
+    't_sunflower', 't_lilypad','t0_cherrybomb','t0_firecherry', 't0_jalapeno', 't0_iceshroom', 't0_grapeshot', 't0_puffshroom',
     't_farm_bush', 't_farm_crystal', 't_farm_mob'
   ],
   LockedTurret: [
     { type: 't2_firepea', weight: 10 }, { type: 't2_peanut', weight: 10 }, { type: 't2_mortar', weight: 10 }, { type: 't2_snowpea', weight: 10 }, { type: 't2_puncher', weight: 10 }, { type: 't2_laserexplode', weight: 10 }, { type: 't2_iceray', weight: 10 }, { type: 't2_pulse', weight: 10 }, { type: 't2_spike', weight: 10 }, { type: 't2_icebomb', weight: 10 },
     { type: 't3_triplepea', weight: 3 }, { type: 't3_firepea2', weight: 3 }, { type: 't3_spinnut', weight: 3 }, { type: 't3_mortar2', weight: 3 }, { type: 't3_snowpea2', weight: 3 }, { type: 't3_inferno', weight: 3 }, { type: 't3_flamethrower', weight: 3 }, { type: 't3_bowling', weight: 3 }, { type: 't3_repulser', weight: 3 }, { type: 't3_snowpeanut', weight: 3 }, { type: 't3_skymortar', weight: 3 }, { type: 't3_laser3', weight: 3 }, { type: 't3_puncher2', weight: 3 }, { type: 't3_aoelaser', weight: 3 }, { type: 't3_iceray2', weight: 3 }, { type: 't3_miningbomb', weight: 3 }, { type: 't3_tesla', weight: 3 }, { type: 't3_icepuncher', weight: 3 }, { type: 't3_densnut', weight: 3 }, { type: 't3_durian', weight: 3 }, { type: 't3_spike2', weight: 3 }, { type: 't3_holonut', weight: 3 }, { type: 't3_minefield', weight: 3 }, { type: 't3_frostfield', weight: 3 }, { type: 't3_triberg', weight: 3 }
   ],
+  BannedTurrets: [],
   UnlockCost: [
     { raisin: 1 },
     { raisin: 2 },
@@ -70,13 +85,104 @@ export const AlmanacProgression = {
     { raisin: 17 },
     { raisin: 20 }
   ],
+  AllTurretCrafting: true,
+  AllTurretUpgrade: true,
   CraftingCostOverride: [
     { type: 't_sunflower', cost: { soil: 40 } },
     { type: 't_seed', canBePurchased: false },
     { type: 't_seed2', canBePurchased: false },
-    { type: 'tx_goldengrape', cost: { sun: 800 } }
+    { type: 'tx_goldengrape', cost: { sun: 400 } }
   ]
 };
+
+export function createDefaultEditorAlmanacProgression(): AlmanacProgressionConfig {
+  const allTurretKeys = Object.keys(turretTypes).filter(k => 
+    turretTypes[k].tier > 0 || turretTypes[k].isSpecial
+  );
+  const defaultStarting = ['t_pea', 't_laser', 't_wall'];
+  const defaultBanned = allTurretKeys.filter(k => !defaultStarting.includes(k));
+
+  return {
+    StartingTurret: defaultStarting,
+    UnlockedByDiscoverTurret: [],
+    LockedTurret: [],
+    BannedTurrets: defaultBanned,
+    UnlockCost: [],
+    AllTurretCrafting: true,
+    AllTurretUpgrade: true,
+    CraftingCostOverride: []
+  };
+}
+
+export function getActiveAlmanacProgression(): AlmanacProgressionConfig {
+  if (state.currentScreen === 'level_editor' && state.isAlmanacEditorMode) {
+    if (!state.levelEditorAlmanacProgression) {
+      state.levelEditorAlmanacProgression = createDefaultEditorAlmanacProgression();
+    }
+    return state.levelEditorAlmanacProgression;
+  }
+
+  const layout = state.currentLevelLayoutData;
+  const customProg = layout?.AlmanacProgression || layout?.almanacProgression || state.activeAlmanacProgression;
+  if (customProg) {
+    return {
+      StartingTurret: customProg.StartingTurret || [],
+      UnlockedByDiscoverTurret: customProg.UnlockedByDiscoverTurret || [],
+      LockedTurret: (customProg.LockedTurret || []).map((t: any) => typeof t === 'string' ? { type: t, weight: 10 } : t),
+      BannedTurrets: customProg.BannedTurrets || [],
+      UnlockCost: customProg.UnlockCost !== undefined ? customProg.UnlockCost : [],
+      AllTurretCrafting: customProg.AllTurretCrafting !== false,
+      AllTurretUpgrade: customProg.AllTurretUpgrade !== false,
+      CraftingCostOverride: customProg.CraftingCostOverride || []
+    };
+  }
+
+  return AlmanacProgression;
+}
+
+export function getTurretProgressionState(key: string, prog: AlmanacProgressionConfig): 'available' | 'locked' | 'needDiscovery' | 'banned' {
+  if (prog.BannedTurrets?.includes(key)) return 'banned';
+  if (prog.UnlockedByDiscoverTurret?.includes(key)) return 'needDiscovery';
+  if (prog.LockedTurret?.some(t => (typeof t === 'string' ? t : t.type) === key)) return 'locked';
+  return 'available';
+}
+
+export function cycleTurretProgressionState(key: string, prog: AlmanacProgressionConfig): 'available' | 'locked' | 'needDiscovery' | 'banned' {
+  if (!prog.StartingTurret) prog.StartingTurret = [];
+  if (!prog.LockedTurret) prog.LockedTurret = [];
+  if (!prog.UnlockedByDiscoverTurret) prog.UnlockedByDiscoverTurret = [];
+  if (!prog.BannedTurrets) prog.BannedTurrets = [];
+
+  const currentState = getTurretProgressionState(key, prog);
+
+  // Remove key from all lists
+  prog.StartingTurret = prog.StartingTurret.filter(k => k !== key);
+  prog.LockedTurret = prog.LockedTurret.filter(t => (typeof t === 'string' ? t : t.type) !== key);
+  prog.UnlockedByDiscoverTurret = prog.UnlockedByDiscoverTurret.filter(k => k !== key);
+  prog.BannedTurrets = prog.BannedTurrets.filter(k => k !== key);
+
+  let nextState: 'available' | 'locked' | 'needDiscovery' | 'banned';
+
+  if (currentState === 'available') {
+    // available -> locked
+    prog.LockedTurret.push({ type: key, weight: 10 });
+    nextState = 'locked';
+  } else if (currentState === 'locked') {
+    // locked -> needDiscovery
+    prog.UnlockedByDiscoverTurret.push(key);
+    nextState = 'needDiscovery';
+  } else if (currentState === 'needDiscovery') {
+    // needDiscovery -> banned
+    prog.BannedTurrets.push(key);
+    nextState = 'banned';
+  } else {
+    // banned -> available
+    prog.StartingTurret.push(key);
+    nextState = 'available';
+  }
+
+  return nextState;
+}
 
 export function getLightLevel(hour: number): number {
   const h = floor(hour) % 24;
@@ -125,34 +231,44 @@ const CHUNK_LEVEL_WEIGHTS: number[][] = [
   [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 10
 ];
 
-export const ENEMY_KEYS = [
-  'e_basic', 'e_armor1', 'e_armor2', 'e_armor3', 'e_shooting', 'e_swarm', 'e_giant', 'e_critter',
-  'e_shooting_giant', 'e_fly', 'e_fly_armor1', 'e_fly_armor2', 'e_snowthrower', 'e_snowthrower_giant',
-  'e_poison', 'e_bomb', 'e_rockpuncher', 'e_suneater'
-];
+export const ENEMY_KEYS = Object.keys(enemyTypes).filter(k => k !== 'e_bomb_mainmenu');
 
-function getWeightsForCurrentTime() {
+export function getWeightsForCurrentTime() {
   const t = getTime();
   const isNight = getLightLevel(t.hour) === 0;
   const dayKey = Math.min(t.day, 9);
   const key = `${dayKey}_${isNight ? 'night' : 'day'}`;
-  const dtWeights = DAYTIME_WEIGHTS[key] || DAYTIME_WEIGHTS["5_night"];
   
+  const customSpawnConfig = state.currentLevelLayoutData?.globalEnemySpawnConfig;
+  const dtWeights = (customSpawnConfig && Array.isArray(customSpawnConfig[key]))
+    ? customSpawnConfig[key]
+    : (DAYTIME_WEIGHTS[key] || DAYTIME_WEIGHTS["5_night"] || Array(ENEMY_KEYS.length).fill(1));
+  
+  const enableWorldGen = state.currentLevelLayoutData?.enableWorldGen ?? (state.currentLevelId === 'sandbox' ? false : true);
+  
+  if (!enableWorldGen) {
+    // When enableWorldGen=false, set CHUNK_LEVEL_WEIGHTS of all enemies to 1
+    return dtWeights.map((w: number) => (w !== undefined ? w : 0) * 1);
+  }
+
   const clIdx = Math.min(Math.max(0, state.currentChunkLevel - 1), CHUNK_LEVEL_WEIGHTS.length - 1);
-  const clWeights = CHUNK_LEVEL_WEIGHTS[clIdx];
+  const clWeights = CHUNK_LEVEL_WEIGHTS[clIdx] || Array(ENEMY_KEYS.length).fill(1);
 
   // Multiply weights
-  return dtWeights.map((w, i) => w * clWeights[i]);
+  return dtWeights.map((w: number, i: number) => (w !== undefined ? w : 0) * (clWeights[i] !== undefined ? clWeights[i] : 1));
 }
 
 export function isLegibleSpot(x: number, y: number): boolean {
   if (state.world.isBlockAt(x, y)) return false;
+  if (state.world.hasSpawnArea && state.world.hasSpawnArea() && !state.world.isSpawnAreaAt(x, y)) {
+    return false;
+  }
   const gx = floor(x / GRID_SIZE);
   const gy = floor(y / GRID_SIZE); 
   const liqKey = state.world.getLiquidAt(gx, gy);
   if (liqKey) {
     const lCfg = liquidTypes[liqKey];
-    if (lCfg.isDanger) return false; // Don't spawn in Lava
+    if (lCfg && lCfg.isDanger) return false; // Don't spawn in Lava
   }
   return true;
 }
@@ -198,10 +314,18 @@ export function spawnFromBudget(amount: number): number {
       }
     }
 
-    let ang = random(Math.PI * 2);
-    let distR = random(12, 18) * GRID_SIZE;
-    let x = state.player.pos.x + cos(ang) * distR;
-    let y = state.player.pos.y + sin(ang) * distR;
+    let x: number, y: number;
+    if (state.world.hasSpawnArea && state.world.hasSpawnArea()) {
+      const sp = state.world.getRandomSpawnAreaPos();
+      if (!sp) break;
+      x = sp.x;
+      y = sp.y;
+    } else {
+      let ang = random(Math.PI * 2);
+      let distR = random(12, 18) * GRID_SIZE;
+      x = state.player.pos.x + cos(ang) * distR;
+      y = state.player.pos.y + sin(ang) * distR;
+    }
     
     // Check environmental legibility and collision
     if (isLegibleSpot(x, y) && !state.world.checkCollision(x, y, enemyTypes[ek].size * 0.5)) {
@@ -224,12 +348,17 @@ export function updateGameSystems() {
   const lightLevel = getLightLevel(t.hour);
   const isNight = lightLevel === 0;
 
-  // BUDGET SCALING FIX: Update currentNightWaveBudget baseline every frame based on the current day
-  const nightIdx = Math.min(t.day - 1, customBudgetPerNight.length - 1);
-  let baseBudget = customBudgetPerNight[nightIdx];
-  if (t.day > customBudgetPerNight.length) {
+  // BUDGET SCALING: Read customBudgetPerNight from levelData if present, fallback to default [100, 200, 400, 800, 1500]
+  const rawBudget = state.currentLevelLayoutData?.customBudgetPerNight;
+  const activeBudgetPerNight: number[] = Array.isArray(rawBudget) && rawBudget.length > 0
+    ? rawBudget
+    : (typeof rawBudget === 'number' ? [rawBudget] : customBudgetPerNight);
+
+  const nightIdx = Math.min(Math.max(0, t.day - 1), activeBudgetPerNight.length - 1);
+  let baseBudget = activeBudgetPerNight[nightIdx] ?? 100;
+  if (t.day > activeBudgetPerNight.length) {
      // Scaled growth beyond array limits
-     baseBudget = customBudgetPerNight[customBudgetPerNight.length - 1] * Math.pow(1.25, t.day - customBudgetPerNight.length);
+     baseBudget = activeBudgetPerNight[activeBudgetPerNight.length - 1] * Math.pow(1.25, t.day - activeBudgetPerNight.length);
   }
   state.currentNightWaveBudget = baseBudget;
 
@@ -280,15 +409,24 @@ export function updateGameSystems() {
   const floorHour = floor(t.totalHours);
   if (floorHour !== state.lastHourProcessed) {
     state.lastHourProcessed = floorHour;
-    let baseNight = 20;
-    let baseDay = 10;
-    let nightLvl = t.day - 1;
-    let dayLvl = Math.max(0, t.day - 2);
+
+    const rawHourlyDay = state.currentLevelLayoutData?.hourlyBudgetPerDay;
+    const hourlyPerDay: number[] = Array.isArray(rawHourlyDay) && rawHourlyDay.length > 0
+      ? rawHourlyDay
+      : (typeof rawHourlyDay === 'number' ? [rawHourlyDay] : defaultHourlyBudgetPerDay);
+
+    const rawHourlyNight = state.currentLevelLayoutData?.hourlyBudgetPerNight;
+    const hourlyPerNight: number[] = Array.isArray(rawHourlyNight) && rawHourlyNight.length > 0
+      ? rawHourlyNight
+      : (typeof rawHourlyNight === 'number' ? [rawHourlyNight] : defaultHourlyBudgetPerNight);
+
+    const dayIdx = Math.min(Math.max(0, t.day - 1), hourlyPerDay.length - 1);
+    const nightIdx = Math.min(Math.max(0, t.day - 1), hourlyPerNight.length - 1);
 
     if (isNight) {
-      state.hourlyBudgetPool += baseNight + (nightLvl * 20);
-    } else if (t.day >= 2) {
-      state.hourlyBudgetPool += baseDay + (dayLvl * 3);
+      state.hourlyBudgetPool += hourlyPerNight[nightIdx] ?? 20;
+    } else {
+      state.hourlyBudgetPool += hourlyPerDay[dayIdx] ?? 3;
     }
   }
 
@@ -301,7 +439,8 @@ export function updateGameSystems() {
   }
 
   // Turret Discovery Check
-  for (const key of AlmanacProgression.UnlockedByDiscoverTurret) {
+  const activeProg = getActiveAlmanacProgression();
+  for (const key of activeProg.UnlockedByDiscoverTurret || []) {
     if (!state.unlockedTurrets.includes(key)) {
       // Check inventory
       if ((state.inventory.items[key] || 0) > 0) {

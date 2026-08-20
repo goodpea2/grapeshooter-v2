@@ -125,7 +125,7 @@ export function drawPlayer(p: any) {
     if (isLeft) scale(-1, 1);
     
     // CONDITION TINTS
-    const isRaged = p.conditions.has('c_raged');
+    const isRaged = p.conditions.has('c_raged') || p.conditions.has('c_raged_visualonly');
     if (p.flash > 0) tint(255, 100, 100);
     else if (isRaged) tint(255, 100 + sin(state.frames * 0.4) * 100, 200); 
     
@@ -135,7 +135,7 @@ export function drawPlayer(p: any) {
     pop();
   } else {
     let c = [30, 40, 70];
-    const isRaged = p.conditions.has('c_raged');
+    const isRaged = p.conditions.has('c_raged') || p.conditions.has('c_raged_visualonly');
     if (p.flash > 0) c = [255, 100, 100];
     else if (isRaged) c = [255, 100, 200];
 
@@ -150,7 +150,7 @@ export function drawPlayer(p: any) {
   }
 
   // 4. Auto Turret (Mining Laser Arm)
-  if (state.isStationary || p.conditions.has('c_raged')) {
+  if (state.isStationary || p.conditions.has('c_raged') || p.conditions.has('c_raged_visualonly')) {
     push();
     rotate(p.autoTurretAngle);
     stroke(20, 20, 40);

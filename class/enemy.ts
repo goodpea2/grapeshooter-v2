@@ -15,6 +15,8 @@ import { Obstacle } from '../balanceObstacles';
 import { drawEnemy } from '../visualEnemies';
 import { isLegibleSpot } from '../lvDemo';
 import { spawnLootAt } from '../economy';
+import { triggerUpgradeHook } from '../src/upgrades';
+import { flowField } from '../pathfinding';
 
 declare const p5: any;
 declare const createVector: any;
@@ -33,6 +35,19 @@ declare const blue: any;
 declare const TWO_PI: any;
 declare const width: any;
 declare const height: any;
+declare const push: any;
+declare const pop: any;
+declare const translate: any;
+declare const fill: any;
+declare const noFill: any;
+declare const stroke: any;
+declare const noStroke: any;
+declare const strokeWeight: any;
+declare const ellipse: any;
+declare const textSize: any;
+declare const textAlign: any;
+declare const CENTER: any;
+declare const text: any;
 declare const HALF_PI: any;
 
 export class Enemy {
@@ -40,6 +55,8 @@ export class Enemy {
   pos: any; type: string; config: any; health: number; maxHealth: number; speed: number; size: number; col: any; target: any = null; flash: number = 0; rot: number; actionType: string[]; actionConfig: any;
   flashType: 'damage' | 'heal' = 'damage';
   meleeCooldown: number = 0; shootCooldown: number = 0; swarmParticles: any[] = []; markedForDespawn: boolean = false;
+  isWinCondition: boolean = false;
+  neverDespawn: boolean = false;
   actionSteps: Map<string, number> = new Map();
   conditions: Map<string, number> = new Map();
   conditionData: Map<string, any> = new Map();
@@ -105,7 +122,7 @@ export class Enemy {
 
     const dSqToPlayer = (this.pos.x - playerPos.x)**2 + (this.pos.y - playerPos.y)**2;
     const despawnRange = (GRID_SIZE * CHUNK_SIZE * 4)**2;
-    if (dSqToPlayer > despawnRange) { 
+    if (dSqToPlayer > despawnRange && !this.isWinCondition && !this.neverDespawn) { 
       this.markedForDespawn = true; 
       const refund = (enemyTypes[this.type].cost || 0);
       state.hourlyBudgetPool += refund; 
@@ -203,7 +220,7 @@ export class Enemy {
           const cellEntities = state.spatialHash.get(key);
           if (cellEntities) {
             for (const ent of cellEntities) {
-              if (ent === this || ent.isDying) continue;
+              if (ent === this || ent.isDying || ent.isValidTarget === false || ent.config?.isValidTarget === false || ent.type === 'o_barrier') continue;
 
               if (isHypnotized) {
                 // Hypnotized enemies target other enemies
@@ -216,7 +233,7 @@ export class Enemy {
                    // If it's a turret, check if it's active
                    if (ent.config && ent.config.collideWithEnemy === false) continue;
                    if (ent.isWaterlogged || ent.isFrosted) continue;
-                   if (ent.config && !state.isStationary && !ent.config.isActiveWhileMoving && ent.getWorldPos) continue;
+                   if (ent.isActive && !ent.isActive()) continue;
                 }
               }
 
@@ -290,7 +307,13 @@ export class Enemy {
     const dSq = dx*dx + dy*dy;
     const d = Math.sqrt(dSq);
     const dirHeading = atan2(dy, dx);
-    this.rot = lerpAngle(this.rot, dirHeading, 0.12);
+
+    const flow = flowField.getEnemyMoveVector(this.pos, this.size, tp);
+    (this as any).pathfindingMode = flow.mode;
+    (this as any).moveVector = { x: flow.vx, y: flow.vy };
+
+    const moveHeading = (Math.abs(flow.vx) > 0.01 || Math.abs(flow.vy) > 0.01) ? atan2(flow.vy, flow.vx) : dirHeading;
+    this.rot = lerpAngle(this.rot, flow.mode === 'los' ? dirHeading : moveHeading, 0.12);
 
     // Enemy-Enemy collision avoidance
     for (let i = -1; i <= 1; i++) {
@@ -316,10 +339,7 @@ export class Enemy {
     }
 
     let targetRadius = (this.target.size || 32) * 0.5;
-    if (this.target instanceof AttachedTurret && this.target.config.actionType.includes('shield')) {
-        targetRadius = this.target.config.actionConfig.shieldRadius || targetRadius;
-    }
-
+    
     const inMeleeRange = d < (this.size * 0.5 + targetRadius + 15);
     const isShooter = this.type === 'e_shooting' || this.type === 'e_shooting_giant';
     const canShootInRange = this.actionType.includes('shoot') && d < this.actionConfig.shootRange && (isShooter || state.world.checkLOS(this.pos.x, this.pos.y, tp.x, tp.y));
@@ -329,7 +349,7 @@ export class Enemy {
     if (shouldMove && this.actionType.includes('moveDefault')) {
       let rThresh = this.actionType.includes('shoot') ? this.actionConfig.shootRange * 0.75 : this.size * 0.6;
       if (d > rThresh) {
-        targetMoveVec = createVector(dx/d, dy/d).mult(this.speed * speedMult);
+        targetMoveVec = createVector(flow.vx, flow.vy).mult(this.speed * speedMult);
         this.moveWithCollisions(targetMoveVec);
       }
     }
@@ -373,7 +393,7 @@ export class Enemy {
 
     // ENEMY DAMAGE REFINEMENT: Ignore damage to inactive turrets
     if (this.target instanceof AttachedTurret || this.target instanceof WorldTurret) {
-        const isRetracted = !state.isStationary && !this.target.config.isActiveWhileMoving && (this.target instanceof AttachedTurret);
+        const isRetracted = !state.isStationary && !this.target.config.isActiveWhileMoving && this.target.isAttachedToPlayer();
         const isInactive = isRetracted || this.target.isWaterlogged || this.target.isFrosted;
         if (isInactive) return;
     }
@@ -391,10 +411,7 @@ export class Enemy {
     if (!tc) return;
 
     let targetRadius = (this.target.size || 32) * 0.5;
-    if (this.target instanceof AttachedTurret && this.target.config.actionType.includes('shield')) {
-        targetRadius = this.target.config.actionConfig.shieldRadius || targetRadius;
-    }
-
+    
     const distToStrike = dist(strikePos.x, strikePos.y, tc.x, tc.y);
     const strikeRange = this.size * 0.5 + targetRadius + 20;
 
@@ -455,14 +472,14 @@ export class Enemy {
     
     for (let t of allTurrets) {
       if (t.config.collideWithEnemy !== false) {
-        const isRetracted = !state.isStationary && !t.config.isActiveWhileMoving && (t instanceof AttachedTurret);
+        const isRetracted = !state.isStationary && !t.config.isActiveWhileMoving && t.isAttachedToPlayer();
         const isInactive = isRetracted || t.isWaterlogged || t.isFrosted;
         if (isInactive) continue;
 
         const twPos = t.getWorldPos();
         let targetRadius = t.size * 0.5;
-        if (t.config.actionType.includes('shield')) {
-            targetRadius = t.config.actionConfig.shieldRadius || targetRadius;
+        if (t.config.actionType.includes('shield') || (t.activeStats?.shieldRadius > 0)) {
+            targetRadius = t.activeStats?.shieldRadius || t.config.actionConfig.shieldRadius || (GRID_SIZE * 1.5);
         }
         const dSq = (x - twPos.x)**2 + (y - twPos.y)**2;
         if (dSq < ((this.size * 0.5 + targetRadius) * 0.95)**2) return true;
@@ -575,8 +592,19 @@ export class Enemy {
     const bottom = state.cameraPos.y + height/2 + margin;
     if (this.pos.x < left || this.pos.x > right || this.pos.y < top || this.pos.y > bottom) return;
     drawEnemy(this);
+
+    if (this.isWinCondition) {
+      push();
+      translate(this.pos.x, this.pos.y);
+      noFill();
+      stroke(255, 215, 0, 180 + 30 * sin(frameCount * 0.05));
+      strokeWeight(2.5);
+      ellipse(0, 0, this.size * 1 + 2 * sin(frameCount * 0.05));
+      
+      pop();
+    }
   }
-  takeDamage(dmg: number) { 
+  takeDamage(dmg: number, source?: any) { 
     if (this.isDying) return false;
     this.health -= dmg; 
     this.flash = 6; 
@@ -597,6 +625,13 @@ export class Enemy {
       this.isDying = true;
       state.totalEnemiesDead++;
       state.killsByType[this.type] = (state.killsByType[this.type] || 0) + 1;
+
+      // Trigger Hooks
+      if (source) {
+        triggerUpgradeHook('onKill', source, { target: this, targetType: 'enemy', typeName: this.type });
+      }
+      triggerUpgradeHook('onDeath', this, { target: this, targetType: 'enemy', typeName: this.type });
+
       spawnLootAt(this.pos.x, this.pos.y, this.type, this.config.lootConfigOnDeath);
       if (this.actionType.includes('spawnEnemy') && this.actionConfig.spawnTriggerOnHealthRatio) {
         if (this.actionConfig.spawnTriggerOnHealthRatio.includes(0)) {

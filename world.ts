@@ -4,10 +4,12 @@ import {
   GRID_SIZE, CHUNK_SIZE, VISIBILITY_RADIUS, LEVEL_THRESHOLDS, LEVEL_BUDGET, WORLD_GEN_STATS, CHUNK_GEN_RADIUS
 } from './constants';
 import { obstacleTypes, overlayTypes, BLOCK_WEIGHTS } from './balanceObstacles';
+import { bulletTypes } from './balanceBullets';
 import { liquidTypes, LIQUID_WEIGHTS, LIQUID_KEYS } from './balanceLiquids';
 import { MuzzleFlash, BlockDebris, BlockHitVFX, LootInFlightVFX } from './vfx/index';
 import { Enemy, Bullet, NPCEntity } from './entities';
 import { spawnLootAt, ECONOMY_CONFIG } from './economy';
+import { triggerUpgradeHook } from './src/upgrades';
 import { worldGenConfig, requestSpawn, spawnFromBudget } from './lvDemo';
 import { drawOverlay } from './visualObstacles';
 import { enemyTypes } from './balanceEnemies';
@@ -16,6 +18,7 @@ import { drawDecoration } from './visualDecoration';
 import { ROOM_PREFABS, RoomPrefab } from './dictionaryRoomPrefab';
 import { generateRoomDirectorData } from './debug/roomDirectorGenerator';
 import { drawAutotile } from './visualAutotiling';
+import { flowField } from './pathfinding';
 
 declare const createVector: any;
 declare const dist: any;
@@ -54,6 +57,7 @@ declare const HALF_PI: any;
 declare const PI: any;
 declare const TWO_PI: any;
 declare const atan2: any;
+declare const radians: any;
 declare const createGraphics: any;
 declare const image: any;
 declare const imageMode: any;
@@ -65,7 +69,7 @@ declare const width: any;
 declare const height: any;
 
 export class Block {
-  gx: number; gy: number; pos: any; type: string; config: any; overlay: string | null;
+  gx: number; gy: number; pos: any; type: string; config: any; overlay: string | null = null;
   isMined: boolean = false; damageGlow: number = 0; health: number; maxHealth: number;
   biome: number = 0; feature: string | null = null;
   sunBits: { x: number, y: number, s: number }[] = [];
@@ -73,28 +77,25 @@ export class Block {
   lastSniperShot: number = 0;
   lastSpawnTime: number = 0;
   spawnerBudget: number = 0;
+  customSpawnerConfig?: any = null;
+  turretCooldown: number = 0;
+  turretStep: number = 0;
+  lockedAngle: number = 0;
+  lockedTargetPos: { x: number, y: number } | null = null;
+  isBarrelLocked: boolean = false;
 
   constructor(gx: number, gy: number, typeKey = 'o_dirt', overlay: string | null = null, biome: number = 0, liquidType: string | null = null) {
     this.gx = gx; this.gy = gy;
     this.pos = createVector(gx * GRID_SIZE, gy * GRID_SIZE);
     this.type = typeKey;
     this.config = obstacleTypes[typeKey] || obstacleTypes['o_dirt'];
-    this.overlay = overlay;
     this.health = this.config.health;
     this.maxHealth = this.health;
     this.biome = biome;
     this.liquidType = liquidType;
 
-    if (this.overlay && overlayTypes[this.overlay]) {
-      const oCfg = overlayTypes[this.overlay];
-      if (oCfg.minHealth > 0 && oCfg.minHealth > this.health) {
-        this.health = oCfg.minHealth;
-        this.maxHealth = this.health;
-      }
-      if (oCfg.enemySpawnConfig) {
-        this.spawnerBudget = oCfg.enemySpawnConfig.budget;
-        this.lastSpawnTime = state.frames + floor(random(oCfg.enemySpawnConfig.spawnInterval));
-      }
+    if (overlay) {
+      this.setOverlay(overlay);
     }
 
     let fn = noise((gx + worldGenConfig.noiseOffsetBlocks) * 0.8, (gy + worldGenConfig.noiseOffsetBlocks) * 0.8, 123);
@@ -102,9 +103,45 @@ export class Block {
     else if (fn > 0.72 && biome < 3) this.feature = 'flower';
     else if (fn > 0.75) this.feature = 'crystal';
     else if (fn > 0.72) this.feature = 'rubble';
+  }
 
-    if (this.overlay && this.overlay.startsWith('sun')) {
-      this.initSunBits(this.overlay);
+  setOverlay(overlayKey: string | null) {
+    this.overlay = overlayKey;
+    if (this.overlay && overlayTypes[this.overlay]) {
+      const oCfg = overlayTypes[this.overlay];
+      if (oCfg.minHealth !== undefined && oCfg.minHealth > 0) {
+        if (this.health < oCfg.minHealth) {
+          this.health = oCfg.minHealth;
+          this.maxHealth = Math.max(this.maxHealth, oCfg.minHealth);
+        }
+      }
+      if (oCfg.enemySpawnConfig) {
+        this.spawnerBudget = oCfg.enemySpawnConfig.budget;
+        this.lastSpawnTime = state.frames + floor(random(oCfg.enemySpawnConfig.spawnInterval));
+      }
+      if (oCfg.enemyTurretConfig) {
+        const eCfg = oCfg.enemyTurretConfig;
+        const initialDelay = Array.isArray(eCfg.shootFireRate) ? eCfg.shootFireRate[0] : eCfg.shootFireRate;
+        this.turretCooldown = floor(random(10, Math.max(30, initialDelay)));
+        this.turretStep = 0;
+        this.isBarrelLocked = false;
+      }
+      if (this.overlay.startsWith('sun')) {
+        this.initSunBits(this.overlay);
+      }
+    }
+    if (state.world && state.world.chunks) {
+      const cx = floor(this.gx / CHUNK_SIZE);
+      const cy = floor(this.gy / CHUNK_SIZE);
+      const chunk = state.world.chunks.get(`${cx},${cy}`);
+      if (chunk) {
+        if (this.overlay) {
+          if (!chunk.overlayBlocks.includes(this)) {
+            chunk.overlayBlocks.push(this);
+          }
+        }
+        chunk.needsRedraw = true;
+      }
     }
   }
 
@@ -124,30 +161,174 @@ export class Block {
   update() {
     if (this.isMined || !this.overlay) return;
     const oCfg = overlayTypes[this.overlay];
-    if (!oCfg || !oCfg.enemySpawnConfig) return;
+    if (!oCfg) return;
 
-    const sCfg = oCfg.enemySpawnConfig;
-    if (sCfg.spawnInterval <= 0) return;
-
-    const dx = this.pos.x + GRID_SIZE/2 - state.player.pos.x;
-    const dy = this.pos.y + GRID_SIZE/2 - state.player.pos.y;
-    const dSq = dx*dx + dy*dy;
-    if (dSq < sCfg.spawnTriggerRadius * sCfg.spawnTriggerRadius) {
-      if (state.frames - this.lastSpawnTime >= sCfg.spawnInterval) {
-        const eKey = sCfg.enemyTypeKey[floor(random(sCfg.enemyTypeKey.length))];
-        const eCfg = enemyTypes[eKey];
-        if (!sCfg.spawnIntervalConsumeBudget || this.spawnerBudget >= eCfg.cost) {
-          const ang = random(TWO_PI);
-          const r = random(GRID_SIZE, sCfg.spawnRadius);
-          const sx = this.pos.x + GRID_SIZE/2 + cos(ang) * r;
-          const sy = this.pos.y + GRID_SIZE/2 + sin(ang) * r;
-          
-          if (!state.world.checkCollision(sx, sy, eCfg.size/2.2)) {
-            requestSpawn(sx, sy, eKey);
-            if (sCfg.spawnIntervalConsumeBudget) this.spawnerBudget -= eCfg.cost;
-            this.lastSpawnTime = state.frames;
+    if (oCfg.enemySpawnConfig || this.customSpawnerConfig) {
+      const sCfg = this.customSpawnerConfig ? { ...oCfg.enemySpawnConfig, ...this.customSpawnerConfig } : oCfg.enemySpawnConfig;
+      if (sCfg && sCfg.spawnInterval > 0) {
+        const dx = this.pos.x + GRID_SIZE/2 - state.player.pos.x;
+        const dy = this.pos.y + GRID_SIZE/2 - state.player.pos.y;
+        const dSq = dx*dx + dy*dy;
+        const trigRad = sCfg.spawnTriggerRadius > 0 ? sCfg.spawnTriggerRadius : 200;
+        if (sCfg.spawnTriggerRadius < 0 || dSq < trigRad * trigRad) {
+          if (state.frames - this.lastSpawnTime >= sCfg.spawnInterval) {
+            const eTypes = (sCfg.enemyTypeKey && sCfg.enemyTypeKey.length > 0) ? sCfg.enemyTypeKey : ['e_basic'];
+            const eKey = eTypes[floor(random(eTypes.length))];
+            const eCfg = enemyTypes[eKey];
+            if (eCfg && (!sCfg.spawnIntervalConsumeBudget || this.spawnerBudget >= eCfg.cost)) {
+              let spawned = false;
+              let attempts = 10;
+              while (attempts > 0 && !spawned) {
+                attempts--;
+                const ang = random(TWO_PI);
+                const r = random(GRID_SIZE, sCfg.spawnRadius || 120);
+                const sx = this.pos.x + GRID_SIZE/2 + cos(ang) * r;
+                const sy = this.pos.y + GRID_SIZE/2 + sin(ang) * r;
+                
+                if (state.world.hasSpawnArea() && !state.world.isSpawnAreaAt(sx, sy)) {
+                  continue;
+                }
+                if (!state.world.checkCollision(sx, sy, eCfg.size/2.2)) {
+                  requestSpawn(sx, sy, eKey);
+                  if (sCfg.spawnIntervalConsumeBudget) this.spawnerBudget -= eCfg.cost;
+                  this.lastSpawnTime = state.frames;
+                  spawned = true;
+                }
+              }
+            }
           }
         }
+      }
+    }
+
+    if (oCfg.enemyTurretConfig) {
+      const eCfg = oCfg.enemyTurretConfig;
+      const bcx = this.pos.x + GRID_SIZE / 2;
+      const bcy = this.pos.y + GRID_SIZE / 2;
+
+      const bulletCfg = bulletTypes[eCfg.bulletTypeKey] || {};
+      const isSelfTarget = eCfg.targetMode === 'self' || eCfg.bulletTypeKey === 'b_enemy_healing_pulse' || (bulletCfg.bulletSpeed === 0 && bulletCfg.bulletLifeTime <= 1 && eCfg.shootRange < 200 && !eCfg.drawAimingLine);
+
+      let target: any = null;
+      let targetX = state.player ? state.player.pos.x : bcx;
+      let targetY = state.player ? state.player.pos.y : bcy;
+
+      if (!isSelfTarget) {
+        const candidates: { pos: any, entity: any }[] = [];
+        if (eCfg.targetMode === 'enemies') {
+          for (const enemy of state.enemies) {
+            if (enemy && enemy.health > 0 && !enemy.isDying) {
+              candidates.push({ pos: enemy.pos, entity: enemy });
+            }
+          }
+        } else {
+          if (state.player && !state.player.isDying) {
+            candidates.push({ pos: state.player.pos, entity: state.player });
+          }
+          if (state.player?.attachments) {
+            for (const att of state.player.attachments) {
+              candidates.push({ pos: att.getWorldPos(), entity: att });
+            }
+          }
+          if (state.world) {
+            const worldTurrets = state.world.getAllTurrets();
+            for (const wt of worldTurrets) {
+              candidates.push({ pos: wt.getWorldPos(), entity: wt });
+            }
+          }
+        }
+
+        const maxDist = eCfg.shootRange || eCfg.sightRadius || 300;
+        let bestDistSq = maxDist * maxDist;
+
+        for (const cand of candidates) {
+          const dx = cand.pos.x - bcx;
+          const dy = cand.pos.y - bcy;
+          const dSq = dx * dx + dy * dy;
+          if (dSq <= bestDistSq) {
+            const canSee = eCfg.seeThroughObstacles || state.world.checkLOS(bcx, bcy, cand.pos.x, cand.pos.y);
+            if (canSee) {
+              bestDistSq = dSq;
+              target = cand.entity;
+              targetX = cand.pos.x;
+              targetY = cand.pos.y;
+            }
+          }
+        }
+      } else {
+        target = this;
+        targetX = bcx;
+        targetY = bcy;
+      }
+
+      if (this.turretCooldown > 0) {
+        this.turretCooldown--;
+      }
+
+      const lockDuration = eCfg.barrelLockDurationBeforeFiring || 0;
+      const isBurstStep = Array.isArray(eCfg.shootFireRate) && this.turretStep > 0;
+      const effectiveLockDuration = isBurstStep ? 0 : lockDuration;
+
+      if (target || isSelfTarget) {
+        if (this.turretCooldown > effectiveLockDuration || !this.isBarrelLocked) {
+          const aimAng = atan2(targetY - bcy, targetX - bcx);
+          this.lockedAngle = aimAng;
+          this.lockedTargetPos = { x: targetX, y: targetY };
+        }
+
+        if (effectiveLockDuration > 0 && this.turretCooldown <= effectiveLockDuration && !this.isBarrelLocked) {
+          this.isBarrelLocked = true;
+        }
+
+        if (this.turretCooldown <= 0) {
+          let fireAngle = this.lockedAngle || 0;
+          if (eCfg.inaccuracy) {
+            fireAngle += random(-radians(eCfg.inaccuracy), radians(eCfg.inaccuracy));
+          }
+
+          let shotTx = targetX;
+          let shotTy = targetY;
+
+          if (bulletCfg.highArcConfig) {
+            shotTx = this.lockedTargetPos ? this.lockedTargetPos.x : bcx + cos(fireAngle) * eCfg.shootRange;
+            shotTy = this.lockedTargetPos ? this.lockedTargetPos.y : bcy + sin(fireAngle) * eCfg.shootRange;
+          } else if (isSelfTarget) {
+            shotTx = bcx;
+            shotTy = bcy;
+          } else {
+            shotTx = bcx + cos(fireAngle) * (eCfg.shootRange || 500);
+            shotTy = bcy + sin(fireAngle) * (eCfg.shootRange || 500);
+          }
+
+          const spawnOffset = isSelfTarget ? 0 : Math.min(GRID_SIZE * 0.5, 14);
+          const sx = bcx + cos(fireAngle) * spawnOffset;
+          const sy = bcy + sin(fireAngle) * spawnOffset;
+
+          const bullet = new Bullet(sx, sy, shotTx, shotTy, eCfg.bulletTypeKey, 'core', this);
+          state.enemyBullets.push(bullet);
+
+          let flashCol = color(255, 50, 50);
+          if (eCfg.muzzleFlashColor) {
+            flashCol = color(...eCfg.muzzleFlashColor);
+          } else if (bulletCfg.bulletColor) {
+            flashCol = color(...bulletCfg.bulletColor);
+          }
+          state.vfx.push(new MuzzleFlash(bcx, bcy, isSelfTarget ? 0 : fireAngle, 30, 8, flashCol));
+
+          if (Array.isArray(eCfg.shootFireRate)) {
+            this.turretStep = (this.turretStep + 1) % eCfg.shootFireRate.length;
+            this.turretCooldown = eCfg.shootFireRate[this.turretStep];
+          } else {
+            this.turretCooldown = eCfg.shootFireRate;
+          }
+
+          this.isBarrelLocked = false;
+        }
+      } else {
+        if (this.turretCooldown <= effectiveLockDuration) {
+          this.turretCooldown = effectiveLockDuration + 1;
+        }
+        this.isBarrelLocked = false;
       }
     }
   }
@@ -162,29 +343,31 @@ export class Block {
 
     if (this.liquidType) {
       const lCfg = liquidTypes[this.liquidType];
-      const pulse = 0.5 + 0.5 * sin(state.frames * lCfg.pulseSpeed + (this.gx + this.gy) * 0.5);
-      const ln = state.world.getLiquidAt(this.gx, this.gy - 1);
-      const ls = state.world.getLiquidAt(this.gx, this.gy + 1);
-      const lw = state.world.getLiquidAt(this.gx - 1, this.gy);
-      const le = state.world.getLiquidAt(this.gx + 1, this.gy);
-      const isLiquidExposed = !ln || !ls || !lw || !le;
-      const rad = 8;
-      noStroke();
-      fill(lCfg.color[0], lCfg.color[1], lCfg.color[2], opacity * (lCfg.color[3] / 255));
-      const tl = (ln || lw) ? 0 : rad;
-      const tr = (ln || le) ? 0 : rad;
-      const br = (ls || le) ? 0 : rad;
-      const bl = (ls || lw) ? 0 : rad;
-      rect(0, 0, GRID_SIZE, GRID_SIZE, tl, tr, br, bl);
-      fill(lCfg.glowColor[0], lCfg.glowColor[1], lCfg.glowColor[2], opacity * (lCfg.glowColor[3] / 255) * pulse);
-      ellipse(GRID_SIZE * 0.3, GRID_SIZE * 0.3, GRID_SIZE * 0.6 * pulse);
-      if (this.liquidType === 'l_lava' && random() < 0.005) {
-        fill(255, 200, 50, opacity * 0.5); ellipse((GRID_SIZE)*0.2, (GRID_SIZE)*0.2, random(4, 10));
-      }
-      if (isLiquidExposed) {
-        stroke(lCfg.glowColor[0], lCfg.glowColor[1], lCfg.glowColor[2], opacity * 0.6); strokeWeight(2); noFill();
-        if (!ln) line(tl, 0, GRID_SIZE - tr, 0); if (!ls) line(bl, GRID_SIZE, GRID_SIZE - br, GRID_SIZE); if (!lw) line(0, tl, 0, GRID_SIZE - bl); if (!le) line(GRID_SIZE, tr, GRID_SIZE, GRID_SIZE - br);
-        if (!ln && !lw) arc(rad, rad, rad * 2, rad * 2, PI, PI + HALF_PI); if (!ln && !le) arc(GRID_SIZE - rad, rad, rad * 2, rad * 2, PI + HALF_PI, TWO_PI); if (!ls && !le) arc(GRID_SIZE - rad, GRID_SIZE - rad, rad * 2, rad * 2, 0, HALF_PI); if (!ls && !lw) arc(rad, GRID_SIZE - rad, rad * 2, rad * 2, HALF_PI, PI);
+      if (lCfg) {
+        const pulse = 0.5 + 0.5 * sin(state.frames * lCfg.pulseSpeed + (this.gx + this.gy) * 0.5);
+        const ln = state.world.getLiquidAt(this.gx, this.gy - 1);
+        const ls = state.world.getLiquidAt(this.gx, this.gy + 1);
+        const lw = state.world.getLiquidAt(this.gx - 1, this.gy);
+        const le = state.world.getLiquidAt(this.gx + 1, this.gy);
+        const isLiquidExposed = !ln || !ls || !lw || !le;
+        const rad = 8;
+        noStroke();
+        fill(lCfg.color[0], lCfg.color[1], lCfg.color[2], opacity * (lCfg.color[3] / 255));
+        const tl = (ln || lw) ? 0 : rad;
+        const tr = (ln || le) ? 0 : rad;
+        const br = (ls || le) ? 0 : rad;
+        const bl = (ls || lw) ? 0 : rad;
+        rect(0, 0, GRID_SIZE, GRID_SIZE, tl, tr, br, bl);
+        fill(lCfg.glowColor[0], lCfg.glowColor[1], lCfg.glowColor[2], opacity * (lCfg.glowColor[3] / 255) * pulse);
+        ellipse(GRID_SIZE * 0.3, GRID_SIZE * 0.3, GRID_SIZE * 0.6 * pulse);
+        if (this.liquidType === 'l_lava' && random() < 0.005) {
+          fill(255, 200, 50, opacity * 0.5); ellipse((GRID_SIZE)*0.2, (GRID_SIZE)*0.2, random(4, 10));
+        }
+        if (isLiquidExposed) {
+          stroke(lCfg.glowColor[0], lCfg.glowColor[1], lCfg.glowColor[2], opacity * 0.6); strokeWeight(2); noFill();
+          if (!ln) line(tl, 0, GRID_SIZE - tr, 0); if (!ls) line(bl, GRID_SIZE, GRID_SIZE - br, GRID_SIZE); if (!lw) line(0, tl, 0, GRID_SIZE - bl); if (!le) line(GRID_SIZE, tr, GRID_SIZE, GRID_SIZE - br);
+          if (!ln && !lw) arc(rad, rad, rad * 2, rad * 2, PI, PI + HALF_PI); if (!ln && !le) arc(GRID_SIZE - rad, rad, rad * 2, rad * 2, PI + HALF_PI, TWO_PI); if (!ls && !le) arc(GRID_SIZE - rad, GRID_SIZE - rad, rad * 2, rad * 2, 0, HALF_PI); if (!ls && !lw) arc(rad, GRID_SIZE - rad, rad * 2, rad * 2, HALF_PI, PI);
+        }
       }
     }
 
@@ -307,31 +490,40 @@ export class Block {
     const isExposed = !n || !s || !w || !e;
     
     const oCfg = overlayTypes[this.overlay];
-    if (oCfg && (isExposed || oCfg?.isConcealedAlongWithObstacle === false)) {
+    if (oCfg && (isExposed || oCfg?.isConcealedAlongWithObstacle === false || state.currentScreen === 'level_editor')) {
       push(); translate(this.pos.x, this.pos.y);
       drawOverlay(oCfg.obstacleOverlayVfx, this, opacity);
       
-      if (oCfg.obstacleOverlayVfx === 'v_sniper_tower') {
+      if (oCfg.enemyTurretConfig) {
         const eCfg = oCfg.enemyTurretConfig;
         const bcx = this.pos.x + GRID_SIZE/2;
         const bcy = this.pos.y + GRID_SIZE/2;
-        const dx = bcx - state.player.pos.x;
-        const dy = bcy - state.player.pos.y;
-        const dSq = dx*dx + dy*dy;
-        const canSee = eCfg.seeThroughObstacles || state.world.checkLOS(bcx, bcy, state.player.pos.x, state.player.pos.y);
-        
-        if (dSq < eCfg.shootRange*eCfg.shootRange && canSee) {
-           const timeSinceLast = state.frames - this.lastSniperShot;
-           const inCharge = timeSinceLast > (eCfg.shootFireRate - 45);
-           if (timeSinceLast >= eCfg.shootFireRate) {
-             state.enemyBullets.push(new Bullet(bcx, bcy, state.player.pos.x, state.player.pos.y, eCfg.bulletTypeKey, 'core'));
-             state.vfx.push(new MuzzleFlash(bcx, bcy, atan2(state.player.pos.y - bcy, state.player.pos.x - bcx), 30, 8, color(255, 50, 50)));
-             this.lastSniperShot = state.frames;
-           }
-           const laserAlpha = inCharge ? 180 + 75 * sin(state.frames * 0.5) : 50;
-           const laserWeight = inCharge ? 2 : 1;
-           stroke(255, 0, 0, laserAlpha * (opacity / 255)); strokeWeight(laserWeight); 
-           line(GRID_SIZE/2, GRID_SIZE/2, state.player.pos.x - this.pos.x, state.player.pos.y - this.pos.y);
+
+        if (eCfg.drawAimingLine && this.lockedTargetPos) {
+          const lockDuration = eCfg.barrelLockDurationBeforeFiring || 0;
+          const inLock = this.isBarrelLocked || (lockDuration > 0 && this.turretCooldown <= lockDuration);
+          const targetPos = this.lockedTargetPos;
+          const dx = targetPos.x - bcx;
+          const dy = targetPos.y - bcy;
+          const dSq = dx * dx + dy * dy;
+
+          if (dSq < eCfg.shootRange * eCfg.shootRange * 1.5) {
+            push();
+            const laserAlpha = inLock ? 180 + 75 * sin(state.frames * 0.5) : 60;
+            const laserWeight = inLock ? 2.5 : 1;
+            stroke(255, inLock ? 40 : 100, 40, laserAlpha * (opacity / 255));
+            strokeWeight(laserWeight);
+
+            if (eCfg.bulletTypeKey === 'b_enemy_mortar_shell') {
+              line(GRID_SIZE/2, GRID_SIZE/2, targetPos.x - this.pos.x, targetPos.y - this.pos.y);
+              noFill();
+              stroke(255, 60, 60, laserAlpha * (opacity / 255));
+              ellipse(targetPos.x - this.pos.x, targetPos.y - this.pos.y, 30 + (inLock ? 6 * sin(state.frames * 0.4) : 0));
+            } else {
+              line(GRID_SIZE/2, GRID_SIZE/2, targetPos.x - this.pos.x, targetPos.y - this.pos.y);
+            }
+            pop();
+          }
         }
       }
       pop();
@@ -357,15 +549,20 @@ export class Block {
     pop();
   }
 
-  takeDamage(dmg: number) {
-    if (this.isMined) return false;
+  takeDamage(dmg: number, source?: any) {
+    if (this.isMined || this.config?.isIndestructible || this.health === Infinity || this.type === 'o_barrier') return false;
     this.health -= dmg; this.damageGlow = 180;
     state.vfx.push(new BlockHitVFX(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2));
     if (this.health <= 0) {
+      this.health = 0;
       this.isMined = true;
-      const cx = floor(this.gx / CHUNK_SIZE);
-      const cy = floor(this.gy / CHUNK_SIZE);
-      state.world.dirtyChunkAndNeighbors(cx, cy);
+      
+      // Trigger Hooks
+      if (source) {
+        triggerUpgradeHook('onMine', source, { target: this, targetType: 'block', typeName: this.overlay || this.type });
+      }
+
+      state.world.dirtyBlock(this.gx, this.gy);
       
       state.vfx.push(new BlockDebris(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, this.config.color));
       
@@ -385,21 +582,25 @@ export class Block {
         }
 
         // --- Death Rattle for Spawners ---
-        if (oCfg.enemySpawnConfig && this.spawnerBudget > 0) {
-          const sCfg = oCfg.enemySpawnConfig;
+        if ((oCfg.enemySpawnConfig || this.customSpawnerConfig) && this.spawnerBudget > 0) {
+          const sCfg = this.customSpawnerConfig ? { ...oCfg.enemySpawnConfig, ...this.customSpawnerConfig } : oCfg.enemySpawnConfig;
           let safety = 50; 
           while (this.spawnerBudget > 0 && safety > 0) {
             safety--;
-            const affordable = sCfg.enemyTypeKey.filter((k: string) => enemyTypes[k].cost <= this.spawnerBudget);
+            const eTypes = (sCfg.enemyTypeKey && sCfg.enemyTypeKey.length > 0) ? sCfg.enemyTypeKey : ['e_basic'];
+            const affordable = eTypes.filter((k: string) => enemyTypes[k] && enemyTypes[k].cost <= this.spawnerBudget);
             if (affordable.length === 0) break;
             
             const eKey = affordable[floor(random(affordable.length))];
             const eCfg = enemyTypes[eKey];
             const ang = random(TWO_PI);
-            const r = random(GRID_SIZE * 0.5, sCfg.spawnRadius * 1.2);
+            const r = random(GRID_SIZE * 0.5, (sCfg.spawnRadius || 120) * 1.2);
             const sx = this.pos.x + GRID_SIZE/2 + cos(ang) * r;
             const sy = this.pos.y + GRID_SIZE/2 + sin(ang) * r;
             
+            if (state.world.hasSpawnArea() && !state.world.isSpawnAreaAt(sx, sy)) {
+              continue;
+            }
             if (!state.world.checkCollision(sx, sy, eCfg.size/2.2)) {
               requestSpawn(sx, sy, eKey);
               this.spawnerBudget -= eCfg.cost;
@@ -452,17 +653,24 @@ export class Chunk {
   constructor(cx: number, cy: number, directorIdx: number, bonusData: any = {}) { 
     this.cx = cx; this.cy = cy; 
     
-    // INTEGRATION: Discovery Order Index mapping
-    const chain = state.roomDirectorChain || [];
-    
-    // NO LOOPING: Only use prefab if director index is within chain bounds.
-    const targetPrefabId = (directorIdx >= 0 && directorIdx < chain.length) ? chain[directorIdx] : null;
-    const prefab = targetPrefabId ? ROOM_PREFABS.find(p => p.id === targetPrefabId) : null;
+    const isWorldGenEnabled = state.currentLevelId !== 'sandbox' && state.currentLevelLayoutData?.enableWorldGen !== false;
 
-    if (prefab) {
-      this.generateFromPrefab(prefab, bonusData);
+    if (isWorldGenEnabled) {
+      // INTEGRATION: Discovery Order Index mapping
+      const chain = state.roomDirectorChain || [];
+      
+      // NO LOOPING: Only use prefab if director index is within chain bounds.
+      const targetPrefabId = (directorIdx >= 0 && directorIdx < chain.length) ? chain[directorIdx] : null;
+      const prefab = targetPrefabId ? ROOM_PREFABS.find(p => p.id === targetPrefabId) : null;
+
+      if (prefab) {
+        this.generateFromPrefab(prefab, bonusData);
+      } else {
+        this.generate(bonusData); 
+      }
     } else {
-      this.generate(bonusData); 
+      this.blocks = [];
+      this.blockMap.clear();
     }
     this.rebuildOverlayList();
   }
@@ -474,6 +682,13 @@ export class Chunk {
   }
 
   generate(bonusData: any = {}, levelOverride?: number) {
+    this.blocks = [];
+    this.blockMap.clear();
+
+    if (state.currentLevelId === 'sandbox' || state.currentLevelLayoutData?.enableWorldGen === false) {
+      return;
+    }
+
     const lv = levelOverride !== undefined ? levelOverride : floor(constrain(state.currentChunkLevel, 0, 10));
     this.localChunkLevel = lv;
     const weights = BLOCK_WEIGHTS[lv];
@@ -548,7 +763,7 @@ export class Chunk {
         const openBlocks = this.blocks.filter(b => !b.isMined && !b.overlay);
         if (openBlocks.length === 0) break;
         const target = openBlocks[floor(random(openBlocks.length))];
-        target.overlay = bonus.key;
+        target.setOverlay(bonus.key);
         (state as any)[bonus.stat]++;
         count--;
       }
@@ -572,7 +787,7 @@ export class Chunk {
 
             if (spawnerPool.length > 0) {
                 const chosenSpawnerKey = spawnerPool[floor(random(spawnerPool.length))];
-                target.overlay = chosenSpawnerKey;
+                target.setOverlay(chosenSpawnerKey);
                 target.spawnerBudget = budgetOverride;
                 state.totalSpawnerSpawned++;
             }
@@ -597,14 +812,19 @@ export class Chunk {
       const openBlocks = this.blocks.filter(b => !b.isMined && !b.overlay);
       if (openBlocks.length === 0) break;
       const target = openBlocks[floor(random(openBlocks.length))];
-      target.overlay = chosenType;
-      target.initSunBits(chosenType);
+      target.setOverlay(chosenType);
       state.totalSunSpawned += (ECONOMY_CONFIG.lootValues as any)[chosenType];
       remainingSun -= (ECONOMY_CONFIG.lootValues as any)[chosenType];
     }
   }
 
   generateFromPrefab(prefab: RoomPrefab, bonusData: any = {}) {
+    if (state.currentLevelId === 'sandbox' || state.currentLevelLayoutData?.enableWorldGen === false) {
+      this.blocks = [];
+      this.blockMap.clear();
+      return;
+    }
+
     const lv = floor(constrain(state.currentChunkLevel, 0, 10));
     this.generate(bonusData, lv);
     
@@ -665,12 +885,7 @@ export class Chunk {
     if (cfg.guaranteedOverlay) {
         const target = pickValidBlockForAddition();
         if (target) {
-            target.overlay = cfg.guaranteedOverlay;
-            const oCfg = overlayTypes[cfg.guaranteedOverlay];
-            if (oCfg && oCfg.minHealth > 0) {
-              target.health = oCfg.minHealth;
-              target.maxHealth = target.health;
-            }
+            target.setOverlay(cfg.guaranteedOverlay);
         }
     }
 
@@ -702,7 +917,7 @@ export class Chunk {
     for (let i = 0; i < spawnerCount; i++) {
       const target = pickValidBlockForAddition();
       if (target && spawnerPool.length > 0) {
-        target.overlay = spawnerPool[floor(random(spawnerPool.length))];
+        target.setOverlay(spawnerPool[floor(random(spawnerPool.length))]);
         const bRange = cfg.enemySpawnerConfig.enemySpawnConfig.budget;
         target.spawnerBudget = floor(random(bRange[0], bRange[1] + 1));
         state.totalSpawnerSpawned++;
@@ -727,8 +942,7 @@ export class Chunk {
         for (let t of affordable) { sum += t.w; if (r <= sum) { chosenType = t.key; break; } }
         const target = pickValidBlockForAddition();
         if (!target) break; 
-        target.overlay = chosenType;
-        target.initSunBits(chosenType);
+        target.setOverlay(chosenType);
         state.totalSunSpawned += (ECONOMY_CONFIG.lootValues as any)[chosenType];
         remainingSun -= (ECONOMY_CONFIG.lootValues as any)[chosenType];
       }
@@ -738,7 +952,7 @@ export class Chunk {
     const tntCount = floor(random(cfg.tnt[0], cfg.tnt[1] + 1));
     for (let i = 0; i < tntCount; i++) {
       const target = pickValidBlockForAddition();
-      if (target) target.overlay = 'ov_tnt';
+      if (target) target.setOverlay('ov_tnt');
     }
 
     for (const g of cfg.guaranteedObstacleConfig) {
@@ -798,7 +1012,8 @@ export class Chunk {
     const chunkW = CHUNK_SIZE * GRID_SIZE;
     if (!this.buffer) {
       this.buffer = createGraphics(chunkW, chunkW);
-      this.buffer.pixelDensity(4);
+      const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+      this.buffer.pixelDensity(dpr);
     }
     const pg = this.buffer;
     (pg as any)._chunkSeed = (this.cx * 131 + this.cy * 71);
@@ -885,7 +1100,7 @@ export class Chunk {
     if (this.buffer) {
       push();
       imageMode(CORNER);
-      image(this.buffer, chunkX, chunkY);
+      image(this.buffer, chunkX, chunkY, chunkW + 0.5, chunkW + 0.5);
       pop();
     }
 
@@ -1009,11 +1224,71 @@ export class WorldManager {
     this.getChunk(cx, cy);
   }
 
+  dirtyBlock(gx: number, gy: number) {
+    flowField.markDirty();
+    const cx = floor(gx / CHUNK_SIZE);
+    const cy = floor(gy / CHUNK_SIZE);
+    
+    // Always mark the chunk containing this block
+    const homeChunk = this.chunks.get(`${cx},${cy}`);
+    if (homeChunk) {
+      homeChunk.needsRedraw = true;
+      homeChunk.rebuildOverlayList();
+    }
+
+    // Only neighbor chunks sharing the perimeter boundary junction need redraw
+    const lx = ((gx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+    const ly = ((gy % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+
+    const touchLeft = lx === 0;
+    const touchRight = lx === CHUNK_SIZE - 1;
+    const touchTop = ly === 0;
+    const touchBottom = ly === CHUNK_SIZE - 1;
+
+    if (touchLeft) {
+      const c = this.chunks.get(`${cx - 1},${cy}`);
+      if (c) c.needsRedraw = true;
+    }
+    if (touchRight) {
+      const c = this.chunks.get(`${cx + 1},${cy}`);
+      if (c) c.needsRedraw = true;
+    }
+    if (touchTop) {
+      const c = this.chunks.get(`${cx},${cy - 1}`);
+      if (c) c.needsRedraw = true;
+    }
+    if (touchBottom) {
+      const c = this.chunks.get(`${cx},${cy + 1}`);
+      if (c) c.needsRedraw = true;
+    }
+    if (touchLeft && touchTop) {
+      const c = this.chunks.get(`${cx - 1},${cy - 1}`);
+      if (c) c.needsRedraw = true;
+    }
+    if (touchLeft && touchBottom) {
+      const c = this.chunks.get(`${cx - 1},${cy + 1}`);
+      if (c) c.needsRedraw = true;
+    }
+    if (touchRight && touchTop) {
+      const c = this.chunks.get(`${cx + 1},${cy - 1}`);
+      if (c) c.needsRedraw = true;
+    }
+    if (touchRight && touchBottom) {
+      const c = this.chunks.get(`${cx + 1},${cy + 1}`);
+      if (c) c.needsRedraw = true;
+    }
+  }
+
   dirtyChunkAndNeighbors(cx: number, cy: number) {
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         const chunk = this.chunks.get(`${cx + dx},${cy + dy}`);
-        if (chunk) chunk.needsRedraw = true;
+        if (chunk) {
+          chunk.needsRedraw = true;
+          if (dx === 0 && dy === 0) {
+            chunk.rebuildOverlayList();
+          }
+        }
       }
     }
   }
@@ -1053,13 +1328,13 @@ export class WorldManager {
         b.maxHealth = b.health;
       }
     }
-    this.dirtyChunkAndNeighbors(cx, cy);
+    this.dirtyBlock(gx, gy);
   }
 
-  takeDamage(gx: number, gy: number, dmg: number) {
+  takeDamage(gx: number, gy: number, dmg: number, source?: any) {
     const b = this.getBlock(gx, gy);
     if (b) {
-      return b.takeDamage(dmg);
+      return b.takeDamage(dmg, source);
     }
     return false;
   }
@@ -1303,5 +1578,43 @@ export class WorldManager {
        }
     }
     return false;
+  }
+
+  spawnAreaSet: Set<string> = new Set();
+
+  hasSpawnArea(): boolean {
+    return !!(this.spawnAreaSet && this.spawnAreaSet.size > 0);
+  }
+
+  isSpawnAreaAt(x: number, y: number): boolean {
+    if (!this.spawnAreaSet || this.spawnAreaSet.size === 0) return true;
+    const gx = floor(x / GRID_SIZE);
+    const gy = floor(y / GRID_SIZE);
+    return this.spawnAreaSet.has(`${gx},${gy}`);
+  }
+
+  isSpawnAreaTile(gx: number, gy: number): boolean {
+    return this.spawnAreaSet ? this.spawnAreaSet.has(`${gx},${gy}`) : false;
+  }
+
+  setSpawnAreaTile(gx: number, gy: number, isArea: boolean) {
+    if (!this.spawnAreaSet) this.spawnAreaSet = new Set();
+    const key = `${gx},${gy}`;
+    if (isArea) {
+      this.spawnAreaSet.add(key);
+    } else {
+      this.spawnAreaSet.delete(key);
+    }
+  }
+
+  getRandomSpawnAreaPos(): { x: number, y: number } | null {
+    if (!this.spawnAreaSet || this.spawnAreaSet.size === 0) return null;
+    const arr = Array.from(this.spawnAreaSet);
+    const picked = arr[floor(random(arr.length))];
+    const [gx, gy] = picked.split(',').map(Number);
+    return {
+      x: gx * GRID_SIZE + random(4, GRID_SIZE - 4),
+      y: gy * GRID_SIZE + random(4, GRID_SIZE - 4)
+    };
   }
 }

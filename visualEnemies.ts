@@ -102,16 +102,47 @@ export function drawEnemy(e: any) {
 
   if (state.debugGizmosEnemies && e.target) {
     push();
-    let tp = e.target.getWorldPos ? e.target.getWorldPos() : (e.target.pos || (e.target.gx !== undefined ? {x: e.target.gx * 34 + 17, y: e.target.gy * 34 + 17} : null));
-    let isPathToTargetClear = false;
+    const tp = e.target.getWorldPos ? e.target.getWorldPos() : (e.target.pos || (e.target.gx !== undefined ? {x: e.target.gx * 34 + 17, y: e.target.gy * 34 + 17} : null));
+    const mode = (e as any).pathfindingMode || 'direct';
+    const moveVec = (e as any).moveVector || { x: 0, y: 0 };
+
+    // Draw trajectory to target
     if (tp && !isNaN(tp.x) && !isNaN(tp.y)) {
-      isPathToTargetClear = state.world.checkLOS(e.pos.x, e.pos.y, tp.x, tp.y);
+      if (mode === 'los') {
+        stroke(0, 255, 120, 160);
+        strokeWeight(1.5);
+        line(e.pos.x, e.pos.y, tp.x, tp.y);
+      } else if (mode === 'flow') {
+        stroke(0, 200, 255, 160);
+        strokeWeight(1.5);
+        line(e.pos.x, e.pos.y, e.pos.x + moveVec.x * 28, e.pos.y + moveVec.y * 28);
+        
+        // Faint guide line to overall target
+        stroke(0, 200, 255, 40);
+        strokeWeight(1);
+        line(e.pos.x, e.pos.y, tp.x, tp.y);
+      } else if (mode === 'siege') {
+        stroke(255, 165, 0, 180);
+        strokeWeight(2);
+        line(e.pos.x, e.pos.y, e.pos.x + moveVec.x * 28, e.pos.y + moveVec.y * 28);
+
+        stroke(255, 165, 0, 50);
+        strokeWeight(1);
+        line(e.pos.x, e.pos.y, tp.x, tp.y);
+      } else {
+        stroke(255, 50, 50, 100);
+        strokeWeight(1);
+        line(e.pos.x, e.pos.y, tp.x, tp.y);
+      }
     }
-    stroke(isPathToTargetClear ? 0 : 255, isPathToTargetClear ? 255 : 50, 50, 100);
-    strokeWeight(1);
-    if (tp && !isNaN(tp.x) && !isNaN(tp.y)) {
-      line(e.pos.x, e.pos.y, tp.x, tp.y);
-    }
+
+    // Pathfinding Mode Indicator Marker
+    noStroke();
+    if (mode === 'los') fill(0, 255, 120, 200);
+    else if (mode === 'flow') fill(0, 200, 255, 200);
+    else if (mode === 'siege') fill(255, 165, 0, 220);
+    else fill(255, 50, 50, 200);
+    ellipse(e.pos.x, e.pos.y - e.size * 0.65, 5, 5);
 
     pop();
   }
@@ -136,6 +167,7 @@ export function drawEnemy(e: any) {
   let imgKey = e.type === 'e_swarm' ? 'img_swarm_center' : 'img_' + e.type.slice(2);
   if (e.type === 'e_dummyTarget') imgKey = 'img_giant';
   if (e.type === 'e_hypnotest') imgKey = 'img_armor1';
+  if (e.type === 'e_bomb_mainmenu') imgKey = 'img_bomb';
   const sprite = state.assets[imgKey];
 
   if (sprite) {

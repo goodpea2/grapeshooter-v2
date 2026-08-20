@@ -9,12 +9,14 @@ import { groundFeatureTypes } from './balanceGroundFeatures';
 import { enemyTypes } from './balanceEnemies';
 import { npcTypes } from './balanceNPC';
 import { turretTypes } from './balanceTurrets';
+import { recalculateAllStats } from './src/upgrades';
 import { Explosion } from './vfx/index';
 import { Bullet, GroundFeature, NPCEntity, LootEntity } from './entities';
 import { spawnLootAt } from './economy';
 import { Block } from './world';
 import { ROOM_PREFABS } from './dictionaryRoomPrefab';
 import { generateRoomDirectorData } from './debug/roomDirectorGenerator';
+import { saveLevelLayout } from './levelManager';
 
 // p5.js global variable declarations
 declare const floor: any;
@@ -48,6 +50,9 @@ declare const color: any;
 declare const createGraphics: any;
 declare const image: any;
 declare const textWidth: any;
+declare const line: any;
+declare const lerp: any;
+declare const BOTTOM: any;
 
 export function drawSlider(x: number, y: number, w: number, label: string, val: number, min: number, max: number, key: string) {
   push();
@@ -373,6 +378,7 @@ export function drawDebugPanel(spawnFromBudget: Function) {
       { l: "Enemy Gizmo", v: state.debugGizmosEnemies, a: () => state.debugGizmosEnemies = !state.debugGizmosEnemies, type: 'toggle', grid: true },
       { l: "INSTANT CD", v: state.instantRechargeTurrets, a: () => state.instantRechargeTurrets = !state.instantRechargeTurrets, type: 'toggle', grid: true },
       { l: "Touch Gizmo", v: state.showTouchGizmo, a: () => state.showTouchGizmo = !state.showTouchGizmo, type: 'toggle', grid: true },
+      { l: "Player Gizmo", v: state.showPlayerGizmos, a: () => state.showPlayerGizmos = !state.showPlayerGizmos, type: 'toggle', grid: true },
       { l: "WORLD PREV", v: state.showWorldGenPreview, a: () => { state.showWorldGenPreview = !state.showWorldGenPreview; state.worldPreviewNeedsUpdate = true; }, type: 'toggle', grid: true },
       { l: "+1k ALL", a: () => { 
         state.sunCurrency += 1000; 
@@ -386,6 +392,7 @@ export function drawDebugPanel(spawnFromBudget: Function) {
         state.iceCurrency += 1000;
       }, grid: true },
       { l: "WARP 12H", a: () => state.timeWarpRemaining = 60, grid: true },
+      { l: "SPEED 0.1", a: () => { state.requestedGameSpeed = 0.1; state.gameSpeed = 0.1; }, grid: true },
       { l: "CLEAR BLOCK", a: () => {
         const b = new Bullet(state.player.pos.x, state.player.pos.y, state.player.pos.x, state.player.pos.y, 'b_cheat_blocks', 'none');
         b.life = 0; 
@@ -396,7 +403,8 @@ export function drawDebugPanel(spawnFromBudget: Function) {
         b.life = 0; 
         state.bullets.push(b);
       }, grid: true},
-      { l: "SPAWN WAVE", a: () => spawnFromBudget(state.currentNightWaveBudget), grid: true }
+      { l: "SPAWN WAVE", a: () => spawnFromBudget(state.currentNightWaveBudget), grid: true },
+      { l: "SaveLevelLayout", a: () => saveLevelLayout(), grid: true }
     );
   }
 
@@ -414,7 +422,12 @@ export function drawDebugPanel(spawnFromBudget: Function) {
           if (!state.unlockedTurrets.includes(key)) state.unlockedTurrets.push(key);
         });
       }, grid: true },
+      { l: "RESET UPGRADES", a: () => {
+        state.turretUpgrades = {};
+        recalculateAllStats();
+      }, grid: true },
       { l: "Turret Gizmo", v: state.debugGizmosTurrets, a: () => state.debugGizmosTurrets = !state.debugGizmosTurrets, type: 'toggle', grid: true },
+      { l: "DrawTurretPath", v: state.debugDrawTurretPath, a: () => state.debugDrawTurretPath = !state.debugDrawTurretPath, type: 'toggle', grid: true },
       { l: "CLEAR TURRET", a: () => {
         const b = new Bullet(state.player.pos.x, state.player.pos.y, state.player.pos.x, state.player.pos.y, 'b_cheat_destroyTurret', 'none');
         b.life = 0; 
@@ -544,12 +557,8 @@ export function drawDebugPanel(spawnFromBudget: Function) {
           const b = new Block(gx, gy, 'o_dirt');
           chunk.blocks.push(b);
           chunk.blockMap.set(`${gx},${gy}`, b);
-          b.overlay = key;
+          b.setOverlay(key);
           b.isMined = false;
-          if (b.overlay.startsWith('sun')) b.initSunBits(b.overlay);
-          const oCfg = overlayTypes[key];
-          if (oCfg.minHealth > 0 && oCfg.minHealth > b.health) { b.health = oCfg.minHealth; b.maxHealth = b.health; }
-          if (oCfg.enemySpawnConfig) { b.spawnerBudget = oCfg.enemySpawnConfig.budget; }
           state.world.dirtyChunkAndNeighbors(cx, cy);
         }
       });
@@ -697,3 +706,164 @@ export function drawDebugPanel(spawnFromBudget: Function) {
   }
   pop();
 }
+
+export function drawTurretPathDebug() {
+  if (!state.player || !state.debugDrawTurretPath) return;
+
+  push();
+
+  // 1. Draw Player Breadcrumb Trail
+  const trail = state.playerTrail || [];
+  if (trail.length > 0) {
+    // Draw connecting polyline through trail
+    noFill();
+    stroke(0, 220, 255, 140);
+    strokeWeight(2);
+    for (let i = 0; i < trail.length - 1; i++) {
+      const p1 = trail[i];
+      const p2 = trail[i + 1];
+      line(p1.x, p1.y, p2.x, p2.y);
+    }
+
+    // Connect newest trail point to player pos
+    const lastTrail = trail[trail.length - 1];
+    stroke(255, 220, 0, 180);
+    strokeWeight(2);
+    line(lastTrail.x, lastTrail.y, state.player.pos.x, state.player.pos.y);
+
+    // Draw individual breadcrumb points
+    for (let i = 0; i < trail.length; i++) {
+      const p = trail[i];
+      const ratio = i / Math.max(1, trail.length - 1);
+      
+      // Color from violet (oldest) to cyan/lime (newest)
+      const r = floor(lerp(180, 50, ratio));
+      const g = floor(lerp(80, 240, ratio));
+      const b = floor(lerp(255, 180, ratio));
+
+      fill(r, g, b, 220);
+      stroke(255, 255, 255, 100);
+      strokeWeight(1);
+      ellipse(p.x, p.y, 8, 8);
+
+      // Index label on every point or step
+      fill(255, 230);
+      noStroke();
+      textAlign(CENTER, CENTER);
+      textSize(8);
+      text(`${i}`, p.x, p.y - 8);
+    }
+
+    // Tail marker
+    fill(255, 100, 100);
+    noStroke();
+    textAlign(CENTER, BOTTOM);
+    textSize(8);
+    text(`[TAIL 0]`, trail[0].x, trail[0].y - 12);
+  }
+
+  // 2. Draw Player Marker
+  push();
+  noFill();
+  stroke(255, 235, 90, 180);
+  strokeWeight(1.5);
+  ellipse(state.player.pos.x, state.player.pos.y, state.player.size + 10);
+  fill(255, 235, 90);
+  noStroke();
+  textAlign(CENTER, BOTTOM);
+  textSize(9);
+  const countdownStr = state.trailFadeTimer > 0 ? ` (fade in ${(state.trailFadeTimer / 60).toFixed(1)}s)` : '';
+  const statusStr = state.isStationary ? `[STATIONARY${countdownStr}]` : "[MOVING]";
+  text(`Player ${statusStr}\nTrail: ${trail.length}pts`, state.player.pos.x, state.player.pos.y - state.player.size / 2 - 8);
+  pop();
+
+  // 3. Draw Attached Turret Breadcrumb Following
+  const attachments = state.player.attachments || [];
+  for (let idx = 0; idx < attachments.length; idx++) {
+    const t = attachments[idx];
+    const wPos = t.getWorldPos();
+    const formationTarget = {
+      x: state.player.pos.x + t.offset.x,
+      y: state.player.pos.y + t.offset.y
+    };
+
+    // Draw formation target ghost marker
+    noFill();
+    stroke(100, 200, 255, 70);
+    strokeWeight(1);
+    ellipse(formationTarget.x, formationTarget.y, t.size, t.size);
+    stroke(100, 200, 255, 50);
+    line(formationTarget.x - 4, formationTarget.y, formationTarget.x + 4, formationTarget.y);
+    line(formationTarget.x, formationTarget.y - 4, formationTarget.x, formationTarget.y + 4);
+
+    if (t.isFollowingTrail && trail.length > 0) {
+      const targetIdx = constrain(t.pathTargetIndex, 0, trail.length - 1);
+      const breadcrumb = trail[targetIdx];
+
+      // Draw line from turret to targeted breadcrumb
+      stroke(255, 80, 180, 220);
+      strokeWeight(2);
+      line(wPos.x, wPos.y, breadcrumb.x, breadcrumb.y);
+
+      // Target breadcrumb highlight
+      fill(255, 80, 180, 120);
+      noStroke();
+      ellipse(breadcrumb.x, breadcrumb.y, 14, 14);
+      stroke(255, 255, 255, 200);
+      strokeWeight(1.5);
+      noFill();
+      ellipse(breadcrumb.x, breadcrumb.y, 18, 18);
+
+      // Perpendicular offset target point
+      if (t.perpendicularOffset && Math.abs(t.perpendicularOffset) > 0.5) {
+        const dx = state.player.pos.x - breadcrumb.x;
+        const dy = state.player.pos.y - breadcrumb.y;
+        const mag = Math.sqrt(dx * dx + dy * dy);
+        if (mag > 0.1) {
+          const perpX = (-dy / mag) * t.perpendicularOffset;
+          const perpY = (dx / mag) * t.perpendicularOffset;
+          const actualTargetX = breadcrumb.x + perpX;
+          const actualTargetY = breadcrumb.y + perpY;
+
+          stroke(255, 200, 80, 160);
+          strokeWeight(1);
+          line(breadcrumb.x, breadcrumb.y, actualTargetX, actualTargetY);
+          fill(255, 200, 80);
+          noStroke();
+          rectMode(CENTER);
+          rect(actualTargetX, actualTargetY, 5, 5);
+        }
+      }
+
+      // Status text above turret
+      fill(255, 120, 200);
+      noStroke();
+      textAlign(CENTER, TOP);
+      textSize(8);
+      const lag = (trail.length - 1) - targetIdx;
+      text(`Trail[${targetIdx}]\nlag:${lag}`, wPos.x, wPos.y + t.size / 2 + 3);
+    } else {
+      // In formation
+      stroke(100, 255, 150, 120);
+      strokeWeight(1);
+      line(wPos.x, wPos.y, formationTarget.x, formationTarget.y);
+
+      fill(100, 255, 150);
+      noStroke();
+      textAlign(CENTER, TOP);
+      textSize(8);
+      const delayInfo = t.reactionTimer > 0 ? `react:${t.reactionTimer}` : `formed`;
+      text(`Formation\n${delayInfo}`, wPos.x, wPos.y + t.size / 2 + 3);
+    }
+
+    // Velocity arrow
+    if (t.vel && (t.vel.x !== 0 || t.vel.y !== 0)) {
+      stroke(255, 255, 100, 180);
+      strokeWeight(1.5);
+      line(wPos.x, wPos.y, wPos.x + t.vel.x * 6, wPos.y + t.vel.y * 6);
+    }
+  }
+
+  pop();
+}
+

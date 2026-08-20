@@ -38,6 +38,24 @@ export const conditionTypes: any = {
     playerCombatBoost: 4.0,
     visualFlashColor: [255, 100, 200] // Pink flash
   },
+  c_raged_visualonly: {
+    name: 'Raged (visual)',
+    conditionVfx: 'condition_raged',
+    playerCombatBoost: 0.0,
+    visualFlashColor: [255, 100, 200] // Pink flash
+  },
+  c_raged_haste: {
+    name: 'Haste',
+    conditionVfx: 'condition_raged',
+    firerateBoost: 0.5,
+    visualFlashColor: [255, 200, 100]
+  },
+  c_kill_rage_dmg: {
+    name: 'Kill Rage',
+    conditionVfx: 'condition_raged',
+    damageBoost: 1.0,
+    visualFlashColor: [255, 50, 50]
+  },
   c_hypnotized: {
     name: 'Hypnotized',
     conditionVfx: 'condition_hypnotized',

@@ -3,6 +3,30 @@ import { HOUR_FRAMES, SPATIAL_HASH_CELL_SIZE } from './constants';
 import { customStartingHour, AlmanacProgression } from './lvDemo';
 
 export const state: any = {
+  currentScreen: 'main_menu', // 'main_menu' | 'game' | 'level_editor'
+  currentLevelId: 'dev_test', // 'dev_test' | 'sandbox' | 'editor_custom'
+  selectedLevelInMenu: 'dev_test',
+  levelEditor: {
+    activeCategory: 'obstacles',
+    activeSubCategory: 'ALL',
+    selectedItemKey: 'o_dirt',
+    paletteScrollX: 0,
+    paletteScrollVel: 0,
+    toolMode: 'brush', // 'brush' | 'bucket' | 'spawn_area'
+    selectedCustomSpawner: null, // { gx, gy, block }
+    toolbarSpawnerTooltip: null, // { key: string, name: string, config: any }
+    customSpawnerPrefabs: [], // array of { id, name, config }
+    activeSpawnerInput: null, // { field: string, textBuffer: string }
+    spawnAreaLassoPoints: [], // { x, y }[]
+    spawnAreaLassoIsRightClick: false,
+    flagDragMode: null, // 'add' | 'remove' | null
+    isFlagDragActive: false,
+    isRightDragOverlayOnly: false,
+    lastFlagToggleFrame: 0,
+    lastBucketFrame: 0,
+    cameraZoom: 1.0
+  },
+  currentLevelLayoutData: null,
   player: null,
   world: null,
   bullets: [],
@@ -33,6 +57,16 @@ export const state: any = {
   lastUnlockedTurret: null,
   unlockPopupTimer: 0,
   isAlmanacOpen: false,
+  isAlmanacEditorMode: false,
+  almanacTab: 'Turrets', // 'Turrets' | 'Enemies' | 'Upgrades' | 'LevelConfig'
+  almanacEditorToggledKeys: new Set(),
+  levelEditorAlmanacProgression: null,
+  levelEditorPlayerUpgrades: null as any,
+  activePlayerUpgradeInput: null as { key: string; field: 'stat' | 'cost' } | null,
+  levelEditorLevelConfig: null as any,
+  activeLevelConfigInput: null as { field: string; subKey?: string; textBuffer: string; isDragging?: boolean } | null,
+  levelConfigScrollY: 0,
+  levelConfigScrollVelocity: 0,
   almanacSelectedTurret: 't_pea', // should be dynamic with previous user selection
   almanacScrollY: 0,
   almanacScrollVelocity: 0,
@@ -53,8 +87,20 @@ export const state: any = {
   
   // Game Over state
   isGameOver: false,
+  isLevelCompleted: false,
+  gameOverDelayTimer: 0,
+  clearedLevels: (() => {
+    try {
+      const saved = localStorage.getItem('grapeshooter_cleared_levels');
+      return new Set<string>(saved ? JSON.parse(saved) : []);
+    } catch {
+      return new Set<string>();
+    }
+  })(),
+  winConditionActive: false,
   showGameOverPopup: false,
   gameOverProgress: 0, // Used for lighting and modal animation
+  ignoreGameplayClickUntilRelease: false,
   totalElixirLootCollected: 0,
   totalSoilLootCollected: 0,
   totalTurretsAcquired: 0,
@@ -130,6 +176,7 @@ export const state: any = {
   showChunkBorders: false,
   showObstacleOutline: false,
   debugGizmosTurrets: false,
+  debugDrawTurretPath: false,
   debugGizmosEnemies: false,
   debugHP: false,
   hoveredTurretInstance: null, 
@@ -164,6 +211,7 @@ export const state: any = {
   instantRechargeTurrets: false,
   simulateTouchScreen: true,
   showTouchGizmo: false,
+  showPlayerGizmos: false,
 
   // Time Warp
   timeWarpRemaining: 0,
@@ -189,6 +237,33 @@ export const state: any = {
   isPlayerMoving: false,
   playerSpeedMultiplier: 0, // 0-1.0 multiplier based on drag distance
   isWASDInput: false, // True if WASD keys are currently pressed
+
+  // Turret Upgrades
+  turretUpgrades: {}, // turretType -> upgradeId[]
+  upgradeSelection: null, // { turretType, options: [upgradeId, upgradeId] }
+  playerUpgrades: {
+    turretAttachCapacity: 0,
+    sunBankCapacity: 0,
+    magnetRadius: 0,
+    damageMultAdd: 0
+  },
+  playerBonuses: {
+    attackAdd: 0,
+    miningAdd: 0,
+    speedMult: 1.0,
+    attackFirerateMult: 1.0,
+    miningFirerateMult: 1.0,
+  },
+
+  // Breadcrumb Trail for Turrets
+  playerTrail: [], // Array of p5.Vector points
+  maxTrailLength: 50,
+  trailFadeTimer: 0, // Countdown timer (in frames) when stationary before remaining breadcrumbs expire
+  trailStartIndexOnMove: 0, // Index in playerTrail where new movement started after being stationary
+
+  // Persistent data for upgrades (e.g. rolled classes, items)
+  // Format: { [turretType]: { [upgradeId]: any[] } }
+  upgradeData: {},
 
   // Damage Number VFX aggregation
   lastDamageTick: new Map(), // entity.uid -> frameCount

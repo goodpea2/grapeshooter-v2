@@ -2,12 +2,14 @@
 import { state } from '../state';
 import { GRID_SIZE, CHUNK_SIZE } from '../constants';
 import { bulletTypes } from '../balanceBullets';
+import { overlayTypes } from '../balanceObstacles';
 import { Explosion, MuzzleFlash, HitSpark, FireworkVFX } from '../vfx';
 import { GroundFeature } from './groundFeature';
-import { WorldTurret } from './worldTurret';
-import { AttachedTurret } from './attachedTurret';
+import { Player } from './player';
 import { Enemy } from './enemy';
 import { drawBullet } from '../visualBullets';
+import { conditionTypes } from '../balanceConditions';
+import { getPlayerUpgradeStat } from '../src/playerUpgrades';
 
 declare const p5: any;
 declare const createVector: any;
@@ -28,16 +30,57 @@ export class Bullet {
   targetPos: any | null = null;
   currentPierceChance: number = 0;
   rotation: number = 0;
+  source: any = null;
+  seeThroughObstacles: boolean = false;
   
   // Track unique hits for piercing consistency
   hitTargets: Set<string> = new Set();
 
-  constructor(x: number, y: number, tx: number, ty: number, typeKey: string, targetType: string) {
+  constructor(x: number, y: number, tx: number, ty: number, typeKey: string, targetType: string, source?: any) {
+    this.source = source;
     this.typeKey = typeKey; this.config = bulletTypes[typeKey] || bulletTypes.b_player;
     this.damageTargets = this.config.damageTargets || [];
     this.pos = createVector(x, y); this.prevPos = this.pos.copy();
     
     this.col = this.config.bulletColor; this.dmg = this.config.bulletDamage; this.targetType = targetType; this.life = this.config.bulletLifeTime;
+    
+    // Check if bullet or source overlay grants seeThroughObstacles
+    if (this.config.seeThroughObstacles) {
+      this.seeThroughObstacles = true;
+    } else if (this.source && this.source.overlay) {
+      const oCfg = overlayTypes[this.source.overlay];
+      if (oCfg?.enemyTurretConfig?.seeThroughObstacles) {
+        this.seeThroughObstacles = true;
+      }
+    }
+
+    // Ignore source block if fired from an overlay block
+    if (this.source && this.source.gx !== undefined && this.source.gy !== undefined) {
+      this.hitTargets.add(`${this.source.gx},${this.source.gy}`);
+    }
+
+    // Apply source multipliers
+    if (this.source) {
+      if (this.source instanceof Player) {
+        const bonuses = state.playerBonuses;
+        const playerDmgMult = 1.0 + (getPlayerUpgradeStat('damageMultAdd') || 0);
+        if (this.typeKey === 'b_player_mining') {
+          this.dmg = (this.dmg + (bonuses.miningAdd || 0)) * playerDmgMult;
+        } else {
+          this.dmg = (this.dmg + (bonuses.attackAdd || 0)) * playerDmgMult;
+        }
+      } else if (this.source.activeStats) {
+        let dMult = this.source.activeStats.damageMult || 1.0;
+        if (this.source.conditions) {
+          for (const [cKey, duration] of this.source.conditions) {
+            const cfg = conditionTypes[cKey];
+            if (cfg?.damageBoost) dMult += cfg.damageBoost;
+          }
+        }
+        this.dmg = (this.dmg * dMult) + (this.source.activeStats.damageAdd || 0);
+      }
+    }
+
     this.currentPierceChance = this.config.initialPierceChance ?? 0;
 
     if (this.config.highArcConfig) {
@@ -95,7 +138,7 @@ export class Bullet {
           const minDist = a.size / 2 + 6;
           if (dSq < minDist*minDist) {
             this.hitTargets.add(a.uid);
-            a.takeDamage(this.dmg);
+            a.takeDamage(this.dmg, this.source);
             this.handleCollision();
             if (this.life <= 0) return;
           }
@@ -111,29 +154,34 @@ export class Bullet {
         let block = chunk?.blocks.find((b: any) => !b.isMined && b.gx === gx && b.gy === gy);
         if (block) {
           this.hitTargets.add(blockKey);
-          block.takeDamage(this.dmg * (this.config.obstacleDamageMultiplier || 1));
-          
-          // Trigger sparking Hit VFX on obstacle impact
-          const hitVfx = this.config.bulletHitVfx || 'v_hit_spark';
-          if (hitVfx === 'v_hit_spark') {
-             state.vfx.push(new HitSpark(this.pos.x, this.pos.y, this.col));
-          }
+          if (!this.seeThroughObstacles) {
+            const killed = block.takeDamage(this.dmg * (this.config.obstacleDamageMultiplier || 1), this.source);
+            if (killed && this.source && this.source.onTargetKilled) {
+              this.source.onTargetKilled(block);
+            }
+            
+            // Trigger sparking Hit VFX on obstacle impact
+            const hitVfx = this.config.bulletHitVfx || 'v_hit_spark';
+            if (hitVfx === 'v_hit_spark') {
+               state.vfx.push(new HitSpark(this.pos.x, this.pos.y, this.col));
+            }
 
-          if (this.config.bounceConfig) {
-             // Calculate bounce
-             const prevGX = floor(this.prevPos.x / GRID_SIZE);
-             const prevGY = floor(this.prevPos.y / GRID_SIZE);
-             if (prevGX !== gx) this.vel.x *= -1;
-             if (prevGY !== gy) this.vel.y *= -1;
-             this.dmg = Math.max(0, this.dmg - (this.config.bounceConfig.damageDecayPerBounce || 0));
-          } else {
-             this.handleCollision(true);
+            if (this.config.bounceConfig) {
+               // Calculate bounce
+               const prevGX = floor(this.prevPos.x / GRID_SIZE);
+               const prevGY = floor(this.prevPos.y / GRID_SIZE);
+               if (prevGX !== gx) this.vel.x *= -1;
+               if (prevGY !== gy) this.vel.y *= -1;
+               this.dmg = Math.max(0, this.dmg - (this.config.bounceConfig.damageDecayPerBounce || 0));
+            } else {
+               this.handleCollision(true);
+            }
+            if (this.life <= 0) return;
           }
-          if (this.life <= 0) return;
         }
       }
     } else {
-        if (state.world.isBlockAt(this.pos.x, this.pos.y)) {
+        if (!this.seeThroughObstacles && state.world.isBlockAt(this.pos.x, this.pos.y)) {
            this.handleCollision();
            if (this.life <= 0) return;
         }
@@ -172,7 +220,10 @@ export class Bullet {
                    state.vfx.push(new HitSpark(this.pos.x, this.pos.y, this.col));
                 }
 
-                e.takeDamage(this.dmg); 
+                const killed = e.takeDamage(this.dmg, this.source); 
+                if (killed && this.source && this.source.onTargetKilled) {
+                  this.source.onTargetKilled(e);
+                }
                 this.handleCollision(); // Process pierce and lifetime
                 if (this.life <= 0) return;
               }
@@ -191,7 +242,7 @@ export class Bullet {
           const minDist = a.size / 2 + 4;
           if (dSq < minDist*minDist) {
             this.hitTargets.add(a.uid);
-            a.takeDamage(this.dmg); 
+            a.takeDamage(this.dmg, this.source); 
             if (this.config.frostAmount && !a.isFrosted) {
               a.frostLevel = Math.min(1, a.frostLevel + this.config.frostAmount);
               if (a.frostLevel >= 1) {

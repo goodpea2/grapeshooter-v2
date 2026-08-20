@@ -27,6 +27,7 @@ export const BITMASK_MAP: Record<number, {x: number, y: number}> = {
 
 // Priority for rendering: Higher number = renders on top
 const MATERIAL_PRIORITY: Record<string, number> = {
+  'o_barrier': 6,
   'o_black': 1,
   'o_slate': 2,
   'o_stone': 3,
@@ -96,10 +97,14 @@ export function drawAutotile(pg: any, vx: number, vy: number, gx: number, gy: nu
     } else if (mat === 'o_black') {
       const nVal = noise((gx + 0.5) * 3, (gy + 0.5) * 3, 999);
       assetKey = nVal > 0.5 ? 'img_tileset_black_v2' : 'img_tileset_black';
+    } else if (mat === 'o_barrier') {
+      const nVal = noise((gx + 0.5) * 3, (gy + 0.5) * 3, 999);
+      assetKey = nVal > 0.5 ? 'img_tileset_barrier_v2' : 'img_tileset_barrier_v2';
     }
     // Add other materials here as assets are provided
     
     const img = state.assets[assetKey];
+    const tileDrawSize = GRID_SIZE + 0.6;
     if (img && img.width > 0) {
       if (mask === 15) {
         const seed = (gx * 31 + gy * 7);
@@ -107,11 +112,11 @@ export function drawAutotile(pg: any, vx: number, vy: number, gx: number, gy: nu
         pg.push();
         pg.translate(drawX + GRID_SIZE / 2, drawY + GRID_SIZE / 2);
         pg.rotate(rot);
-        pg.image(img, -GRID_SIZE / 2, -GRID_SIZE / 2, GRID_SIZE, GRID_SIZE, 
+        pg.image(img, -tileDrawSize / 2, -tileDrawSize / 2, tileDrawSize, tileDrawSize, 
                  coords.x * tileSize, coords.y * tileSize, tileSize, tileSize);
         pg.pop();
       } else {
-        pg.image(img, drawX, drawY, GRID_SIZE, GRID_SIZE, 
+        pg.image(img, drawX, drawY, tileDrawSize, tileDrawSize, 
                  coords.x * tileSize, coords.y * tileSize, tileSize, tileSize);
       }
     }
@@ -127,9 +132,11 @@ export function drawAutotile(pg: any, vx: number, vy: number, gx: number, gy: nu
   if (concealedMask > 0) {
     const concealedCoords = BITMASK_MAP[concealedMask];
     const concealedImg = state.assets['img_tileset_concealed'];
+    const concealedDrawSize = GRID_SIZE + 0.4;
+    const concealedDrawOffset = -0.4;
     if (concealedImg && concealedImg.width > 0) {
       pg.blendMode((window as any).MULTIPLY);
-      pg.image(concealedImg, drawX, drawY, GRID_SIZE, GRID_SIZE,
+      pg.image(concealedImg, drawX + concealedDrawOffset, drawY + concealedDrawOffset, concealedDrawSize, concealedDrawSize,
                concealedCoords.x * tileSize, concealedCoords.y * tileSize, tileSize, tileSize);
       pg.blendMode((window as any).BLEND);
     }

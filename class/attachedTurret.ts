@@ -36,9 +36,17 @@ import { Turret } from './turret';
 
 export class AttachedTurret extends Turret {
   hq: number; hr: number; offset: any;
+  pos: any;
+  vel: any;
   
   // Staggered target scan
   targetScanTimer: number;
+
+  // Trail following state
+  pathTargetIndex: number = -1;
+  reactionTimer: number = 0;
+  isFollowingTrail: boolean = false;
+  perpendicularOffset: number = 0; // Natural "wiggle" in the line
 
   // Animation states
   jumpOffset: any = null;
@@ -49,7 +57,10 @@ export class AttachedTurret extends Turret {
     super(type, parent);
     this.hq = hq; this.hr = hr;
     this.offset = createVector(HEX_DIST * (1.5 * hq), HEX_DIST * (Math.sqrt(3)/2 * hq + Math.sqrt(3) * hr));
+    this.pos = parent.pos.copy();
+    this.vel = createVector(0, 0);
     this.targetScanTimer = floor(random(TurretMinScanRate));
+    this.perpendicularOffset = random(-10, 10);
 
     // Resolve ingredients for merging logic
     if (this.config.tier === 1) {
@@ -86,8 +97,193 @@ export class AttachedTurret extends Turret {
     }
   }
   
-  getWorldPos() { return p5.Vector.add(this.parent.pos, this.offset); }
+  getWorldPos() { return this.pos; }
   
+  update() {
+    this.updateMovement();
+    super.update();
+  }
+
+  customIsActive(): boolean | null {
+    // Turrets don't fire while moving (either because player is moving or the turret itself is in motion)
+    if (!state.isStationary && !this.config.isActiveWhileMoving) return false;
+    
+    // Inactive while moving itself (following trail or moving towards formation)
+    if (this.isFollowingTrail) return false;
+    if (this.vel.magSq() > 0.04) return false;
+
+    return null; // Fall back to default logic
+  }
+
+  private updateMovement() {
+    // 1. Determine Target
+    const formationTarget = p5.Vector.add(this.parent.pos, this.offset);
+    let currentMoveTarget = formationTarget;
+
+    if (!state.isStationary) {
+      // Start/Increment reaction delay
+      if (!this.isFollowingTrail) {
+        this.reactionTimer++;
+        const indexInSquad = this.parent.attachments.indexOf(this);
+        const requiredDelay = 5 + indexInSquad * 2; // Staggered start
+
+        if (this.reactionTimer > requiredDelay && state.playerTrail.length > 0) {
+          this.isFollowingTrail = true;
+          // Pick the newly-created breadcrumb first (from when the player started moving again)
+          const startIdx = state.trailStartIndexOnMove !== undefined ? state.trailStartIndexOnMove : 0;
+          this.pathTargetIndex = Math.max(0, Math.min(state.playerTrail.length - 1, startIdx));
+        }
+      }
+    } else {
+      // Player is stationary
+      this.reactionTimer = 0;
+    }
+
+    // Process trail following (active both when moving and while catching up when player is stationary)
+    if (this.isFollowingTrail && state.playerTrail.length > 0) {
+      const minValidIdx = state.trailStartIndexOnMove !== undefined ? state.trailStartIndexOnMove : 0;
+      if (this.pathTargetIndex < minValidIdx) {
+        this.pathTargetIndex = Math.min(state.playerTrail.length - 1, minValidIdx);
+      }
+      if (this.pathTargetIndex >= state.playerTrail.length) {
+        this.pathTargetIndex = state.playerTrail.length - 1;
+      }
+
+      const breadcrumb = state.playerTrail[this.pathTargetIndex];
+      currentMoveTarget = breadcrumb.copy();
+
+      // Add perpendicular "loosness"
+      const toPlayer = p5.Vector.sub(this.parent.pos, breadcrumb);
+      if (toPlayer.mag() > 0.1) {
+        const perp = createVector(-toPlayer.y, toPlayer.x).normalize().mult(this.perpendicularOffset);
+        currentMoveTarget.add(perp);
+      }
+
+      // Advance index if reached breadcrumb
+      if (dist(this.pos.x, this.pos.y, currentMoveTarget.x, currentMoveTarget.y) < 25) {
+        if (this.pathTargetIndex < state.playerTrail.length - 1) {
+          this.pathTargetIndex = Math.min(this.pathTargetIndex + 3, state.playerTrail.length - 1);
+        } else if (state.isStationary) {
+          // Reached the end of available breadcrumbs while stationary -> transition toward formation
+          const isFormationBlocked = state.world.isBlockAt(formationTarget.x, formationTarget.y);
+          if (!isFormationBlocked) {
+            this.isFollowingTrail = false;
+            currentMoveTarget = formationTarget;
+          }
+        }
+      }
+
+      // LOOK-AHEAD SHORTCUT:
+      // Every few frames, check if we are near a breadcrumb that's much further in the path
+      if (state.frames % 5 === 0) {
+        const checkWindow = 30; // How many points to look ahead
+        const searchEnd = Math.min(this.pathTargetIndex + checkWindow, state.playerTrail.length - 1);
+        
+        for (let i = searchEnd; i > this.pathTargetIndex; i--) {
+          const futurePoint = state.playerTrail[i];
+          const dToFuture = dist(this.pos.x, this.pos.y, futurePoint.x, futurePoint.y);
+          
+          // If we are close to a future point and have LOS, skip to it!
+          if (dToFuture < 45 && state.world.checkLOS(this.pos.x, this.pos.y, futurePoint.x, futurePoint.y)) {
+            this.pathTargetIndex = i;
+            break;
+          }
+        }
+      }
+
+      // CATCH-UP SNAP: 
+      // If we've fallen more than 100 points behind, snap the index closer to maintain the swarm's tail.
+      const lag = (state.playerTrail.length - 1) - this.pathTargetIndex;
+      if (lag > 100) {
+        this.pathTargetIndex = state.playerTrail.length - 50;
+      }
+    } else if (state.isStationary || !this.isFollowingTrail) {
+      // Return to formation
+      const isFormationBlocked = state.world.isBlockAt(formationTarget.x, formationTarget.y);
+      if (!isFormationBlocked) {
+        currentMoveTarget = formationTarget;
+        this.isFollowingTrail = false;
+      } else {
+        // If blocked, stay put or follow last trail point
+        if (state.playerTrail.length > 0) {
+          currentMoveTarget = state.playerTrail[state.playerTrail.length - 1];
+        } else {
+          currentMoveTarget = this.pos; // Stay put
+        }
+      }
+    }
+
+    // 2. Steering toward currentMoveTarget
+    const desired = p5.Vector.sub(currentMoveTarget, this.pos);
+    const d = desired.mag();
+    
+    // Arrival logic: slow down as we get close
+    let maxSpeed = this.isFollowingTrail ? 5 : 4;
+    
+    // Dynamic Speed: If the player is far ahead on the trail, "run" faster to keep the line compact
+    if (this.isFollowingTrail) {
+      const lag = (state.playerTrail.length - 1) - this.pathTargetIndex;
+      if (lag > 30) maxSpeed = 6.5;
+      if (lag > 60) maxSpeed = 8;
+    }
+
+    const maxForce = 0.3;
+    
+    if (d < 50) {
+      const m = lerp(0, maxSpeed, d / 50);
+      desired.setMag(m);
+    } else {
+      desired.setMag(maxSpeed);
+    }
+
+    const steer = p5.Vector.sub(desired, this.vel);
+    steer.limit(maxForce);
+    this.vel.add(steer);
+    
+    // 3. Separation Force (Personal Bubble)
+    for (const other of this.parent.attachments) {
+      if (other === this) continue;
+      const otherPos = other.getWorldPos();
+      const distSq = (this.pos.x - otherPos.x)**2 + (this.pos.y - otherPos.y)**2;
+      const minDist = (this.size + other.size) * 0.45;
+      if (distSq < minDist * minDist && distSq > 0.01) {
+        const diff = p5.Vector.sub(this.pos, otherPos);
+        diff.normalize();
+        diff.div(Math.sqrt(distSq)); // Weight by distance
+        this.vel.add(diff.mult(0.5));
+      }
+    }
+
+    // Friction and velocity integration
+    this.vel.mult(0.92);
+    
+    const nextX = this.pos.x + this.vel.x;
+    const nextY = this.pos.y + this.vel.y;
+    
+    // Collision-aware position update
+    if (!state.world.isBlockAt(nextX, this.pos.y)) {
+      this.pos.x = nextX;
+    } else {
+      this.vel.x *= -0.2;
+    }
+    
+    if (!state.world.isBlockAt(this.pos.x, nextY)) {
+      this.pos.y = nextY;
+    } else {
+      this.vel.y *= -0.2;
+    }
+  }
+
+  replaceWith(type: string) {
+    const newTurret = new AttachedTurret(type, this.parent, this.hq, this.hr);
+    newTurret.pos = this.pos.copy();
+    newTurret.vel = this.vel.copy();
+    const index = this.parent.attachments.indexOf(this);
+    if (index !== -1) {
+      this.parent.attachments[index] = newTurret;
+    }
+  }
+
   isPowered(): boolean {
     return true; // Attached turrets are always powered for now
   }
@@ -101,6 +297,8 @@ export class AttachedTurret extends Turret {
   }
 
   private applyTurretRepulsion(wPos: any) {
+    // We already handle separation with other attached turrets in updateMovement
+    // This handles repulsion from WORLD turrets or external objects
     const worldTurrets = state.world.getAllTurrets();
     const myRadius = this.size * 0.45;
     for (const wt of worldTurrets) {
@@ -112,20 +310,19 @@ export class AttachedTurret extends Turret {
       if (dSq < minDist * minDist && dSq > 0.01) {
         const d = Math.sqrt(dSq);
         const overlap = minDist - d;
-        const pushX = (dx / d) * (overlap + 0.05);
-        const pushY = (dy / d) * (overlap + 0.05);
-        this.parent.pos.x += pushX;
-        this.parent.pos.y += pushY;
+        const push = createVector(dx / d, dy / d).mult(overlap * 0.2);
+        this.vel.add(push);
       }
     }
   }
 
   protected updateEnvironment(gx: number, gy: number, liquidType: string | null, lData: any) {
     const wPos = this.getWorldPos();
+    
+    // Use physical proximity to ground turret for lilypad check
     const groundTurret = this.parent.attachments.find((a: any) => 
-      a.hq === this.hq && 
-      a.hr === this.hr && 
-      a.config.turretLayer === 'ground'
+      a.config.turretLayer === 'ground' &&
+      dist(a.pos.x, a.pos.y, this.pos.x, this.pos.y) < GRID_SIZE
     );
     const isProtectedByLilypad = groundTurret && groundTurret.type === 't_lilypad';
     this.isWaterlogged = (liquidType === 'l_water') && !isProtectedByLilypad;
@@ -157,140 +354,8 @@ export class AttachedTurret extends Turret {
     this.applyTurretRepulsion(wPos);
   }
 
-  protected handleGrowth(wPos: any) {
-    if (this.type === 't_seed' || this.type === 't_seed2') {
-      const gCfg = this.config.actionConfig;
-      const interval = gCfg.growthInterval || 150;
-      if (state.frames % interval === 0) {
-        let gain = 1;
-        if (this.isWaterlogged) gain = 4;
-        this.growthProgress += gain;
-        if (this.growthProgress >= (gCfg.maxGrowth || 32)) {
-          let pool = ['t_pea', 't_laser', 't_wall', 't_mine', 't_ice'];
-          if (this.type === 't_seed2') {
-             pool = ['t2_repeater', 't2_firepea', 't2_laser2', 't2_peanut', 't2_puncher', 't2_tall', 't2_mortar', 't2_pulse', 't2_laserexplode', 't2_minespawner', 't2_snowpea', 't2_iceray', 't2_spike', 't2_icebomb', 't2_stun'];
-          }
-          const chosen = pool[floor(random(pool.length))];
-          const index = this.parent.attachments.indexOf(this);
-          if (index !== -1) {
-            const nt = new AttachedTurret(chosen, this.parent, this.hq, this.hr);
-            this.parent.attachments[index] = nt;
-            state.vfx.push(new MergeVFX(wPos.x, wPos.y, [255, 255, 255]));
-          }
-        }
-      }
-    }
-  }
-
-  protected handleFarm(wPos: any) {
-    if (this.config.actionType.includes('farm')) {
-      const fCfg = this.config.farmConfig;
-      const isHarvestStage = this.farmStage === fCfg.assetImg.length - 1;
-      
-      if (!isHarvestStage) {
-        const elixirNeeded = fCfg.elixirRequired[this.farmStage] || 0;
-        const hasRequirement = this.farmElixirCount >= elixirNeeded;
-
-        if (hasRequirement) {
-          if (this.farmGrowthTimer > 0) {
-            this.farmGrowthTimer--;
-          } else {
-            // Grow to next stage
-            this.farmStage++;
-            this.farmElixirCount = 0;
-            if (this.farmStage < fCfg.assetImg.length) {
-              this.farmGrowthTimer = fCfg.growthTimer[this.farmStage];
-            }
-          }
-        } else {
-          // Attract elixir
-          const range = fCfg.attractRange || GRID_SIZE * 4;
-          const rangeSq = range * range;
-          
-          let currentlyAttractedCount = 0;
-          
-          // OPTIMIZATION: Only check loot in active chunks
-          state.activeChunkKeys.forEach((key: string) => {
-            const chunk = state.world.chunks.get(key);
-            if (chunk) {
-              for (let l of chunk.loot) {
-                if (l.isBeingAttractedByFarm && l.farmAttractor === this) {
-                  currentlyAttractedCount++;
-                }
-              }
-            }
-          });
-
-          if (this.farmElixirCount + currentlyAttractedCount < elixirNeeded) {
-            state.activeChunkKeys.forEach((key: string) => {
-              const chunk = state.world.chunks.get(key);
-              if (chunk) {
-                for (let l of chunk.loot) {
-                  if (l.typeKey === 'elixir' && l.life > 0 && !l.isBeingAttractedByFarm) {
-                    const dSq = (wPos.x - l.pos.x)**2 + (wPos.y - l.pos.y)**2;
-                    if (dSq < rangeSq) {
-                      l.isBeingAttractedByFarm = true;
-                      l.farmAttractor = this;
-                      currentlyAttractedCount++;
-                      if (this.farmElixirCount + currentlyAttractedCount >= elixirNeeded) break;
-                    }
-                  }
-                }
-              }
-            });
-          }
-        }
-      } else {
-        // Harvest stage
-        if (fCfg.isMobFarm) {
-          this.spawnMobFarmEnemy();
-          
-          if (fCfg.resetAfterHarvest) {
-            this.farmStage = 0;
-            this.farmGrowthTimer = fCfg.growthTimer[0];
-            this.farmElixirCount = 0;
-          }
-        }
-      }
-    }
-  }
-
   protected executeActions(wPos: any) {
     super.executeActions(wPos);
-    
-    // Handle jump logic for AttachedTurret
-    const config = this.config.actionConfig;
-    if (this.config.actionType.includes('pulse') && this.jumpFrames === 0) {
-      let triggered = false;
-      const tCenter = this.getTargetCenter();
-      if (tCenter) {
-        const dSq = (wPos.x - tCenter.x)**2 + (wPos.y - tCenter.y)**2;
-        if (dSq < Math.max(1, config.pulseTriggerRadius * config.pulseTriggerRadius)) triggered = true;
-      }
-      
-      if (triggered && config.pulseTurretJumpAtTriggerSource && this.getTargetCenter()) { 
-        this.jumpFrames = 20; 
-        this.jumpTargetPos = this.getTargetCenter()?.copy(); 
-      }
-    }
-
-    if (this.jumpFrames > 0) {
-      this.jumpFrames--;
-      if (this.jumpTargetPos) {
-        const progress = 1 - (this.jumpFrames / 20);
-        this.jumpOffset = p5.Vector.sub(this.jumpTargetPos, wPos).mult(sin(progress * Math.PI));
-      }
-      if (this.jumpFrames === 0) {
-        const tCenter = this.jumpTargetPos;
-        if (config.pulseBulletTypeKey) {
-            const sx = config.pulseCenteredAtTriggerSource && tCenter ? tCenter.x : wPos.x;
-            const sy = config.pulseCenteredAtTriggerSource && tCenter ? tCenter.y : wPos.y;
-            let b = new Bullet(sx, sy, sx, sy, config.pulseBulletTypeKey, 'none'); b.life = 0; state.bullets.push(b);
-            this.pulseAnimTimer = 15;
-        }
-        this.jumpOffset = null; this.jumpTargetPos = null;
-      }
-    }
   }
 
   private spawnMobFarmEnemy() {
@@ -354,14 +419,15 @@ export class AttachedTurret extends Turret {
     const gx = floor(wPos.x / GRID_SIZE); const gy = floor(wPos.y / GRID_SIZE);
     const myRadius = this.size * 0.45; const blockRadius = GRID_SIZE * 0.5;
     const minSafeDist = myRadius + blockRadius;
+    
     for (let i = gx - 1; i <= gx + 1; i++) for (let j = gy - 1; j <= gy + 1; j++) {
       const bx = i * GRID_SIZE + GRID_SIZE/2; const by = j * GRID_SIZE + GRID_SIZE/2;
       if (state.world.isBlockAt(bx, by)) {
         const dx = wPos.x - bx; const dy = wPos.y - by; const dSq = dx*dx + dy*dy;
         if (dSq < minSafeDist * minSafeDist && dSq > 0.01) { 
           const d = Math.sqrt(dSq); const overlap = minSafeDist - d;
-          const pushX = (dx / d) * (overlap + 0.05); const pushY = (dy / d) * (overlap + 0.05);
-          this.parent.pos.x += pushX; this.parent.pos.y += pushY; 
+          const push = createVector(dx / d, dy / d).mult(overlap * 0.5);
+          this.vel.add(push); 
         }
       }
     }
@@ -404,7 +470,7 @@ export class AttachedTurret extends Turret {
         const cw = CHUNK_SIZE * GRID_SIZE; const dx = (chunk.cx * cw + cw/2) - wPos.x; const dy = (chunk.cy * cw + cw/2) - wPos.y;
         if (dx*dx + dy*dy > (range + cw)**2) return;
         chunk.blocks.forEach((b: any) => {
-          if (b.isMined) return;
+          if (b.isMined || b.type === 'o_barrier' || b.config?.isValidTarget === false || b.isValidTarget === false) return;
           const bcx = b.pos.x + GRID_SIZE/2; const bcy = b.pos.y + GRID_SIZE/2;
           const dSq = (wPos.x - bcx)**2 + (wPos.y - bcy)**2;
           if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, bcx, bcy)) results.push(b);
@@ -421,7 +487,7 @@ export class AttachedTurret extends Turret {
     return results;
   }
 
-  protected onDeath() {
+  public onDeath() {
     super.onDeath();
     const index = this.parent.attachments.indexOf(this);
     if (index !== -1) {

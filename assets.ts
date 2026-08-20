@@ -18,6 +18,7 @@ export const ASSETS = {
   img_snowthrower_giant: "https://i.ibb.co/sJd9T7Rr/e-snowthrower-giant.png",
   img_poison: "https://i.ibb.co/xSs68Kfq/e-poison.png",
   img_bomb: "https://i.ibb.co/hhyvsHq/e-bomb.png",
+  img_bomb_mainmenu: "https://i.ibb.co/hhyvsHq/e-bomb.png",
   img_rockpuncher: "https://i.ibb.co/fVYJMPS1/e-rockpuncher.png",
   img_suneater: "https://i.ibb.co/4ZBqwV1y/e-suneater.png",
   img_swarm_center: "https://i.ibb.co/MyKZDBGY/e-swarm-center.png",
@@ -217,7 +218,9 @@ export const ASSETS = {
   img_tileset_slate_v2: "https://i.ibb.co/S44v0W1M/tileset-slate-v2.png",
   img_tileset_black: "https://i.ibb.co/1fZ3DfjG/tileset-black.png",
   img_tileset_black_v2: "https://i.ibb.co/tTG6W6dL/tileset-black-v2.png",
-  img_tileset_concealed: "https://i.ibb.co/bRzH3dnK/tileset-conceal.png",
+  img_tileset_concealed: "https://i.ibb.co/XrNCc3qp/tileset-conceal.png",
+  img_tileset_barrier: "https://i.ibb.co/Jj93vYPM/tileset-barrier-v2.png",
+  img_tileset_barrier_v2: "https://i.ibb.co/Jj93vYPM/tileset-barrier-v2.png",
   img_tileset_fallback: "https://i.ibb.co/xSYp1VBX/fallback.png",
 
   // New Obstacle Assets

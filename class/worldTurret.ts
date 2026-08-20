@@ -2,6 +2,7 @@
 import { Turret } from './turret';
 import { state } from '../state';
 import { GRID_SIZE, WORLD_TURRET_ACTIVE_RANGE } from '../constants';
+import { turretTypes } from '../balanceTurrets';
 import { Bullet } from './bullet';
 import { MuzzleFlash, MagicLinkVFX, SparkVFX, WeldingHitVFX, MergeVFX } from '../vfx/index';
 import { spawnLootAt } from '../economy';
@@ -31,6 +32,12 @@ export class WorldTurret extends Turret {
 
   getWorldPos() {
     return this.pos;
+  }
+
+  replaceWith(type: string) {
+    const newTurret = new WorldTurret(type, this.gx, this.gy);
+    state.world.removeTurret(this.gx, this.gy);
+    state.world.addTurret(newTurret);
   }
 
   isPowered(): boolean {
@@ -64,90 +71,6 @@ export class WorldTurret extends Turret {
       }
     } else if (!this.isFrosted) {
       this.frostLevel = Math.max(0, this.frostLevel - 1/800);
-    }
-  }
-
-  protected handleGrowth(wPos: any) {
-    if (this.type === 't_seed' || this.type === 't_seed2') {
-      const gCfg = this.config.actionConfig;
-      const interval = gCfg.growthInterval || 150;
-      if (state.frames % interval === 0) {
-        let gain = 1;
-        if (this.isWaterlogged) gain = 4;
-        this.growthProgress += gain;
-        if (this.growthProgress >= (gCfg.maxGrowth || 32)) {
-          let pool = ['t_pea', 't_laser', 't_wall', 't_mine', 't_ice'];
-          if (this.type === 't_seed2') {
-             pool = ['t2_repeater', 't2_firepea', 't2_laser2', 't2_peanut', 't2_puncher', 't2_tall', 't2_mortar', 't2_pulse', 't2_laserexplode', 't2_minespawner', 't2_snowpea', 't2_iceray', 't2_spike', 't2_icebomb', 't2_stun'];
-          }
-          const chosen = pool[floor(random(pool.length))];
-          const nt = new WorldTurret(chosen, this.gx, this.gy);
-          state.world.removeTurret(this.gx, this.gy);
-          state.world.addTurret(nt);
-        }
-      }
-    }
-  }
-
-  protected handleFarm(wPos: any) {
-    // Similar to AttachedTurret but without player-specific logic if any
-    const fCfg = this.config.farmConfig;
-    if (!fCfg) return;
-    const isHarvestStage = this.farmStage === fCfg.assetImg.length - 1;
-    
-    if (!isHarvestStage) {
-      const elixirNeeded = fCfg.elixirRequired[this.farmStage] || 0;
-      const hasRequirement = this.farmElixirCount >= elixirNeeded;
-
-      if (hasRequirement) {
-        if (this.farmGrowthTimer > 0) {
-          this.farmGrowthTimer--;
-        } else {
-          this.farmStage++;
-          this.farmElixirCount = 0;
-          if (this.farmStage < fCfg.assetImg.length) {
-            this.farmGrowthTimer = fCfg.growthTimer[this.farmStage];
-          }
-        }
-      } else {
-        const range = fCfg.attractRange || GRID_SIZE * 4;
-        const rangeSq = range * range;
-        let currentlyAttractedCount = 0;
-        
-        // OPTIMIZATION: Only check loot in active chunks
-        state.activeChunkKeys.forEach((key: string) => {
-          const chunk = state.world.chunks.get(key);
-          if (chunk) {
-            for (let l of chunk.loot) {
-              if (l.isBeingAttractedByFarm && l.farmAttractor === this) {
-                currentlyAttractedCount++;
-              }
-            }
-          }
-        });
-
-        if (this.farmElixirCount + currentlyAttractedCount < elixirNeeded) {
-          state.activeChunkKeys.forEach((key: string) => {
-            const chunk = state.world.chunks.get(key);
-            if (chunk) {
-              for (let l of chunk.loot) {
-                if (l.typeKey === 'elixir' && l.life > 0 && !l.isBeingAttractedByFarm) {
-                  const dSq = (wPos.x - l.pos.x)**2 + (wPos.y - l.pos.y)**2;
-                  if (dSq < rangeSq) {
-                    l.isBeingAttractedByFarm = true;
-                    l.farmAttractor = this;
-                    currentlyAttractedCount++;
-                    if (this.farmElixirCount + currentlyAttractedCount >= elixirNeeded) break;
-                  }
-                }
-              }
-            }
-          });
-        }
-      }
-    } else if (fCfg.isMobFarm) {
-       // Mob farm logic
-       // ...
     }
   }
 
@@ -186,7 +109,7 @@ export class WorldTurret extends Turret {
     state.vfx.push(new MergeVFX(wPos.x, wPos.y, [255, 255, 255]));
   }
 
-  protected onDeath() {
+  public onDeath() {
     super.onDeath();
     state.world.removeTurret(this.gx, this.gy);
   }

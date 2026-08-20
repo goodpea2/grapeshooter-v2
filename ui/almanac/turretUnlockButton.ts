@@ -2,7 +2,16 @@
 import { state } from '../../state';
 import { turretTypes } from '../../balanceTurrets';
 import { TYPE_MAP, drawTurretSprite } from '../../assetTurret';
-import { AlmanacProgression } from '../../lvDemo';
+import { getActiveAlmanacProgression } from '../../lvDemo';
+
+export function isTurretUnlockAvailable(): boolean {
+  const prog = getActiveAlmanacProgression();
+  const costs = prog.UnlockCost;
+  if (!costs || !Array.isArray(costs) || costs.length === 0) return false;
+  if (!state.lockedTurrets || state.lockedTurrets.length === 0) return false;
+  if (state.unlockCount >= costs.length) return false;
+  return true;
+}
 
 declare const dist: any;
 declare const mouseX: any;
@@ -35,16 +44,31 @@ declare const strokeWeight: any;
 declare const mouseIsPressed: any;
 
 export function drawTurretUnlockButton(x: number, y: number, w: number, h: number, modalX: number, modalY: number) {
-  const costIdx = Math.min(state.unlockCount, AlmanacProgression.UnlockCost.length - 1);
-  const costObj = AlmanacProgression.UnlockCost[costIdx];
+  if (!isTurretUnlockAvailable()) return;
+
+  const prog = getActiveAlmanacProgression();
+  const costs = prog.UnlockCost || [];
+  const costIdx = Math.min(state.unlockCount, costs.length - 1);
+  const costObj = costs[costIdx];
+  if (!costObj) return;
+
   const costType = Object.keys(costObj)[0];
   const costVal = (costObj as any)[costType];
   
   let currentCurrency = 0;
-  let iconKey = '';
+  let iconKey = `img_icon_${costType}`;
   if (costType === 'raisin') { currentCurrency = state.raisinCurrency; iconKey = 'img_icon_raisin'; }
   else if (costType === 'soil') { currentCurrency = state.soilCurrency; iconKey = 'img_icon_soil'; }
   else if (costType === 'elixir') { currentCurrency = state.elixirCurrency; iconKey = 'img_icon_elixir'; }
+  else if (costType === 'sun') { currentCurrency = state.sunCurrency; iconKey = 'img_icon_sun'; }
+  else if (costType === 'leaf') { currentCurrency = state.leafCurrency; iconKey = 'img_icon_leaf'; }
+  else if (costType === 'shard') { currentCurrency = state.shardCurrency; iconKey = 'img_icon_shard'; }
+  else if (costType === 'shell') { currentCurrency = state.shellCurrency; iconKey = 'img_icon_shell'; }
+  else if (costType === 'fuel') { currentCurrency = state.fuelCurrency; iconKey = 'img_icon_fuel'; }
+  else if (costType === 'ice') { currentCurrency = state.iceCurrency; iconKey = 'img_icon_ice'; }
+  else if ((state as any)[`${costType}Currency`] !== undefined) {
+    currentCurrency = (state as any)[`${costType}Currency`];
+  }
   
   const canAfford = currentCurrency >= costVal;
 
@@ -180,19 +204,23 @@ export function drawTurretUnlockButton(x: number, y: number, w: number, h: numbe
     drawTurretSprite(dummyTurret);
     noTint();
     pop();
-  } else {
-    fill(255, 200);
-    textAlign(CENTER, CENTER);
-    textSize(14);
-    text("MAXED", bx, by - 10);
   }
 
   // Handle Unlock Click
-  if (hov && mouseIsPressed && canAfford && state.lockedTurrets.length > 0 && !state.almanacIsDragging) {
+  if (hov && mouseIsPressed && canAfford && state.lockedTurrets.length > 0 && !state.almanacIsDragging && !state.upgradeSelection) {
     // Deduct cost
     if (costType === 'raisin') state.raisinCurrency -= costVal;
     else if (costType === 'soil') state.soilCurrency -= costVal;
     else if (costType === 'elixir') state.elixirCurrency -= costVal;
+    else if (costType === 'sun') state.sunCurrency -= costVal;
+    else if (costType === 'leaf') state.leafCurrency -= costVal;
+    else if (costType === 'shard') state.shardCurrency -= costVal;
+    else if (costType === 'shell') state.shellCurrency -= costVal;
+    else if (costType === 'fuel') state.fuelCurrency -= costVal;
+    else if (costType === 'ice') state.iceCurrency -= costVal;
+    else if ((state as any)[`${costType}Currency`] !== undefined) {
+      (state as any)[`${costType}Currency`] -= costVal;
+    }
 
     // Unlock a random turret from locked list with weights
     let totalWeight = 0;

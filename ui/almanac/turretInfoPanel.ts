@@ -6,7 +6,8 @@ import { GRID_SIZE, HOUR_FRAMES } from '../../constants';
 import { TURRET_RECIPES } from '../../dictionaryTurretMerging';
 import { CLASS_ICON_MAP, TURRET_DISPLAY_STATS, DEFAULT_STATS } from '../../UITurretTooltip';
 import { ShopFlyVFX } from '../../vfx/index';
-import { AlmanacProgression } from '../../lvDemo';
+import { AlmanacProgression, getActiveAlmanacProgression } from '../../lvDemo';
+import { UPGRADE_COSTS, UPGRADES, TURRET_UPGRADE_POOLS, recalculateAllStats } from '../../src/upgrades';
 
 declare const push: any;
 declare const pop: any;
@@ -44,7 +45,9 @@ export function drawTurretInfoPanel(x: number, y: number, w: number, h: number, 
   const tr = turretTypes[key];
   if (!tr) return;
 
-  const isUnlocked = state.unlockedTurrets.includes(key);
+  const prog = getActiveAlmanacProgression();
+  const isEditorMode = !!state.isAlmanacEditorMode;
+  const isUnlocked = isEditorMode || state.unlockedTurrets.includes(key);
 
   push();
   translate(x, y);
@@ -88,7 +91,7 @@ export function drawTurretInfoPanel(x: number, y: number, w: number, h: number, 
     fill(255);
     textAlign(CENTER, CENTER);
     textSize(16);
-    const isDiscover = AlmanacProgression.UnlockedByDiscoverTurret.includes(key);
+    const isDiscover = (prog.UnlockedByDiscoverTurret || []).includes(key);
     text(isDiscover ? "DISCOVER TO UNLOCK" : "UNLOCK TO USE", 0, 100);
     pop();
     
@@ -143,11 +146,17 @@ export function drawTurretInfoPanel(x: number, y: number, w: number, h: number, 
   textSize(16);
   text(tr.name, -80, 0);
 
-  // Buy Button (Green Pill with costs)
-  drawBuyButton(0, 40, rightColW - 20, 35, modalX + x + rightColX + rightColW / 2, modalY + y + topSectionY-12, key);
+  const showBuy = prog.AllTurretCrafting !== false;
+  const showUpgrade = prog.AllTurretUpgrade !== false;
 
-  // Upgrade Button (Gold Pill)
-  drawUpgradeButton(0, 85, rightColW -20 , 35, modalX + x + rightColX + rightColW / 2, modalY + y + topSectionY-12);
+  let btnY = 38;
+  if (showBuy) {
+    drawBuyButton(0, btnY, rightColW - 20, 35, modalX + x + rightColX + rightColW / 2, modalY + y + topSectionY-12, key, prog, isEditorMode);
+    btnY += 45;
+  }
+  if (showUpgrade) {
+    drawUpgradeButton(0, btnY, rightColW - 20, 35, modalX + x + rightColX + rightColW / 2, modalY + y + topSectionY-12, key, isEditorMode);
+  }
   pop();
 
   // Bottom Section: Stats Grid and Description
@@ -156,18 +165,32 @@ export function drawTurretInfoPanel(x: number, y: number, w: number, h: number, 
 
   const descY = 210; 
   const descH = h - descY - 15;
-  drawDescriptionArea(15, descY, w - 30, descH, tr.tooltip || "");
+  const appliedUpgrades = state.turretUpgrades[key] || [];
+  let upgradeHistory = "";
+  if (appliedUpgrades.length > 0) {
+    upgradeHistory = "\n\nUPGRADE HISTORY:\n" + appliedUpgrades.map((id: string, idx: number) => {
+      const upgrade = UPGRADES[id];
+      let name = upgrade?.description || id;
+      const dataList = state.upgradeData[key]?.[id];
+      if (dataList && dataList[idx]) {
+        name += ` (${dataList[idx]})`;
+      }
+      return `- ${name}`;
+    }).join('\n');
+  }
+  const fullDesc = (tr.tooltip || "") + upgradeHistory;
+  drawDescriptionArea(15, descY, w - 30, descH, fullDesc);
 
   pop();
 }
 
-function drawBuyButton(x: number, y: number, w: number, h: number, parentX: number, parentY: number, key: string) {
+function drawBuyButton(x: number, y: number, w: number, h: number, parentX: number, parentY: number, key: string, prog: any, isEditorMode: boolean) {
   const screenX = parentX + x;
   const screenY = parentY + y;
   const tr = turretTypes[key];
   
   // 1. Check for overrides
-  const override = AlmanacProgression.CraftingCostOverride.find((o: any) => o.type === key);
+  const override = (prog?.CraftingCostOverride || []).find((o: any) => o.type === key);
   
   if (override && override.canBePurchased === false) {
     push();
@@ -235,7 +258,7 @@ function drawBuyButton(x: number, y: number, w: number, h: number, parentX: numb
   
   pop();
 
-  if (hov && mouseIsPressed && canAfford) {
+  if (!isEditorMode && hov && mouseIsPressed && canAfford && !state.upgradeSelection) {
     // Deduct costs
     for (const [res, amount] of Object.entries(costs)) {
       (state as any)[res + 'Currency'] -= (amount as number);
@@ -258,12 +281,20 @@ function drawBuyButton(x: number, y: number, w: number, h: number, parentX: numb
   }
 }
 
-function drawUpgradeButton(x: number, y: number, w: number, h: number, parentX: number, parentY: number) {
+function drawUpgradeButton(x: number, y: number, w: number, h: number, parentX: number, parentY: number, key: string, isEditorMode?: boolean) {
   const screenX = parentX + x;
   const screenY = parentY + y;
   
   const hov = mouseX > screenX - w/2 && mouseX < screenX + w/2 && 
               mouseY > screenY - h/2 && mouseY < screenY + h/2;
+
+  const appliedUpgrades = state.turretUpgrades[key] || [];
+  const upgradeCount = appliedUpgrades.length;
+  const costs = UPGRADE_COSTS[key] || [10, 20, 40, 80, 160];
+  const maxUpgrades = costs.length;
+  const isMaxed = upgradeCount >= maxUpgrades;
+  const cost = isMaxed ? 0 : costs[upgradeCount];
+  const canAfford = state.elixirCurrency >= cost;
 
   push();
   translate(x, y);
@@ -274,25 +305,62 @@ function drawUpgradeButton(x: number, y: number, w: number, h: number, parentX: 
   fill(0, 0, 0, 225);
   rect(0, 4, w, h, 12);
   
-  fill(hov ? [230, 225, 100] : [255, 132, 0]);
+  if (isMaxed) {
+    fill(60, 60, 60);
+  } else {
+    fill(hov && canAfford ? [230, 225, 100] : [255, 132, 0]);
+  }
   rect(0, 0, w, h, 12);
 
-  fill(hov ? [255, 132, 0] : [255, 195, 0]);
+  if (isMaxed) {
+    fill(40, 40, 40);
+  } else {
+    fill(hov && canAfford ? [255, 132, 0] : [255, 195, 0]);
+  }
   rect(0, -4, w, h-4, 12);
   
-  fill(0);
+  fill(isMaxed ? 150 : 0);
   textAlign(LEFT, CENTER);
   textSize(14);
-  text("Upgrade (WIP)", -w/2 + 15, 0);
+  text(isMaxed ? "MAX UPGRADED" : `UPGRADE (${upgradeCount}/${maxUpgrades})`, -w/2 + 15, 0);
   
-  // Elixir Cost
-  imageMode(CENTER);
-  image(state.assets['img_icon_elixir'], w/2 - 65, 0, 32, 32);
-  textAlign(LEFT, CENTER);
-  textSize(14);
-  text("26/600", w/2 - 50, 0);
+  if (!isMaxed) {
+    // Elixir Cost
+    imageMode(CENTER);
+    image(state.assets['img_icon_elixir'], w/2 - 65, 0, 24, 24);
+    textAlign(LEFT, CENTER);
+    textSize(14);
+    fill(canAfford ? 0 : [200, 0, 0]);
+    text(cost, w/2 - 50, 0);
+  }
   
   pop();
+
+  if (!isEditorMode && hov && mouseIsPressed && !isMaxed && canAfford && !state.upgradeSelection) {
+    // Deduct cost
+    state.elixirCurrency -= cost;
+
+    // Trigger Upgrade Selection
+    let pool = TURRET_UPGRADE_POOLS[key] || [];
+    if (pool.length === 0) pool = ['u_test_fallback'];
+    
+    if (pool.length > 0) {
+      // Pick 2 random upgrades from the pool (can be same for now, or unique)
+      const shuffled = [...pool].sort(() => Math.random() - 0.5);
+      const options = [shuffled[0], shuffled[1] || shuffled[0]];
+      const preRolledData = options.map(id => {
+        const upg = UPGRADES[id];
+        return upg?.preRoll ? upg.preRoll() : null;
+      });
+      state.upgradeSelection = {
+        turretType: key,
+        options,
+        preRolledData
+      };
+    }
+
+    (window as any).mouseIsPressed = false;
+  }
 }
 
 function drawStatsGrid(x: number, y: number, w: number, type: string) {

@@ -28,14 +28,20 @@ declare const BOTTOM: any;
 declare const CORNER: any;
 declare const rect: any;
 declare const random: any;
+declare const width: any;
+declare const height: any;
+declare const dist: any;
+declare const mouseX: any;
+declare const mouseY: any;
+declare const TOP: any;
+declare const textSize: any;
+declare const textAlign: any;
+declare const text: any;
 declare const beginShape: any;
 declare const endShape: any;
 declare const vertex: any;
 declare const CLOSE: any;
 declare const map: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
 declare const floor: any;
 declare const radians: any;
 declare const triangle: any;
@@ -47,6 +53,28 @@ export function drawTurret(t: any) {
   const config = t.config;
   const actionConfig = config.actionConfig;
   
+  // Laser Beams: Render in clean, unrotated and unscaled world space
+  const canDrawLaser = (t.isAttachedToPlayer() ? state.isStationary : true) && !t.isWaterlogged && !t.isFrosted;
+  if (canDrawLaser) {
+    if (t.config.actionType.includes('laserBeam') && t.target) {
+      const tc = t.getTargetCenter();
+      if (tc) {
+        const ramp = t.rampFactor || 0;
+        const baseWidth = t.config.actionConfig.beamWidth || 4;
+        const dynamicWidth = baseWidth * (1 + ramp * 1.5);
+        
+        push();
+        stroke(t.config.color[0], t.config.color[1], t.config.color[2], t.alpha * 0.4);
+        strokeWeight(dynamicWidth * 2.5 + sin(state.frames * 0.6) * 4);
+        line(wPos.x, wPos.y, tc.x, tc.y);
+        stroke(255, t.alpha * 0.9);
+        strokeWeight(dynamicWidth * 0.8);
+        line(wPos.x, wPos.y, tc.x, tc.y);
+        pop();
+      }
+    }
+  }
+
   // ANIMATION CALCULATION
   const isMoving = !state.isStationary && t.isAttachedToPlayer();
   const frames = state.frames;
@@ -207,13 +235,40 @@ export function drawTurret(t: any) {
         text(lifeInfo, 0, t.size/2 + 25);
         pop();
     }
+
+    const screenX = wPos.x - (state.cameraPos.x - width/2);
+    const screenY = wPos.y - (state.cameraPos.y - height/2);
+    const dMouse = dist(mouseX, mouseY, screenX, screenY);
+    if (dMouse < t.size / 2 + 10) {
+      push();
+      const tx = 15;
+      const ty = -70;
+      fill(0, 220);
+      stroke(255, 100);
+      rect(tx, ty, 140, 85, 4);
+      noStroke();
+      fill(255);
+      textSize(10);
+      textAlign(LEFT, TOP);
+      const s = t.activeStats || {};
+      let info = `dmgMult: ${s.damageMult?.toFixed(2)}\n`;
+      info += `frMult: ${s.firerateDivider?.toFixed(2)}\n`;
+      info += `rangeMult: ${s.rangeMult?.toFixed(2)}\n`;
+      info += `maxHp: ${t.maxHealth?.toFixed(0)}\n`;
+      info += `pAtkFR: ${state.playerBonuses.attackFirerateMult?.toFixed(2)}x\n`;
+      info += `pMinFR: ${state.playerBonuses.miningFirerateMult?.toFixed(2)}x`;
+      text(info, tx + 5, ty + 5);
+      pop();
+    }
     pop();
   }
 
-  if (config.actionType.includes('shield') && t.specialActivityLevel > 0.01) {
+  const hasShieldVFX = config.actionType.includes('shield') || (t.activeStats?.shieldRadius > 0);
+  if (hasShieldVFX && t.specialActivityLevel > 0.01) {
     // Shield VFX is intentionally not scaled by animScaleX/Y
     const activity = t.specialActivityLevel;
-    const rad = (actionConfig.shieldRadius || 50) * activity;
+    let sRad = t.activeStats?.shieldRadius || actionConfig.shieldRadius || (GRID_SIZE * 1.5);
+    const rad = sRad * activity;
     const pulse = 1.0 + 0.03 * sin(state.frames * 0.05);
     const alpha = (t.alpha / 255) * (100 + 20 * sin(state.frames * 0.04)) * activity;
     
@@ -290,24 +345,6 @@ export function drawTurret(t: any) {
       ellipse(-(t.config.size || 22) * 0.2, -(t.config.size || 22) * 0.2, (t.config.size || 22) * 0.4);
     }
     pop();
-  }
-
-  if (state.isStationary && !t.isWaterlogged && !t.isFrosted) {
-    if (t.config.actionType.includes('laserBeam') && t.target) {
-      let tc = t.getTargetCenter();
-      if (tc) {
-        const ramp = t.rampFactor || 0;
-        const baseWidth = t.config.actionConfig.beamWidth;
-        const dynamicWidth = baseWidth * (1 + ramp * 1.5);
-        
-        stroke(t.config.color[0], t.config.color[1], t.config.color[2], t.alpha * 0.4);
-        strokeWeight(dynamicWidth * 2.5 + sin(state.frames * 0.6) * 4);
-        line(0, 0, tc.x - wPos.x, tc.y - wPos.y);
-        stroke(255, t.alpha * 0.9);
-        strokeWeight(dynamicWidth * 0.8);
-        line(0, 0, tc.x - wPos.x, tc.y - wPos.y);
-      }
-    }
   }
 
   if ((t.type === 't_seed' || t.type === 't_seed2') && t.growthProgress > 0) {

@@ -13,7 +13,9 @@ declare const CENTER: any;
 declare const tint: any;
 declare const noTint: any;
 declare const abs: any;
+declare const PI: any;
 declare const HALF_PI: any;
+declare const TWO_PI: any;
 declare const cos: any;
 declare const sin: any;
 declare const map: any;
@@ -134,9 +136,12 @@ export function drawTurretSprite(t: any) {
   let isLeft = false;
   let isBack = false;
 
-  const ang = t.angle; 
-  if (abs(ang) > HALF_PI) isLeft = true;
-  if (ang < 0) isBack = true;
+  const rawAng = t.angle || 0;
+  const ang = ((rawAng % TWO_PI) + TWO_PI) % TWO_PI; // [0, 2PI]
+  const normalizedAng = ang > PI ? ang - TWO_PI : ang; // [-PI, PI]
+  
+  if (abs(normalizedAng) > HALF_PI) isLeft = true;
+  if (normalizedAng < 0) isBack = true;
 
   // Logic for unarmed state override
   let onCooldown = false;
@@ -208,6 +213,8 @@ export function drawTurretSprite(t: any) {
         let hash = 0;
         for(let i=0; i<t.uid.length; i++) hash += t.uid.charCodeAt(i);
         rotate((hash % 360) * (Math.PI / 180));
+    } else if (config.smoothRotation) {
+        rotate(t.angle);
     } else {
         if (isLeft) scale(-1, 1);
     }

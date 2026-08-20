@@ -4,14 +4,15 @@ import { turretTypes } from '../../balanceTurrets';
 import { TYPE_MAP, drawTurretSprite } from '../../assetTurret';
 import { CLASS_ICON_MAP } from '../../UITurretTooltip';
 import { TURRET_RECIPES } from '../../dictionaryTurretMerging';
-import { AlmanacProgression } from '../../lvDemo';
+import { AlmanacProgression, getActiveAlmanacProgression, getTurretProgressionState, cycleTurretProgressionState } from '../../lvDemo';
 
 declare const push: any;
 declare const pop: any;
 declare const translate: any;
 declare const fill: any;
-declare const noStroke: any;
+declare const noFill: any;
 declare const stroke: any;
+declare const noStroke: any;
 declare const strokeWeight: any;
 declare const rect: any;
 declare const textAlign: any;
@@ -32,7 +33,6 @@ declare const noTint: any;
 declare const CENTER: any;
 declare const map: any;
 declare const constrain: any;
-declare const noFill: any;
 declare const frameCount: any;
 declare const scale: any;
 declare const sin: any;
@@ -42,15 +42,25 @@ export function drawTurretList(x: number, y: number, w: number, h: number, modal
   const itemH = 105;
   const padding = 10;
 
-  const validTurrets = new Set([
-    ...AlmanacProgression.StartingTurret,
-    ...AlmanacProgression.UnlockedByDiscoverTurret,
-    ...AlmanacProgression.LockedTurret.map(t => t.type)
-  ]);
+  const prog = getActiveAlmanacProgression();
+  const isEditorMode = !!state.isAlmanacEditorMode;
 
-  const turrets = Object.keys(turretTypes).filter(k => 
-    (turretTypes[k].tier > 0 || turretTypes[k].isSpecial) && validTurrets.has(k)
-  );
+  let turrets: string[];
+  if (isEditorMode) {
+    turrets = Object.keys(turretTypes).filter(k => 
+      turretTypes[k].tier > 0 || turretTypes[k].isSpecial
+    );
+  } else {
+    const banned = new Set(prog.BannedTurrets || []);
+    const validTurrets = new Set([
+      ...(prog.StartingTurret || []),
+      ...(prog.UnlockedByDiscoverTurret || []),
+      ...(prog.LockedTurret || []).map((t: any) => typeof t === 'string' ? t : t.type)
+    ]);
+    turrets = Object.keys(turretTypes).filter(k => 
+      (turretTypes[k].tier > 0 || turretTypes[k].isSpecial) && validTurrets.has(k) && !banned.has(k)
+    );
+  }
   
   // Group by Tier
   const tiers: Record<string, string[]> = {};
@@ -157,7 +167,18 @@ export function drawTurretList(x: number, y: number, w: number, h: number, modal
 
 function drawTurretGridItem(x: number, y: number, key: string, parentX: number, parentY: number) {
   const isSelected = state.almanacSelectedTurret === key;
-  const isUnlocked = state.unlockedTurrets.includes(key);
+  const prog = getActiveAlmanacProgression();
+  const isEditorMode = !!state.isAlmanacEditorMode;
+
+  let isUnlocked = false;
+  let turretState: 'available' | 'locked' | 'needDiscovery' | 'banned' = 'available';
+
+  if (isEditorMode) {
+    turretState = getTurretProgressionState(key, prog);
+    isUnlocked = (turretState === 'available');
+  } else {
+    isUnlocked = state.unlockedTurrets.includes(key);
+  }
   
   const screenX = parentX + x;
   const screenY = parentY + y;
@@ -167,8 +188,6 @@ function drawTurretGridItem(x: number, y: number, key: string, parentX: number, 
 
   push();
   translate(x, y);
-
-  
 
   // Podium with depth and shadow
   push();
@@ -245,13 +264,10 @@ function drawTurretGridItem(x: number, y: number, key: string, parentX: number, 
   translate(0, -10);
   scale(animScaleX*1.25, animScaleY*1.25);
 
-
-
   const dummyTurret = {
     type: key,
     config: config,
     angle: 0,
-    //framesAlive: framesAlive,
     alpha: isUnlocked ? 255 : 100,
     actionTimers: new Map(),
     flashTimer: 0,
@@ -265,8 +281,56 @@ function drawTurretGridItem(x: number, y: number, key: string, parentX: number, 
   noTint();
   pop();
 
-  if (hov && mouseIsPressed && !state.almanacIsDragging) {
+  // Draw overlay state symbols (? for needDiscovery, x for banned)
+  if (isEditorMode) {
+    if (turretState === 'needDiscovery') {
+      push();
+      translate(0, -25);
+      textAlign(CENTER, CENTER);
+      textSize(34);
+      // Shadow
+      fill(0, 0, 0, 230);
+      noStroke();
+      text('?', 2, 2);
+      // Symbol
+      fill(255, 220, 90);
+      stroke(30, 35, 60, 240);
+      strokeWeight(3);
+      text('?', 0, 0);
+      pop();
+    } else if (turretState === 'banned') {
+      push();
+      translate(0, -25);
+      textAlign(CENTER, CENTER);
+      textSize(32);
+      // Shadow
+      fill(0, 0, 0, 230);
+      noStroke();
+      text('x', 2, 2);
+      // Symbol
+      fill(255, 75, 75);
+      stroke(40, 15, 25, 240);
+      strokeWeight(3);
+      text('x', 0, 0);
+      pop();
+    }
+  }
+
+  if (!mouseIsPressed) {
+    if (state.almanacEditorToggledKeys) {
+      state.almanacEditorToggledKeys.clear();
+    }
+  }
+
+  if (hov && mouseIsPressed && !state.upgradeSelection) {
     state.almanacSelectedTurret = key;
+    if (isEditorMode) {
+      if (!state.almanacEditorToggledKeys) state.almanacEditorToggledKeys = new Set();
+      if (!state.almanacEditorToggledKeys.has(key)) {
+        state.almanacEditorToggledKeys.add(key);
+        cycleTurretProgressionState(key, prog);
+      }
+    }
   }
   
   pop();
@@ -277,15 +341,25 @@ export function getTurretY(targetKey: string): number {
   const itemW = 105;
   const w = 450; // Standard Almanac list width
 
-  const validTurrets = new Set([
-    ...AlmanacProgression.StartingTurret,
-    ...AlmanacProgression.UnlockedByDiscoverTurret,
-    ...AlmanacProgression.LockedTurret.map(t => t.type)
-  ]);
+  const prog = getActiveAlmanacProgression();
+  const isEditorMode = !!state.isAlmanacEditorMode;
 
-  const turrets = Object.keys(turretTypes).filter(k => 
-    (turretTypes[k].tier > 0 || turretTypes[k].isSpecial) && validTurrets.has(k)
-  );
+  let turrets: string[];
+  if (isEditorMode) {
+    turrets = Object.keys(turretTypes).filter(k => 
+      turretTypes[k].tier > 0 || turretTypes[k].isSpecial
+    );
+  } else {
+    const banned = new Set(prog.BannedTurrets || []);
+    const validTurrets = new Set([
+      ...(prog.StartingTurret || []),
+      ...(prog.UnlockedByDiscoverTurret || []),
+      ...(prog.LockedTurret || []).map((t: any) => typeof t === 'string' ? t : t.type)
+    ]);
+    turrets = Object.keys(turretTypes).filter(k => 
+      (turretTypes[k].tier > 0 || turretTypes[k].isSpecial) && validTurrets.has(k) && !banned.has(k)
+    );
+  }
   
   const tiers: Record<string, string[]> = {};
   const specialTurrets = ['t_sunflower', 't_lilypad', 't_seed', 't_seed2'];

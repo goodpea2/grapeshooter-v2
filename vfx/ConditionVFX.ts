@@ -86,7 +86,7 @@ export class ConditionVFX {
         line(-3, 0, 3, 0); line(0, -3, 0, 3);
         pop();
       }
-    } else if (this.type === 'c_raged') {
+    } else if (this.type === 'c_raged' || this.type === 'c_raged_visualonly') {
         let r = (this.target.size / 2 || 15) + 8;
         noFill();
         stroke(255, 100, 200, 180); strokeWeight(3);

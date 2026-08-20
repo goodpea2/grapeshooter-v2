@@ -3,6 +3,7 @@ import { state } from './state';
 import { turretTypes } from './balanceTurrets';
 import { TYPE_MAP } from './assetTurret';
 import { ShopFlyVFX } from './vfx/index';
+import { getPlayerUpgradeStat } from './src/playerUpgrades';
 
 declare const floor: any;
 declare const dist: any;
@@ -149,7 +150,10 @@ export function handleNpcUiClick() {
               }
               state.totalTurretsAcquired += amount;
             } else if (trade.itemType === 'resource') {
-              if (trade.itemKey === 'sun') state.sunCurrency += amount;
+              if (trade.itemKey === 'sun') {
+                const sunCap = getPlayerUpgradeStat('sunBankCapacity') || 20;
+                state.sunCurrency = Math.min(sunCap, state.sunCurrency + amount);
+              }
               if (trade.itemKey === 'soil') state.soilCurrency += amount;
               if (trade.itemKey === 'elixir') state.elixirCurrency += amount;
               if (trade.itemKey === 'raisin') state.raisinCurrency += amount;
