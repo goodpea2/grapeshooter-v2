@@ -161,8 +161,8 @@ export const ASSETS = {
   img_icon_leaf: "https://i.ibb.co/qYcq5yBT/icon-leaf.png",
   img_icon_almanac: "https://i.ibb.co/tMXJCXb3/icon-almanac.png",
   img_icon_almanac_glow: "https://i.ibb.co/hJSczhtX/icon-almanac-glow.png",
-  img_icon_playerupgrade: "https://i.ibb.co/Kp0fDQyP/icon-playerupgrade.png",
-  img_icon_playerupgrade_glow: "https://i.ibb.co/1Yd5n30S/icon-playerupgrade-glow.png",
+  img_icon_playerupgrade: "https://i.ibb.co/3yK2jb4G/icon-playerupgrade.png",
+  img_icon_playerupgrade_glow: "https://i.ibb.co/LDYzG31Y/icon-playerupgrade-glow.png",
   img_icon_detach: "https://i.ibb.co/C3RwnXh1/icon-detach.png",
   img_icon_detach_glow: "https://i.ibb.co/NnCDL9L7/icon-detach-glow.png",
 
