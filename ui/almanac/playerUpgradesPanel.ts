@@ -4,6 +4,8 @@ import {
   getPlayerUpgradeInfo, 
   purchasePlayerUpgrade 
 } from '../../src/playerUpgrades';
+import { drawCard, drawButton, registerUIHitbox } from '../../uiComponents';
+import { color } from '../../uiColors';
 
 declare const push: any;
 declare const pop: any;
@@ -36,14 +38,32 @@ declare const frameCount: any;
 declare const ellipse: any;
 declare const sin: any;
 declare const scale: any;
+declare const constrain: any;
+declare const drawingContext: any;
 
-export const UPGRADE_KEYS = ['turretAttachCapacity', 'sunBankCapacity', 'magnetRadius', 'damageMultAdd'];
+export const UPGRADE_KEYS = [
+  'turretAttachCapacity',
+  'sunBankCapacity',
+  'damageMultAdd',
+  'magnetRadius',
+  'movementSpeed',
+  'maxStamina',
+  'clickHoldBoost'
+];
 
 export interface EditorPlayerUpgradeEntry {
   statStr: string;
   costStr: string;
   values?: number[];
   costs?: number[];
+}
+
+export function handlePlayerUpgradesScroll(delta: number): boolean {
+  if (state.playerUpgradesMaxScroll !== undefined && state.playerUpgradesMaxScroll < 0) {
+    state.playerUpgradesScrollVelocity = (state.playerUpgradesScrollVelocity || 0) - delta * 0.35;
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -54,7 +74,6 @@ export function initLevelEditorPlayerUpgradesFromData(layoutData?: any) {
     state.levelEditorPlayerUpgrades = {};
   }
 
-  // If layoutData is explicitly provided (e.g. from level import or startLevelEditor)
   if (layoutData !== undefined) {
     for (const key of UPGRADE_KEYS) {
       const raw = layoutData?.[key];
@@ -77,7 +96,6 @@ export function initLevelEditorPlayerUpgradesFromData(layoutData?: any) {
       }
     }
   } else {
-    // If layoutData is undefined, just make sure each key has an entry without wiping session edits
     for (const key of UPGRADE_KEYS) {
       if (!state.levelEditorPlayerUpgrades[key]) {
         state.levelEditorPlayerUpgrades[key] = {
@@ -99,7 +117,6 @@ export function parseAndSyncPlayerUpgrade(key: string) {
   const entry = state.levelEditorPlayerUpgrades[key];
   if (!entry) return;
 
-  // 1. Parse Stat string
   const statClean = entry.statStr.replace(/[\[\]"']/g, '').trim();
   if (statClean.length > 0) {
     const tokens = statClean.split(',').map((s: string) => s.trim().replace(/%/g, '')).filter((s: string) => s.length > 0);
@@ -109,7 +126,6 @@ export function parseAndSyncPlayerUpgrade(key: string) {
     entry.values = undefined;
   }
 
-  // 2. Parse Cost string
   const costClean = entry.costStr.replace(/[\[\]"']/g, '').trim();
   if (costClean.length > 0) {
     const tokens = costClean.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
@@ -154,11 +170,6 @@ export function drawPlayerUpgradesPanel(x: number, y: number, w: number, h: numb
   push();
   translate(x, y);
 
-  // Background Container
-  fill(15, 18, 35, 180);
-  noStroke();
-  rect(0, 0, w, h, 24);
-
   if (state.isAlmanacEditorMode) {
     drawEditorUpgradesPanel(w, h, modalX + x, modalY + y);
   } else {
@@ -169,65 +180,262 @@ export function drawPlayerUpgradesPanel(x: number, y: number, w: number, h: numb
 }
 
 /**
- * Normal Gameplay Mode: Upgrades purchasing and stats progression.
+ * Normal Gameplay Mode: Clean layout with Title, Floating Player in Center, and Scrollable 2-Column Upgrade Cards.
  */
 function drawGameplayUpgradesPanel(w: number, h: number, globalPanelX: number, globalPanelY: number) {
-  // Title (Top Center)
-  fill(255, 215, 60);
-  textAlign(CENTER, TOP);
+  // Title (Top Center) - exactly "Player Upgrades"
+  fill(...color.yellow());
+  textAlign(CENTER, CENTER);
   textSize(22);
-  text("Player Upgrades", w / 2, 14);
-
-  // Center: Player Character
-  const playerCenterX = w / 2;
-  const playerCenterY = h / 2 + 10;
-
-  push();
-  // Player Shadow
   noStroke();
-  fill(0, 0, 0, 90);
-  ellipse(playerCenterX, playerCenterY + 58, 65, 22);
+  text("Player Upgrades", w / 2, 22);
 
-  // Player Sprite with subtle breathing
-  translate(playerCenterX, playerCenterY);
-  const breatheRate = 0.08;
-  const breatheAmp = 0.03;
-  const animScaleY = 1.0 + sin(frameCount * breatheRate) * breatheAmp;
-  const animScaleX = 1.0 / animScaleY;
-  scale(animScaleX * 1.7, animScaleY * 1.7);
+  const padX = 24;
+  const topY = 0;
+  const centerW = 180;
+  const cardW = Math.floor((w - padX * 2 - centerW) / 2);
+  const cardH = 126;
+  const cardGapY = 12;
 
-  imageMode(CENTER);
-  const playerSprite = state.assets['img_player_front_right'];
-  if (playerSprite) {
-    image(playerSprite, 0, 0, 120, 120);
+  const leftX = padX;
+  const rightX = w - padX - cardW;
+  const centerX = w / 2;
+
+  const visibleH = h - topY - 14;
+
+  const leftKeys: string[] = [];
+  const rightKeys: string[] = [];
+  for (let i = 0; i < UPGRADE_KEYS.length; i++) {
+    if (i % 2 === 0) leftKeys.push(UPGRADE_KEYS[i]);
+    else rightKeys.push(UPGRADE_KEYS[i]);
+  }
+
+  const rowCount = Math.max(leftKeys.length, rightKeys.length);
+  const totalContentH = rowCount * cardH + (rowCount - 1) * cardGapY;
+  const maxScroll = Math.min(0, visibleH - totalContentH);
+  state.playerUpgradesMaxScroll = maxScroll;
+
+  // Scroll Drag & Velocity Physics
+  const isInside = mouseX >= globalPanelX && mouseX <= globalPanelX + w && mouseY >= globalPanelY + topY && mouseY <= globalPanelY + h;
+  if (mouseIsPressed && isInside) {
+    const dy = mouseY - ((window as any).pmouseY || mouseY);
+    if (Math.abs(dy) > 0.5) {
+      state.playerUpgradesScrollVelocity = dy;
+      if (Math.abs(dy) > 2) state.playerUpgradesIsDragging = true;
+    }
+  } else {
+    state.playerUpgradesScrollVelocity = (state.playerUpgradesScrollVelocity || 0) * 0.75;
+    if (!mouseIsPressed) state.playerUpgradesIsDragging = false;
+  }
+
+  state.playerUpgradesScrollY = (state.playerUpgradesScrollY || 0) + (state.playerUpgradesScrollVelocity || 0);
+  state.playerUpgradesScrollY = constrain(state.playerUpgradesScrollY, maxScroll, 0);
+
+  // 1. Draw Center Player (fixed in center, no stats box)
+  drawCenterPlayer(centerX, topY, centerW, visibleH);
+
+  // 2. Draw Clipped Scrollable Cards
+  push();
+  if (drawingContext) {
+    drawingContext.save();
+    drawingContext.beginPath();
+    drawingContext.rect(0, topY, w, visibleH);
+    drawingContext.clip();
+  }
+
+  translate(0, state.playerUpgradesScrollY);
+
+  for (let i = 0; i < leftKeys.length; i++) {
+    const key = leftKeys[i];
+    const cy = topY + i * (cardH + cardGapY);
+    drawGameplayUpgradeCard(leftX, cy, cardW, cardH, key, globalPanelX, globalPanelY, topY, visibleH);
+  }
+
+  for (let i = 0; i < rightKeys.length; i++) {
+    const key = rightKeys[i];
+    const cy = topY + i * (cardH + cardGapY);
+    drawGameplayUpgradeCard(rightX, cy, cardW, cardH, key, globalPanelX, globalPanelY, topY, visibleH);
+  }
+
+  if (drawingContext) {
+    drawingContext.restore();
   }
   pop();
 
-  // 4 Upgrade Panels on the sides (matching TurretInfoPanel style)
-  const marginSide = 20;
-  const marginTop = 48;
-  const marginBottom = 16;
-  const centerGap = 160;
-  const cardW = (w - marginSide * 2 - centerGap) / 2;
-  const cardH = (h - marginTop - marginBottom - 14) / 2;
+  // 3. Slim Scrollbar if scrollable
+  if (maxScroll < 0) {
+    const scrollbarTrackH = visibleH - 20;
+    const thumbH = Math.max(28, (visibleH / totalContentH) * scrollbarTrackH);
+    const scrollProgress = maxScroll === 0 ? 0 : state.playerUpgradesScrollY / maxScroll;
+    const thumbY = topY + 10 + scrollProgress * (scrollbarTrackH - thumbH);
+    const thumbX = w - 10;
 
-  const leftColX = marginSide;
-  const rightColX = w - marginSide - cardW;
-  const topRowY = marginTop;
-  const bottomRowY = topRowY + cardH + 14;
-
-  const cardPositions = [
-    { x: leftColX, y: topRowY },
-    { x: leftColX, y: bottomRowY },
-    { x: rightColX, y: topRowY },
-    { x: rightColX, y: bottomRowY }
-  ];
-
-  for (let i = 0; i < UPGRADE_KEYS.length; i++) {
-    const key = UPGRADE_KEYS[i];
-    const pos = cardPositions[i];
-    drawGameplayUpgradeCard(pos.x, pos.y, cardW, cardH, key, globalPanelX, globalPanelY);
+    noStroke();
+    fill(25, 60, 48, 120);
+    rect(thumbX, topY + 10, 4, scrollbarTrackH, 2);
+    fill(...color.yellow(), 180);
+    rect(thumbX, thumbY, 4, thumbH, 2);
   }
+}
+
+/**
+ * Renders the central player sprite with glowing shadow/aura.
+ */
+function drawCenterPlayer(cx: number, cy: number, cw: number, ch: number) {
+  push();
+  translate(cx, cy + ch / 2 - 20);
+
+  // 1. Aura / Pedestal shadow
+  const floatOff = sin(frameCount * 0.06) * 5;
+
+  noStroke();
+  fill(0, 0, 0, 80);
+  ellipse(0, 46, 84, 18);
+
+  // 2. Player Sprite
+  const playerAsset = state.assets['img_player_front_right'] || state.assets['img_player_idle_0'] || state.assets['img_basic'];
+  if (playerAsset) {
+    imageMode(CENTER);
+    image(playerAsset, 0, floatOff, 200, 200);
+  }
+
+  pop();
+}
+
+/**
+ * Draws an upgrade card using modular components and design tokens matching image.png.
+ */
+function drawGameplayUpgradeCard(
+  cx: number, cy: number, cw: number, ch: number, 
+  upgradeKey: string, globalPanelX: number, globalPanelY: number,
+  clipTopY: number, clipH: number
+) {
+  const info = getPlayerUpgradeInfo(upgradeKey);
+  const cardGlobalX = globalPanelX + cx;
+  const cardGlobalY = globalPanelY + cy + (state.playerUpgradesScrollY || 0);
+
+  // Check if card is visible inside the clip rect
+  const isVisible = cardGlobalY + ch >= globalPanelY + clipTopY && cardGlobalY <= globalPanelY + clipTopY + clipH;
+
+  const isCardHovered = mouseX >= cardGlobalX && mouseX <= cardGlobalX + cw &&
+                       mouseY >= cardGlobalY && mouseY <= cardGlobalY + ch &&
+                       mouseY >= globalPanelY + clipTopY && mouseY <= globalPanelY + clipTopY + clipH;
+
+  push();
+  translate(cx, cy);
+
+  // 1. Card Container
+  drawCard(0, 0, cw, ch, {
+    radius: 16,
+    bgColor: [16, 44, 34, 245],
+    borderColor: isCardHovered ? color.lightGreen() : [28, 70, 56, 255],
+    borderWidth: isCardHovered ? 4 : 0,
+  });
+
+  // 2. Icon frame (Top Left)
+  const iconSize = 40;
+  const iconX = 12;
+  const iconY = 12;
+
+  fill(10, 28, 22);
+  noStroke();
+  rect(iconX, iconY, iconSize, iconSize, 10);
+
+  const asset = state.assets[info.config.icon] || state.assets['img_basic'];
+  if (asset) {
+    imageMode(CENTER);
+    image(asset, iconX + iconSize / 2, iconY + iconSize / 2, 28, 28);
+  }
+
+  // 3. Title & Description beside Icon
+  const textX = iconX + iconSize + 10;
+  const textW = cw - textX - 12;
+
+  fill(...color.yellow());
+  textAlign(LEFT, TOP);
+  textSize(15);
+  noStroke();
+  text(info.config.name, textX, iconY + 1);
+
+  // Description
+  fill(185, 215, 195, 230);
+  textSize(10.5);
+  text(info.config.description, textX, iconY + 20, textW, 36);
+
+  // 4. Progression Pips (Bottom Left)
+  const pipsStartX = 14;
+  const pipsY = 74;
+  const totalPips = info.maxLevel;
+  const pipGap = 3;
+  const maxPipsW = 160;
+  const pipW = totalPips > 0 ? Math.min(22, (maxPipsW - (totalPips - 1) * pipGap) / totalPips) : 0;
+  const pipH = 5.5;
+
+  if (totalPips > 0) {
+    for (let p = 0; p < totalPips; p++) {
+      const px = pipsStartX + p * (pipW + pipGap);
+      const isFilled = p < info.currentLevel;
+      fill(isFilled ? color.yellow() : [26, 65, 52]);
+      noStroke();
+      rect(px, pipsY, pipW, pipH, 2.5);
+    }
+  }
+
+  // 5. Stat Value Progression Text
+  const statY = 100;
+  textAlign(LEFT, CENTER);
+  textSize(13);
+
+  if (info.isMax) {
+    fill(255);
+    const valText = info.config.statFormat(info.currVal);
+    text(valText, 14, statY);
+    fill(...color.lightGreen());
+    text(" (MAX)", 14 + textWidth(valText), statY);
+  } else {
+    fill(255);
+    const curValText = info.config.statFormat(info.currVal);
+    text(curValText, 14, statY);
+    const curW = textWidth(curValText);
+
+    fill(...color.lightGreen());
+    text(" → ", 14 + curW, statY);
+    const arrowW = textWidth(" → ");
+
+    const nextValText = info.config.statFormat(info.nextVal);
+    text(nextValText, 14 + curW + arrowW, statY);
+  }
+
+  // 6. Upgrade Button (Bottom Right)
+  const btnW = 80;
+  const btnH = 32;
+  const btnX = cw - btnW - 14;
+  const btnY = ch - btnH - 12;
+
+  if (isVisible) {
+    const btnLabel = info.isMax ? 'MAX' : `${info.cost}`;
+    const btnIcon = info.isMax ? undefined : state.assets['img_icon_elixir'];
+    drawButton(btnX, btnY, btnW, btnH, btnLabel, {
+      id: `btn_upgrade_${upgradeKey}`,
+      variant: (info.canAfford && !info.isMax) ? 'yellow' : 'dark',
+      icon: btnIcon,
+      iconSize: 32,
+      fontSize: 16,
+      radius: 8,
+      depth3D: 2,
+      hitboxX: cardGlobalX + btnX,
+      hitboxY: cardGlobalY + btnY,
+      disabled: !info.canAfford || info.isMax,
+      layer: 110,
+      onClick: () => {
+        if (!state.playerUpgradesIsDragging) {
+          purchasePlayerUpgrade(upgradeKey);
+        }
+      }
+    });
+  }
+
+  pop();
 }
 
 /**
@@ -237,10 +445,10 @@ function drawEditorUpgradesPanel(w: number, h: number, globalPanelX: number, glo
   initLevelEditorPlayerUpgradesFromData();
 
   // Header Banner
-  const bannerX = 24;
-  const bannerY = 16;
-  const bannerW = w - 48;
-  const bannerH = 36;
+  const bannerX = 20;
+  const bannerY = 12;
+  const bannerW = w - 40;
+  const bannerH = 34;
 
   push();
   fill(12, 15, 30, 230);
@@ -256,32 +464,42 @@ function drawEditorUpgradesPanel(w: number, h: number, globalPanelX: number, glo
 
   // "RESET ALL DEFAULTS" button in header
   const resetAllW = 145;
-  const resetAllH = 26;
+  const resetAllH = 24;
   const resetAllX = bannerW - resetAllW - 6;
   const resetAllY = (bannerH - resetAllH) / 2;
-  const isResetAllHov = mouseX >= globalPanelX + bannerX + resetAllX && mouseX <= globalPanelX + bannerX + resetAllX + resetAllW &&
-                         mouseY >= globalPanelY + bannerY + resetAllY && mouseY <= globalPanelY + bannerY + resetAllY + resetAllH;
 
-  fill(isResetAllHov ? [75, 45, 110] : [45, 32, 75]);
-  stroke(isResetAllHov ? [180, 130, 240] : [100, 75, 150]);
-  strokeWeight(1);
-  rect(bannerX + resetAllX, bannerY + resetAllY, resetAllW, resetAllH, 6);
-  noStroke();
-  fill(isResetAllHov ? [255, 245, 255] : [210, 190, 240]);
-  textAlign(CENTER, CENTER);
-  textSize(10);
-  text("RESET ALL TO DEFAULT", bannerX + resetAllX + resetAllW / 2, bannerY + resetAllY + resetAllH / 2);
+  drawButton(bannerX + resetAllX, bannerY + resetAllY, resetAllW, resetAllH, "RESET ALL TO DEFAULT", {
+    id: 'btn_reset_all_upgrades',
+    variant: 'purple',
+    fontSize: 10,
+    radius: 6,
+    depth3D: 2,
+    hitboxX: globalPanelX + bannerX + resetAllX,
+    hitboxY: globalPanelY + bannerY + resetAllY,
+    onClick: () => {
+      for (const key of UPGRADE_KEYS) {
+        if (state.levelEditorPlayerUpgrades[key]) {
+          state.levelEditorPlayerUpgrades[key].statStr = '';
+          state.levelEditorPlayerUpgrades[key].costStr = '';
+          state.levelEditorPlayerUpgrades[key].values = undefined;
+          state.levelEditorPlayerUpgrades[key].costs = undefined;
+        }
+      }
+      state.activePlayerUpgradeInput = null;
+    }
+  });
+
   pop();
 
-  // Grid layout for 4 editable upgrade cards
-  const gridStartX = 24;
-  const gridStartY = 64;
-  const gridW = w - 48;
-  const cardGap = 14;
+  // 2-Column Grid layout for editable upgrade cards
+  const gridStartX = 20;
+  const gridStartY = 54;
+  const cardGap = 10;
+  const gridW = w - 40;
   const cardW = (gridW - cardGap) / 2;
-  const cardH = (h - gridStartY - 18 - cardGap) / 2;
+  const cardH = 100;
 
-  for (let i = 0; i < UPGRADE_KEYS.length; i++) {
+  for (let i = 0; i < 7; i++) {
     const key = UPGRADE_KEYS[i];
     const col = i % 2;
     const row = Math.floor(i / 2);
@@ -333,40 +551,39 @@ function drawEditorUpgradeCard(
   fill(20, 24, 48);
   stroke(hasCustom ? [90, 80, 140] : [45, 52, 95]);
   strokeWeight(hasCustom ? 2 : 1.5);
-  rect(0, 0, cw, ch, 12);
+  rect(0, 0, cw, ch, 10);
 
-  // 1. Header: Icon + Title (Clear button removed)
-  const iconSize = 28;
-  const iconX = 14;
-  const iconY = 10;
+  // Header: Icon + Title
+  const iconSize = 24;
+  const iconX = 10;
+  const iconY = 8;
 
   fill(12, 14, 28);
   noStroke();
-  rect(iconX, iconY, iconSize, iconSize, 6);
+  rect(iconX, iconY, iconSize, iconSize, 5);
 
   const asset = state.assets[defaultCfg?.icon] || state.assets['img_basic'];
   if (asset) {
     imageMode(CENTER);
-    image(asset, iconX + iconSize / 2, iconY + iconSize / 2, 22, 22);
+    image(asset, iconX + iconSize / 2, iconY + iconSize / 2, 18, 18);
   }
 
-  // Name
   fill(255);
   textAlign(LEFT, CENTER);
-  textSize(13.5);
-  text(defaultCfg?.name || key, iconX + iconSize + 10, iconY + iconSize / 2);
+  textSize(12);
+  text(defaultCfg?.name || key, iconX + iconSize + 8, iconY + iconSize / 2);
 
-  // 2. Line 1: StatLevel
-  const labelX = 14;
-  const statRowY = 46;
-  const fieldH = 24;
-  const labelW = 82;
+  // Line 1: StatLevel
+  const labelX = 10;
+  const statRowY = 38;
+  const fieldH = 22;
+  const labelW = 75;
   const fieldX = labelX + labelW;
-  const fieldW = cw - fieldX - 14;
+  const fieldW = cw - fieldX - 10;
 
   fill(180, 195, 230);
   textAlign(LEFT, CENTER);
-  textSize(11.5);
+  textSize(11);
   text("StatLevel:", labelX, statRowY + fieldH / 2);
 
   const isStatActive = state.activePlayerUpgradeInput?.key === key && state.activePlayerUpgradeInput?.field === 'stat';
@@ -376,16 +593,14 @@ function drawEditorUpgradeCard(
   fill(isStatActive ? [10, 13, 26] : (isStatHov ? [16, 20, 42] : [13, 16, 34]));
   stroke(isStatActive ? [80, 200, 255] : (isStatHov ? [80, 100, 160] : [45, 55, 95]));
   strokeWeight(isStatActive ? 2 : 0);
-  rect(fieldX, statRowY, fieldW, fieldH, 5);
+  rect(fieldX, statRowY, fieldW, fieldH, 4);
   noStroke();
 
-  // Draw Stat Field Content
   const statStr = editorEntry.statStr || '';
-  textSize(11);
+  textSize(10.5);
   textAlign(LEFT, CENTER);
 
   if (isStatActive) {
-    // Handle live mouse drag within this focused field
     if (mouseIsPressed && state.activePlayerUpgradeInput?.isDragging) {
       const relX = mouseX - (cardGlobalX + fieldX);
       const dragIdx = getCharIndexFromClick(relX, statStr);
@@ -399,12 +614,11 @@ function drawEditorUpgradeCard(
     const selMin = Math.min(sStart, sEnd);
     const selMax = Math.max(sStart, sEnd);
 
-    // Draw selection highlight
     if (selMin < selMax) {
       const x1 = fieldX + 8 + textWidth(statStr.slice(0, selMin));
       const x2 = fieldX + 8 + textWidth(statStr.slice(0, selMax));
       fill(50, 120, 220, 160);
-      rect(x1, statRowY + 3, x2 - x1, fieldH - 6, 2);
+      rect(x1, statRowY + 2, x2 - x1, fieldH - 4, 2);
     }
 
     if (statStr.length > 0) {
@@ -412,13 +626,12 @@ function drawEditorUpgradeCard(
       text(statStr, fieldX + 8, statRowY + fieldH / 2);
     }
 
-    // Draw blinking cursor if no multi-character selection
     if (selMin === selMax) {
       const showCursor = floor(frameCount / 20) % 2 === 0;
       if (showCursor) {
         const curX = fieldX + 8 + textWidth(statStr.slice(0, cur));
         fill(80, 200, 255);
-        rect(curX, statRowY + 4, 2, fieldH - 8, 1);
+        rect(curX, statRowY + 3, 2, fieldH - 6, 1);
       }
     }
   } else {
@@ -432,12 +645,12 @@ function drawEditorUpgradeCard(
     }
   }
 
-  // 3. Line 2: UpgradeCost
-  const costRowY = 78;
+  // Line 2: UpgradeCost
+  const costRowY = 66;
 
   fill(180, 195, 230);
   textAlign(LEFT, CENTER);
-  textSize(11.5);
+  textSize(11);
   text("UpgradeCost:", labelX, costRowY + fieldH / 2);
 
   const isCostActive = state.activePlayerUpgradeInput?.key === key && state.activePlayerUpgradeInput?.field === 'cost';
@@ -447,16 +660,14 @@ function drawEditorUpgradeCard(
   fill(isCostActive ? [10, 13, 26] : (isCostHov ? [16, 20, 42] : [13, 16, 34]));
   stroke(isCostActive ? [80, 200, 255] : (isCostHov ? [80, 100, 160] : [45, 55, 95]));
   strokeWeight(isCostActive ? 2 : 0);
-  rect(fieldX, costRowY, fieldW, fieldH, 5);
+  rect(fieldX, costRowY, fieldW, fieldH, 4);
   noStroke();
 
-  // Draw Cost Field Content
   const costStr = editorEntry.costStr || '';
-  textSize(11);
+  textSize(10.5);
   textAlign(LEFT, CENTER);
 
   if (isCostActive) {
-    // Handle live mouse drag within this focused field
     if (mouseIsPressed && state.activePlayerUpgradeInput?.isDragging) {
       const relX = mouseX - (cardGlobalX + fieldX);
       const dragIdx = getCharIndexFromClick(relX, costStr);
@@ -470,12 +681,11 @@ function drawEditorUpgradeCard(
     const selMin = Math.min(sStart, sEnd);
     const selMax = Math.max(sStart, sEnd);
 
-    // Draw selection highlight
     if (selMin < selMax) {
       const x1 = fieldX + 8 + textWidth(costStr.slice(0, selMin));
       const x2 = fieldX + 8 + textWidth(costStr.slice(0, selMax));
       fill(50, 120, 220, 160);
-      rect(x1, costRowY + 3, x2 - x1, fieldH - 6, 2);
+      rect(x1, costRowY + 2, x2 - x1, fieldH - 4, 2);
     }
 
     if (costStr.length > 0) {
@@ -483,13 +693,12 @@ function drawEditorUpgradeCard(
       text(costStr, fieldX + 8, costRowY + fieldH / 2);
     }
 
-    // Draw blinking cursor if no multi-character selection
     if (selMin === selMax) {
       const showCursor = floor(frameCount / 20) % 2 === 0;
       if (showCursor) {
         const curX = fieldX + 8 + textWidth(costStr.slice(0, cur));
         fill(80, 200, 255);
-        rect(curX, costRowY + 4, 2, fieldH - 8, 1);
+        rect(curX, costRowY + 3, 2, fieldH - 6, 1);
       }
     }
   } else {
@@ -501,168 +710,6 @@ function drawEditorUpgradeCard(
       fill(90, 105, 135);
       text(`${defaultCostStr}`, fieldX + 8, costRowY + fieldH / 2);
     }
-  }
-
-  pop();
-}
-
-function drawGameplayUpgradeCard(
-  cx: number, cy: number, cw: number, ch: number, 
-  upgradeKey: string, globalPanelX: number, globalPanelY: number
-) {
-  const info = getPlayerUpgradeInfo(upgradeKey);
-  const cardGlobalX = globalPanelX + cx;
-  const cardGlobalY = globalPanelY + cy;
-
-  const isCardHovered = mouseX >= cardGlobalX && mouseX <= cardGlobalX + cw &&
-                       mouseY >= cardGlobalY && mouseY <= cardGlobalY + ch;
-
-  push();
-  translate(cx, cy);
-
-  // 1. Card Container: Outline ONLY shows up on hover
-  fill(12, 45, 30);
-  if (isCardHovered) {
-    stroke(45, 110, 75);
-    strokeWeight(4);
-  } else {
-    noStroke();
-  }
-  rect(0, 0, cw, ch, 18);
-
-  // 2. Icon frame (Top Left)
-  const iconSize = 46;
-  const iconX = 14;
-  const iconY = 14;
-  fill(8, 28, 18);
-  noStroke();
-  rect(iconX, iconY, iconSize, iconSize, 12);
-
-  const asset = state.assets[info.config.icon] || state.assets['img_basic'];
-  if (asset) {
-    imageMode(CENTER);
-    image(asset, iconX + iconSize / 2, iconY + iconSize / 2, 34, 34);
-  }
-
-  // 3. Title & Description
-  const textX = iconX + iconSize + 12;
-  const textW = cw - textX - 14;
-
-  fill(255, 215, 60);
-  textAlign(LEFT, TOP);
-  textSize(14.5);
-  text(info.config.name, textX, iconY + 2);
-
-  fill(235, 240, 245);
-  textSize(10.5);
-  text(info.config.description, textX, iconY + 22, textW, 36);
-
-  // 4. Segmented Level Progression Pips
-  const pipsStartX = 14;
-  const pipsY = iconY + iconSize + 14;
-  const totalPips = info.maxLevel;
-  const pipGap = 5;
-  const availablePipsWidth = cw - 28;
-  const pipW = totalPips > 0 ? (availablePipsWidth - (totalPips - 1) * pipGap) / totalPips : 0;
-  const pipH = 7;
-
-  if (totalPips > 0) {
-    for (let p = 0; p < totalPips; p++) {
-      const px = pipsStartX + p * (pipW + pipGap);
-      const isFilled = p < info.currentLevel;
-      if (isFilled) {
-        fill(255, 195, 25);
-      } else {
-        fill(16, 65, 48);
-      }
-      noStroke();
-      rect(px, pipsY, pipW, pipH, 3.5);
-    }
-  }
-
-  // 5. Bottom Row: Stat on Left, Upgrade Button on Right
-  const bottomY = ch - 42;
-  const statCenterY = bottomY + 14;
-
-  textAlign(LEFT, CENTER);
-  if (info.isMax) {
-    fill(255);
-    textSize(13);
-    const valText = info.config.statFormat(info.currVal);
-    text(valText, 14, statCenterY);
-    fill(80, 245, 165);
-    text(" (MAX)", 14 + textWidth(valText), statCenterY);
-  } else {
-    fill(255);
-    textSize(12.5);
-    const curValText = info.config.statFormat(info.currVal);
-    text(curValText, 14, statCenterY);
-    const curW = textWidth(curValText);
-
-    fill(80, 245, 165);
-    text(" → ", 14 + curW, statCenterY);
-    const arrowW = textWidth(" → ");
-
-    const nextValText = info.config.statFormat(info.nextVal);
-    text(nextValText, 14 + curW + arrowW, statCenterY);
-  }
-
-  // Upgrade Button (Right) - Only render if not maxed
-  if (!info.isMax) {
-    const btnW = 126;
-    const btnH = 32;
-    const btnCenterX = cw - btnW / 2 - 14;
-    const btnCenterY = bottomY + btnH / 2;
-    const btnGlobalCenterX = cardGlobalX + btnCenterX;
-    const btnGlobalCenterY = cardGlobalY + btnCenterY;
-
-    const isBtnHovered = mouseX >= btnGlobalCenterX - btnW / 2 && mouseX <= btnGlobalCenterX + btnW / 2 &&
-                         mouseY >= btnGlobalCenterY - btnH / 2 && mouseY <= btnGlobalCenterY + btnH / 2;
-
-    push();
-    translate(btnCenterX, btnCenterY);
-    rectMode(CENTER);
-
-    // 3D Shadow
-    noStroke();
-    fill(0, 0, 0, 225);
-    rect(0, 4, btnW, btnH, 12);
-
-    // 3D Bevel base
-    if (!info.canAfford) {
-      fill(80, 80, 80);
-    } else {
-      fill(isBtnHovered ? [230, 225, 100] : [255, 132, 0]);
-    }
-    rect(0, 0, btnW, btnH, 12);
-
-    // 3D Top face
-    if (!info.canAfford) {
-      fill(100, 100, 100);
-    } else {
-      fill(isBtnHovered ? [255, 132, 0] : [255, 195, 0]);
-    }
-    rect(0, -4, btnW, btnH - 4, 12);
-
-    // "UPGRADE" Text
-    fill(info.canAfford ? 0 : 220);
-    textAlign(LEFT, CENTER);
-    textSize(12);
-    text("UPGRADE", -btnW / 2 + 10, -2);
-
-    // Elixir Icon + Cost
-    const curIcon = state.assets['img_icon_elixir'];
-    if (curIcon) {
-      imageMode(CENTER);
-      image(curIcon, btnW / 2 - 38, -2, 24, 24);
-    }
-
-    fill(info.canAfford ? 0 : [255, 100, 100]);
-    textAlign(LEFT, CENTER);
-    textSize(12.5);
-    text(`${info.cost}`, btnW / 2 - 25, -2);
-
-    pop();
   }
 
   pop();
@@ -684,42 +731,16 @@ export function handlePlayerUpgradesClick(mx: number, my: number, modalX: number
   if (state.isAlmanacEditorMode) {
     initLevelEditorPlayerUpgradesFromData();
 
-    // 1. Check "RESET ALL TO DEFAULT" in header banner
-    const bannerX = 24;
-    const bannerY = 16;
-    const bannerW = panelW - 48;
-    const bannerH = 36;
-    const resetAllW = 145;
-    const resetAllH = 26;
-    const resetAllX = bannerW - resetAllW - 6;
-    const resetAllY = (bannerH - resetAllH) / 2;
-
-    const resetAllGX = globalPanelX + bannerX + resetAllX;
-    const resetAllGY = globalPanelY + bannerY + resetAllY;
-    if (mx >= resetAllGX && mx <= resetAllGX + resetAllW && my >= resetAllGY && my <= resetAllGY + resetAllH) {
-      for (const key of UPGRADE_KEYS) {
-        if (state.levelEditorPlayerUpgrades[key]) {
-          state.levelEditorPlayerUpgrades[key].statStr = '';
-          state.levelEditorPlayerUpgrades[key].costStr = '';
-          state.levelEditorPlayerUpgrades[key].values = undefined;
-          state.levelEditorPlayerUpgrades[key].costs = undefined;
-        }
-      }
-      state.activePlayerUpgradeInput = null;
-      return true;
-    }
-
-    // 2. Check individual cards
-    const gridStartX = 24;
-    const gridStartY = 64;
-    const gridW = panelW - 48;
-    const cardGap = 14;
+    const gridStartX = 20;
+    const gridStartY = 54;
+    const cardGap = 10;
+    const gridW = panelW - 40;
     const cardW = (gridW - cardGap) / 2;
-    const cardH = (panelH - gridStartY - 18 - cardGap) / 2;
+    const cardH = 100;
 
     let clickedInputField = false;
 
-    for (let i = 0; i < UPGRADE_KEYS.length; i++) {
+    for (let i = 0; i < 7; i++) {
       const key = UPGRADE_KEYS[i];
       const col = i % 2;
       const row = Math.floor(i / 2);
@@ -731,14 +752,14 @@ export function handlePlayerUpgradesClick(mx: number, my: number, modalX: number
 
       const editorEntry = state.levelEditorPlayerUpgrades[key] || { statStr: '', costStr: '' };
 
-      const labelX = 14;
-      const labelW = 82;
+      const labelX = 10;
+      const labelW = 75;
       const fieldX = labelX + labelW;
-      const fieldW = cardW - fieldX - 14;
-      const fieldH = 24;
+      const fieldW = cardW - fieldX - 10;
+      const fieldH = 22;
 
       // Check Stat Input Box
-      const statRowY = 46;
+      const statRowY = 38;
       const statGX = cardGX + fieldX;
       const statGY = cardGY + statRowY;
       if (mx >= statGX && mx <= statGX + fieldW && my >= statGY && my <= statGY + fieldH) {
@@ -757,7 +778,7 @@ export function handlePlayerUpgradesClick(mx: number, my: number, modalX: number
       }
 
       // Check Cost Input Box
-      const costRowY = 78;
+      const costRowY = 66;
       const costGX = cardGX + fieldX;
       const costGY = cardGY + costRowY;
       if (mx >= costGX && mx <= costGX + fieldW && my >= costGY && my <= costGY + fieldH) {
@@ -782,38 +803,7 @@ export function handlePlayerUpgradesClick(mx: number, my: number, modalX: number
     return true;
   }
 
-  // Normal gameplay mode clicks
-  const marginSide = 20;
-  const marginTop = 48;
-  const marginBottom = 16;
-  const centerGap = 160;
-  const cardW = (panelW - marginSide * 2 - centerGap) / 2;
-  const cardH = (panelH - marginTop - marginBottom - 14) / 2;
-
-  const leftColX = marginSide;
-  const rightColX = panelW - marginSide - cardW;
-  const topRowY = marginTop;
-  const bottomRowY = topRowY + cardH + 14;
-
-  const cardPositions = [
-    { x: leftColX, y: topRowY },
-    { x: leftColX, y: bottomRowY },
-    { x: rightColX, y: topRowY },
-    { x: rightColX, y: bottomRowY }
-  ];
-
-  for (let i = 0; i < UPGRADE_KEYS.length; i++) {
-    const key = UPGRADE_KEYS[i];
-    const pos = cardPositions[i];
-    const cardGlobalX = globalPanelX + pos.x;
-    const cardGlobalY = globalPanelY + pos.y;
-
-    if (mx >= cardGlobalX && mx <= cardGlobalX + cardW && my >= cardGlobalY && my <= cardGlobalY + cardH) {
-      purchasePlayerUpgrade(key);
-      return true;
-    }
-  }
-
+  // Normal gameplay mode clicks are handled by immediate-mode hitboxes registered by drawButton.
   return true;
 }
 
@@ -822,11 +812,6 @@ export function handlePlayerUpgradesClick(mx: number, my: number, modalX: number
  */
 export function handlePlayerUpgradeMouseDrag(mx: number, my: number) {
   if (!state.activePlayerUpgradeInput || !state.activePlayerUpgradeInput.isDragging) return;
-  const { key: uKey, field } = state.activePlayerUpgradeInput;
-  const entry = state.levelEditorPlayerUpgrades?.[uKey];
-  const str = (field === 'stat' ? entry?.statStr : entry?.costStr) || '';
-  
-  // Note: drawEditorUpgradeCard handles per-frame drag while mouseIsPressed
 }
 
 export function handlePlayerUpgradeMouseRelease() {
@@ -855,7 +840,6 @@ export function handlePlayerUpgradeKeyInput(inputKey: string, keyCode: number, e
   const entry = state.levelEditorPlayerUpgrades[uKey];
   const str = (field === 'stat' ? entry.statStr : entry.costStr) || '';
 
-  // Clamp selection and cursor
   let cur = Math.max(0, Math.min(str.length, state.activePlayerUpgradeInput.cursor ?? str.length));
   let sStart = Math.max(0, Math.min(str.length, state.activePlayerUpgradeInput.selectionStart ?? cur));
   let sEnd = Math.max(0, Math.min(str.length, state.activePlayerUpgradeInput.selectionEnd ?? cur));
@@ -863,14 +847,12 @@ export function handlePlayerUpgradeKeyInput(inputKey: string, keyCode: number, e
   const selMax = Math.max(sStart, sEnd);
   const hasSelection = selMin < selMax;
 
-  // 1. Escape or Enter to finish editing
   if (keyCode === 27 || keyCode === 13) {
     parseAndSyncPlayerUpgrade(uKey);
     state.activePlayerUpgradeInput = null;
     return true;
   }
 
-  // 2. Tab to cycle to next input field (and select all)
   if (keyCode === 9) {
     parseAndSyncPlayerUpgrade(uKey);
     const keyIdx = UPGRADE_KEYS.indexOf(uKey);
@@ -897,7 +879,6 @@ export function handlePlayerUpgradeKeyInput(inputKey: string, keyCode: number, e
     return true;
   }
 
-  // 3. Select All (Ctrl+A or Cmd+A)
   if ((event?.ctrlKey || event?.metaKey) && (inputKey === 'a' || inputKey === 'A' || keyCode === 65)) {
     state.activePlayerUpgradeInput.selectionStart = 0;
     state.activePlayerUpgradeInput.selectionEnd = str.length;
@@ -905,7 +886,6 @@ export function handlePlayerUpgradeKeyInput(inputKey: string, keyCode: number, e
     return true;
   }
 
-  // 4. Left Arrow
   if (keyCode === 37) {
     if (event?.shiftKey) {
       const next = Math.max(0, sEnd - 1);
@@ -920,7 +900,6 @@ export function handlePlayerUpgradeKeyInput(inputKey: string, keyCode: number, e
     return true;
   }
 
-  // 5. Right Arrow
   if (keyCode === 39) {
     if (event?.shiftKey) {
       const next = Math.min(str.length, sEnd + 1);
@@ -935,7 +914,6 @@ export function handlePlayerUpgradeKeyInput(inputKey: string, keyCode: number, e
     return true;
   }
 
-  // 6. Home
   if (keyCode === 36) {
     if (event?.shiftKey) {
       state.activePlayerUpgradeInput.selectionEnd = 0;
@@ -948,7 +926,6 @@ export function handlePlayerUpgradeKeyInput(inputKey: string, keyCode: number, e
     return true;
   }
 
-  // 7. End
   if (keyCode === 35) {
     if (event?.shiftKey) {
       state.activePlayerUpgradeInput.selectionEnd = str.length;
@@ -961,7 +938,6 @@ export function handlePlayerUpgradeKeyInput(inputKey: string, keyCode: number, e
     return true;
   }
 
-  // 8. Backspace
   if (keyCode === 8) {
     let newStr = str;
     let newCur = cur;
@@ -982,7 +958,6 @@ export function handlePlayerUpgradeKeyInput(inputKey: string, keyCode: number, e
     return true;
   }
 
-  // 9. Delete
   if (keyCode === 46) {
     let newStr = str;
     let newCur = cur;
@@ -1003,7 +978,6 @@ export function handlePlayerUpgradeKeyInput(inputKey: string, keyCode: number, e
     return true;
   }
 
-  // 10. Typing valid characters (numbers, commas, dots, spaces, minuses, percentages, quotes, brackets)
   if (inputKey && inputKey.length === 1 && !event?.ctrlKey && !event?.metaKey) {
     if (/^[0-9.,\s\-+%\/\[\]"']$/.test(inputKey)) {
       let newStr = str;
@@ -1026,5 +1000,5 @@ export function handlePlayerUpgradeKeyInput(inputKey: string, keyCode: number, e
     }
   }
 
-  return true; // Consume keys when focused in input field
+  return true;
 }

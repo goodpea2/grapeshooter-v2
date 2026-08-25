@@ -52,9 +52,13 @@ export class BugSplatVFX {
     this.pos = createVector(x, y);
     this.color = col;
     for(let i=0; i<15; i++){
+      const ang1 = random(TWO_PI);
+      const dist1 = random(size * 0.1, size * 0.5);
+      const ang2 = random(TWO_PI);
+      const speed2 = random(2, 6);
       this.blobs.push({
-        off: p5.Vector.random2D().mult(random(size * 0.1, size * 0.5)),
-        v: p5.Vector.random2D().mult(random(2, 6)),
+        off: createVector(cos(ang1) * dist1, sin(ang1) * dist1),
+        v: createVector(cos(ang2) * speed2, sin(ang2) * speed2),
         s: random(size * 0.2, size * 0.5)
       });
     }

@@ -1,4 +1,5 @@
 export { LootInFlightVFX } from './LootInFlightVFX';
+export { PayGateFlyVFX } from './PayGateFlyVFX';
 export { MagicLinkVFX } from './MagicLinkVFX';
 export { FirstStrikeVFX } from './FirstStrikeVFX';
 export { FrostFieldAuraVFX } from './FrostFieldAuraVFX';

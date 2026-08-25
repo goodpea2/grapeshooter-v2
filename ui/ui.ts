@@ -1,15 +1,15 @@
 
-import { state } from './state';
-import { HOUR_FRAMES, GRID_SIZE, VERSION, HUD_SAFEZONE } from './constants';
-import { turretTypes } from './balanceTurrets';
+import { state } from '../state';
+import { HOUR_FRAMES, GRID_SIZE, VERSION, HUD_SAFEZONE } from '../constants';
+import { turretTypes } from '../balanceTurrets';
 import { drawDebugPanel, drawWorldGenPreview } from './uiDebug';
-import { TYPE_MAP } from './assetTurret';
-import { getLightLevel, customDayLightConfig } from './lvDemo';
+import { TYPE_MAP } from '../assetTurret';
+import { getLightLevel, customDayLightConfig } from '../lvDemo';
 import { drawNPCPanel } from './uiNpcShop';
-import { drawTurretIcon } from './ui/inventory/turretIcon';
+import { drawTurretIcon } from './inventory/turretIcon';
 import { drawNewTurretTooltip } from './UITurretTooltip';
-import { restoreLevelFromCache } from './levelEditor';
-import { getPlayerUpgradeStat } from './src/playerUpgrades';
+import { restoreLevelFromCache } from '../levelEditor';
+import { getPlayerUpgradeStat } from '../src/playerUpgrades';
 
 declare const floor: any;
 declare const nf: any;
@@ -224,12 +224,57 @@ function drawStats(alpha: number) {
   fill(155, 255, 0, alpha);
   rect(x + 30, y + 10, 115 * hpRatio, 6, 3);
 
-  // WinCondition Tracker Text next to health bar
+  // Stamina Bar
+  const maxStam = state.player?.maxStamina || 100;
+  const currStam = state.player?.stamina ?? 100;
+  const baseInnerBarW = 50;
+  const innerStaminaBarW = baseInnerBarW * (maxStam / 100);
+  const staminaW = 30 + innerStaminaBarW + 15;
+  const staminaX = x + hpW + 10;
+
+  fill(30, 25, 60, alpha);
+  rect(staminaX, y, staminaW, hpH, 13);
+
+  if (state.assets['img_icon_stamina']) {
+    imageMode(CENTER);
+    image(state.assets['img_icon_stamina'], staminaX + 13, y + 13, 50, 50);
+  }
+
+  fill(20, 15, 45, alpha * 0.4);
+  rect(staminaX + 30, y + 10, innerStaminaBarW, 6, 3);
+
+  const stamRatio = constrain(currStam / maxStam, 0, 1);
+  const isDepleting = (state.player?.staminaDepletingTimer || 0) > 0;
+  if (isDepleting) {
+    fill(255, 255, 255, alpha); // White color while depleting
+  } else {
+    fill(0, 220, 255, alpha); // Cyan color while recovering and by default
+  }
+  rect(staminaX + 30, y + 10, innerStaminaBarW * stamRatio, 6, 3);
+
+  // WinCondition Tracker Text next to stamina bar
   const winConditionEnemies = (state.enemies || []).filter((e: any) => e.isWinCondition);
-  if (winConditionEnemies.length > 0) {
-    const remainingWinCount = winConditionEnemies.filter((e: any) => e.health > 0 && !e.isDying).length;
-    const trackerX = x + hpW + 15;
-    const txt = `Eliminate the marked Grapes (${remainingWinCount} left)`;
+  let winBlocksCount = 0;
+  if (state.world && state.world.chunks) {
+    state.world.chunks.forEach((chunk: any) => {
+      for (const b of chunk.blocks) {
+        if (b.isWinCondition && !b.isMined) {
+          winBlocksCount++;
+        }
+      }
+    });
+  }
+  const remainingEnemyCount = winConditionEnemies.filter((e: any) => e.health > 0 && !e.isDying).length;
+  if (remainingEnemyCount > 0 || winBlocksCount > 0) {
+    let txt = '';
+    if (remainingEnemyCount > 0 && winBlocksCount > 0) {
+      txt = `Defeat Grapes (${remainingEnemyCount}) & Break blocks (${winBlocksCount} left)`;
+    } else if (remainingEnemyCount > 0) {
+      txt = `Eliminate the marked Grapes (${remainingEnemyCount} left)`;
+    } else {
+      txt = `Break the marked blocks (${winBlocksCount} left)`;
+    }
+    const trackerX = staminaX + staminaW + 15;
     textSize(12);
     fill(255);
     textAlign(LEFT, CENTER);
@@ -464,33 +509,6 @@ export function drawUI(spawnFromBudget: Function) {
     fill(255); textAlign(CENTER, CENTER); textSize(12); text("Debug", dbgX + dbgW/2, dbgY + dbgH/2);
     if (dbgHov && mouseIsPressed && !state.isAlmanacOpen && !state.showUnlockPopup) { state.showDebug = !state.showDebug; (window as any).mouseIsPressed = false; }
     pop();
-
-    // Back To Edit Button (if in Level Editor Playtest Mode)
-    if (state.isEditorPlaytest && state.levelEditorCache) {
-      push();
-      const btnW = 130;
-      const btnH = 32;
-      const btnX = width / 2 - btnW / 2;
-      const btnY = 12;
-      const isHov = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
-
-      fill(isHov ? [220, 50, 50, 240] : [170, 35, 35, 220]);
-      stroke(255, 180, 180);
-      strokeWeight(1.5);
-      rect(btnX, btnY, btnW, btnH, 8);
-
-      fill(255);
-      noStroke();
-      textAlign(CENTER, CENTER);
-      textSize(12);
-      text("◀ BACK TO EDIT", btnX + btnW / 2, btnY + btnH / 2);
-
-      if (isHov && mouseIsPressed) {
-        (window as any).mouseIsPressed = false;
-        restoreLevelFromCache(state.levelEditorCache);
-      }
-      pop();
-    }
 
     drawDebugPanel(spawnFromBudget);
     drawNPCPanel();

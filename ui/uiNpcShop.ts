@@ -1,9 +1,9 @@
 
-import { state } from './state';
-import { turretTypes } from './balanceTurrets';
-import { TYPE_MAP } from './assetTurret';
-import { ShopFlyVFX } from './vfx/index';
-import { getPlayerUpgradeStat } from './src/playerUpgrades';
+import { state } from '../state';
+import { turretTypes } from '../balanceTurrets';
+import { TYPE_MAP } from '../assetTurret';
+import { ShopFlyVFX } from '../vfx/index';
+import { getPlayerUpgradeStat } from '../src/playerUpgrades';
 
 declare const floor: any;
 declare const dist: any;

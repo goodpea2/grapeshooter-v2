@@ -1,5 +1,6 @@
 
 import { state } from '../../state';
+import { drawCloseButton } from '../../uiComponents';
 import { drawTurretList } from './turretList';
 import { drawTurretInfoPanel } from './turretInfoPanel';
 import { drawTurretUnlockButton, isTurretUnlockAvailable } from './turretUnlockButton';
@@ -174,17 +175,17 @@ export function drawAlmanac() {
     }
   }
 
-  // Close Button
-  if (!state.upgradeSelection) {
-    drawCloseButton(modalW - 40, 20, x, y);
-  }
-
   // Upgrade Selection Popup (Overlays everything in Almanac)
   if (state.upgradeSelection) {
     drawUpgradeSelectionPopup(modalW, modalH);
   }
 
   pop();
+
+  // Close Button (Rendered on top in absolute screen coordinates)
+  if (!state.upgradeSelection) {
+    drawCloseButton(x + modalW - 46, y + 16, 34, () => closeAlmanac(), { layer: 150 });
+  }
 }
 
 function drawTabs(x: number, y: number, modalX: number, modalY: number) {
@@ -255,27 +256,20 @@ function drawTabs(x: number, y: number, modalX: number, modalY: number) {
   }
 }
 
-function drawCloseButton(x: number, y: number, modalX: number, modalY: number) {
-  const size = 45;
-  const hov = dist(mouseX, mouseY, modalX + x, modalY + y) < size / 2;
-
-  push();
-  translate(x, y);
-  fill(hov ? [255, 100, 100] : [200, 50, 50]);
-  noStroke();
-  ellipse(0, 0, size);
-  fill(255);
-  textAlign(CENTER, CENTER);
-  textSize(24);
-  text("X", 0, 0);
-  pop();
-
-  if (hov && mouseIsPressed) {
-    state.isAlmanacOpen = false;
-    state.isPaused = false;
-    state.isAlmanacEditorMode = false;
-    (window as any).mouseIsPressed = false;
-  }
+export function closeAlmanac() {
+  state.isAlmanacOpen = false;
+  state.isPaused = false;
+  state.isAlmanacEditorMode = false;
+  state.suppressGameplayMouseUntilRelease = true;
+  state.touchStartPos = null;
+  state.touchInputVec = { x: 0, y: 0 };
+  state.playerSpeedMultiplier = 0;
+  state.draggedTurretType = null;
+  state.draggedTurretInstance = null;
+  state.isCurrentlyDragging = false;
+  if (state.player) state.player.isClickHolding = false;
+  if (state.levelEditor) state.levelEditor.isWorldDragActive = false;
+  (window as any).mouseIsPressed = false;
 }
 
 export function handleAlmanacClick(): boolean {
@@ -304,9 +298,7 @@ export function handleAlmanacClick(): boolean {
   // Check if click is outside modal to close
   const tabsX = x - 70;
   if (mouseX < tabsX || mouseX > x + modalW || mouseY < y || mouseY > y + modalH) {
-    state.isAlmanacOpen = false;
-    state.isPaused = false;
-    state.isAlmanacEditorMode = false;
+    closeAlmanac();
     return true;
   }
 

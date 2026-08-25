@@ -1,6 +1,7 @@
 import { state } from '../state';
 import { GRID_SIZE, CHUNK_SIZE } from '../constants';
 import { overlayTypes } from '../balanceObstacles';
+import { liquidTypes } from '../balanceLiquids';
 import { enemyTypes } from '../balanceEnemies';
 import { npcTypes } from '../balanceNPC';
 import { lootTypes } from '../balanceLootTable';
@@ -171,6 +172,9 @@ export function placeSelectedItem(mWorldX: number, mWorldY: number) {
     if (block) {
       block.isMined = false;
       block.setOverlay(key);
+      if (key === 'ov_textsign' && !block.customText) {
+        block.customText = 'Hint';
+      }
       const oCfg = overlayTypes[key];
       if (key === 'ov_spawner_custom' || oCfg?.isCustomPrefab || oCfg?.isEnemySpawner) {
         const tip = state.levelEditor.toolbarSpawnerTooltip;
@@ -190,6 +194,41 @@ export function placeSelectedItem(mWorldX: number, mWorldY: number) {
         block.health = block.customSpawnerConfig.health;
         block.maxHealth = block.customSpawnerConfig.health;
       }
+
+      if (key === 'sunGenerator') {
+        const tip = state.levelEditor.toolbarSunGeneratorTooltip;
+        const sgCfg = overlayTypes['sunGenerator'];
+        const dmg = (tip && tip.config?.damagePerSun !== undefined) ? tip.config.damagePerSun : (sgCfg?.damagePerSun ?? 600);
+        const maxS = (tip && tip.config?.maxSun !== undefined) ? tip.config.maxSun : (sgCfg?.maxSunDropped ?? 100);
+        block.sunGeneratorConfig = {
+          damagePerSun: dmg,
+          maxSun: maxS,
+          accumulatedDamage: 0,
+          sunsDropped: 0
+        };
+      }
+
+      if (oCfg?.catalystConfig || key === 'catalyst_clay') {
+        const cCfg = oCfg?.catalystConfig || (overlayTypes['catalyst_clay'] as any)?.catalystConfig;
+        const matrix = cCfg?.neighborMatrix || [
+          [-1, -1], [0, -1], [1, -1],
+          [-1,  0],          [1,  0],
+          [-1,  1], [0,  1], [1,  1]
+        ];
+        const spawnObstacle = cCfg?.obstacleToSpawn || 'o_clay';
+        for (const [dx, dy] of matrix) {
+          const nx = gx + dx;
+          const ny = gy + dy;
+          const targetBlk = state.world.getBlock(nx, ny);
+          if (!targetBlk || targetBlk.isMined) {
+            state.world.setBlock(nx, ny, spawnObstacle);
+            const ncx = floor(nx / CHUNK_SIZE);
+            const ncy = floor(ny / CHUNK_SIZE);
+            state.world.dirtyChunkAndNeighbors(ncx, ncy);
+          }
+        }
+      }
+
       const cx = floor(gx / CHUNK_SIZE);
       const cy = floor(gy / CHUNK_SIZE);
       state.world.dirtyChunkAndNeighbors(cx, cy);
@@ -206,6 +245,24 @@ export function placeSelectedItem(mWorldX: number, mWorldY: number) {
       chunk.blockMap.set(`${gx},${gy}`, block);
     }
     block.liquidType = key;
+    if (key === 'l_spawner' || key.startsWith('l_spawner') || liquidTypes[key]?.isEnemySpawner || liquidTypes[key]?.enemySpawnConfig) {
+      const lCfg = liquidTypes[key];
+      const tip = state.levelEditor.toolbarSpawnerTooltip;
+      const activeConfig = (tip && tip.key === key) ? tip.config : (lCfg?.enemySpawnConfig || {});
+      const activeName = (tip && tip.key === key) ? tip.name : (lCfg?.name || 'Ground Spawner');
+      block.customSpawnerConfig = {
+        name: activeName,
+        budget: activeConfig.budget !== undefined ? activeConfig.budget : (block.spawnerBudget || 60),
+        enemyTypeKey: activeConfig.enemyTypeKey ? [...activeConfig.enemyTypeKey] : ['e_basic'],
+        spawnRadius: activeConfig.spawnRadius !== undefined ? activeConfig.spawnRadius : 120,
+        spawnTriggerRadius: activeConfig.spawnTriggerRadius !== undefined ? activeConfig.spawnTriggerRadius : 200,
+        spawnInterval: activeConfig.spawnInterval !== undefined ? activeConfig.spawnInterval : 60,
+        spawnIntervalConsumeBudget: activeConfig.spawnIntervalConsumeBudget !== false,
+        health: activeConfig.health || 300
+      };
+      block.spawnerBudget = block.customSpawnerConfig.budget;
+      block.lastSpawnTime = state.frames + Math.floor(Math.random() * (block.customSpawnerConfig.spawnInterval || 60));
+    }
     const cx = floor(gx / CHUNK_SIZE);
     const cy = floor(gy / CHUNK_SIZE);
     state.world.dirtyChunkAndNeighbors(cx, cy);
@@ -265,6 +322,24 @@ export function placeSelectedItem(mWorldX: number, mWorldY: number) {
             enemy.isWinCondition = false;
           }
         }
+      } else {
+        const block = state.world.getBlock(gx, gy);
+        if (block && !block.isMined) {
+          if (!state.levelEditor.isFlagDragActive) {
+            state.levelEditor.isFlagDragActive = true;
+            state.levelEditor.flagDragMode = block.isWinCondition ? 'remove' : 'add';
+            block.isWinCondition = (state.levelEditor.flagDragMode === 'add');
+          } else {
+            if (state.levelEditor.flagDragMode === 'add') {
+              block.isWinCondition = true;
+            } else if (state.levelEditor.flagDragMode === 'remove') {
+              block.isWinCondition = false;
+            }
+          }
+          const cx = floor(gx / CHUNK_SIZE);
+          const cy = floor(gy / CHUNK_SIZE);
+          state.world.dirtyChunkAndNeighbors(cx, cy);
+        }
       }
     }
   }
@@ -275,6 +350,23 @@ export function deleteAtPosition(mWorldX: number, mWorldY: number, onlyOverlay: 
   const gy = floor(mWorldY / GRID_SIZE);
 
   if (!state.world) return;
+
+  if (state.levelEditor?.activeCategory === 'flags') {
+    // When in flags mode, right-click removes win condition flags instead of deleting entities
+    const enemy = state.enemies.find((e: any) => dist(e.pos.x, e.pos.y, mWorldX, mWorldY) < 28);
+    if (enemy) {
+      enemy.isWinCondition = false;
+      return;
+    }
+    const block = state.world.getBlock(gx, gy);
+    if (block && block.isWinCondition) {
+      block.isWinCondition = false;
+      const cx = floor(gx / CHUNK_SIZE);
+      const cy = floor(gy / CHUNK_SIZE);
+      state.world.dirtyChunkAndNeighbors(cx, cy);
+    }
+    return;
+  }
 
   if (onlyOverlay) {
     const block = state.world.getBlock(gx, gy);

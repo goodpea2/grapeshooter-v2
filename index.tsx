@@ -11,29 +11,52 @@ import { bulletTypes } from './balanceBullets';
 import { WorldManager } from './world';
 import { Player, Enemy, AttachedTurret, WorldTurret, SunLoot, NPCEntity } from './entities';
 import { createAttachedTurret, createWorldTurret } from './class/turret/TurretRegistry';
-import { getTime, drawUI, drawTurretTooltip } from './ui';
+import { getTime, drawUI, drawTurretTooltip } from './ui/ui';
 import { drawAlmanac, handleAlmanacClick } from './ui/almanac/mainLayout';
 import { drawUnlockPopup, handleUnlockPopupClick, updateUnlockPopup } from './ui/almanac/turretUnlockPopup';
-import { drawGameOver, handleGameOverClick } from './uiGameOver';
-import { drawWorldGenPreview, drawTurretPathDebug } from './uiDebug';
-import { handleNpcUiClick, handleNpcUiPress } from './uiNpcShop';
+import { drawGameOver, handleGameOverClick } from './ui/uiGameOver';
+import { drawWorldGenPreview, drawTurretPathDebug } from './ui/uiDebug';
+import { uiComponentsShowcase } from './ui/uiComponentsShowcase';
+import { handleNpcUiClick, handleNpcUiPress } from './ui/uiNpcShop';
 import { updateGameSystems, spawnFromBudget, getLightLevel, customDayLightConfig } from './lvDemo';
 import { MergeVFX, ShopFlyVFX } from './vfx/index';
 import { triggerUpgradeHook } from './src/upgrades';
 import { ASSETS } from './assets';
 import { getHexAxial, axialToWorld, isAdjacent } from './utils/hex';
 import { handleTouchStarted, handleTouchMoved, handleTouchEnded, drawTouchVisuals } from './touchScreen';
-import { drawGameSpeedButtons, handleGameSpeedButtonClick } from './uiGameSpeed';
+import { drawGameSpeedButtons, handleGameSpeedButtonClick } from './ui/uiGameSpeed';
 // Added TYPE_MAP to imports to resolve the error on line 413
 import { drawTurretSprite, TYPE_MAP } from './assetTurret';
 import { drawSelectionHighlight, drawMergeBubble } from './ui/overlay/TurretMergeOverlay';
 import { drawPendingSpawn } from './visualEnemies';
 import { drawTickingExplosive } from './visualObstacles';
 import { DisabledTurrets } from './debug/turretAvailability';
-import { drawMainMenu, handleMainMenuClick } from './uiMainMenu';
-import { drawLevelEditor, handleLevelEditorClick, handleLevelEditorScroll, handleLevelEditorMouseRelease, handleSpawnerKeyInput } from './levelEditor';
+import { drawMainMenu, handleMainMenuClick } from './ui/uiMainMenu';
+import { beginUIFrame, handleUIMousePress, handleUIMouseRelease } from './uiComponents';
+import {
+  drawLevelEditor,
+  handleLevelEditorPress,
+  handleLevelEditorClick,
+  handleLevelEditorScroll,
+  handleLevelEditorMouseRelease,
+  handleSpawnerKeyInput,
+  handleSunGeneratorKeyInput,
+  paygateModal,
+  handlePayGateModalKeyInput,
+  handlePayGateCostModalDrag,
+  sunGeneratorModal,
+  handleSunGeneratorModalKeyInput,
+  textSignEditor,
+  handleInlineTextSignKeyInput,
+  handleInlineTextSignDrag
+} from './levelEditor';
 import { getPlayerUpgradeStat } from './src/playerUpgrades';
-import { handlePlayerUpgradeKeyInput, handlePlayerUpgradeMouseDrag, handlePlayerUpgradeMouseRelease } from './ui/almanac/playerUpgradesPanel';
+import { 
+  handlePlayerUpgradeKeyInput, 
+  handlePlayerUpgradeMouseDrag, 
+  handlePlayerUpgradeMouseRelease,
+  handlePlayerUpgradesScroll
+} from './ui/almanac/playerUpgradesPanel';
 import { handleLevelConfigKeyInput, handleLevelConfigScroll } from './ui/almanac/levelConfigPanel';
 import { flowField } from './pathfinding';
 
@@ -687,10 +710,21 @@ function tick() {
   // WinCondition check
   if (!state.isGameOver && state.currentScreen === 'game') {
     const winEnemies = (state.enemies || []).filter((e: any) => e.isWinCondition);
-    if (state.winConditionActive || winEnemies.length > 0) {
+    let winBlocksCount = 0;
+    if (state.world && state.world.chunks) {
+      state.world.chunks.forEach((chunk: any) => {
+        for (const b of chunk.blocks) {
+          if (b.isWinCondition && !b.isMined) {
+            winBlocksCount++;
+          }
+        }
+      });
+    }
+    const hasAnyWinCondition = winEnemies.length > 0 || winBlocksCount > 0 || state.winConditionActive;
+    if (hasAnyWinCondition) {
       state.winConditionActive = true;
       const aliveWinEnemies = winEnemies.filter((e: any) => e.health > 0 && !e.isDying).length;
-      if (aliveWinEnemies === 0 && state.player && state.player.health > 0) {
+      if (aliveWinEnemies === 0 && winBlocksCount === 0 && state.player && state.player.health > 0) {
         state.isGameOver = true;
         state.showGameOverPopup = true;
         state.isLevelCompleted = true;
@@ -699,6 +733,34 @@ function tick() {
           try {
             localStorage.setItem('grapeshooter_cleared_levels', JSON.stringify([...state.clearedLevels]));
           } catch (e) {}
+
+          // Star Rating Calculation based on elapsed seconds
+          const isSandboxOrEmpty = state.currentLevelId === 'sandbox' || state.currentLevelId === 'empty' || state.currentLevelLayoutData?.tag === 'sandbox' || state.currentLevelLayoutData?.tag === 'empty';
+          if (isSandboxOrEmpty) {
+            state.lastLevelStarsEarned = 0;
+          } else {
+            const elapsedSec = floor(state.frames / 60);
+            const starTargets = state.currentLevelLayoutData?.starRatingTargets || {};
+            const star1Target = starTargets.star1 !== undefined ? starTargets.star1 : 600;
+            const star2Target = starTargets.star2 !== undefined ? starTargets.star2 : 300;
+            const star3Target = starTargets.star3 !== undefined ? starTargets.star3 : 180;
+            let earnedStars = 0;
+            if (elapsedSec <= star3Target) {
+              earnedStars = 3;
+            } else if (elapsedSec <= star2Target) {
+              earnedStars = 2;
+            } else if (elapsedSec <= star1Target) {
+              earnedStars = 1;
+            }
+            state.lastLevelStarsEarned = earnedStars;
+            const previousBestStars = state.levelStars[state.currentLevelId] || 0;
+            if (earnedStars > previousBestStars) {
+              state.levelStars[state.currentLevelId] = earnedStars;
+              try {
+                localStorage.setItem('grapeshooter_level_stars', JSON.stringify(state.levelStars));
+              } catch (e) {}
+            }
+          }
         }
       }
     }
@@ -716,6 +778,8 @@ function tick() {
 }
 
 (window as any).draw = () => {
+  beginUIFrame();
+
   if (state.currentScreen === 'main_menu') {
     drawMainMenu();
     return;
@@ -822,7 +886,8 @@ function tick() {
   state.hoveredTurretInstance = null;
   if (mouseX > state.uiWidth || !state.isStationary) {
     const worldTurrets = state.world.getAllTurrets();
-    const sortedForSelection = [...state.player.attachments, ...worldTurrets].sort((a, b) => {
+    const accessibleWorldTurrets = worldTurrets.filter((wt: any) => flowField.isTileAccessible(wt.getWorldPos().x, wt.getWorldPos().y));
+    const sortedForSelection = [...state.player.attachments, ...accessibleWorldTurrets].sort((a, b) => {
         const la = a.config.turretLayer || 'normal'; const lb = b.config.turretLayer || 'normal';
         if (la !== lb) return la === 'normal' ? -1 : 1;
         const posA = a.getWorldPos(); const posB = b.getWorldPos();
@@ -982,7 +1047,7 @@ function tick() {
             return dist(wx, wy, attPos.x, attPos.y) < (allowAttachedSlots ? safeDist : GRID_SIZE * 0.8);
           }) || (allowAttachedSlots && dist(wx, wy, state.player.pos.x, state.player.pos.y) < safeDist) || dist(wx, wy, state.player.pos.x, state.player.pos.y) < (state.player.size * 0.35);
           
-          if (!isTooClose && !state.world.isBlockAt(wx, wy) && !state.world.getTurretAt(gx, gy)) {
+          if (!isTooClose && !state.world.isBlockAt(wx, wy) && !state.world.getTurretAt(gx, gy) && flowField.isTileAccessible(wx, wy)) {
             const canAfford = state.sunCurrency >= purchaseCost;
             push(); translate(wx, wy);
             if (canAfford) {
@@ -1012,7 +1077,8 @@ function tick() {
 
     // 2. Find bestMergeTarget and bestSnap
     const mergeCandidates: any[] = [];
-    const allMergeableTurrets = [...state.player.attachments, ...state.world.getAllTurrets()];
+    const accessibleWorldForMerge = state.world.getAllTurrets().filter((wt: any) => flowField.isTileAccessible(wt.getWorldPos().x, wt.getWorldPos().y));
+    const allMergeableTurrets = [...state.player.attachments, ...accessibleWorldForMerge];
     for (const att of allMergeableTurrets) {
       if (att === state.draggedTurretInstance) continue;
       const wPos = att.getWorldPos();
@@ -1115,6 +1181,11 @@ function tick() {
   if (state.debugGizmosEnemies) {
     flowField.drawDebug();
   }
+
+  if (state.world) {
+    state.world.drawPayGateCostBubbles();
+    state.world.drawSunGeneratorHoverBubbles(mWorld.x, mWorld.y);
+  }
   pop(); 
 
   // Apply speedup flash effect to global lighting
@@ -1137,6 +1208,7 @@ function tick() {
 
   drawAlmanac();
   drawUnlockPopup();
+  uiComponentsShowcase.draw();
 
   if (state.hoveredTurretInstance && !state.draggedTurretInstance && !activePlacementType) { 
     drawTurretTooltip(state.hoveredTurretInstance, mouseX, mouseY); 
@@ -1151,24 +1223,19 @@ function tick() {
 };
 
 (window as any).mousePressed = () => {
-  if (handleUnlockPopupClick()) return;
-
-  if (state.currentScreen === 'main_menu') {
-    handleMainMenuClick();
+  state.isMouseDown = true;
+  if (state.suppressGameplayMouseUntilRelease) {
     return;
   }
+
+  // Register mouse down on modular UI hitboxes
+  handleUIMousePress(mouseX, mouseY);
+
   if (state.currentScreen === 'level_editor') {
-    handleLevelEditorClick();
+    handleLevelEditorPress(mouseX, mouseY);
     return;
   }
 
-  // If Almanac is open during gameplay, route input strictly to Almanac and block canvas interaction
-  if (state.isAlmanacOpen) {
-    handleAlmanacClick();
-    return;
-  }
-
-  state.needsTargetReScan = true;
   const RIGHT: any = (window as any).RIGHT;
   const mouseButton: any = (window as any).mouseButton;
 
@@ -1180,6 +1247,15 @@ function tick() {
     return false; // Prevent default context menu
   }
 
+  if (state.currentScreen === 'main_menu') {
+    return;
+  }
+  if (state.isAlmanacOpen) {
+    return;
+  }
+
+  state.needsTargetReScan = true;
+
   if (state.simulateTouchScreen) {
     handleTouchStarted([{ x: mouseX, y: mouseY }]);
   } else {
@@ -1188,15 +1264,10 @@ function tick() {
     state.playerSpeedMultiplier = 0; // Reset speed multiplier on new click
   }
 
-  if (state.isGameOver) {
-    if (handleGameOverClick()) return;
-  }
-
-  if (handleGameSpeedButtonClick()) return; // Handle game speed buttons first
-
   if (state.activeNPC && handleNpcUiPress()) {
     return;
   }
+
   if (mouseX > state.uiWidth && state.isStationary) {
     const activePlacementType = state.isCurrentlyDragging ? state.draggedTurretType : state.selectedTurretType;
     const isScaling = !!(activePlacementType || state.draggedTurretInstance);
@@ -1227,6 +1298,9 @@ function tick() {
     const worldTurrets = state.world.getAllTurrets();
     for (let wt of worldTurrets) {
       if (dist(mWorld.x, mWorld.y, wt.getWorldPos().x, wt.getWorldPos().y) < wt.size/2 + 5) {
+        if (!flowField.isTileAccessible(wt.getWorldPos().x, wt.getWorldPos().y)) {
+          continue;
+        }
         state.draggedTurretInstance = wt; state.dragOrigin = { x: mouseX, y: mouseY }; state.isCurrentlyDragging = false; return;
       }
     }
@@ -1247,11 +1321,29 @@ function tick() {
 }
 
 (window as any).mouseDragged = () => {
+  if (state.suppressGameplayMouseUntilRelease) return;
   if (state.isAlmanacOpen) {
     if (state.isAlmanacEditorMode && state.almanacTab === 'Upgrades' && state.activePlayerUpgradeInput?.isDragging) {
       handlePlayerUpgradeMouseDrag(mouseX, mouseY);
     }
     return;
+  }
+
+  if (state.currentScreen === 'level_editor') {
+    if (paygateModal.isOpen && paygateModal.amountState.isDragging) {
+      handlePayGateCostModalDrag();
+      return;
+    }
+    if (textSignEditor.isOpen && textSignEditor.textState.isDragging) {
+      const zoom = state.levelEditor?.cameraZoom || 1.0;
+      const mWorldX = (mouseX - width / 2) / zoom + state.cameraPos.x;
+      const mWorldY = (mouseY - height / 2) / zoom + state.cameraPos.y;
+      handleInlineTextSignDrag(mWorldX, mWorldY);
+      return;
+    }
+    if (state.levelEditor?.editingPaygateModal || state.levelEditor?.editingTextSign) {
+      return;
+    }
   }
 
   if (state.simulateTouchScreen) {
@@ -1295,13 +1387,32 @@ function tick() {
 };
 
 (window as any).mouseReleased = () => {
-  if (state.isAlmanacOpen) {
-    handlePlayerUpgradeMouseRelease();
+  state.isMouseDown = false;
+  state.suppressGameplayMouseUntilRelease = false;
+
+  // 1. Dispatch modular UI hitboxes (triggered only if mouse down and up on the same button)
+  if (handleUIMouseRelease(mouseX, mouseY)) {
     return;
   }
 
+  // 2. Component showcase and popups
+  if (uiComponentsShowcase.handleClick(mouseX, mouseY)) return;
+  if (handleUnlockPopupClick()) return;
+
+  if (state.currentScreen === 'main_menu') {
+    handleMainMenuClick();
+    return;
+  }
   if (state.currentScreen === 'level_editor') {
+    handleLevelEditorClick();
     handleLevelEditorMouseRelease();
+    return;
+  }
+
+  // If Almanac is open during gameplay, route input strictly to Almanac and block canvas interaction
+  if (state.isAlmanacOpen) {
+    handlePlayerUpgradeMouseRelease();
+    handleAlmanacClick();
     return;
   }
 
@@ -1313,7 +1424,13 @@ function tick() {
     state.touchInputVec = { x: 0, y: 0 };
     state.playerSpeedMultiplier = 0;
   }
-  if (state.isGameOver) return;
+
+  if (state.isGameOver) {
+    if (handleGameOverClick()) return;
+    return;
+  }
+
+  if (handleGameSpeedButtonClick()) return;
 
   if (state.activeNPC && handleNpcUiClick()) {
     state.pressedTradeId = null;
@@ -1350,6 +1467,9 @@ function tick() {
   if (state.isAlmanacOpen) {
     if (state.almanacTab === 'LevelConfig') {
       if (handleLevelConfigScroll(event.delta)) return false;
+    }
+    if (state.almanacTab === 'Upgrades') {
+      if (handlePlayerUpgradesScroll(event.delta)) return false;
     }
     const modalW = Math.min(1050, width * 0.9);
     const leftPanelW = modalW * 0.6;
@@ -1413,11 +1533,41 @@ function tick() {
       return false;
     }
   }
-  if (state.currentScreen === 'level_editor' && state.levelEditor?.activeSpawnerInput) {
-    const k = event?.key || key;
-    const code = event?.keyCode || keyCode;
-    if (handleSpawnerKeyInput(k, code, event)) {
-      return false;
+  if (state.currentScreen === 'level_editor') {
+    if (paygateModal.isOpen) {
+      const k = event?.key || key;
+      const code = event?.keyCode || keyCode;
+      if (handlePayGateModalKeyInput(k, code, event)) {
+        return false;
+      }
+    }
+    if (sunGeneratorModal.isOpen) {
+      const k = event?.key || key;
+      const code = event?.keyCode || keyCode;
+      if (handleSunGeneratorModalKeyInput(k, code, event)) {
+        return false;
+      }
+    }
+    if (textSignEditor.isOpen) {
+      const k = event?.key || key;
+      const code = event?.keyCode || keyCode;
+      if (handleInlineTextSignKeyInput(k, code, event)) {
+        return false;
+      }
+    }
+    if (state.levelEditor?.activeSpawnerInput) {
+      const k = event?.key || key;
+      const code = event?.keyCode || keyCode;
+      if (handleSpawnerKeyInput(k, code, event)) {
+        return false;
+      }
+    }
+    if (state.levelEditor?.activeSunGeneratorInput) {
+      const k = event?.key || key;
+      const code = event?.keyCode || keyCode;
+      if (handleSunGeneratorKeyInput(k, code, event)) {
+        return false;
+      }
     }
   }
   state.needsTargetReScan = true;
@@ -1436,8 +1586,10 @@ function tick() {
   if (state.isAlmanacOpen && state.almanacTab === 'Upgrades' && state.isAlmanacEditorMode && state.activePlayerUpgradeInput) {
     return false;
   }
-  if (state.currentScreen === 'level_editor' && state.levelEditor?.activeSpawnerInput) {
-    return false;
+  if (state.currentScreen === 'level_editor') {
+    if (paygateModal.isOpen || sunGeneratorModal.isOpen || textSignEditor.isOpen || state.levelEditor?.activeSpawnerInput || state.levelEditor?.activeSunGeneratorInput) {
+      return false;
+    }
   }
 };
 
@@ -1454,6 +1606,32 @@ function tick() {
     state.player.isClickHolding = false;
   }
 };
+
+window.addEventListener('blur', () => {
+  state.suppressGameplayMouseUntilRelease = false;
+  if (state.levelEditor) {
+    state.levelEditor.isWorldDragActive = false;
+    state.levelEditor.isRightDragActive = false;
+    state.levelEditor.isRightDragOverlayOnly = false;
+    state.levelEditor.isFlagDragActive = false;
+    state.levelEditor.spawnAreaLassoPoints = [];
+  }
+  state.touchStartPos = null;
+  state.touchInputVec = { x: 0, y: 0 };
+  state.playerSpeedMultiplier = 0;
+  (window as any).mouseIsPressed = false;
+});
+
+window.addEventListener('focus', () => {
+  if (state.levelEditor) {
+    state.levelEditor.isWorldDragActive = false;
+    state.levelEditor.isRightDragActive = false;
+    state.levelEditor.isRightDragOverlayOnly = false;
+    state.levelEditor.isFlagDragActive = false;
+  }
+  (window as any).mouseIsPressed = false;
+});
+
 
 function map(n: number, start1: number, stop1: number, start2: number, stop2: number) { return ((n - start1) / (stop1 - start1)) * (stop2 - start2) + start2; }
 

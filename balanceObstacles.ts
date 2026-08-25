@@ -34,10 +34,33 @@ export const obstacleTypes: any = {
     blocksLOS: true,
     lootConfigOnDeath: null,
     connectToOtherBlock: true
+  },
+  o_paygate: {
+    name: 'Pay Gate',
+    health: Infinity,
+    isIndestructible: true,
+    isValidTarget: false,
+    color: [185, 145, 85],
+    borderColor: [225, 185, 115],
+    blocksLOS: true,
+    lootConfigOnDeath: null,
+    connectToOtherBlock: true,
+    desc: 'Barrier that opens when paid required resources.',
+    defaultCost: { resource: 'soil', amount: 10 }
   }
 };
 
 export const overlayTypes: any = {
+  ov_textsign: {
+    name: 'Text Sign',
+    minHealth: -1,
+    isValuable: false,
+    obstacleOverlayVfx: 'v_textsign',
+    isConcealedAlongWithObstacle: false,
+    blocksLOS: false,
+    desc: 'Displays a custom text hint bubble above the obstacle.',
+    customTextSign: 'Hint: Click in Level Editor to edit text'
+  },
   sunTiny: { 
     name: 'Tiny Sun', 
     minHealth: -1, 
@@ -303,6 +326,38 @@ export const overlayTypes: any = {
     },
     assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: true, randomFlip: true },
     lootConfigOnDeath: 'lc_spawner'
+  },
+  sunGenerator: {
+    name: 'Sun Generator',
+    minHealth: -1,
+    isValuable: true,
+    isEnemy: false,
+    isValidTarget: true,
+    damagePerSun: 600,
+    maxSunDropped: 100,
+    obstacleOverlayVfx: 'v_sun_generator',
+    isConcealedAlongWithObstacle: false,
+    assetImgConfig: { idleAssetImg: ['img_sun_generator'], randomRotation: false, randomFlip: false }
+  },
+  catalyst_clay: {
+    name: 'Clay Catalyst',
+    minHealth: Infinity,
+    isIndestructible: true,
+    isValidTarget: false,
+    isEnemy: false,
+    isValuable: true,
+    obstacleOverlayVfx: 'v_catalyst_clay',
+    isConcealedAlongWithObstacle: false,
+    assetImgConfig: { idleAssetImg: ['img_catalyst_clay'], randomRotation: false, randomFlip: false },
+    catalystConfig: {
+      neighborMatrix: [
+        [-1, -1], [0, -1], [1, -1],
+        [-1,  0],          [1,  0],
+        [-1,  1], [0,  1], [1,  1]
+      ],
+      spawnInterval: HOUR_FRAMES * 0.5,
+      obstacleToSpawn: 'o_clay'
+    }
   }
 };
 

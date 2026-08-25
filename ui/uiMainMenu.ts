@@ -1,10 +1,11 @@
-import { state } from './state';
-import { LEVELS, refreshLevels, startLevel, triggerImportLevelJson } from './levelManager';
-import { startLevelEditor } from './levelEditor';
-import { enemyTypes } from './balanceEnemies';
-import { bulletTypes } from './balanceBullets';
-import { GRID_SIZE } from './constants';
-import { BugSplatVFX, GiantDeathVFX, Explosion, FireworkVFX, DamageNumberVFX, drawPersistentDeathVisual } from './vfx/index';
+import { state } from '../state';
+import { LEVELS, refreshLevels, startLevel, triggerImportLevelJson } from '../levelManager';
+import { startLevelEditor } from '../levelEditor';
+import { enemyTypes } from '../balanceEnemies';
+import { bulletTypes } from '../balanceBullets';
+import { GRID_SIZE } from '../constants';
+import { BugSplatVFX, GiantDeathVFX, Explosion, FireworkVFX, DamageNumberVFX, drawPersistentDeathVisual } from '../vfx/index';
+import { drawYellowButton, drawCyanButton, drawPurpleButton } from '../uiComponents';
 
 declare const push: any;
 declare const pop: any;
@@ -37,6 +38,10 @@ declare const textWidth: any;
 declare const strokeWeight: any;
 declare const map: any;
 declare const constrain: any;
+declare const beginShape: any;
+declare const vertex: any;
+declare const endShape: any;
+declare const CLOSE: any;
 declare const lerp: any;
 declare const image: any;
 declare const imageMode: any;
@@ -170,9 +175,10 @@ function triggerBulletExplosion(bKey: string, cx: number, cy: number) {
     menuVfx.push(new FireworkVFX(cx, cy));
   } 
 
-  // Calculate damage & hit enemies in blast radius
-  for (let i = menuEnemies.length - 1; i >= 0; i--) {
-    const e = menuEnemies[i];
+  // Calculate damage & hit enemies in blast radius using snapshot to prevent index shifts during chain explosions
+  const targets = [...menuEnemies];
+  for (const e of targets) {
+    if (!e || !menuEnemies.includes(e)) continue;
     const d = Math.hypot(e.x - cx, e.y - cy);
     if (d <= maxR + e.size * 0.5) {
       let dmg = bCfg.bulletDamage || 100;
@@ -199,13 +205,23 @@ function triggerBulletExplosion(bKey: string, cx: number, cy: number) {
       menuVfx.push(new DamageNumberVFX(e.x, e.y - e.size * 0.5, Math.round(dmg), [255, 255, 255]));
 
       if (e.health <= 0) {
-        killMenuEnemy(e, i);
+        killMenuEnemy(e);
       }
     }
   }
 }
 
 function killMenuEnemy(e: MenuEnemy, index?: number) {
+  if (!e) return;
+  const idx = index !== undefined ? index : menuEnemies.indexOf(e);
+  if (idx === -1 || idx >= menuEnemies.length || menuEnemies[idx] !== e) {
+    const realIdx = menuEnemies.indexOf(e);
+    if (realIdx === -1) return; // already removed
+    menuEnemies.splice(realIdx, 1);
+  } else {
+    menuEnemies.splice(idx, 1);
+  }
+
   // In-game persistent splat to background buffer
   drawPersistentDeathVisual(e.x, e.y, e.size, e.col, getSplatBuffer(width, height));
 
@@ -214,14 +230,6 @@ function killMenuEnemy(e: MenuEnemy, index?: number) {
     menuVfx.push(new GiantDeathVFX(e.x, e.y, e.size, e.col));
   } else {
     menuVfx.push(new BugSplatVFX(e.x, e.y, e.size, color(e.col[0], e.col[1], e.col[2])));
-  }
-
-  // Remove enemy
-  if (index !== undefined) {
-    menuEnemies.splice(index, 1);
-  } else {
-    const idx = menuEnemies.indexOf(e);
-    if (idx !== -1) menuEnemies.splice(idx, 1);
   }
 
   // Trigger on-death actions (e.g. e_bomb_mainmenu spawns b_bomb_mainmenu)
@@ -243,6 +251,7 @@ function handleMiniGameExplosion(cx: number, cy: number) {
   const minFleeDist = 2 * GRID_SIZE;  // 2 tiles (64px)
 
   for (const e of menuEnemies) {
+    if (!e) continue;
     const d = Math.hypot(e.x - cx, e.y - cy);
     if (d <= maxFleeDist) {
       const baseAngle = Math.atan2(e.y - cy, e.x - cx);
@@ -275,6 +284,7 @@ function updateAndDrawMiniGame(minX: number, maxX: number, minY: number, maxY: n
   // Update & Draw VFX (Explosion, BugSplatVFX, DamageNumberVFX)
   for (let i = menuVfx.length - 1; i >= 0; i--) {
     const v = menuVfx[i];
+    if (!v) continue;
     v.update();
     v.display();
     if (v.isDone()) {
@@ -286,6 +296,7 @@ function updateAndDrawMiniGame(minX: number, maxX: number, minY: number, maxY: n
   const despawnMargin = 80;
   for (let i = menuEnemies.length - 1; i >= 0; i--) {
     const e = menuEnemies[i];
+    if (!e) continue;
 
     // Handle distance-based flee direction switch after delay expires
     if (e.fleeTimer !== undefined && e.fleeTimer > 0) {
@@ -522,39 +533,56 @@ export function drawMainMenu() {
     const descRightMargin = isHovered ? 125 : (isCleared ? 115 : 30);
     text(level.description, cx + 20, cy + 45, cardW - descRightMargin, 38);
 
+    // Star Rating Display (1, 2, 3 stars)
+    const isSandboxOrEmpty = level.id === 'sandbox' || level.id === 'empty' || level.tag === 'sandbox' || level.tag === 'empty';
+    if (!isSandboxOrEmpty) {
+      const starsEarned = state.levelStars ? (state.levelStars[level.id] || 0) : 0;
+      const starStartX = cx + cardW - 84;
+      const starY = cy + 20;
+      const grapeSprite = state.assets['img_tx_goldengrape_front'];
+
+      for (let sIdx = 0; sIdx < 3; sIdx++) {
+        const isStarActive = sIdx < starsEarned;
+        const sx = starStartX + sIdx * 24;
+        push();
+        translate(sx, starY);
+        imageMode(CENTER);
+        if (isStarActive) {
+          if (grapeSprite) {
+            image(grapeSprite, 0, 0, 20, 20);
+          } else {
+            fill(255, 215, 0);
+            ellipse(0, 0, 16, 16);
+          }
+        } else {
+          if (grapeSprite) {
+            tint(65, 75, 120, 140);
+            image(grapeSprite, 0, 0, 17, 17);
+          } else {
+            fill(65, 75, 120, 150);
+            ellipse(0, 0, 13, 13);
+          }
+        }
+        pop();
+      }
+    }
+
     // Right Side: Tactile PLAY Button on Hover, or Cleared Tag if cleared and unhovered
     if (isHovered) {
-      // Tactile 3D PLAY Button from turretInfoPanelUI
       const playBtnW = 92;
       const playBtnH = 40;
       const playBtnX = cx + cardW - playBtnW - 16;
       const playBtnY = cy + (cardH - playBtnH) / 2;
 
-      const isPlayHovered = mouseX >= playBtnX && mouseX <= playBtnX + playBtnW && mouseY >= playBtnY && mouseY <= playBtnY + playBtnH;
-      const isPlayPressed = isPlayHovered && mouseIsPressed;
-
-      push();
-      translate(playBtnX, playBtnY);
-
-      // Button Shadow
-      noStroke();
-      fill(0, 0, 0, 220);
-      rect(0, isPlayPressed ? 2 : 4, playBtnW, playBtnH, 10);
-
-      // Button Rim/Bevel (Orange)
-      fill(210, 115, 0);
-      rect(0, isPlayPressed ? 2 : 0, playBtnW, playBtnH, 10);
-
-      // Button Face (Golden Yellow)
-      fill(isPlayHovered ? [255, 225, 20] : [255, 200, 0]);
-      rect(0, isPlayPressed ? 1 : -3, playBtnW, playBtnH - 3, 10);
-
-      // Button Text
-      fill(12, 14, 24);
-      textAlign(CENTER, CENTER);
-      textSize(15);
-      text("PLAY", playBtnW / 2, (isPlayPressed ? 1 : -3) + (playBtnH - 3) / 2);
-      pop();
+      drawYellowButton(playBtnX, playBtnY, playBtnW, playBtnH, "PLAY", {
+        fontSize: 15,
+        radius: 10,
+        depth3D: 4,
+        onClick: () => {
+          state.selectedLevelInMenu = level.id;
+          startLevel(level.id);
+        }
+      });
     } else if (isCleared) {
       // Cleared Text in yellow with purple shadow
       const clearX = cx + cardW - 60;
@@ -595,50 +623,28 @@ export function drawMainMenu() {
   // Button 1: LEVEL EDITOR
   const btn1X = leftMargin;
   const btn1Y = bottomY;
-  const isBtn1Hovered = mouseX >= btn1X && mouseX <= btn1X + singleBtnW && mouseY >= btn1Y && mouseY <= btn1Y + bottomBtnH;
-  const isBtn1Pressed = isBtn1Hovered && mouseIsPressed;
 
-  push();
-  translate(btn1X, btn1Y);
-  noStroke();
-  fill(0, 0, 0, 200);
-  rect(0, isBtn1Pressed ? 2 : 4, singleBtnW, bottomBtnH, 10);
-
-  fill(0, 120, 180);
-  rect(0, isBtn1Pressed ? 2 : 0, singleBtnW, bottomBtnH, 10);
-
-  fill(isBtn1Hovered ? [0, 215, 255] : [0, 175, 230]);
-  rect(0, isBtn1Pressed ? 1 : -3, singleBtnW, bottomBtnH - 3, 10);
-
-  fill(10, 25, 45);
-  textAlign(CENTER, CENTER);
-  textSize(13);
-  text("LEVEL EDITOR", singleBtnW / 2, (isBtn1Pressed ? 1 : -3) + (bottomBtnH - 3) / 2);
-  pop();
+  drawCyanButton(btn1X, btn1Y, singleBtnW, bottomBtnH, "LEVEL EDITOR", {
+    fontSize: 13,
+    radius: 10,
+    depth3D: 4,
+    onClick: () => {
+      startLevelEditor();
+    }
+  });
 
   // Button 2: IMPORT LEVEL
   const btn2X = btn1X + singleBtnW + bottomBtnGap;
   const btn2Y = bottomY;
-  const isBtn2Hovered = mouseX >= btn2X && mouseX <= btn2X + singleBtnW && mouseY >= btn2Y && mouseY <= btn2Y + bottomBtnH;
-  const isBtn2Pressed = isBtn2Hovered && mouseIsPressed;
 
-  push();
-  translate(btn2X, btn2Y);
-  noStroke();
-  fill(0, 0, 0, 200);
-  rect(0, isBtn2Pressed ? 2 : 4, singleBtnW, bottomBtnH, 10);
-
-  fill(125, 65, 195);
-  rect(0, isBtn2Pressed ? 2 : 0, singleBtnW, bottomBtnH, 10);
-
-  fill(isBtn2Hovered ? [190, 120, 255] : [155, 90, 230]);
-  rect(0, isBtn2Pressed ? 1 : -3, singleBtnW, bottomBtnH - 3, 10);
-
-  fill(250, 245, 255);
-  textAlign(CENTER, CENTER);
-  textSize(13);
-  text("IMPORT LEVEL", singleBtnW / 2, (isBtn2Pressed ? 1 : -3) + (bottomBtnH - 3) / 2);
-  pop();
+  drawPurpleButton(btn2X, btn2Y, singleBtnW, bottomBtnH, "IMPORT LEVEL", {
+    fontSize: 13,
+    radius: 10,
+    depth3D: 4,
+    onClick: () => {
+      triggerImportLevelJson();
+    }
+  });
 
   pop();
 }

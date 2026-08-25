@@ -1,7 +1,8 @@
 ## FOR AI Agents:
 Strictly follow the established art style of the game
-Scan through all of the file system for extra context and follow the exiting modularization, avoid hard-coding as much as possible
+Scan through all of the file system for extra context and follow the existing modularization architecture, avoid hard-coding as much as possible
 Do not add extra texts when not requested to, keep the UI as simple as possible
+The game's UI system is organized around reusable design tokens and an Immediate-Mode Hitbox Registry, use modular UI from uiComponents.ts whenever generating new UI, do not redraw UI from scratch.
 
 # Core Explorer: Technical & Design Library
 
@@ -76,9 +77,13 @@ The Almanac (v4.0) serves as the central hub for discovery, purchasing, and reci
 - **Multi-Resource Economy**: The game features a tiered resource system:
     - **Primary**: Sun (Mining), Elixir (Combat), Soil (Exploration), Raisins (Special).
     - **Rare Components**: Leaf, Shard, Shell, Fuel, and Ice. These are required for crafting and purchasing higher-tier turrets.
-- **Dynamic UI**: The Almanac features a left-aligned navigation system, real-time resource monitors, and a specialized **Player Upgrades** display centering the animated player sprite with four side cards styled after the `TurretInfoPanel` dark green theme with segmented tier progression bars, hover-only card borders, and the tactile yellow 3D Upgrade button style.
+- **Dynamic UI**: The Almanac features a left-aligned navigation system, real-time resource monitors, and a specialized **Player Upgrades** display centering the animated player sprite with a 2-column scrollable grid of upgrade cards styled using the `uiComponents.ts` design tokens (deep forest green cards `[16, 44, 34]`, gold titles and pips, light-green stat progression arrows, and tactile 3D yellow upgrade buttons).
 - **Level-Specific Player Upgrades**: When loading a level from the Level List, the game strictly loads the level's own `playerUpgrades` configuration (with fallback to default if not defined), cleanly isolating gameplay from any modifications made during recent Level Editor sessions.
 - **Interactive Upgrade Editing & Text Navigation**: In the Level Editor's Upgrade Config, text inputs for `StatLevel:` and `UpgradeCost:` support seamless cursor navigation (arrow keys, Home/End), text selection (drag-to-highlight, Shift+Arrows, Ctrl+A), and instant reactive parsing across imported and newly created custom maps without getting stuck at stale cache states.
+- **Ground Spawner (Liquid) Prefab Pipeline**:
+  - `l_spawner` (Ground Spawner) operates as a liquid-layer entity that triggers enemy spawns independently of block mining status.
+  - Rendered with its custom ground asset at 50% opacity and no liquid-base texture.
+  - Adding or duplicating prefabs while editing a Ground Spawner now correctly stores the new prefab under the `Liquids` tab (`liquidTypes`), preserving full customization of budget, intervals, spawn trigger radius, and enemy lists.
 
 ---
 
@@ -107,6 +112,11 @@ A dedicated sandbox environment accessible directly from the Main Menu:
   - Easily import any level JSON file directly from the Main Menu or Level Editor using the `IMPORT JSON` button. Imported levels are automatically added to the playable level list and loaded instantly into the editor canvas for testing or editing.
   - Access the interactive **ALMANAC CONFIG** modal directly inside the Level Editor to customize turret availability matrices (Available, Locked, Discover Required [?], or Banned [x]).
   - **Player Upgrade Config Tab**: In Level Editor mode, the Upgrades tab in Almanac Config displays `"PLAYER UPGRADE CONFIG: Edit Stats and Costs (leave blank for default)"`. Each upgrade card is streamlined to a clean title, 1 line for `StatLevel:` (e.g. `[6,7,8,9,10]`), and 1 line for `UpgradeCost:` (e.g. `[5,10,15,20]`). Custom overrides are automatically bundled into the exported level JSON under `playerUpgrades` and `PlayerUpgrades`.
+- **Interactive PayGate & TextSign Editors**:
+  - **Dynamic PayGateGroup Clustering & Live BreakCost Bubbles**: PayGate groups display their live BreakCost with enlarged text (100% larger) and the resource icon positioned beside the amount. When creating new PayGate blocks or modifying existing clusters (painting, bucket filling, erasing, or splitting), BreakCost bubbles are generated and updated dynamically with real-time center recalculations. Clicking directly on any PayGate cost bubble opens the configuration popup modal to adjust the resource type and amount.
+  - **Stationary Collision PayGate Resource Spending**: In-game PayGates strictly require the player to physically collide with the PayGate obstacle AND remain stationary (not moving) before resources are deducted, preventing accidental resource consumption when walking by. During successful resource spending in-game, the obstacle-hit VFX plays across the entire PayGate group.
+  - **Inline TextSign Speech Bubble Editor**: Clicking directly on any placed TextSign speech bubble opens an inline text editor directly on the bubble with save and discard buttons, full cursor positioning, and conventional drag-to-select text editing support.
+  - **Input Focus & Canvas Locking**: While editing any input fields or modal text boxes, camera panning and world canvas interactions are cleanly locked to support standard drag-selection and keyboard navigation.
 - **Instant Play-Testing & Exporting**: Test custom map layouts immediately in game mode or export to JSON directly for the `/level` folder with custom `almanacProgression` and `playerUpgrades` configuration included.
 - **Instant Unlock Popup Dismiss**: Players can click or tap anywhere on the screen at any point during a plant unlock reveal sequence to skip the animation and close the popup instantly.
 
@@ -157,17 +167,17 @@ The mobile base utilizes a trail-following breadcrumb mechanic for trailing turr
 
 ## ⚡ Player Upgrades System
 Players can now upgrade their core stats during gameplay via the Almanac's **Upgrades** tab:
-- **`turretAttachCapacity`**: Limits the number of turrets attachable to the player's core base (Default levels: `[6, 8, 10, 13, 16, 20, 24]`, Elixir cost: `[5, 10, 20, 35, 60, 100]`).
+- **`turretAttachCapacity`**: Limits the number of turrets attachable to the player's core base 
   - Displayed in the HUD currency bar as `(currentAttachedCount) / (TurretAttachCapacity)` with the sunflower icon.
   - **`CountTowardAttachedCapacity` Flag**: Individual turrets like `t_lilypad` set `CountTowardAttachedCapacity: false` so ground-layer or utility platforms do not count towards the attachment capacity limit.
   - When capacity is reached, attached slot previews around the player are hidden during purchase AND when dragging/picking up a `WorldTurret`, and the attaching action is completely disabled.
   - If a player collects stray/dropped turret loot while at capacity, the turret automatically spawns as a `WorldTurret` on the nearest clear grid cell instead of attaching, and collisions with world turrets are ignored.
-- **`sunBankCapacity`**: Maximum Sun loot currency storage (Default levels: `[20, 30, 50, 70, 100, 200, 400]`, Elixir cost: `[5, 15, 30, 50, 80, 100]`).
+- **`sunBankCapacity`**: Maximum Sun loot currency storage 
   - Displayed in the HUD currency bar as `(currentSunCount) / (SunBankCapacity)`.
   - When maximum capacity is reached, dropped Sun loot is ignored (cannot be attracted by magnet or collected by player).
-- **`magnetRadius`**: Magnet attraction pickup radius for loot and dropped resources (Default levels: `[gridSize*2.5, *3, *3.6, *4.2, *4.8, *5.4, *6]`, Elixir cost: `[10, 20, 40, 70, 100, 120]`).
+- **`magnetRadius`**: Magnet attraction pickup radius for loot and dropped resources 
   - Directly drives the attraction radius of all valid dropped items towards the player.
-- **`damageMultAdd`**: Additive damage multiplier applied ONLY to the player's own direct mining and attacking combat projectiles (`b_player` and `b_player_mining`), preserving independent turret balance (Default levels: `[0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5]`, Elixir cost: `[5, 15, 30, 50, 80, 100]`).
+- **`damageMultAdd`**: Additive damage multiplier applied ONLY to the player's own direct mining and attacking combat projectiles (`b_player` and `b_player_mining`), preserving independent turret balance
 - **LevelData Overrides**: Upgrade tiers, stats, costs, and cost currencies can be overridden on a per-level basis via `LevelData.playerUpgrades` or `levelConfig.playerUpgrades`.
 
 ---
@@ -182,9 +192,9 @@ Turrets retain their exact remaining health throughout pickup, flight, inventory
 
 ## 📈 Level Budget & Hourly Spawning Customization
 Level designers can control ambient and night wave difficulty scaling directly in level JSON files:
-- **`customBudgetPerNight`**: Overrides the baseline nightly wave budget per day (e.g. `[100, 200, 400, 800, 1500, ...]`).
-- **`hourlyBudgetPerDay`**: Configures the hourly budget allocation during daytime per day (e.g. `[3, 10, 15, 18, 20]`).
-- **`hourlyBudgetPerNight`**: Configures the hourly ambient budget replenishment during nighttime per day (e.g. `[20, 40, 50, 60, 70]`).
+- **`customBudgetPerNight`**: Overrides the baseline nightly wave budget per day 
+- **`hourlyBudgetPerDay`**: Configures the hourly budget allocation during daytime per day 
+- **`hourlyBudgetPerNight`**: Configures the hourly ambient budget replenishment during nighttime per day
 - **`enabledCurrency`**: Defines the visible and active currencies for the level (e.g. `["sun", "elixir"]`), allowing smooth, progressive introduction of resources to players.
 
 ---
@@ -252,9 +262,12 @@ The Main Menu features a sleek layout pairing level navigation with a responsive
   - The Level Editor codebase is partitioned into cohesive modules under `/levelEditor/` (`types.ts`, `palette.ts`, `camera.ts`, `tools.ts`, `spawnerTooltip.ts`, `canvas.ts`, `actions.ts`, and `index.ts`), ensuring clean separation of concerns and high maintainability.
 - **Pure v2 JSON Format & Deprecated v1**:
   - Level serialization and deserialization strictly operate on the modern span-compressed v2 format, deprecating legacy v1 parsing for optimal performance and cleaner codebase architecture.
-- **Level Editor Camera Zoom & Interaction Isolation**:
+- **Level Editor Camera Zoom & Strict Interaction Isolation**:
   - Added smooth mouse wheel camera zooming (`0.3x` to `3.0x`) in the Level Editor centered on world view.
-  - Strict UI interaction isolation prevents brush or tile modifications while interacting with tooltips, top menus, or category tabs.
+  - **Strict Interaction Isolation**: Drag and paint operations on the world canvas strictly require pointer activation directly over open canvas space (`state.levelEditor.isWorldDragActive`).
+  - Closing tooltips (e.g. `SpawnerTooltip`), clicking UI buttons (`IMPORT JSON`, `EXPORT`, tabs, pills), or dismissing modal overlays cleanly resets drag flags and prevents click bleeding or stuck drag-edit states.
+  - Closing the Almanac modal in gameplay or editor mode suppresses mouse drag interactions until the pointer is released, preventing unintentional character movement or world interactions.
+  - Window blur events automatically reset mouse press and drag vectors.
 - **Player Upgrades Max Level & Single StatLevel Logic**:
   - In gameplay mode, player upgrades defined with a single `StatLevel` (or having reached max rank) are cleanly labeled as `(MAX)` and the `Upgrade` purchase button is removed.
 
@@ -277,3 +290,132 @@ The Main Menu features a sleek layout pairing level navigation with a responsive
   - Computes clearance maps (distinguishing 1×1 standard enemy paths from 2×2 giant enemy passages) and derives smooth gradient vectors for hundreds of concurrent swarm units with negligible CPU overhead ($<0.2\text{ ms}$).
   - Features **Perimeter Siege Fallback**: When the player is completely walled off or an enemy is in a disconnected cavern, enemies calculate gradient descent towards the closest exterior wall facing the player rather than freezing or vibrating.
   - **Dynamic Debug Gizmos**: When `EnemyGizmos` (`state.debugGizmosEnemies`) is toggled on in Debug Mode, renders visible flow field vector arrows and color-coded trajectory lines (`LOS` in neon green, `FLOW` in cyan, `SIEGE` in orange, and `DIRECT` in red).
+
+---
+
+## 🚧 PayGate Obstacles & Interactive Text Signs
+- **`o_paygate` (Pay Gate Obstacle)**:
+  - Custom obstacle utilizing the `tileset-paygate.png` autotiling texture set.
+  - Unlike standard destructible obstacles, Pay Gates cannot be mined by normal weapons and require resources to unlock.
+  - **`PayGateGroup` Clustering**: Contiguous or interconnected Pay Gate blocks automatically form a cohesive `PayGateGroup` sharing a single unlock cost and state.
+  - **Proximity Cost Display**: Approaching a Pay Gate group renders the cost bubble (styled consistently with the turret-merging bubble overlay) indicating the required resource type, remaining cost, and affordability.
+  - **Physical Spending on Collision**: When the player walks into a Pay Gate block, the required resource is spent one-by-one with visual `PayGateFlyVFX` particles flying into the center of the gate. Once all required resources are spent, the entire `PayGateGroup` breaks automatically.
+  - **Level Editor PayGate Config Tooltip**: Level designers can customize the required currency and amount per Pay Gate cluster with quick `-10`, `-1`, `+1`, `+10` adjustment buttons and numeric entry (fallback: 10 Soil).
+- **`ov_textsign` (Text Sign Overlay)**:
+  - Speech bubble hint/tutorial sign overlay placed on top of obstacle blocks.
+  - Displays a clean speech bubble with tailored text hints for players during exploration and tutorials.
+  - **Level Editor TextSign Tooltip**: Allows designers to type and edit custom messages up to 100 characters directly from the Level Editor canvas.
+- **Strict Line-of-Sight (DDA Raycasting)**:
+  - Refactored `checkLOS` in `world.ts` using a fast Digital Differential Analyzer (DDA) raycaster.
+  - Prevents player shots, laser beams, and enemy projectile line-of-sight from penetrating through diagonal block gaps (`(0,1)` / `(1,0)` corner junctions).
+- **PayGateGroup Cost Serialization & Deserialization**:
+  - `serializeChunkBlocks` and `deserializeChunkBlocks` in `levelManager.ts` fully persist cluster-level `paygateConfig` (resource type, required amount, and spent state) for each PayGate block.
+  - `rebuildPayGateGroups()` is automatically triggered upon level start, level import, and cache restoration, ensuring that connected PayGate obstacles are unified into clusters with accurate break costs and interactive world cost bubbles.
+
+---
+
+## 🎨 Modular UI Component System & Tokens
+- **Centralized Color Palette (`uiColors.ts`)**:
+  - Stores all standard game colors as token functions with RGBA alpha support (`color.purple(alpha)`, `color.yellow()`, `color.panelBlue()`, `color.gray()`, `color.lightGray()`, `color.darkGray()`, `color.veryLightYellow()`, `color.black()`, etc.).
+  - Adheres strictly to the established **Almanac UI** art style: clean, un-stroked cards, high-contrast typography, and tactile 3D buttons.
+- **Reusable UI Primitives (`uiComponents.ts`)**:
+  - **Buttons (`drawButton`, `drawYellowButton`, `drawRedButton`, `drawGreenButton`, `drawCyanButton`, `drawPurpleButton`, `drawDarkButton`, `drawGrayButton`)**:
+    - **Normal State**: Clean 3D tactile button with bevel edge and deep shadow offset.
+    - **Hovered State**: Smoothly reverses the top and bottom gradient face colors (no outline border).
+    - **Pressed State**: Renders a crisp white perimeter border outline with a 1px physical press displacement.
+    - **Buttons with Icons**: Supports embedded item/resource icons scaled 50% larger (34px standard size) with crisp alignment alongside label text.
+    - **Gray Button Variant**: Neutral slate/gray button variant for utility and secondary actions.
+  - **Close Button Component (`CloseButton` / `drawCloseButton`)**: Standardized circular tactile close button with red gradient face, dark red beveled base, deep drop shadow, centered white 'X' icon, and a crisp white outline ring on press. Replaces custom modal close buttons across all popups and tooltips.
+  - **Cards & Modals (`drawModalFrame`, `drawCard`)**: Standardized Almanac-style modal frames, header bars, close buttons, and selectable inset cards with custom border and background options.
+  - **Inputs & Steppers (`drawNumberStepper`, `drawInputField`)**: Standardized numeric steppers (`-` [value] `+`) and interactive text input controls with cursor and selection rendering.
+  - **Speech Bubbles (`drawSpeechBubble`)**: Dynamic directional speech bubbles with customizable tail direction and resource/action icon badges.
+- **Refactored Editor Popups & Tooltips**:
+  - `PayGateModalUI`, `TextSignEditorUI`, and `SpawnerTooltip` (both Spawner Info and Spawner Prefab Config) have been migrated completely to use `uiComponents` primitives (`drawModalFrame`, `drawCard`, `drawButton`, `CloseButton`) and the unified hitbox registry.
+- **UI Components Showcase (`uiComponentsShowcase.ts`)**:
+  - Interactive test gallery accessible via the Debug Menu (`Show All UI Components`) to visually test and verify all component variants, hover states, pressed states, icons, steppers, and speech bubbles.
+- **Immediate-Mode Hitbox Registry & Two-Phase Click System**:
+  - Uses `beginUIFrame()`, `registerUIHitbox()`, `handleUIMousePress()`, and `handleUIMouseRelease()` for robust click dispatching.
+  - **Two-Phase Click Requirement (Double-Trigger Prevention)**: Buttons and interactive controls require both mouse-down (press) and mouse-up (release) within the same element hitbox to trigger a click event. This eliminates double-trigger bugs (where an action executed on both MouseDown and MouseUp) and prevents accidental triggers when moving, dragging the camera, or releasing outside a button.
+  - **Level Editor World Input Pipeline**:
+    - Dispatches `handleLevelEditorPress()` directly on mouse-down prior to generic gameplay checks, enabling immediate activation of block placement, bucket fill, spawn area lassoing, and entity manipulation.
+    - Seamlessly differentiates left-click (place/mark/fill) from right-click (erase/delete/unmark) across all tools and categories (Obstacles, Liquids, Overlays, Entities, Turrets, Flags).
+    - Mouse-drag operations in the Level Editor are strictly isolated from player touch/gameplay vector calculations, ensuring smooth and uninterrupted painting and canvas editing.
+  - **Typography Normalization**: All UI text rendering explicitly enforces `textStyle(NORMAL)` and `noStroke()` to eliminate unintended font outlines and blurriness across all canvas resolutions.
+- **Directory Structure (`/ui/`)**:
+  - All dedicated UI modules (`uiMainMenu.ts`, `uiGameOver.ts`, `uiGameSpeed.ts`, `uiNpcShop.ts`, `uiDebug.ts`, `uiComponentsShowcase.ts`, `almanac/`, `overlay/`) reside cleanly within the `/ui/` directory, while root `uiColors.ts` and `uiComponents.ts` serve as the universal foundation across the entire game and editor.
+
+---
+
+## 🌿 Interactive Overlays & World Mechanics
+- **`catalyst_clay` (Clay Catalyst Overlay)**:
+  - An indestructible, non-targetable overlay (`isValidTarget: false`) placed on terrain blocks that generates adjacent `o_clay` blocks over time.
+  - **CatalystConfig Structure**: Configured via `catalystConfig: { neighborMatrix: [[-1,-1], [0,-1], [1,-1], [-1,0], [1,0], [-1,1], [0,1], [1,1]], spawnInterval: HOUR_FRAMES * 0.5, obstacleToSpawn: 'o_clay' }` in `overlayTypes`.
+  - **Instant Placement Spawning**: Placing a Clay Catalyst in the Level Editor immediately populates all empty adjacent neighbor tiles in its matrix with the target obstacle.
+  - **Dynamic Spawn & Halt**: In active gameplay, every interval it randomly chooses one empty neighboring tile (`!block || block.isMined`) to turn into Clay with dust debris VFX. If all 8 adjacent tiles are occupied, its spawn cycle halts until an adjacent block is mined.
+  - **Debug & Editor Gizmos**: When `debugHP` or Level Editor mode is active, renders visual bounding box gizmos around all 8 matrix neighbor positions (green outline for empty/valid spawn spots, red outline for occupied spots).
+- **`gf_spawner` (Ground Spawner Budget & Death Visual)**:
+  - Ground-layer enemy spawner feature that spends its localized spawner budget when producing enemies.
+  - When its budget is fully depleted (`spawnerBudget <= 0`), the spawner automatically expires (`life = 0`) and triggers the purple `BugSplatVFX` death explosion at its location.
+- **`sunGenerator` (Sun Generator Overlay)**:
+  - Specialized resource node overlay requiring damage to harvest Sun currency.
+  - Spawns physical `sun` loot entities upon reaching cumulative damage milestones, pairing with the in-game hover speech bubble (`[Icon] X left`) and lowest target priority for auto-aiming turrets.
+  - **Level Editor Customization**: Interactive customization tooltip (`Sun Generator Config`) accessible directly by clicking the Sun Generator card in the Overlays palette or selecting a placed Sun Generator on the world canvas, allowing on-the-fly adjustment of `damagePerSun` and `maxSun`.
+
+---
+
+## ⚡ Player Stamina, ClickHolding Boost & Upgrades
+- **Stamina System**:
+  - **Base Stamina & HUD Display**: Base 100 stamina displayed as a dedicated `StaminaBar` directly adjacent to the `HealthBar`, with an icon badge and dynamic length scaling based on `maxStamina`.
+  - **ClickHolding Boost Consumption**: While holding left click / spacebar for mining boost, stamina depletes by 2 per bullet fired.
+  - **Stamina Color States**: The stamina bar smoothly transitions to white while depleting, and cyan while recovering and by default.
+  - **Target Prioritization**: Auto-mining under ClickHolding boost preserves normal target prioritization rather than overriding firing logic.
+  - **Auto-Recovery**: Recovers at 2 stamina per 6 frames strictly when the player is stationary and at least 1 second (60 frames) has passed since stamina was last spent.
+- **Expanded Player Upgrades in Almanac**:
+  - `maxStamina`: Increases maximum player stamina and extends stamina bar width.
+  - `clickHoldBoost`: Enhances mining shot boost effectiveness.
+  - `movementSpeed`: Enhances baseline player travel velocity.
+  - **Almanac Upgrades UI**: Features a 2-column responsive layout with smooth mouse-wheel velocity scrolling and canvas boundary clipping.
+- **PayGate Collision & Trigger Margin**:
+  - Player contact range for spending resources at PayGate groups increased by +1px to ensure reliable resource transfer even during subtle physical repulsion.
+- **Level Editor & Playtest UI**:
+  - Unified playtest controls by removing the duplicated top-middle red button, keeping the clean Cyan "BACK TO EDIT" header button in the top right.
+
+---
+
+## 🌟 Star Rating, Win Conditions & Liquid Spawner Systems
+- **Player Movement Speed Tuning**:
+  - Rebalanced core player base velocity by -15% (from 3.6 to 3.06) for enhanced tactical positioning and maneuverability control.
+- **`l_spawner` Liquid Spawner**:
+  - Consolidated ground spawners into the **Liquids** layer (`l_spawner`) in `balanceLiquids.ts`.
+  - Renders the custom animated idle spawner asset with smooth liquid blending, spawning enemy waves from its budget and expiring into splash VFX when depleted.
+- **Block & Enemy Win Condition Objectives**:
+  - **Level Editor Win Condition Flag Tool**: Designers can flag specific destructible obstacles and blocks as mandatory mission objectives using the Flag tool (`🚩 WIN`).
+  - **In-World Visual Indicator**: Flagged win-condition blocks display an animated golden target beacon with pulsing rings and marker flags on the world canvas.
+  - **Dynamic In-Game Tracker & Victory Check**: Displays a unified in-game HUD tracker (`Defeat Grapes (X) & Break blocks (Y left)`) and triggers victory automatically when all designated enemies and blocks are cleared.
+  - **Full Level Serialization**: Preserves `isWinCondition` flags across block span encoding (`[startGx, length, gy, ..., isWinCondition]`) and imports.
+- **Sun Generator Toolbar Tooltip Synchronization**:
+  - Selecting a placed Sun Generator or toolbar preset opens the configuration tooltip and immediately syncs `damagePerSun` and `maxSun` to the target coordinate and chunk buffers.
+- **Level Star Rating System (1–3 Stars)**:
+  - **Configurable Time Targets**: Level designers can define completion time thresholds (`star2` and `star3` targets in seconds) in the `LEVEL CONFIG` panel in Almanac.
+  - **Dynamic Victory Calculation**: Winning a level awards 1 star (completion), 2 stars (under `star2` target time), or 3 stars (under `star3` target time).
+  - **Persistent High Scores**: Star ratings are saved in local storage (`grapeshooter_level_stars`) and displayed as golden star shapes across level cards in the Main Menu and the Victory popup.
+- **Dual HUD Quick-Access Buttons**:
+  - Added a dedicated **Player Upgrade** HUD button (`img_icon_playerupgrade`) alongside the Almanac button in the bottom-right corner.
+  - Clicking the Player Upgrade button navigates directly to the player's core stat upgrades panel with glowing hover and active tab feedback.
+
+---
+
+## 🍇 Commander Upgrade Hub, Detach All & Pathfinding Engine
+- **Almanac Player Upgrade Redesign**:
+  - **Centered Commander Showcase**: Centers the animated player sprite on a floating radiant pedestal with an idle breathing effect and live Core Stats breakdown card (attached capacity, movement speed, sun currency, elixir).
+  - **Surrounding Compact Upgrade Matrix**: Surrounds the central commander with compact upgrade cards utilizing design tokens and `uiComponents.ts` primitives (`drawCard`, `drawButton`, segmented progression pips, and level tags).
+- **Detach All Turrets Action**:
+  - Displays a dedicated `DetachAllTurrets` button in the center-bottom HUD bar whenever the player is stationary and has attached turrets.
+  - Clicking the button smoothly detaches all attached units, finds adjacent accessible world tiles using BFS spiral placement, converts them into `WorldTurret` instances, and triggers `onDetach` upgrade hooks with VFX.
+- **Smart Pathfinding & Obstacle Avoidance**:
+  - **Cardinal-Only Vectors Near Obstacles**: Dijkstra vector field generation restricts gradient descent to purely orthogonal (cardinal) directions whenever adjacent to obstacles, eliminating awkward corner clipping.
+  - **Tile Center Steering Bias**: Enemy movement incorporates a perpendicular centering pull towards tile midpoints prior to steering into turns.
+  - **Reachable Tile Placement & Turret Interaction**: World turret selection, placement preview snapping, and drag-and-drop merging enforce `flowField.isTileAccessible` checks relative to the player's location.
+- **Sun Generator Harvest Rescan**:
+  - Harvesting Sun currency from a Sun Generator automatically dispatches an obstacle update event, clearing targeting locks and refreshing target scans for both the player core and surrounding turrets.
+

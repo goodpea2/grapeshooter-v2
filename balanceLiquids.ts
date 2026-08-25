@@ -45,7 +45,7 @@ export const liquidTypes: any = {
       turretFireRateMultiplier: 0.5,
       blocksMovement: false,
     },
-    isDanger: true
+    isDanger: false
   },
   l_lava: {
     name: 'Lava',
@@ -76,6 +76,38 @@ export const liquidTypes: any = {
           condition: 'c_burning',
           conditionDuration: 60
         }
+      }
+    }
+  },
+  l_spawner: {
+    name: 'Ground Spawner',
+    color: [140, 30, 180, 220],
+    glowColor: [200, 60, 240, 90],
+    pulseSpeed: 0.04,
+    playerTrailVfx: 'tar_trail',
+    enemyTrailVfx: 'tar_trail',
+    trailVfxInterval: 45,
+    isDanger: false,
+    isEnemySpawner: true,
+    assetImgConfig: { idleAssetImg: ['img_ground_spawner_a'], randomRotation: false, randomFlip: false },
+    liquidConfig: {
+      playerMovementSpeedMultiplier: 1.0,
+      enemyMovementSpeedMultiplier: 1.0,
+      turretFireRateMultiplier: 1.0,
+      blocksMovement: false,
+    },
+    enemySpawnConfig: {
+      budget: 60,
+      enemyTypeKey: ['e_basic'],
+      spawnRadius: 120,
+      spawnTriggerRadius: 200,
+      spawnInterval: 60,
+      spawnIntervalConsumeBudget: true,
+      hourlySpawnConfig: {
+        enabled: true,
+        hourlyBudgetMultiplier: 2.0,
+        hourlyBudgetAdd: 0,
+        selfDestructAfterBudgetSpawned: 2000
       }
     }
   }

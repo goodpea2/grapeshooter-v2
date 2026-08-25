@@ -304,7 +304,16 @@ export class FlowFieldManager {
         let bestDirX = 0;
         let bestDirY = 0;
 
-        for (let i = 0; i < 8; i++) {
+        // Avoid diagonal vectors when adjacent to obstacles
+        const hasNearbyObstacle = (
+          (lx > 0 && this.clearance[idx - 1] < minClearance) ||
+          (lx + 1 < FIELD_DIM && this.clearance[idx + 1] < minClearance) ||
+          (ly > 0 && this.clearance[idx - FIELD_DIM] < minClearance) ||
+          (ly + 1 < FIELD_DIM && this.clearance[idx + FIELD_DIM] < minClearance)
+        );
+
+        const maxDirections = hasNearbyObstacle ? 4 : 8;
+        for (let i = 0; i < maxDirections; i++) {
           const nx = lx + dxs[i];
           const ny = ly + dys[i];
           if (nx < 0 || nx >= FIELD_DIM || ny < 0 || ny >= FIELD_DIM) continue;
@@ -326,6 +335,33 @@ export class FlowFieldManager {
         }
       }
     }
+  }
+
+  isTileAccessible(worldX: number, worldY: number): boolean {
+    if (!state.player) return true;
+    const dx = worldX - state.player.pos.x;
+    const dy = worldY - state.player.pos.y;
+    const dSq = dx * dx + dy * dy;
+    if (dSq <= (GRID_SIZE * 1.6) ** 2) return true;
+    if (state.world && state.world.checkLOS && state.world.checkLOS(state.player.pos.x, state.player.pos.y, worldX, worldY)) {
+      return true;
+    }
+    const gx = floor(worldX / GRID_SIZE);
+    const gy = floor(worldY / GRID_SIZE);
+    const lx = gx - this.originGx;
+    const ly = gy - this.originGy;
+    if (lx < 0 || lx >= FIELD_DIM || ly < 0 || ly >= FIELD_DIM) {
+      return false;
+    }
+    const idx = ly * FIELD_DIM + lx;
+    return this.distNormal[idx] < 1e8 && this.isSiegeNormal[idx] === 0;
+  }
+
+  isGridAccessible(gx: number, gy: number): boolean {
+    if (!state.player) return true;
+    const wx = gx * GRID_SIZE + GRID_SIZE / 2;
+    const wy = gy * GRID_SIZE + GRID_SIZE / 2;
+    return this.isTileAccessible(wx, wy);
   }
 
   getEnemyMoveVector(
@@ -357,11 +393,34 @@ export class FlowFieldManager {
       const idx = ly * FIELD_DIM + lx;
       const isGiant = enemySize >= 44;
 
-      const vx = isGiant ? this.vecXGiant[idx] : this.vecXNormal[idx];
-      const vy = isGiant ? this.vecYGiant[idx] : this.vecYNormal[idx];
+      let vx = isGiant ? this.vecXGiant[idx] : this.vecXNormal[idx];
+      let vy = isGiant ? this.vecYGiant[idx] : this.vecYNormal[idx];
       const isSiege = (isGiant ? this.isSiegeGiant[idx] : this.isSiegeNormal[idx]) === 1;
 
       if (Math.abs(vx) > 0.01 || Math.abs(vy) > 0.01) {
+        // Tile Centering prior to steering:
+        // Compute offset from current tile center and steer towards tile center
+        const tileCenterX = (egx + 0.5) * GRID_SIZE;
+        const tileCenterY = (egy + 0.5) * GRID_SIZE;
+        const offX = tileCenterX - enemyPos.x;
+        const offY = tileCenterY - enemyPos.y;
+
+        const centeringWeight = 0.55;
+        if (Math.abs(vx) > 0.7 && Math.abs(vy) < 0.3) {
+          vy += Math.max(-1, Math.min(1, offY / (GRID_SIZE * 0.4))) * centeringWeight;
+        } else if (Math.abs(vy) > 0.7 && Math.abs(vx) < 0.3) {
+          vx += Math.max(-1, Math.min(1, offX / (GRID_SIZE * 0.4))) * centeringWeight;
+        } else {
+          vx += Math.max(-0.6, Math.min(0.6, offX / GRID_SIZE)) * centeringWeight;
+          vy += Math.max(-0.6, Math.min(0.6, offY / GRID_SIZE)) * centeringWeight;
+        }
+
+        const len = Math.sqrt(vx * vx + vy * vy);
+        if (len > 0.001) {
+          vx /= len;
+          vy /= len;
+        }
+
         return { vx, vy, mode: isSiege ? 'siege' : 'flow' };
       }
     }

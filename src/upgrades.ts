@@ -479,7 +479,7 @@ export function recalculateTurretStats(turret: any) {
   }
 }
 
-export function triggerUpgradeHook(hookType: 'onKill' | 'onMine' | 'onDeath' | 'onMerge' | 'onShot', source: any, context: any) {
+export function triggerUpgradeHook(hookType: 'onKill' | 'onMine' | 'onDeath' | 'onMerge' | 'onShot' | 'onDetach', source: any, context: any) {
   const baseContext = { ...context, hookType, source };
 
   // Increment counters

@@ -15,8 +15,14 @@ export const state: any = {
     toolMode: 'brush', // 'brush' | 'bucket' | 'spawn_area'
     selectedCustomSpawner: null, // { gx, gy, block }
     toolbarSpawnerTooltip: null, // { key: string, name: string, config: any }
+    toolbarSunGeneratorTooltip: null, // { key: string, name: string, config: { damagePerSun: number, maxSun: number } }
+    toolbarPaygateTooltip: null, // { gx?: number, gy?: number, resource: string, amount: number }
+    toolbarTextSignTooltip: null, // { gx?: number, gy?: number, text: string }
     customSpawnerPrefabs: [], // array of { id, name, config }
     activeSpawnerInput: null, // { field: string, textBuffer: string }
+    activeSunGeneratorInput: null, // { field: string, textBuffer: string }
+    activePaygateInput: null, // { field: string, textBuffer: string }
+    activeTextSignInput: null, // { textBuffer: string }
     spawnAreaLassoPoints: [], // { x, y }[]
     spawnAreaLassoIsRightClick: false,
     flagDragMode: null, // 'add' | 'remove' | null
@@ -24,8 +30,10 @@ export const state: any = {
     isRightDragOverlayOnly: false,
     lastFlagToggleFrame: 0,
     lastBucketFrame: 0,
-    cameraZoom: 1.0
+    cameraZoom: 1.0,
+    isWorldDragActive: false
   },
+  suppressGameplayMouseUntilRelease: false,
   currentLevelLayoutData: null,
   player: null,
   world: null,
@@ -96,6 +104,15 @@ export const state: any = {
       return new Set<string>();
     }
   })(),
+  levelStars: (() => {
+    try {
+      const saved = localStorage.getItem('grapeshooter_level_stars');
+      return saved ? (JSON.parse(saved) as Record<string, number>) : {};
+    } catch {
+      return {} as Record<string, number>;
+    }
+  })(),
+  lastLevelStarsEarned: 0,
   winConditionActive: false,
   showGameOverPopup: false,
   gameOverProgress: 0, // Used for lighting and modal animation
@@ -243,7 +260,10 @@ export const state: any = {
     turretAttachCapacity: 0,
     sunBankCapacity: 0,
     magnetRadius: 0,
-    damageMultAdd: 0
+    damageMultAdd: 0,
+    maxStamina: 0,
+    clickHoldBoost: 0,
+    movementSpeed: 0
   },
   playerBonuses: {
     attackAdd: 0,

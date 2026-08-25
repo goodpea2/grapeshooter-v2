@@ -150,6 +150,7 @@ export const ASSETS = {
   // UI Icons
   img_icon_elixir: "https://i.ibb.co/yB7nHpR4/icon-elixir.png",
   img_icon_health: "https://i.ibb.co/bt6k3Z5/icon-health.png",
+  img_icon_stamina: "https://i.ibb.co/RkZRTx6K/icon-stamina.png",
   img_icon_soil: "https://i.ibb.co/TBj66xWX/icon-soil.png",
   img_icon_sun: "https://i.ibb.co/vx8rqK71/icon-sun.png",
   img_icon_raisin: "https://i.ibb.co/mCvqks7R/icon-raisin.png",
@@ -160,6 +161,10 @@ export const ASSETS = {
   img_icon_leaf: "https://i.ibb.co/qYcq5yBT/icon-leaf.png",
   img_icon_almanac: "https://i.ibb.co/tMXJCXb3/icon-almanac.png",
   img_icon_almanac_glow: "https://i.ibb.co/hJSczhtX/icon-almanac-glow.png",
+  img_icon_playerupgrade: "https://i.ibb.co/Kp0fDQyP/icon-playerupgrade.png",
+  img_icon_playerupgrade_glow: "https://i.ibb.co/1Yd5n30S/icon-playerupgrade-glow.png",
+  img_icon_detach: "https://i.ibb.co/C3RwnXh1/icon-detach.png",
+  img_icon_detach_glow: "https://i.ibb.co/NnCDL9L7/icon-detach-glow.png",
 
   // New Tooltip Class Icons
   img_icon_duplicate: "https://i.ibb.co/Qg4SFPS/icon-duplicate.png",
@@ -221,6 +226,7 @@ export const ASSETS = {
   img_tileset_concealed: "https://i.ibb.co/XrNCc3qp/tileset-conceal.png",
   img_tileset_barrier: "https://i.ibb.co/Jj93vYPM/tileset-barrier-v2.png",
   img_tileset_barrier_v2: "https://i.ibb.co/Jj93vYPM/tileset-barrier-v2.png",
+  img_tileset_paygate: "https://i.ibb.co/Qj1M2gNf/tileset-paygate.png",
   img_tileset_fallback: "https://i.ibb.co/xSYp1VBX/fallback.png",
 
   // New Obstacle Assets
@@ -228,6 +234,9 @@ export const ASSETS = {
   img_o_crate_v2: "https://i.ibb.co/XfVNn4xS/o-crate-v2.png",
   img_o_pot: "https://i.ibb.co/FL79vyVd/o-pot.png",
   img_o_pot_v2: "https://i.ibb.co/vGTXxV5/o-pot-v2.png",
+  img_sun_generator: "https://i.ibb.co/LDh25y6T/blockoverlay-sun-genertor.png",
+  img_catalyst_clay: "https://i.ibb.co/xqnT3HcM/blockoverlay-catalyst-clay.png",
+  img_ground_spawner_a: "https://i.ibb.co/tw1yn8kW/ground-spawner-a.png",
 
   // Golden Grape Turret
   img_tx_goldengrape_front: "https://i.ibb.co/J8V5DLW/t-goldengrape-front-right.png"

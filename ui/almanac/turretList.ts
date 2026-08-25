@@ -2,7 +2,7 @@
 import { state } from '../../state';
 import { turretTypes } from '../../balanceTurrets';
 import { TYPE_MAP, drawTurretSprite } from '../../assetTurret';
-import { CLASS_ICON_MAP } from '../../UITurretTooltip';
+import { CLASS_ICON_MAP } from '../UITurretTooltip';
 import { TURRET_RECIPES } from '../../dictionaryTurretMerging';
 import { AlmanacProgression, getActiveAlmanacProgression, getTurretProgressionState, cycleTurretProgressionState } from '../../lvDemo';
 

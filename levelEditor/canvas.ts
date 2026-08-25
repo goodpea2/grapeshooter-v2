@@ -1,6 +1,7 @@
 import { state } from '../state';
 import { GRID_SIZE } from '../constants';
 import { overlayTypes } from '../balanceObstacles';
+import { liquidTypes } from '../balanceLiquids';
 import { PaletteItem } from './types';
 import { getAllPaletteItems, renderPaletteItemIcon } from './palette';
 import { updateLevelEditorCamera } from './camera';
@@ -14,9 +15,48 @@ import {
 import {
   isMouseOverSpawnerTooltip,
   drawWorldHoverSpawnerTooltip,
-  drawToolbarSpawnerTooltip
+  drawToolbarSpawnerTooltip,
+  openToolbarSpawnerTooltip,
+  isMouseOverSunGeneratorTooltip,
+  drawToolbarSunGeneratorTooltip,
+  openToolbarSunGeneratorTooltip
 } from './spawnerTooltip';
+import {
+  paygateModal,
+  drawPayGateCostModal,
+  handlePayGateCostModalRelease
+} from './paygateModal';
+import {
+  sunGeneratorModal,
+  drawSunGeneratorModal,
+  handleSunGeneratorModalRelease
+} from './sunGeneratorModal';
+import {
+  textSignEditor,
+  getTextSignAtWorldPos,
+  drawInlineTextSignEditor,
+  handleInlineTextSignRelease
+} from './textsignEditor';
 import { drawAlmanac } from '../ui/almanac/mainLayout';
+import {
+  drawButton,
+  drawRedButton,
+  drawDarkButton,
+  drawPurpleButton,
+  drawGreenButton,
+  drawCyanButton,
+  drawCard,
+  registerUIHitbox
+} from '../uiComponents';
+import { color } from '../uiColors';
+import {
+  saveLevelLayout,
+  triggerImportLevelJson
+} from '../levelManager';
+import { testPlayLevel, restoreLevelFromCache } from './actions';
+import { createDefaultEditorAlmanacProgression } from '../lvDemo';
+import { initLevelEditorPlayerUpgradesFromData } from '../ui/almanac/playerUpgradesPanel';
+import { initLevelEditorLevelConfig } from '../ui/almanac/levelConfigPanel';
 
 declare const push: any;
 declare const pop: any;
@@ -27,6 +67,8 @@ declare const strokeWeight: any;
 declare const noStroke: any;
 declare const rect: any;
 declare const ellipse: any;
+declare const textStyle: any;
+declare const NORMAL: any;
 declare const line: any;
 declare const background: any;
 declare const textAlign: any;
@@ -73,14 +115,18 @@ export function drawLevelEditor() {
   const leftBarW = 48;
   const leftBarH = 154;
   const isOverLeftBar = mouseX >= leftBarX && mouseX <= leftBarX + leftBarW && mouseY >= leftBarY && mouseY <= leftBarY + leftBarH;
-  const isOverSpawnerTip = isMouseOverSpawnerTooltip(topBarH, paletteH);
-  const isOverWorld = !state.isAlmanacOpen && mouseY >= topBarH && mouseY < height - paletteH && !isOverLeftBar && !isOverSpawnerTip;
+  const isOverSpawnerTip = isMouseOverSpawnerTooltip(topBarH, paletteH) || isMouseOverSunGeneratorTooltip(topBarH, paletteH);
+  const isModalOpen = paygateModal.isOpen || textSignEditor.isOpen || !!state.levelEditor.editingPaygateModal || !!state.levelEditor.editingTextSign;
+  const isOverWorld = !state.isAlmanacOpen && !isModalOpen && mouseY >= topBarH && mouseY < height - paletteH && !isOverLeftBar && !isOverSpawnerTip;
 
   // Calculate mouse world coordinates accounting for cameraZoom
   const mWorldX = (mouseX - width / 2) / zoom + state.cameraPos.x;
   const mWorldY = (mouseY - height / 2) / zoom + state.cameraPos.y;
   const gx = floor(mWorldX / GRID_SIZE);
   const gy = floor(mWorldY / GRID_SIZE);
+
+  const hoveredPayGateGroup = (state.world && !isModalOpen && isOverWorld) ? state.world.getPayGateGroupByWorldPos(mWorldX, mWorldY) : null;
+  const hoveredTextSignBlock = (state.world && !isModalOpen && isOverWorld && !hoveredPayGateGroup) ? getTextSignAtWorldPos(mWorldX, mWorldY) : null;
 
   push();
   // 1. World Camera Translation and Zoom for ALL world elements
@@ -102,13 +148,21 @@ export function drawLevelEditor() {
   const worldTurrets = state.world ? state.world.getAllTurrets() : [];
   for (const wt of worldTurrets) wt.display();
 
+  // Render Live BreakCost for all PayGateGroups on the edit canvas
+  if (state.world) {
+    state.world.drawPayGateCostBubbles(undefined, true, hoveredPayGateGroup);
+  }
+
+  // Render Inline TextSign speech bubble editor if active
+  drawInlineTextSignEditor(mWorldX, mWorldY);
+
   // Render Spawner Trigger Radius Preview and Spawner Names in LevelEditor Mode for placed spawners
   if (state.world) {
     state.world.chunks.forEach((chunk: any) => {
       chunk.blocks.forEach((b: any) => {
-        if (!b.isMined && b.overlay && overlayTypes[b.overlay]) {
-          const oCfg = overlayTypes[b.overlay];
-          if (oCfg.isEnemySpawner || oCfg.enemySpawnConfig || b.customSpawnerConfig) {
+        if (!b.isMined && (b.overlay || b.liquidType)) {
+          const oCfg = (b.overlay ? overlayTypes[b.overlay] : null) || (b.liquidType ? liquidTypes[b.liquidType] : null);
+          if (oCfg && (oCfg.isEnemySpawner || oCfg.enemySpawnConfig || b.customSpawnerConfig)) {
             const eCfg = b.customSpawnerConfig || oCfg.enemySpawnConfig;
             let trigRad = eCfg?.spawnTriggerRadius > 0 ? eCfg.spawnTriggerRadius : 0;
             const bcx = b.pos.x + GRID_SIZE / 2;
@@ -185,14 +239,24 @@ export function drawLevelEditor() {
   }
 
   // Cursor Preview & Interaction Handling
-  if (isOverWorld) {
+  if (isOverWorld && !hoveredPayGateGroup && !hoveredTextSignBlock && !isModalOpen) {
     const tileX = gx * GRID_SIZE;
     const tileY = gy * GRID_SIZE;
 
     // Detect mouse buttons (Left-click = Place/Fill/Mark, Right-click = Delete/Unmark)
+    // ONLY allowed when world drag is actively initiated by clicking on the canvas
     const rawEvt = (window as any).event;
-    const isLeftPress = mouseIsPressed && (mouseButton === LEFT || (window as any).mouseButton === LEFT || (rawEvt && rawEvt.buttons === 1));
-    const isRightPress = mouseIsPressed && (mouseButton === RIGHT || (window as any).mouseButton === RIGHT || (rawEvt && rawEvt.buttons === 2));
+    const isMouseCurrentlyHeld = mouseIsPressed || state.isMouseDown || (rawEvt && rawEvt.buttons > 0);
+    if (!isMouseCurrentlyHeld) {
+      state.levelEditor.isWorldDragActive = false;
+      state.levelEditor.isRightDragActive = false;
+      state.levelEditor.isRightDragOverlayOnly = false;
+      state.levelEditor.isFlagDragActive = false;
+    }
+    const isWorldDrag = !!state.levelEditor.isWorldDragActive;
+    const isRightBtn = mouseButton === RIGHT || (window as any).mouseButton === RIGHT || (rawEvt && (rawEvt.button === 2 || rawEvt.buttons === 2)) || !!state.levelEditor.isRightDragActive;
+    const isLeftPress = isWorldDrag && isMouseCurrentlyHeld && !isRightBtn;
+    const isRightPress = isWorldDrag && isMouseCurrentlyHeld && isRightBtn;
     
     // Check Right Drag initiation for overlay only filter
     if (isRightPress) {
@@ -201,9 +265,6 @@ export function drawLevelEditor() {
         const blockUnder = state.world?.getBlock(gx, gy);
         state.levelEditor.isRightDragOverlayOnly = (state.levelEditor.activeCategory === 'overlays') || (!!blockUnder?.overlay);
       }
-    } else {
-      state.levelEditor.isRightDragActive = false;
-      state.levelEditor.isRightDragOverlayOnly = false;
     }
 
     if (state.levelEditor.toolMode === 'spawn_area') {
@@ -322,9 +383,9 @@ export function drawLevelEditor() {
       // Snapped Grid Tile Cursor (Brush Mode)
       const selKey = state.levelEditor.selectedItemKey;
       const selCat = state.levelEditor.activeCategory;
-      if (selCat === 'overlays' && selKey && overlayTypes[selKey]) {
-        const oCfg = overlayTypes[selKey];
-        if (oCfg.isEnemySpawner || oCfg.enemySpawnConfig || selKey === 'ov_spawner_custom') {
+      if ((selCat === 'overlays' || selCat === 'liquids') && selKey) {
+        const oCfg = overlayTypes[selKey] || liquidTypes[selKey];
+        if (oCfg && (oCfg.isEnemySpawner || oCfg.enemySpawnConfig || selKey === 'ov_spawner_custom' || selKey === 'l_spawner')) {
           const eCfg = oCfg.enemySpawnConfig || { spawnTriggerRadius: 200 };
           let trigRad = eCfg?.spawnTriggerRadius > 0 ? eCfg.spawnTriggerRadius : 200;
           const previewX = tileX + GRID_SIZE / 2;
@@ -382,9 +443,9 @@ export function drawLevelEditor() {
   // 5.1 Read-Only Spawner Hover Tooltip on world canvas
   if (isOverWorld && !isOverSpawnerTip) {
     const hovBlk = state.world?.getBlock(gx, gy);
-    if (hovBlk && !hovBlk.isMined && hovBlk.overlay) {
-      const oCfg = overlayTypes[hovBlk.overlay];
-      if (oCfg && (oCfg.isEnemySpawner || oCfg.enemySpawnConfig || hovBlk.customSpawnerConfig || hovBlk.overlay === 'ov_spawner_custom')) {
+    if (hovBlk && !hovBlk.isMined) {
+      const oCfg = (hovBlk.overlay ? overlayTypes[hovBlk.overlay] : null) || (hovBlk.liquidType ? liquidTypes[hovBlk.liquidType] : null);
+      if (oCfg && (oCfg.isEnemySpawner || oCfg.enemySpawnConfig || hovBlk.customSpawnerConfig || hovBlk.overlay === 'ov_spawner_custom' || hovBlk.liquidType === 'l_spawner')) {
         drawWorldHoverSpawnerTooltip(hovBlk, oCfg, topBarH, paletteH);
       }
     }
@@ -395,9 +456,24 @@ export function drawLevelEditor() {
     drawToolbarSpawnerTooltip(topBarH, paletteH);
   }
 
+  // 5.3 Editable Toolbar Sun Generator Tooltip
+  if (state.levelEditor.toolbarSunGeneratorTooltip) {
+    drawToolbarSunGeneratorTooltip(topBarH, paletteH);
+  }
+
   // 6. Draw Almanac if open in Editor Mode
   if (state.isAlmanacOpen) {
     drawAlmanac();
+  }
+
+  // 7. Draw PayGate Cost Modal if open
+  if (paygateModal.isOpen) {
+    drawPayGateCostModal();
+  }
+
+  // 8. Draw SunGenerator Config Modal if open
+  if (sunGeneratorModal.isOpen) {
+    drawSunGeneratorModal();
   }
 }
 
@@ -412,6 +488,7 @@ export function drawLeftToolbar(topBarH: number) {
   stroke(35, 45, 80);
   strokeWeight(1);
   rect(barX, barY, barW, barH, 8);
+  noStroke();
 
   const btnW = 38;
   const btnH = 40;
@@ -420,95 +497,74 @@ export function drawLeftToolbar(topBarH: number) {
 
   // 1. Brush Button
   const isBrush = state.levelEditor.toolMode === 'brush';
-  const isBrushHov = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
-  fill(isBrush ? [20, 50, 95] : (isBrushHov ? [25, 38, 70] : [14, 18, 36]));
-  stroke(isBrush ? [0, 220, 255] : (isBrushHov ? [70, 120, 200] : [35, 45, 80]));
-  strokeWeight(isBrush ? 1.5 : 1);
-  rect(btnX, btnY, btnW, btnH, 6);
-
+  drawButton(btnX, btnY, btnW, btnH, 'BRUSH', {
+    id: 'le_tool_brush',
+    variant: isBrush ? 'cyan' : 'dark',
+    isSelected: isBrush,
+    radius: 6,
+    fontSize: 7.5,
+    depth3D: 2,
+    onClick: () => {
+      state.levelEditor.toolMode = 'brush';
+    }
+  });
+  // Overlay icon on top of button
+  noStroke();
   fill(255);
   textAlign(CENTER, CENTER);
-  textSize(14);
-  text('🖌️', btnX + btnW / 2, btnY + 14);
-  textSize(7.5);
-  fill(isBrush ? [0, 220, 255] : [160, 175, 200]);
-  text('BRUSH', btnX + btnW / 2, btnY + 29);
+  textSize(13);
+  textStyle(NORMAL);
+  text('🖌️', btnX + btnW / 2, btnY + 13);
 
   btnY += btnH + 8;
 
   // 2. Bucket Fill Button
   const isBucket = state.levelEditor.toolMode === 'bucket';
-  const isBucketHov = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
-  fill(isBucket ? [20, 50, 95] : (isBucketHov ? [25, 38, 70] : [14, 18, 36]));
-  stroke(isBucket ? [0, 220, 255] : (isBucketHov ? [70, 120, 200] : [35, 45, 80]));
-  strokeWeight(isBucket ? 1.5 : 1);
-  rect(btnX, btnY, btnW, btnH, 6);
-
+  drawButton(btnX, btnY, btnW, btnH, 'FILL', {
+    id: 'le_tool_bucket',
+    variant: isBucket ? 'cyan' : 'dark',
+    isSelected: isBucket,
+    radius: 6,
+    fontSize: 7.5,
+    depth3D: 2,
+    onClick: () => {
+      state.levelEditor.toolMode = 'bucket';
+      if (state.levelEditor.activeCategory !== 'obstacles' && state.levelEditor.activeCategory !== 'liquids') {
+        state.levelEditor.activeCategory = 'obstacles';
+        state.levelEditor.selectedItemKey = 'o_dirt';
+      }
+    }
+  });
+  noStroke();
   fill(255);
   textAlign(CENTER, CENTER);
-  textSize(14);
-  text('🪣', btnX + btnW / 2, btnY + 14);
-  textSize(7.5);
-  fill(isBucket ? [0, 220, 255] : [160, 175, 200]);
-  text('FILL', btnX + btnW / 2, btnY + 29);
+  textSize(13);
+  textStyle(NORMAL);
+  text('🪣', btnX + btnW / 2, btnY + 13);
 
   btnY += btnH + 8;
 
   // 3. Mark Spawn Area Button
   const isSpawnArea = state.levelEditor.toolMode === 'spawn_area';
-  const isSpawnHov = mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH;
-  fill(isSpawnArea ? [60, 25, 95] : (isSpawnHov ? [45, 25, 75] : [18, 14, 36]));
-  stroke(isSpawnArea ? [192, 132, 252] : (isSpawnHov ? [168, 85, 247] : [55, 35, 85]));
-  strokeWeight(isSpawnArea ? 1.5 : 1);
-  rect(btnX, btnY, btnW, btnH, 6);
-
+  drawButton(btnX, btnY, btnW, btnH, 'SPAWN', {
+    id: 'le_tool_spawn',
+    variant: isSpawnArea ? 'purple' : 'dark',
+    isSelected: isSpawnArea,
+    radius: 6,
+    fontSize: 7,
+    depth3D: 2,
+    onClick: () => {
+      state.levelEditor.toolMode = 'spawn_area';
+    }
+  });
+  noStroke();
   fill(255);
   textAlign(CENTER, CENTER);
-  textSize(14);
-  text('🟣', btnX + btnW / 2, btnY + 14);
-  textSize(7);
-  fill(isSpawnArea ? [216, 180, 254] : [190, 165, 220]);
-  text('SPAWN', btnX + btnW / 2, btnY + 29);
+  textSize(13);
+  textStyle(NORMAL);
+  text('🟣', btnX + btnW / 2, btnY + 13);
 
   pop();
-}
-
-export function handleLevelEditorMouseRelease() {
-  if (state.currentScreen !== 'level_editor') return;
-
-  // Complete MarkSpawnArea circle/lasso selection
-  if (state.levelEditor.toolMode === 'spawn_area' && state.levelEditor.spawnAreaLassoPoints && state.levelEditor.spawnAreaLassoPoints.length >= 3) {
-    const pts = state.levelEditor.spawnAreaLassoPoints;
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const p of pts) {
-      if (p.x < minX) minX = p.x;
-      if (p.x > maxX) maxX = p.x;
-      if (p.y < minY) minY = p.y;
-      if (p.y > maxY) maxY = p.y;
-    }
-    const minGx = Math.floor(minX / GRID_SIZE) - 1;
-    const maxGx = Math.ceil(maxX / GRID_SIZE) + 1;
-    const minGy = Math.floor(minY / GRID_SIZE) - 1;
-    const maxGy = Math.ceil(maxY / GRID_SIZE) + 1;
-
-    const wasRight = state.levelEditor.isRightDragActive || (window as any).mouseButton === RIGHT || mouseButton === RIGHT;
-    const markVal = !wasRight;
-
-    for (let tx = minGx; tx <= maxGx; tx++) {
-      for (let ty = minGy; ty <= maxGy; ty++) {
-        const centerPt = { x: tx * GRID_SIZE + GRID_SIZE / 2, y: ty * GRID_SIZE + GRID_SIZE / 2 };
-        if (isPointInPolygon(centerPt.x, centerPt.y, pts)) {
-          state.world?.setSpawnAreaTile(tx, ty, markVal);
-        }
-      }
-    }
-  }
-
-  state.levelEditor.spawnAreaLassoPoints = [];
-  state.levelEditor.isFlagDragActive = false;
-  state.levelEditor.flagDragMode = null;
-  state.levelEditor.isRightDragActive = false;
-  state.levelEditor.isRightDragOverlayOnly = false;
 }
 
 export function drawTopBar(headerH: number) {
@@ -517,83 +573,105 @@ export function drawTopBar(headerH: number) {
   stroke(35, 45, 80);
   strokeWeight(1);
   rect(0, 0, width, headerH);
+  noStroke();
 
   textAlign(LEFT, CENTER);
   textSize(14);
+  textStyle(NORMAL);
+  noStroke();
   fill(0, 220, 255);
   text("LEVEL EDITOR", 16, headerH / 2);
 
   textAlign(LEFT, CENTER);
   textSize(10);
+  textStyle(NORMAL);
+  noStroke();
   fill(140, 160, 190);
   text("WASD: Move  |  Left-Click: Paint/Fill  |  Right-Click: Delete/Clear", 140, headerH / 2);
 
-  const btnH = 22;
-  const btnW = 55;
+  const btnH = 24;
+  const btnW = 60;
   const gap = 6;
   let curX = width - 16 - btnW;
 
-  const btnBgNormal = [45, 60, 90];
-  const btnBgHover = [75, 100, 145];
-
   // EXIT MENU Button (Red)
-  const isExitHov = mouseX >= curX && mouseX <= curX + btnW && mouseY >= (headerH - btnH) / 2 && mouseY <= (headerH + btnH) / 2;
-  fill(isExitHov ? [220, 60, 60] : [180, 40, 40]);
-  noStroke();
-  rect(curX, (headerH - btnH) / 2, btnW, btnH, 4);
-  textAlign(CENTER, CENTER);
-  textSize(8.5);
-  fill(255, 255, 255);
-  text("EXIT MENU", curX + btnW / 2, headerH / 2);
+  drawRedButton(curX, (headerH - btnH) / 2, btnW, btnH, "EXIT MENU", {
+    id: 'le_btn_exit',
+    fontSize: 8.5,
+    radius: 6,
+    depth3D: 2,
+    onClick: () => {
+      state.currentScreen = 'main_menu';
+    }
+  });
 
   curX -= (btnW + gap);
 
   // EXPORT JSON Button
-  const isExpHov = mouseX >= curX && mouseX <= curX + btnW && mouseY >= (headerH - btnH) / 2 && mouseY <= (headerH + btnH) / 2;
-  fill(isExpHov ? btnBgHover : btnBgNormal);
-  noStroke();
-  rect(curX, (headerH - btnH) / 2, btnW, btnH, 4);
-  textAlign(CENTER, CENTER);
-  textSize(8.5);
-  fill(240, 245, 255);
-  text("EXPORT", curX + btnW / 2, headerH / 2);
+  drawDarkButton(curX, (headerH - btnH) / 2, btnW, btnH, "EXPORT", {
+    id: 'le_btn_export',
+    fontSize: 8.5,
+    radius: 6,
+    depth3D: 2,
+    onClick: () => {
+      saveLevelLayout();
+    }
+  });
 
   curX -= (btnW + gap);
 
   // IMPORT JSON Button
-  const isImpHov = mouseX >= curX && mouseX <= curX + btnW && mouseY >= (headerH - btnH) / 2 && mouseY <= (headerH + btnH) / 2;
-  fill(isImpHov ? btnBgHover : btnBgNormal);
-  noStroke();
-  rect(curX, (headerH - btnH) / 2, btnW, btnH, 4);
-  textAlign(CENTER, CENTER);
-  textSize(8.5);
-  fill(240, 245, 255);
-  text("IMPORT", curX + btnW / 2, headerH / 2);
+  drawDarkButton(curX, (headerH - btnH) / 2, btnW, btnH, "IMPORT", {
+    id: 'le_btn_import',
+    fontSize: 8.5,
+    radius: 6,
+    depth3D: 2,
+    onClick: () => {
+      state.levelEditor.toolbarSpawnerTooltip = null;
+      state.levelEditor.activeSpawnerInput = null;
+      state.levelEditor.isWorldDragActive = false;
+      (window as any).mouseIsPressed = false;
+      triggerImportLevelJson((data) => {
+        restoreLevelFromCache(data);
+      });
+    }
+  });
 
-  curX -= (gap + 85);
+  const almanacW = 95;
+  curX -= (almanacW + gap);
 
   // ALMANAC CONFIG Button
-  const almanacW = 85;
-  const isAlmHov = mouseX >= curX && mouseX <= curX + almanacW && mouseY >= (headerH - btnH) / 2 && mouseY <= (headerH + btnH) / 2;
-  fill(isAlmHov ? [100, 70, 180] : [65, 45, 130]);
-  noStroke();
-  rect(curX, (headerH - btnH) / 2, almanacW, btnH, 4);
-  textAlign(CENTER, CENTER);
-  textSize(8);
-  fill(240, 230, 255);
-  text("ALMANAC CONFIG", curX + almanacW / 2, headerH / 2);
+  drawPurpleButton(curX, (headerH - btnH) / 2, almanacW, btnH, "ALMANAC CONFIG", {
+    id: 'le_btn_almanac',
+    fontSize: 8,
+    radius: 6,
+    depth3D: 2,
+    onClick: () => {
+      if (!state.levelEditorAlmanacProgression) {
+        state.levelEditorAlmanacProgression = createDefaultEditorAlmanacProgression();
+      }
+      initLevelEditorPlayerUpgradesFromData(state.currentLevelLayoutData?.playerUpgrades);
+      initLevelEditorLevelConfig(state.currentLevelLayoutData);
+      state.isAlmanacOpen = true;
+      state.isAlmanacEditorMode = true;
+      state.almanacTab = 'Turrets';
+      state.almanacScrollY = 0;
+      state.almanacScrollVelocity = 0;
+    }
+  });
 
   curX -= (btnW + gap);
 
   // TEST LEVEL Button
-  const isTestHov = mouseX >= curX && mouseX <= curX + btnW && mouseY >= (headerH - btnH) / 2 && mouseY <= (headerH + btnH) / 2;
-  fill(isTestHov ? btnBgHover : btnBgNormal);
-  noStroke();
-  rect(curX, (headerH - btnH) / 2, btnW, btnH, 4);
-  textAlign(CENTER, CENTER);
-  textSize(8.5);
-  fill(240, 245, 255);
-  text("TEST LEVEL", curX + btnW / 2, headerH / 2);
+  drawGreenButton(curX, (headerH - btnH) / 2, btnW, btnH, "TEST LEVEL", {
+    id: 'le_btn_test',
+    fontSize: 8.5,
+    radius: 6,
+    depth3D: 2,
+    onClick: () => {
+      testPlayLevel();
+    }
+  });
 
   pop();
 }
@@ -607,13 +685,13 @@ export function drawPalettePanel(panelH: number) {
   stroke(40, 55, 95);
   strokeWeight(1.5);
   rect(0, panelY, width, panelH);
+  noStroke();
 
   // Category Tabs
   const categories: { key: PaletteItem['category']; label: string; disabled?: boolean }[] = [
     { key: 'obstacles', label: 'OBSTACLES' },
     { key: 'overlays', label: 'OVERLAYS' },
     { key: 'liquids', label: 'LIQUIDS' },
-    { key: 'groundFeatures', label: 'GROUND FEATURES', disabled: true },
     { key: 'entities', label: 'ENTITIES' },
     { key: 'turrets', label: 'TURRETS' },
     { key: 'flags', label: 'FLAGS' }
@@ -625,30 +703,34 @@ export function drawPalettePanel(panelH: number) {
 
   for (const tab of categories) {
     textSize(9);
+    textStyle(NORMAL);
     const tw = textWidth(tab.label) + 14;
     const isSelected = state.levelEditor.activeCategory === tab.key;
-    const isHovered = !tab.disabled && mouseX >= tabX && mouseX <= tabX + tw && mouseY >= panelY + tabMargin && mouseY <= panelY + tabMargin + tabH;
 
-    noStroke();
-    if (tab.disabled) {
-      fill(16, 18, 30, 140);
-    } else if (isSelected) {
-      fill(0, 200, 255, 230);
-    } else if (isHovered) {
-      fill(40, 60, 110, 200);
-    } else {
-      fill(20, 25, 45, 180);
-    }
-
-    rect(tabX, panelY + tabMargin, tw, tabH, 4);
-
-    textAlign(CENTER, CENTER);
-    if (tab.disabled) {
-      fill(80, 90, 115, 120);
-    } else {
-      fill(isSelected ? [10, 20, 35] : (isHovered ? [230, 240, 255] : [150, 170, 200]));
-    }
-    text(tab.label, tabX + tw / 2, panelY + tabMargin + tabH / 2);
+    drawButton(tabX, panelY + tabMargin, tw, tabH, tab.label, {
+      id: `le_tab_${tab.key}`,
+      variant: isSelected ? 'cyan' : 'dark',
+      isSelected,
+      disabled: tab.disabled,
+      fontSize: 8.5,
+      radius: 4,
+      depth3D: 1,
+      onClick: () => {
+        if (!tab.disabled) {
+          state.levelEditor.activeCategory = tab.key;
+          if (tab.key === 'entities') {
+            state.levelEditor.activeSubCategory = 'ALL';
+          }
+          const allItems = getAllPaletteItems();
+          const first = allItems.find(i => i.category === tab.key);
+          if (first) {
+            state.levelEditor.selectedItemKey = first.key;
+          }
+          state.levelEditor.paletteScrollX = 0;
+          state.levelEditor.paletteScrollVel = 0;
+        }
+      }
+    });
 
     tabX += tw + 5;
   }
@@ -662,23 +744,23 @@ export function drawPalettePanel(panelH: number) {
 
     for (const sub of subCats) {
       textSize(8);
+      textStyle(NORMAL);
       const sw = textWidth(sub) + 12;
       const isSubSel = (state.levelEditor.activeSubCategory || 'ALL') === sub;
-      const isSubHov = mouseX >= subX && mouseX <= subX + sw && mouseY >= contentY && mouseY <= contentY + subH;
 
-      noStroke();
-      if (isSubSel) {
-        fill(255, 220, 100, 230);
-      } else if (isSubHov) {
-        fill(60, 80, 130, 200);
-      } else {
-        fill(25, 30, 52, 160);
-      }
-
-      rect(subX, contentY, sw, subH, 3);
-      textAlign(CENTER, CENTER);
-      fill(isSubSel ? [20, 20, 10] : [190, 200, 220]);
-      text(sub, subX + sw / 2, contentY + subH / 2);
+      drawButton(subX, contentY, sw, subH, sub, {
+        id: `le_sub_${sub}`,
+        variant: isSubSel ? 'yellow' : 'dark',
+        isSelected: isSubSel,
+        fontSize: 7.5,
+        radius: 3,
+        depth3D: 1,
+        onClick: () => {
+          state.levelEditor.activeSubCategory = sub;
+          state.levelEditor.paletteScrollX = 0;
+          state.levelEditor.paletteScrollVel = 0;
+        }
+      });
 
       subX += sw + 4;
     }
@@ -693,7 +775,7 @@ export function drawPalettePanel(panelH: number) {
     categoryItems = categoryItems.filter(i => i.subCategory === state.levelEditor.activeSubCategory);
   }
 
-  const cardW = 42;
+  const cardW = 44;
   const cardH = 46;
   const cardGap = 5;
   const totalW = categoryItems.length * (cardW + cardGap) - cardGap;
@@ -730,24 +812,21 @@ export function drawPalettePanel(panelH: number) {
     if (cx + cardW < 0 || cx > width) continue;
 
     const isSelected = state.levelEditor.selectedItemKey === item.key;
-    const isHovered = mouseX >= cx && mouseX <= cx + cardW && mouseY >= contentY && mouseY <= contentY + cardH;
 
-    // Card Background
-    if (isSelected) {
-      fill(25, 50, 90, 240);
-      stroke(0, 220, 255);
-      strokeWeight(1.5);
-    } else if (isHovered) {
-      fill(22, 35, 65, 220);
-      stroke(100, 150, 230, 180);
-      strokeWeight(1);
-    } else {
-      fill(14, 18, 34, 200);
-      stroke(40, 52, 90, 120);
-      strokeWeight(1);
-    }
-
-    rect(cx, contentY, cardW, cardH, 5);
+    drawCard(cx, contentY, cardW, cardH, {
+      radius: 6,
+      isSelected,
+      isHoverable: true,
+      id: `le_card_${item.key}`,
+      onClick: () => {
+        state.levelEditor.selectedItemKey = item.key;
+        if ((item.category === 'overlays' && item.key.startsWith('ov_spawner')) || (item.category === 'liquids' && (item.key === 'l_spawner' || item.key.startsWith('l_spawner'))) || item.key === 'l_spawner' || item.key.startsWith('l_spawner')) {
+          openToolbarSpawnerTooltip(item.key);
+        } else if (item.category === 'overlays' && item.key === 'sunGenerator') {
+          openToolbarSunGeneratorTooltip();
+        }
+      }
+    });
 
     // Card Icon
     renderPaletteItemIcon(item, cx + cardW / 2, contentY + 16, 20);
@@ -755,7 +834,9 @@ export function drawPalettePanel(panelH: number) {
     // Card Label
     textAlign(CENTER, TOP);
     textSize(8);
-    fill(isSelected ? [255, 255, 255] : (isHovered ? [230, 240, 255] : [150, 165, 190]));
+    textStyle(NORMAL);
+    noStroke();
+    fill(isSelected ? [255, 255, 255] : [160, 175, 200]);
     text(item.name, cx + 2, contentY + 28, cardW - 4, 16);
   }
 

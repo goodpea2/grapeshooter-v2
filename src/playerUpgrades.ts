@@ -61,6 +61,36 @@ export const DEFAULT_PLAYER_UPGRADE_CONFIGS: Record<string, PlayerUpgradeTrackCo
     values: [0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5],
     costs: [5, 15, 30, 50, 80, 100],
     costType: 'elixir'
+  },
+  maxStamina: {
+    id: 'maxStamina',
+    name: 'Max Stamina',
+    description: 'Increases maximum stamina',
+    icon: 'img_icon_stamina',
+    statFormat: (val: number) => `${val} stamina`,
+    values: [100, 125, 150, 180, 220, 260, 300],
+    costs: [5, 10, 20, 35, 60, 100],
+    costType: 'elixir'
+  },
+  clickHoldBoost: {
+    id: 'clickHoldBoost',
+    name: 'Charge Attack Boost',
+    description: 'Increase attacking and mining speed while under boost',
+    icon: 'img_icon_sun',
+    statFormat: (val: number) => `+${Math.round(val * 100)}%`,
+    values: [2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0],
+    costs: [10, 20, 40, 70, 100, 120],
+    costType: 'elixir'
+  },
+  movementSpeed: {
+    id: 'movementSpeed',
+    name: 'Movement Speed',
+    description: 'Increase moving speed',
+    icon: 'img_icon_leaf',
+    statFormat: (val: number) => `+${Math.round(val * 100)}%`,
+    values: [0, 0.08, 0.16, 0.24, 0.32, 0.40, 0.50],
+    costs: [10, 20, 40, 70, 110, 150],
+    costType: 'elixir'
   }
 };
 
@@ -114,7 +144,10 @@ export function getPlayerUpgradeLevel(upgradeKey: string): number {
       turretAttachCapacity: 0,
       sunBankCapacity: 0,
       magnetRadius: 0,
-      damageMultAdd: 0
+      damageMultAdd: 0,
+      maxStamina: 0,
+      clickHoldBoost: 0,
+      movementSpeed: 0
     };
   }
   return state.playerUpgrades[upgradeKey] || 0;
@@ -190,7 +223,10 @@ export function resetPlayerUpgrades() {
     turretAttachCapacity: 0,
     sunBankCapacity: 0,
     magnetRadius: 0,
-    damageMultAdd: 0
+    damageMultAdd: 0,
+    maxStamina: 0,
+    clickHoldBoost: 0,
+    movementSpeed: 0
   };
   recalculateAllStats();
 }

@@ -62,18 +62,7 @@ export function getAllPaletteItems(): PaletteItem[] {
     });
   }
 
-  // 4. Ground Features
-  for (const key of Object.keys(groundFeatureTypes)) {
-    items.push({
-      key,
-      name: groundFeatureTypes[key].name || key,
-      category: 'groundFeatures',
-      desc: groundFeatureTypes[key].desc || '',
-      color: groundFeatureTypes[key].color
-    });
-  }
-
-  // 5. Entities
+  // 4. Entities
   items.push({
     key: 'player_spawn',
     name: 'Player Core',
@@ -170,7 +159,17 @@ export function renderPaletteItemIcon(item: PaletteItem, px: number, py: number,
     const chestAsset = item.key === 'ov_chest' ? 'img_treasurechest' : null;
     const assetKey = idleAsset || spawnerAsset || tntAsset || chestAsset;
 
-    if (assetKey && state.assets[assetKey]) {
+    if (item.key === 'ov_textsign') {
+      fill(25, 30, 55);
+      stroke(240, 190, 80);
+      strokeWeight(1.5);
+      rect(-size / 2 + 2, -size / 2 + 5, size - 4, size - 10, 4);
+      fill(255, 220, 100);
+      noStroke();
+      textSize(8);
+      textAlign(CENTER, CENTER);
+      text('TXT', 0, 0);
+    } else if (assetKey && state.assets[assetKey]) {
       imageMode(CENTER);
       image(state.assets[assetKey], 0, 0, size, size);
       if (item.key === 'ov_spawner_custom' || cfg?.isCustomPrefab) {
@@ -190,11 +189,11 @@ export function renderPaletteItemIcon(item: PaletteItem, px: number, py: number,
     fill(cfg ? cfg.color : [50, 100, 200]);
     noStroke();
     rect(-size / 2, -size / 2, size, size, 6);
-  } else if (item.category === 'groundFeatures') {
-    const cfg = groundFeatureTypes[item.key];
-    fill(cfg && cfg.color ? cfg.color : [255, 100, 50]);
-    noStroke();
-    ellipse(0, 0, size * 0.8);
+    const idleAsset = cfg?.assetImgConfig?.idleAssetImg?.[0];
+    if (idleAsset && state.assets[idleAsset]) {
+      imageMode(CENTER);
+      image(state.assets[idleAsset], 0, 0, size, size);
+    }
   } else if (item.category === 'entities') {
     if (item.key === 'player_spawn') {
       const sprite = state.assets['img_player_front_right'] || state.assets['img_core'];

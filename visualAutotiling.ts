@@ -27,6 +27,7 @@ export const BITMASK_MAP: Record<number, {x: number, y: number}> = {
 
 // Priority for rendering: Higher number = renders on top
 const MATERIAL_PRIORITY: Record<string, number> = {
+  'o_paygate': 7,
   'o_barrier': 6,
   'o_black': 1,
   'o_slate': 2,
@@ -100,6 +101,8 @@ export function drawAutotile(pg: any, vx: number, vy: number, gx: number, gy: nu
     } else if (mat === 'o_barrier') {
       const nVal = noise((gx + 0.5) * 3, (gy + 0.5) * 3, 999);
       assetKey = nVal > 0.5 ? 'img_tileset_barrier_v2' : 'img_tileset_barrier_v2';
+    } else if (mat === 'o_paygate') {
+      assetKey = 'img_tileset_paygate';
     }
     // Add other materials here as assets are provided
     

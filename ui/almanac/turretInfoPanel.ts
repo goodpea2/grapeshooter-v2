@@ -4,7 +4,7 @@ import { turretTypes } from '../../balanceTurrets';
 import { TYPE_MAP, drawTurretSprite } from '../../assetTurret';
 import { GRID_SIZE, HOUR_FRAMES } from '../../constants';
 import { TURRET_RECIPES } from '../../dictionaryTurretMerging';
-import { CLASS_ICON_MAP, TURRET_DISPLAY_STATS, DEFAULT_STATS } from '../../UITurretTooltip';
+import { CLASS_ICON_MAP, TURRET_DISPLAY_STATS, DEFAULT_STATS } from '../UITurretTooltip';
 import { ShopFlyVFX } from '../../vfx/index';
 import { AlmanacProgression, getActiveAlmanacProgression } from '../../lvDemo';
 import { UPGRADE_COSTS, UPGRADES, TURRET_UPGRADE_POOLS, recalculateAllStats } from '../../src/upgrades';
@@ -377,7 +377,7 @@ function drawStatsGrid(x: number, y: number, w: number, type: string) {
   textSize(11);
   const colW = w / 2;
   
-  stats.forEach((s, i) => {
+  stats.forEach((s: any, i: number) => {
     const r = floor(i / 2);
     const c = i % 2;
     const sx = c * colW + 12;

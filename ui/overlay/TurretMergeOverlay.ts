@@ -102,5 +102,73 @@ export function drawMergeBubble(x: number, y: number, outputType: string, cost: 
   pop();
 }
 
+/**
+ * Draws a white bubble chat with the resource and remaining cost for a PayGateGroup.
+ * Horizontal layout: resource icon next to the cost number, with 100% larger text size (14px).
+ */
+export function drawPayGateBubble(
+  x: number,
+  y: number,
+  resource: string,
+  remainingCost: number,
+  canAfford: boolean,
+  alpha: number = 255,
+  isEditorHover: boolean = false
+) {
+  push();
+  translate(x, y);
+
+  const costText = `${remainingCost}`;
+  textSize(14);
+  const tw = textWidth(costText);
+  const iconSize = 16;
+  const gap = 4;
+  const padX = 8;
+  const bubbleW = Math.max(42, iconSize + gap + tw + padX * 2);
+  const bubbleH = 24;
+  const bubbleY = -20;
+
+  let bgColor = [255, 255, 255];
+  if (!canAfford) {
+    bgColor = [255, 130, 130];
+  } else if (isEditorHover) {
+    bgColor = [254, 240, 138]; // soft highlight on hover in editor
+  }
+
+  // Draw bubble tail
+  fill(bgColor[0], bgColor[1], bgColor[2], alpha);
+  if (isEditorHover) {
+    stroke(245, 158, 11, alpha);
+    strokeWeight(1.5);
+  } else {
+    noStroke();
+  }
+  triangle(0, bubbleY + bubbleH / 2 + 5, -4, bubbleY + bubbleH / 2 - 1, 4, bubbleY + bubbleH / 2 - 1);
+
+  // Draw bubble body
+  rectMode(CENTER);
+  rect(0, bubbleY, bubbleW, bubbleH, 6);
+
+  // Calculate horizontal positions for Icon and Text
+  const totalContentW = iconSize + gap + tw;
+  const startX = -totalContentW / 2;
+
+  // Draw resource icon
+  const iconKey = resource.startsWith('img_') ? resource : `img_icon_${resource}`;
+  const iconSprite = state.assets[iconKey] || state.assets['img_icon_soil'];
+  if (iconSprite) {
+    imageMode(CENTER);
+    image(iconSprite, startX + iconSize / 2, bubbleY, iconSize, iconSize);
+  }
+
+  // Draw cost text
+  fill(20, 20, 30, alpha);
+  noStroke();
+  textAlign(LEFT, CENTER);
+  text(costText, startX + iconSize + gap, bubbleY);
+
+  pop();
+}
+
 declare const triangle: any;
 declare const rectMode: any;

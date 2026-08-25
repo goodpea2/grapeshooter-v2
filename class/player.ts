@@ -19,6 +19,7 @@ declare const createVector: any;
 declare const dist: any;
 declare const atan2: any;
 declare const floor: any;
+declare const constrain: any;
 declare const frameCount: any;
 declare const random: any;
 declare const cos: any;
@@ -28,11 +29,15 @@ declare const radians: any;
 declare const TWO_PI: any;
 
 export class Player {
-  pos: any; prevPos: any; size = 30; attachments: AttachedTurret[] = []; health = 100; maxHealth = 100; speed = 3.6; flash = 0; autoTurretAngle = 0; autoTurretLastShot = 0; autoTurretRange = GRID_SIZE * 6; autoTurretFireRate = 22; recoil = 0; target: any = null;
+  pos: any; prevPos: any; size = 30; attachments: AttachedTurret[] = []; health = 100; maxHealth = 100; speed = 3.0; flash = 0; autoTurretAngle = 0; autoTurretLastShot = 0; autoTurretRange = GRID_SIZE * 6; autoTurretFireRate = 22; recoil = 0; target: any = null;
+  stamina = 100;
+  maxStamina = 100;
+  lastStaminaSpentFrame = -1000;
+  staminaDepletingTimer = 0;
   hurtAnimTimer = 0;
   isClickHolding: boolean = false;
-  autoTurretClickMiningBoost = 3; // +300% mining speed
-  autoTurretClickAttackBoost = 0; // No boost for attacking
+  autoTurretClickMiningBoost = 2; // +200% mining speed
+  autoTurretClickAttackBoost = 2; // +200% attack speed
   pulseAnimTimer = 0;
   conditions: Map<string, number> = new Map();
   
@@ -51,6 +56,9 @@ export class Player {
     this.pos = createVector(x, y); 
     this.prevPos = createVector(x, y); 
     this.moveInputVec = createVector(0, 0);
+    const configuredMaxStam = getPlayerUpgradeStat('maxStamina') || 100;
+    this.maxStamina = configuredMaxStam;
+    this.stamina = configuredMaxStam;
   }
   
   applyCondition(cKey: string, duration: number) {
@@ -65,6 +73,27 @@ export class Player {
     if (this.flash > 0) this.flash--;
     if (this.hurtAnimTimer > 0) this.hurtAnimTimer--;
     if (this.pulseAnimTimer > 0) this.pulseAnimTimer--;
+    if (this.staminaDepletingTimer > 0) this.staminaDepletingTimer--;
+
+    // Update Max Stamina from upgrades
+    const currentMaxStam = getPlayerUpgradeStat('maxStamina') || 100;
+    if (currentMaxStam !== this.maxStamina) {
+      const diff = currentMaxStam - this.maxStamina;
+      this.maxStamina = currentMaxStam;
+      if (diff > 0) {
+        this.stamina = Math.min(this.maxStamina, this.stamina + diff);
+      } else {
+        this.stamina = Math.min(this.maxStamina, this.stamina);
+      }
+    }
+
+    // Stamina auto-recovery: only when player is not moving and >= 1 second (60 frames) since last stamina spent
+    // Recovery rate: 2 per 6 frames (1/3 per frame)
+    const isMoving = this.isMovingIntent;
+    const timeSinceLastSpent = state.frames - this.lastStaminaSpentFrame;
+    if (!isMoving && timeSinceLastSpent >= 60 && this.stamina < this.maxStamina) {
+      this.stamina = Math.min(this.maxStamina, this.stamina + (2 / 6));
+    }
 
     // Game Over check
     if (this.health <= 0 && !state.isGameOver) {
@@ -110,7 +139,9 @@ export class Player {
     // 2. Perform Movement
     if (this.isMovingIntent && !isTurretSelected) { 
       let effectiveSpeedMultiplier = state.isWASDInput ? 1.0 : state.playerSpeedMultiplier;
-      const move = this.moveInputVec.copy().normalize().mult(this.speed * lMult * effectiveSpeedMultiplier * (state.playerBonuses.speedMult || 1.0)); 
+      const moveSpeedBonus = getPlayerUpgradeStat('movementSpeed') || 0;
+      const totalSpeedMultiplier = (state.playerBonuses.speedMult || 1.0) * (1.0 + moveSpeedBonus);
+      const move = this.moveInputVec.copy().normalize().mult(this.speed * lMult * effectiveSpeedMultiplier * totalSpeedMultiplier); 
       this.moveWithSliding(move);
 
       // Update Breadcrumb Trail
@@ -277,6 +308,25 @@ export class Player {
           const dy = this.pos.y - by;
           const dSq = dx*dx + dy*dy;
           
+          const block = state.world.getBlock(i, j);
+          if (block && block.type === 'o_paygate' && !block.isMined) {
+            // Check actual collision contact with the block's physical bounds (increased trigger range by 1px)
+            const cX = constrain(this.pos.x, i * GRID_SIZE, (i + 1) * GRID_SIZE);
+            const cY = constrain(this.pos.y, j * GRID_SIZE, (j + 1) * GRID_SIZE);
+            const distSqToBlock = (this.pos.x - cX) ** 2 + (this.pos.y - cY) ** 2;
+            const isCollidingWithBlock = distSqToBlock <= (myRadius + 3) ** 2;
+
+            if (isCollidingWithBlock && !this.isMovingIntent) {
+              const grp = state.world.getPayGateGroup(block);
+              if (grp) {
+                if (state.frames - grp.lastPayFrame >= 6) {
+                  grp.lastPayFrame = state.frames;
+                  grp.payOneResource(state.world);
+                }
+              }
+            }
+          }
+
           if (dSq < minSafeDist * minSafeDist && dSq > 0.01) {
             const d = Math.sqrt(dSq);
             const overlap = minSafeDist - d;
@@ -398,11 +448,20 @@ export class Player {
 
   updateAutoTurret(fireRateMult: number) {
     const isRaged = this.conditions.has('c_raged') || this.conditions.has('c_raged_visualonly');
+    
+    // Resolve ClickHold boost from upgrade
+    const boostStat = getPlayerUpgradeStat('clickHoldBoost');
+    const boostVal = boostStat !== undefined ? boostStat : 1.0;
+    this.autoTurretClickAttackBoost = boostVal;
+    this.autoTurretClickMiningBoost = boostVal;
+
+    const isBoostActive = this.isClickHolding && this.stamina >= 2;
+
     // do not delete this line - effectiveFireRate is a stackable percentage, not exponential, for example: "4x fire rate" translates to +300% fire rate, so 2 sources of 4x fire rate gives the output of +600%. 
     let attackBonus = (fireRateMult - 1.0) + ((state.playerBonuses.attackFirerateMult || 1.0) - 1.0);
     let miningBonus = (fireRateMult - 1.0) + ((state.playerBonuses.miningFirerateMult || 1.0) - 1.0);
     
-    if (this.isClickHolding) {
+    if (isBoostActive) {
       attackBonus += this.autoTurretClickAttackBoost;
       miningBonus += this.autoTurretClickMiningBoost;
     }
@@ -428,71 +487,10 @@ export class Player {
       }
     }
 
-    // If holding click, force switch to mining (skip enemy/icecube targeting)
-    // ALLOW mining while moving if click is held
-    if (this.isClickHolding && state.isStationary) {
-      let ht = this.findHarvestTarget(this.pos, this.autoTurretRange);
-      if (ht) {
-        let bc = ht.getWorldPos();
-        this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x);
-        if (state.frames - this.autoTurretLastShot > effectiveMiningFireRate) {
-          for (let i = 0; i < miningBulletsToSpawn; i++) {
-            let sa = this.autoTurretAngle;
-            let startX = this.pos.x;
-            let startY = this.pos.y;
-            let targetX = bc.x;
-            let targetY = bc.y;
-            if (i > 0) {
-              const offX = random(-10, 10);
-              const offY = random(-10, 10);
-              startX += offX; startY += offY;
-              targetX += offX; targetY += offY;
-            }
-            state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player_mining', 'none', this));
-            if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 14, 4, color(255, 255, 100)));
-          }
-          if (this.isClickHolding && this.autoTurretClickMiningBoost > 0) this.applyCondition('c_raged_visualonly', 10);
-          this.autoTurretLastShot = state.frames;
-          this.recoil = 3;
-          this.pulseAnimTimer = 10;
-        }
-        return;
-      }
+    // Firing condition: stationary, raged, or holding click
+    if (!state.isStationary && !isRaged && !this.isClickHolding) return;
 
-      let t = this.findBlockTarget(this.pos, this.autoTurretRange); 
-      if (t) { 
-        let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; 
-        this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); 
-        if (state.frames - this.autoTurretLastShot > effectiveMiningFireRate) { 
-          for (let i = 0; i < miningBulletsToSpawn; i++) {
-            let sa = this.autoTurretAngle;
-            let startX = this.pos.x;
-            let startY = this.pos.y;
-            let targetX = bc.x;
-            let targetY = bc.y;
-            if (i > 0) {
-              const offX = random(-10, 10);
-              const offY = random(-10, 10);
-              startX += offX; startY += offY;
-              targetX += offX; targetY += offY;
-            }
-            state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player_mining', 'none', this)); 
-            if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 14, 4, color(255, 255, 100))); 
-          }
-          // Play rage VFX on player when mining boost is active
-          if (this.isClickHolding && this.autoTurretClickMiningBoost > 0) {
-            this.applyCondition('c_raged', 10);
-          }
-          this.autoTurretLastShot = state.frames; 
-          this.recoil = 3; 
-          this.pulseAnimTimer = 10; 
-        } 
-        return; 
-      }
-    }
-
-    if (!state.isStationary && !isRaged) return;
-
+    // 1. Frosted attachments (icecube target)
     let bestR = null; let minRD = this.autoTurretRange;
     for (let a of this.attachments) if (a.isFrosted && a.iceCubeHealth > 0) { let d = dist(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y); if (d < minRD && state.world.checkLOS(this.pos.x, this.pos.y, a.getWorldPos().x, a.getWorldPos().y)) { minRD = d; bestR = a; } }
     if (bestR) { 
@@ -515,10 +513,18 @@ export class Player {
           state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player', 'icecube', this)); 
           if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 24, 6, color(100, 200, 255))); 
         }
+        if (isBoostActive) {
+          this.stamina = Math.max(0, this.stamina - 2 * attackBulletsToSpawn);
+          this.lastStaminaSpentFrame = state.frames;
+          this.staminaDepletingTimer = 12;
+          this.applyCondition('c_raged_visualonly', 10);
+        }
         this.autoTurretLastShot = state.frames; this.recoil = 6; this.pulseAnimTimer = 15; 
       } 
       return; 
     }
+
+    // 2. Enemies
     let nearestE = null; let minDistE = this.autoTurretRange;
     for (let e of state.enemies) if (e.health > 0 && !e.isDying) { let d = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y); if (d < minDistE && state.world.checkLOS(this.pos.x, this.pos.y, e.pos.x, e.pos.y)) { minDistE = d; nearestE = e; } }
     if (nearestE) { 
@@ -539,10 +545,57 @@ export class Player {
           state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player', 'enemy', this)); 
           if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 24, 6, color(100, 200, 255))); 
         }
+        if (isBoostActive) {
+          this.stamina = Math.max(0, this.stamina - 2 * attackBulletsToSpawn);
+          this.lastStaminaSpentFrame = state.frames;
+          this.staminaDepletingTimer = 12;
+          this.applyCondition('c_raged_visualonly', 10);
+        }
         this.autoTurretLastShot = state.frames; this.recoil = 6; this.pulseAnimTimer = 15; 
       } 
-    } else {
-      let t = this.findBlockTarget(this.pos, this.autoTurretRange); if (t) { let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); if (state.frames - this.autoTurretLastShot > effectiveMiningFireRate) { 
+      return;
+    }
+
+    // 3. Harvest Targets (ready to harvest sunflowers, etc.)
+    let ht = this.findHarvestTarget(this.pos, this.autoTurretRange);
+    if (ht) {
+      let bc = ht.getWorldPos();
+      this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x);
+      if (state.frames - this.autoTurretLastShot > effectiveMiningFireRate) {
+        for (let i = 0; i < miningBulletsToSpawn; i++) {
+          let sa = this.autoTurretAngle;
+          let startX = this.pos.x;
+          let startY = this.pos.y;
+          let targetX = bc.x;
+          let targetY = bc.y;
+          if (i > 0) {
+            const offX = random(-10, 10);
+            const offY = random(-10, 10);
+            startX += offX; startY += offY;
+            targetX += offX; targetY += offY;
+          }
+          state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player_mining', 'none', this));
+          if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 14, 4, color(255, 255, 100)));
+        }
+        if (isBoostActive) {
+          this.stamina = Math.max(0, this.stamina - 2 * miningBulletsToSpawn);
+          this.lastStaminaSpentFrame = state.frames;
+          this.staminaDepletingTimer = 12;
+          this.applyCondition('c_raged_visualonly', 10);
+        }
+        this.autoTurretLastShot = state.frames;
+        this.recoil = 3;
+        this.pulseAnimTimer = 10;
+      }
+      return;
+    }
+
+    // 4. Block Targets (dirt, rocks, sunGenerator, spawners, etc.)
+    let t = this.findBlockTarget(this.pos, this.autoTurretRange); 
+    if (t) { 
+      let bc = { x: t.pos.x + GRID_SIZE/2, y: t.pos.y + GRID_SIZE/2 }; 
+      this.autoTurretAngle = atan2(bc.y - this.pos.y, bc.x - this.pos.x); 
+      if (state.frames - this.autoTurretLastShot > effectiveMiningFireRate) { 
         for (let i = 0; i < miningBulletsToSpawn; i++) {
           let sa = this.autoTurretAngle;
           let startX = this.pos.x;
@@ -558,7 +611,17 @@ export class Player {
           state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player_mining', 'none', this)); 
           if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 14, 4, color(255, 255, 100))); 
         }
-        this.autoTurretLastShot = state.frames; this.recoil = 3; this.pulseAnimTimer = 10; } }
+        if (isBoostActive) {
+          this.stamina = Math.max(0, this.stamina - 2 * miningBulletsToSpawn);
+          this.lastStaminaSpentFrame = state.frames;
+          this.staminaDepletingTimer = 12;
+          this.applyCondition('c_raged_visualonly', 10);
+        }
+        this.autoTurretLastShot = state.frames; 
+        this.recoil = 3; 
+        this.pulseAnimTimer = 10; 
+      } 
+      return;
     }
   }
 
@@ -577,13 +640,15 @@ export class Player {
           const blocks = chunk.blocks as any[];
           for (const b of blocks) {
               if (b.isMined || !b.pos || b.type === 'o_barrier' || b.config?.isValidTarget === false || b.isValidTarget === false) continue;
+              const oCfg = b.overlay ? overlayTypes[b.overlay] : null;
+              if (oCfg?.isValidTarget === false) continue;
+
               const bc = { x: b.pos.x + GRID_SIZE/2, y: b.pos.y + GRID_SIZE/2 };
               const d = dist(origin.x, origin.y, bc.x, bc.y);
               if (d > range) continue;
               
               if (!state.world.checkLOS(origin.x, origin.y, bc.x, bc.y)) continue;
               
-              const oCfg = b.overlay ? overlayTypes[b.overlay] : null;
               if (oCfg?.isValuable || oCfg?.isEnemy) {
                   if (d < mdPri) { mdPri = d; nPri = b; }
               } else {

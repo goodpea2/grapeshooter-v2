@@ -86,5 +86,24 @@ export const groundFeatureTypes: any = {
     tickRate: 1,
     vfxType: 'forcefield',
     color: [50, 150, 255]
+  },
+  gf_spawner: {
+    name: 'Ground Spawner',
+    life: Infinity,
+    radius: 34,
+    isEnemySpawner: true,
+    isEnemy: true,
+    danger: 3,
+    isDanger: true,
+    color: [180, 50, 220],
+    assetImgConfig: { idleAssetImg: ['img_ground_spawner_a'], randomRotation: false, randomFlip: false },
+    enemySpawnConfig: {
+      budget: 60,
+      enemyTypeKey: ['e_basic'],
+      spawnRadius: 120,
+      spawnTriggerRadius: 200,
+      spawnInterval: 60,
+      spawnIntervalConsumeBudget: true
+    }
   }
 };

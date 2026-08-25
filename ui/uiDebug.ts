@@ -1,22 +1,24 @@
 
 // Added p5.js global variable declarations to avoid TS errors
-import { state } from './state';
-import { GRID_SIZE, LEVEL_THRESHOLDS, HOUR_FRAMES, CHUNK_SIZE } from './constants';
-import { worldGenConfig, requestSpawn, AlmanacProgression } from './lvDemo';
-import { liquidTypes, LIQUID_KEYS, LIQUID_WEIGHTS } from './balanceLiquids';
-import { obstacleTypes, overlayTypes, BLOCK_WEIGHTS } from './balanceObstacles';
-import { groundFeatureTypes } from './balanceGroundFeatures';
-import { enemyTypes } from './balanceEnemies';
-import { npcTypes } from './balanceNPC';
-import { turretTypes } from './balanceTurrets';
-import { recalculateAllStats } from './src/upgrades';
-import { Explosion } from './vfx/index';
-import { Bullet, GroundFeature, NPCEntity, LootEntity } from './entities';
-import { spawnLootAt } from './economy';
-import { Block } from './world';
-import { ROOM_PREFABS } from './dictionaryRoomPrefab';
-import { generateRoomDirectorData } from './debug/roomDirectorGenerator';
-import { saveLevelLayout } from './levelManager';
+import { state } from '../state';
+import { GRID_SIZE, LEVEL_THRESHOLDS, HOUR_FRAMES, CHUNK_SIZE } from '../constants';
+import { worldGenConfig, requestSpawn, AlmanacProgression } from '../lvDemo';
+import { liquidTypes, LIQUID_KEYS, LIQUID_WEIGHTS } from '../balanceLiquids';
+import { obstacleTypes, overlayTypes, BLOCK_WEIGHTS } from '../balanceObstacles';
+import { groundFeatureTypes } from '../balanceGroundFeatures';
+import { enemyTypes } from '../balanceEnemies';
+import { npcTypes } from '../balanceNPC';
+import { turretTypes } from '../balanceTurrets';
+import { recalculateAllStats } from '../src/upgrades';
+import { Explosion } from '../vfx/index';
+import { Bullet, GroundFeature, NPCEntity, LootEntity } from '../entities';
+import { spawnLootAt } from '../economy';
+import { Block } from '../world';
+import { ROOM_PREFABS } from '../dictionaryRoomPrefab';
+import { generateRoomDirectorData } from '../debug/roomDirectorGenerator';
+import { saveLevelLayout } from '../levelManager';
+import { uiComponentsShowcase } from './uiComponentsShowcase';
+import { drawButton, drawDarkButton, drawGreenButton, drawCyanButton, drawRedButton, registerUIHitbox } from '../uiComponents';
 
 // p5.js global variable declarations
 declare const floor: any;
@@ -53,6 +55,8 @@ declare const textWidth: any;
 declare const line: any;
 declare const lerp: any;
 declare const BOTTOM: any;
+declare const textStyle: any;
+declare const NORMAL: any;
 
 export function drawSlider(x: number, y: number, w: number, label: string, val: number, min: number, max: number, key: string) {
   push();
@@ -404,7 +408,8 @@ export function drawDebugPanel(spawnFromBudget: Function) {
         state.bullets.push(b);
       }, grid: true},
       { l: "SPAWN WAVE", a: () => spawnFromBudget(state.currentNightWaveBudget), grid: true },
-      { l: "SaveLevelLayout", a: () => saveLevelLayout(), grid: true }
+      { l: "SaveLevelLayout", a: () => saveLevelLayout(), grid: true },
+      { l: "SHOW UI COMPONENTS", a: () => uiComponentsShowcase.open(), grid: false }
     );
   }
 
@@ -602,33 +607,35 @@ export function drawDebugPanel(spawnFromBudget: Function) {
     const inBounds = curY > actionsPanelY - 50 && curY < actionsPanelY + actionsPanelH + 50;
 
     if (item.type === 'header') {
-      const bx = panelCenterX;
       const isCollapsed = state.debugSectionsCollapsed[item.section];
-      let hov = !isInteractionBlocked && mouseX > bx - 130 && mouseX < bx + 130 && mouseY > curY - 12 && mouseY < curY + 12;
       
       if (inBounds) {
-        push();
-        rectMode(CENTER);
-        fill(isCollapsed ? 40 : 80, 150); if (hov) fill(100);
-        stroke(255, 50); strokeWeight(1);
-        rect(bx, curY, 250, btnH, 4);
-        fill(255); textAlign(CENTER, CENTER); textSize(11); 
-        text(`${isCollapsed ? '[+]' : '[-]'} ${item.l}`, bx, curY);
-        pop();
-      }
-
-      if (hov && mouseIsPressed && Math.abs(state.debugScrollVelocity) < 2) { 
-          state.debugSectionsCollapsed[item.section] = !isCollapsed;
-          (window as any).mouseIsPressed = false; 
+        drawButton(panelCenterX - 125, curY - 11, 250, 22, `${isCollapsed ? '[+]' : '[-]'} ${item.l}`, {
+          id: `dbg_hdr_${item.section}`,
+          variant: isCollapsed ? 'dark' : 'cyan',
+          isSelected: !isCollapsed,
+          fontSize: 10.5,
+          radius: 4,
+          depth3D: 1,
+          onClick: () => {
+            if (Math.abs(state.debugScrollVelocity) < 2) {
+              state.debugSectionsCollapsed[item.section] = !isCollapsed;
+            }
+          }
+        });
       }
       curY += btnSpacing;
     } 
     else if (item.type === 'subheader') {
       if (inBounds) {
-          push();
-          fill(200, 200, 100); textAlign(LEFT, CENTER); textSize(10);
-          text(item.l.toUpperCase(), debugX + 15, curY);
-          pop();
+        push();
+        noStroke();
+        fill(220, 220, 120);
+        textAlign(LEFT, CENTER);
+        textSize(10);
+        textStyle(NORMAL);
+        text(item.l.toUpperCase(), debugX + 15, curY);
+        pop();
       }
       curY += btnSpacing;
     }
@@ -644,48 +651,42 @@ export function drawDebugPanel(spawnFromBudget: Function) {
         gridGroup.forEach((gItem, idx) => {
           const bx = panelCenterX + (idx === 0 ? -colW/2 : colW/2);
           const bw = colW - 10;
-          let hov = !isInteractionBlocked && mouseX > bx - bw/2 && mouseX < bx + bw/2 && mouseY > curY - 12 && mouseY < curY + 12;
           const isToggle = gItem.type === 'toggle';
           
-          push();
-          rectMode(CENTER);
-          if (isToggle) { fill(gItem.v ? [0, 150, 50] : 40); if(hov) fill(gItem.v ? [0, 200, 70] : 70); }
-          else { fill(hov ? 70 : 40); }
-          stroke(255, 30); strokeWeight(1);
-          rect(bx, curY, bw, btnH, 4);
-          fill(220); textAlign(CENTER, CENTER); textSize(9); 
-          text(gItem.l, bx, curY);
-          pop();
-
-          if (hov && mouseIsPressed && Math.abs(state.debugScrollVelocity) < 2) { 
-              gItem.a(); 
-              (window as any).mouseIsPressed = false; 
-          }
+          drawButton(bx - bw / 2, curY - 11, bw, 22, gItem.l, {
+            id: `dbg_btn_${i}_${idx}`,
+            variant: isToggle ? (gItem.v ? 'green' : 'dark') : 'dark',
+            isSelected: isToggle && !!gItem.v,
+            fontSize: 8.5,
+            radius: 4,
+            depth3D: 1,
+            onClick: () => {
+              if (Math.abs(state.debugScrollVelocity) < 2) {
+                gItem.a();
+              }
+            }
+          });
         });
       }
       curY += btnSpacing;
     }
     else {
-      const bx = panelCenterX;
-      const bw = 250;
-      let hov = !isInteractionBlocked && mouseX > bx - bw/2 && mouseX < bx + bw/2 && mouseY > curY - 12 && mouseY < curY + 12;
       const isToggle = item.type === 'toggle';
 
       if (inBounds) {
-        push();
-        rectMode(CENTER);
-        if (isToggle) { fill(item.v ? [0, 150, 50] : 40); if(hov) fill(item.v ? [0, 200, 70] : 70); }
-        else { fill(item.v ? 70 : 40); }
-        stroke(255, 50); strokeWeight(1);
-        rect(bx, curY, bw, btnH, 4);
-        fill(220); textAlign(CENTER, CENTER); textSize(10); 
-        text(item.l, bx, curY);
-        pop();
-      }
-
-      if (hov && mouseIsPressed && Math.abs(state.debugScrollVelocity) < 2) { 
-          item.a(); 
-          (window as any).mouseIsPressed = false; 
+        drawButton(panelCenterX - 125, curY - 11, 250, 22, item.l, {
+          id: `dbg_btn_${i}`,
+          variant: isToggle ? (item.v ? 'green' : 'dark') : 'dark',
+          isSelected: isToggle && !!item.v,
+          fontSize: 9.5,
+          radius: 4,
+          depth3D: 1,
+          onClick: () => {
+            if (Math.abs(state.debugScrollVelocity) < 2) {
+              item.a();
+            }
+          }
+        });
       }
       curY += btnSpacing;
     }

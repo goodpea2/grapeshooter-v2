@@ -127,6 +127,7 @@ export interface EditorLevelConfigData {
   name: string;
   description: string;
   tag: string;
+  sunSpawnHourInterval: string;
   customBudgetPerNight: string;
   hourlyBudgetPerDay: string;
   hourlyBudgetPerNight: string;
@@ -134,6 +135,7 @@ export interface EditorLevelConfigData {
   enabledCurrency: string[];
   startingResource: Record<string, number>;
   globalEnemySpawnConfig: Record<string, number[]>;
+  starRatingTargets?: { star1?: number; star2?: number; star3?: number };
 }
 
 export function initLevelEditorLevelConfig(layoutData?: any) {
@@ -201,18 +203,29 @@ export function initLevelEditorLevelConfig(layoutData?: any) {
     }
   }
 
+  const rawStarTargets = current.starRatingTargets || {};
+
+  const rawSunInterval = current.sunSpawnHourInterval !== undefined ? current.sunSpawnHourInterval : (current.SunSpawnHourInterval !== undefined ? current.SunSpawnHourInterval : 0.5);
+  const sunIntervalStr = String(rawSunInterval);
+
   state.levelEditorLevelConfig = {
     id: current.levelId || current.id || state.currentLevelId || 'editor_custom',
     name: current.levelName || current.name || 'Custom Level',
     description: current['level Description'] || current.levelDescription || current.description || 'Custom level layout created in Level Editor.',
     tag: current.tag || 'CUSTOM MAP',
+    sunSpawnHourInterval: sunIntervalStr,
     customBudgetPerNight: budgetStr,
     hourlyBudgetPerDay: hourlyDayStr,
     hourlyBudgetPerNight: hourlyNightStr,
     unlockCost: unlockCostStr,
     enabledCurrency: enabledCurrencies,
     startingResource: startRes,
-    globalEnemySpawnConfig: spawnCfg
+    globalEnemySpawnConfig: spawnCfg,
+    starRatingTargets: {
+      star1: rawStarTargets.star1 !== undefined ? rawStarTargets.star1 : 600,
+      star2: rawStarTargets.star2 !== undefined ? rawStarTargets.star2 : 300,
+      star3: rawStarTargets.star3 !== undefined ? rawStarTargets.star3 : 180
+    }
   };
 }
 
@@ -237,6 +250,8 @@ export function serializeLevelEditorLevelConfig(): any {
   const parsedHourlyDay = parseNumberOrArray(cfg.hourlyBudgetPerDay, DEFAULT_HOURLY_BUDGET_PER_DAY);
   const parsedHourlyNight = parseNumberOrArray(cfg.hourlyBudgetPerNight, DEFAULT_HOURLY_BUDGET_PER_NIGHT);
   const parsedUnlockCosts = parseUnlockCostString(cfg.unlockCost || '');
+  const parsedSunInterval = parseFloat(cfg.sunSpawnHourInterval);
+  const finalSunInterval = (!isNaN(parsedSunInterval) && parsedSunInterval > 0) ? parsedSunInterval : 0.5;
 
   if (state.levelEditorAlmanacProgression) {
     state.levelEditorAlmanacProgression.UnlockCost = parsedUnlockCosts;
@@ -247,12 +262,18 @@ export function serializeLevelEditorLevelConfig(): any {
     levelName: cfg.name || 'Custom Level',
     levelDescription: cfg.description || 'Custom level layout.',
     tag: cfg.tag || 'CUSTOM MAP',
+    sunSpawnHourInterval: finalSunInterval,
     customBudgetPerNight: parsedBudget,
     hourlyBudgetPerDay: parsedHourlyDay,
     hourlyBudgetPerNight: parsedHourlyNight,
     enabledCurrency: [...(cfg.enabledCurrency || ['sun', 'elixir', 'soil'])],
     startingResource: { ...(cfg.startingResource || { sun: 3 }) },
-    globalEnemySpawnConfig: JSON.parse(JSON.stringify(cfg.globalEnemySpawnConfig || DEFAULT_DAYTIME_WEIGHTS))
+    globalEnemySpawnConfig: JSON.parse(JSON.stringify(cfg.globalEnemySpawnConfig || DEFAULT_DAYTIME_WEIGHTS)),
+    starRatingTargets: {
+      star1: cfg.starRatingTargets?.star1 ?? 600,
+      star2: cfg.starRatingTargets?.star2 ?? 300,
+      star3: cfg.starRatingTargets?.star3 ?? 180
+    }
   };
 }
 
@@ -277,7 +298,7 @@ export function drawLevelConfigPanel(
   // Viewport setup (no extra redundant title headers)
   const viewY = 16;
   const viewH = panelH - viewY - 12;
-  const totalContentH = 145 + 14 + 92 + 14 + 80 + 14 + 100 + 14 + 265 + 14 + (24 + enemyKeys.length * 21 + 56) + 40;
+  const totalContentH = 145 + 14 + 92 + 14 + 80 + 14 + 80 + 14 + 100 + 14 + 265 + 14 + (24 + enemyKeys.length * 21 + 56) + 40;
   const minScroll = Math.min(0, viewH - totalContentH);
 
   // Smooth scroll damping
@@ -328,12 +349,13 @@ export function drawLevelConfigPanel(
   textSize(11.5);
   text("1. METADATA & IDENTITY", card1X + 14, curY + 12);
 
-  // Row 1: ID & Tag
+  // Row 1: ID, Tag, Sun Spawn Interval
   const fieldH = 24;
   const row1Y = curY + 34;
+  const col1W = Math.max(120, (card1W - 28 - 20) / 3);
 
   renderTextInput(
-    card1X + 14, row1Y, 180, fieldH,
+    card1X + 14, row1Y, col1W, fieldH,
     "Level ID",
     'id',
     cfg.id,
@@ -341,10 +363,18 @@ export function drawLevelConfigPanel(
   );
 
   renderTextInput(
-    card1X + 210, row1Y, 180, fieldH,
+    card1X + 14 + col1W + 10, row1Y, col1W, fieldH,
     "Tag / Category",
     'tag',
     cfg.tag,
+    globalOffsetX, globalOffsetY
+  );
+
+  renderTextInput(
+    card1X + 14 + (col1W + 10) * 2, row1Y, col1W, fieldH,
+    "Sun Spawn Interval (Hours, e.g. 0.5)",
+    'sunSpawnHourInterval',
+    cfg.sunSpawnHourInterval,
     globalOffsetX, globalOffsetY
   );
 
@@ -486,7 +516,53 @@ export function drawLevelConfigPanel(
   curY += cardUnlockH + 14;
 
   // ==========================================
-  // SECTION 4: Enabled Currencies
+  // SECTION 4: Star Rating Time Targets
+  // ==========================================
+  const cardStarH = 80;
+  fill(22, 28, 54);
+  noStroke();
+  rect(card1X, curY, card1W, cardStarH, 12);
+
+  fill(0, 220, 255);
+  noStroke();
+  textAlign(LEFT, TOP);
+  textSize(11.5);
+  text("4. STAR RATING TIME TARGETS (Seconds to beat)", card1X + 14, curY + 12);
+
+  const starRowY = curY + 34;
+  const starColW = (card1W - 48) / 3;
+
+  // Star 1 Target
+  renderTextInput(
+    card1X + 14, starRowY, starColW, fieldH,
+    "★ Target Time (e.g. 600s)",
+    'star1',
+    String(cfg.starRatingTargets?.star1 ?? 600),
+    globalOffsetX, globalOffsetY
+  );
+
+  // Star 2 Target
+  renderTextInput(
+    card1X + 14 + starColW + 10, starRowY, starColW, fieldH,
+    "★★ Target Time (e.g. 300s)",
+    'star2',
+    String(cfg.starRatingTargets?.star2 ?? 300),
+    globalOffsetX, globalOffsetY
+  );
+
+  // Star 3 Target
+  renderTextInput(
+    card1X + 14 + (starColW + 10) * 2, starRowY, starColW, fieldH,
+    "★★★ Target Time (e.g. 180s)",
+    'star3',
+    String(cfg.starRatingTargets?.star3 ?? 180),
+    globalOffsetX, globalOffsetY
+  );
+
+  curY += cardStarH + 14;
+
+  // ==========================================
+  // SECTION 5: Enabled Currencies
   // ==========================================
   const card3H = 100;
   fill(22, 28, 54);
@@ -497,7 +573,7 @@ export function drawLevelConfigPanel(
   noStroke();
   textAlign(LEFT, TOP);
   textSize(11.5);
-  text("4. ENABLED CURRENCIES (Click to toggle)", card1X + 14, curY + 12);
+  text("5. ENABLED CURRENCIES (Click to toggle)", card1X + 14, curY + 12);
 
   let curBadgeX = card1X + 14;
   let curBadgeY = curY + 34;
@@ -1089,7 +1165,42 @@ export function handleLevelConfigClick(
     return true;
   }
 
-  // --- 4. ENABLED CURRENCIES ---
+  // --- 4. STAR RATING TARGETS ---
+  curY += 80 + 14;
+  const starRowY = curY + 34;
+  const starColW = (card1W - 48) / 3;
+
+  // Star 1 input click
+  const star1X = card1X + 14;
+  if (localX >= star1X && localX <= star1X + starColW && localY >= starRowY && localY <= starRowY + fieldH) {
+    state.activeLevelConfigInput = {
+      field: 'star1',
+      textBuffer: String(cfg.starRatingTargets?.star1 ?? 600)
+    };
+    return true;
+  }
+
+  // Star 2 input click
+  const star2X = card1X + 14 + starColW + 10;
+  if (localX >= star2X && localX <= star2X + starColW && localY >= starRowY && localY <= starRowY + fieldH) {
+    state.activeLevelConfigInput = {
+      field: 'star2',
+      textBuffer: String(cfg.starRatingTargets?.star2 ?? 300)
+    };
+    return true;
+  }
+
+  // Star 3 input click
+  const star3X = card1X + 14 + (starColW + 10) * 2;
+  if (localX >= star3X && localX <= star3X + starColW && localY >= starRowY && localY <= starRowY + fieldH) {
+    state.activeLevelConfigInput = {
+      field: 'star3',
+      textBuffer: String(cfg.starRatingTargets?.star3 ?? 180)
+    };
+    return true;
+  }
+
+  // --- 5. ENABLED CURRENCIES ---
   curY += 80 + 14;
   let curBadgeX = card1X + 14;
   let curBadgeY = curY + 34;
@@ -1276,6 +1387,18 @@ function applyLevelConfigInputBuffer(cfg: EditorLevelConfigData, input: { field:
   } else if (input.field === 'startingResource' && input.subKey) {
     const n = parseInt(input.textBuffer, 10);
     cfg.startingResource[input.subKey] = !isNaN(n) ? Math.max(0, n) : 0;
+  } else if (input.field === 'star1') {
+    if (!cfg.starRatingTargets) cfg.starRatingTargets = {};
+    const n = parseInt(input.textBuffer, 10);
+    cfg.starRatingTargets.star1 = !isNaN(n) ? Math.max(1, n) : 600;
+  } else if (input.field === 'star2') {
+    if (!cfg.starRatingTargets) cfg.starRatingTargets = {};
+    const n = parseInt(input.textBuffer, 10);
+    cfg.starRatingTargets.star2 = !isNaN(n) ? Math.max(1, n) : 300;
+  } else if (input.field === 'star3') {
+    if (!cfg.starRatingTargets) cfg.starRatingTargets = {};
+    const n = parseInt(input.textBuffer, 10);
+    cfg.starRatingTargets.star3 = !isNaN(n) ? Math.max(1, n) : 180;
   }
 }
 

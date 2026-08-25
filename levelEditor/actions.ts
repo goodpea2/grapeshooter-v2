@@ -6,9 +6,44 @@ import { Player, GroundFeature, NPCEntity, Enemy } from '../entities';
 import { PaletteItem } from './types';
 import { getAllPaletteItems } from './palette';
 import {
+  fillBucketObstacle,
+  fillBucketLiquid,
+  placeSelectedItem,
+  deleteAtPosition,
+  isPointInPolygon
+} from './tools';
+import {
   openToolbarSpawnerTooltip,
-  handleToolbarSpawnerTooltipClick
+  handleToolbarSpawnerTooltipClick,
+  isMouseOverSpawnerTooltip,
+  isMouseOverSunGeneratorTooltip,
+  handleToolbarSunGeneratorTooltipClick,
+  openToolbarSunGeneratorTooltip
 } from './spawnerTooltip';
+import {
+  paygateModal,
+  openPayGateCostModal,
+  handlePayGateCostModalPress,
+  handlePayGateCostModalClick,
+  handlePayGateCostModalRelease
+} from './paygateModal';
+import {
+  sunGeneratorModal,
+  openSunGeneratorModal,
+  openSunGeneratorModalAt,
+  closeSunGeneratorModal,
+  isSunGeneratorModalOpen,
+  handleSunGeneratorModalClick,
+  handleSunGeneratorModalRelease
+} from './sunGeneratorModal';
+import {
+  textSignEditor,
+  openTextSignEditor,
+  getTextSignAtWorldPos,
+  handleInlineTextSignPress,
+  handleInlineTextSignClick,
+  handleInlineTextSignRelease
+} from './textsignEditor';
 import {
   saveLevelLayout,
   startLevel,
@@ -27,6 +62,7 @@ import { handleAlmanacClick } from '../ui/almanac/mainLayout';
 import { createDefaultEditorAlmanacProgression, AlmanacProgression } from '../lvDemo';
 import { initLevelEditorPlayerUpgradesFromData, serializeLevelEditorPlayerUpgrades } from '../ui/almanac/playerUpgradesPanel';
 import { initLevelEditorLevelConfig, serializeLevelEditorLevelConfig } from '../ui/almanac/levelConfigPanel';
+import { handleRegisteredUIClick } from '../uiComponents';
 
 declare const mouseX: any;
 declare const mouseY: any;
@@ -85,230 +121,192 @@ export function startLevelEditor() {
   }
 }
 
-export function handleLevelEditorClick(): boolean {
+export function handleLevelEditorPress(mx: number, my: number): boolean {
   if (state.currentScreen !== 'level_editor') return false;
 
-  // If Almanac modal is open, process its clicks / outside click to close
+  // 1. If Almanac modal is open, let Almanac handle
   if (state.isAlmanacOpen) {
-    return handleAlmanacClick();
+    state.levelEditor.isWorldDragActive = false;
+    return false;
+  }
+
+  // 2. If Paygate modal is open
+  if (paygateModal.isOpen) {
+    state.levelEditor.isWorldDragActive = false;
+    return handlePayGateCostModalPress();
+  }
+
+  // 2.1 If Sun Generator modal is open
+  if (sunGeneratorModal.isOpen) {
+    state.levelEditor.isWorldDragActive = false;
+    return true;
+  }
+
+  const zoom = state.levelEditor?.cameraZoom || 1.0;
+  const mWorldX = (mx - width / 2) / zoom + state.cameraPos.x;
+  const mWorldY = (my - height / 2) / zoom + state.cameraPos.y;
+
+  // 3. If inline TextSign editor is open
+  if (textSignEditor.isOpen) {
+    state.levelEditor.isWorldDragActive = false;
+    return handleInlineTextSignPress(mWorldX, mWorldY);
   }
 
   const topBarH = 44;
   const panelH = 92;
   const panelY = height - panelH;
 
-  // 0. Check Toolbar Spawner Tooltip clicks first if open
-  if (handleToolbarSpawnerTooltipClick(topBarH, panelH)) {
+  // 4. If over SpawnerTooltip
+  if (isMouseOverSpawnerTooltip(topBarH, panelH) || isMouseOverSunGeneratorTooltip(topBarH, panelH)) {
+    state.levelEditor.isWorldDragActive = false;
     return true;
   }
 
-  // 1. Check Left Tool Bar Clicks
   const barX = 10;
   const barY = topBarH + 10;
   const barW = 48;
   const barH = 154;
-  if (mouseX >= barX && mouseX <= barX + barW && mouseY >= barY && mouseY <= barY + barH) {
-    const btnW = 38;
-    const btnH = 40;
-    const btnX = barX + 5;
-    let btnY = barY + 7;
+  const isOverLeftBar = mx >= barX && mx <= barX + barW && my >= barY && my <= barY + barH;
+  const isOverTopBar = my <= topBarH;
+  const isOverPalette = my >= panelY;
 
-    // Brush Tool Click
-    if (mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH) {
-      state.levelEditor.toolMode = 'brush';
-      return true;
-    }
-
-    btnY += btnH + 8;
-
-    // Fill Bucket Tool Click
-    if (mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH) {
-      state.levelEditor.toolMode = 'bucket';
-      if (state.levelEditor.activeCategory !== 'obstacles' && state.levelEditor.activeCategory !== 'liquids') {
-        state.levelEditor.activeCategory = 'obstacles';
-        state.levelEditor.selectedItemKey = 'o_dirt';
-      }
-      return true;
-    }
-
-    btnY += btnH + 8;
-
-    // Mark Spawn Area Tool Click
-    if (mouseX >= btnX && mouseX <= btnX + btnW && mouseY >= btnY && mouseY <= btnY + btnH) {
-      state.levelEditor.toolMode = 'spawn_area';
-      return true;
-    }
-
-    return true;
+  if (isOverLeftBar || isOverTopBar || isOverPalette) {
+    state.levelEditor.isWorldDragActive = false;
+    return false;
   }
 
-  // 2. Check Top Bar Button Clicks
-  if (mouseY <= topBarH) {
-    const btnH = 22;
-    const btnW = 55;
-    const gap = 6;
-    let curX = width - 16 - btnW;
+  // 5. Genuine World Canvas Press
+  const isRight = (window as any).mouseButton === (window as any).RIGHT || (window as any).event?.button === 2;
+  state.levelEditor.isWorldDragActive = true;
+  state.levelEditor.isRightDragActive = isRight;
+  state.levelEditor.isRightDragOverlayOnly = isRight && (state.levelEditor.activeCategory === 'overlays');
 
-    // EXIT MENU Button
-    if (mouseX >= curX && mouseX <= curX + btnW && mouseY >= (topBarH - btnH) / 2 && mouseY <= (topBarH + btnH) / 2) {
-      state.currentScreen = 'main_menu';
+  // When Flag WinCondition tool is selected, do not open modals/tooltips so flags can be applied freely
+  const isFlagsToolActive = state.levelEditor.activeCategory === 'flags';
+
+  if (!isRight && !isFlagsToolActive) {
+    // Check clicking on a PayGate cost bubble
+    const clickedPayGateGroup = state.world ? state.world.getPayGateGroupByWorldPos(mWorldX, mWorldY) : null;
+    if (clickedPayGateGroup) {
+      state.levelEditor.isWorldDragActive = false;
+      openPayGateCostModal(clickedPayGateGroup);
       return true;
     }
 
-    curX -= (btnW + gap);
-
-    // EXPORT JSON Button
-    if (mouseX >= curX && mouseX <= curX + btnW && mouseY >= (topBarH - btnH) / 2 && mouseY <= (topBarH + btnH) / 2) {
-      saveLevelLayout();
+    // Check clicking on a TextSign speech bubble
+    const clickedTextSignBlock = getTextSignAtWorldPos(mWorldX, mWorldY);
+    if (clickedTextSignBlock) {
+      state.levelEditor.isWorldDragActive = false;
+      openTextSignEditor(clickedTextSignBlock);
       return true;
     }
 
-    curX -= (btnW + gap);
-
-    // IMPORT JSON Button
-    if (mouseX >= curX && mouseX <= curX + btnW && mouseY >= (topBarH - btnH) / 2 && mouseY <= (topBarH + btnH) / 2) {
-      state.levelEditor.toolbarSpawnerTooltip = null;
-      state.levelEditor.activeSpawnerInput = null;
-      triggerImportLevelJson((data) => {
-        restoreLevelFromCache(data);
-      });
-      return true;
-    }
-
-    const almanacW = 85;
-    curX -= (almanacW + gap);
-
-    // ALMANAC CONFIG Button
-    if (mouseX >= curX && mouseX <= curX + almanacW && mouseY >= (topBarH - btnH) / 2 && mouseY <= (topBarH + btnH) / 2) {
-      if (!state.levelEditorAlmanacProgression) {
-        state.levelEditorAlmanacProgression = createDefaultEditorAlmanacProgression();
-      }
-      initLevelEditorPlayerUpgradesFromData(state.currentLevelLayoutData?.playerUpgrades);
-      initLevelEditorLevelConfig(state.currentLevelLayoutData);
-      state.isAlmanacOpen = true;
-      state.isAlmanacEditorMode = true;
-      state.almanacTab = 'Turrets';
-      state.almanacScrollY = 0;
-      state.almanacScrollVelocity = 0;
-      return true;
-    }
-
-    curX -= (btnW + gap);
-
-    // TEST LEVEL Button
-    if (mouseX >= curX && mouseX <= curX + btnW && mouseY >= (topBarH - btnH) / 2 && mouseY <= (topBarH + btnH) / 2) {
-      testPlayLevel();
-      return true;
-    }
-
-    return true;
-  }
-
-  // 3. Check Bottom Palette Panel Clicks
-  if (mouseY >= panelY) {
-    const tabH = 18;
-    const tabMargin = 4;
-    let tabX = 12;
-
-    const categories: { key: PaletteItem['category']; label: string; disabled?: boolean }[] = [
-      { key: 'obstacles', label: 'OBSTACLES' },
-      { key: 'overlays', label: 'OVERLAYS' },
-      { key: 'liquids', label: 'LIQUIDS' },
-      { key: 'groundFeatures', label: 'GROUND FEATURES', disabled: true },
-      { key: 'entities', label: 'ENTITIES' },
-      { key: 'turrets', label: 'TURRETS' },
-      { key: 'flags', label: 'FLAGS' }
-    ];
-
-    // Check Category Tabs Click
-    for (const tab of categories) {
-      textSize(9);
-      const tw = textWidth(tab.label) + 14;
-      if (!tab.disabled && mouseX >= tabX && mouseX <= tabX + tw && mouseY >= panelY + tabMargin && mouseY <= panelY + tabMargin + tabH) {
-        state.levelEditor.activeCategory = tab.key;
-        state.levelEditor.paletteScrollX = 0;
-        state.levelEditor.activeSpawnerInput = null;
-        // Auto-select first item of new category
-        const allItems = getAllPaletteItems();
-        const first = allItems.find(i => i.category === tab.key);
-        if (first) {
-          state.levelEditor.selectedItemKey = first.key;
-          if (tab.key === 'overlays') {
-            const oCfg = overlayTypes[first.key];
-            if (first.key === 'ov_spawner_custom' || oCfg?.isEnemySpawner || oCfg?.enemySpawnConfig || oCfg?.isCustomPrefab) {
-              openToolbarSpawnerTooltip(first.key);
-            } else {
-              state.levelEditor.toolbarSpawnerTooltip = null;
-            }
-          } else {
-            state.levelEditor.toolbarSpawnerTooltip = null;
-          }
-        }
+    // Check clicking on an existing SunGenerator or Spawner block on the world canvas
+    const gx = Math.floor(mWorldX / GRID_SIZE);
+    const gy = Math.floor(mWorldY / GRID_SIZE);
+    const clickedBlock = state.world?.getBlock(gx, gy);
+    if (clickedBlock) {
+      if (!clickedBlock.isMined && (clickedBlock.overlay === 'sunGenerator' || clickedBlock.overlay === 'ov_sun_generator')) {
+        state.levelEditor.isWorldDragActive = false;
+        openSunGeneratorModal(clickedBlock);
         return true;
-      }
-      tabX += tw + 5;
-    }
-
-    let contentY = panelY + tabMargin + tabH + 4;
-
-    // Check Sub-category Pills Click (if entities category)
-    if (state.levelEditor.activeCategory === 'entities') {
-      const subCats = ['ALL', 'Player', 'Enemies', 'NPCs', 'Loot'];
-      let subX = 12;
-      const subH = 15;
-
-      for (const sub of subCats) {
-        textSize(8);
-        const sw = textWidth(sub) + 12;
-        if (mouseX >= subX && mouseX <= subX + sw && mouseY >= contentY && mouseY <= contentY + subH) {
-          state.levelEditor.activeSubCategory = sub;
-          state.levelEditor.paletteScrollX = 0;
-          return true;
-        }
-        subX += sw + 4;
-      }
-
-      contentY += subH + 4;
-    }
-
-    // Check Item Card Clicks
-    const allItems = getAllPaletteItems();
-    let categoryItems = allItems.filter(i => i.category === state.levelEditor.activeCategory);
-    if (state.levelEditor.activeCategory === 'entities' && state.levelEditor.activeSubCategory && state.levelEditor.activeSubCategory !== 'ALL') {
-      categoryItems = categoryItems.filter(i => i.subCategory === state.levelEditor.activeSubCategory);
-    }
-
-    const cardW = 42;
-    const cardH = 46;
-    const cardGap = 5;
-    const startX = 12 + (state.levelEditor.paletteScrollX || 0);
-
-    for (let i = 0; i < categoryItems.length; i++) {
-      const item = categoryItems[i];
-      const cx = startX + i * (cardW + cardGap);
-
-      if (mouseX >= cx && mouseX <= cx + cardW && mouseY >= contentY && mouseY <= contentY + cardH) {
-        state.levelEditor.selectedItemKey = item.key;
-        if (state.levelEditor.activeCategory === 'overlays') {
-          const oCfg = overlayTypes[item.key];
-          if (item.key === 'ov_spawner_custom' || oCfg?.isEnemySpawner || oCfg?.enemySpawnConfig || oCfg?.isCustomPrefab) {
-            openToolbarSpawnerTooltip(item.key);
-          } else {
-            state.levelEditor.toolbarSpawnerTooltip = null;
-            state.levelEditor.activeSpawnerInput = null;
-          }
-        } else {
-          state.levelEditor.toolbarSpawnerTooltip = null;
-          state.levelEditor.activeSpawnerInput = null;
-        }
+      } else if ((clickedBlock.overlay && (clickedBlock.overlay.startsWith('ov_spawner') || clickedBlock.overlay.startsWith('spawner_'))) || clickedBlock.liquidType === 'l_spawner' || clickedBlock.customSpawnerConfig) {
+        state.levelEditor.isWorldDragActive = false;
+        openToolbarSpawnerTooltip(clickedBlock.overlay || clickedBlock.liquidType || 'l_spawner');
         return true;
       }
     }
+  }
 
+  return true;
+}
+
+export function handleLevelEditorClick(): boolean {
+  if (state.currentScreen !== 'level_editor') return false;
+
+  // If Almanac modal is open, process its clicks / outside click to close
+  if (state.isAlmanacOpen) {
+    state.levelEditor.isWorldDragActive = false;
+    return handleAlmanacClick();
+  }
+
+  // If PayGate Cost Modal is open, handle clicks on it
+  if (paygateModal.isOpen) {
+    state.levelEditor.isWorldDragActive = false;
+    return handlePayGateCostModalClick();
+  }
+
+  // If Sun Generator Modal is open, handle clicks on it
+  if (sunGeneratorModal.isOpen) {
+    state.levelEditor.isWorldDragActive = false;
+    return handleSunGeneratorModalClick();
+  }
+
+  const zoom = state.levelEditor?.cameraZoom || 1.0;
+  const mWorldX = (mouseX - width / 2) / zoom + state.cameraPos.x;
+  const mWorldY = (mouseY - height / 2) / zoom + state.cameraPos.y;
+
+  // If inline TextSign editor is open, handle clicks on it
+  if (textSignEditor.isOpen) {
+    state.levelEditor.isWorldDragActive = false;
+    return handleInlineTextSignClick(mWorldX, mWorldY);
+  }
+
+  const topBarH = 44;
+  const panelH = 92;
+  const panelY = height - panelH;
+
+  // 0. Check Toolbar Spawner Tooltip click first if open
+  if (handleToolbarSpawnerTooltipClick(topBarH, panelH)) {
+    state.levelEditor.isWorldDragActive = false;
+    return true;
+  }
+  if (handleToolbarSunGeneratorTooltipClick(topBarH, panelH)) {
+    state.levelEditor.isWorldDragActive = false;
     return true;
   }
 
   return false;
+}
+
+export function handleLevelEditorMouseRelease() {
+  if (state.currentScreen !== 'level_editor') return;
+
+  // Complete Lasso polygon filling for Mark Spawn Area
+  if (state.levelEditor.toolMode === 'spawn_area' && state.levelEditor.spawnAreaLassoPoints && state.levelEditor.spawnAreaLassoPoints.length > 2) {
+    const pts = state.levelEditor.spawnAreaLassoPoints;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of pts) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    const minGx = Math.floor(minX / GRID_SIZE);
+    const maxGx = Math.floor(maxX / GRID_SIZE);
+    const minGy = Math.floor(minY / GRID_SIZE);
+    const maxGy = Math.floor(maxY / GRID_SIZE);
+    const isAdding = !state.levelEditor.isRightDragActive;
+
+    for (let gx = minGx; gx <= maxGx; gx++) {
+      for (let gy = minGy; gy <= maxGy; gy++) {
+        const cx = gx * GRID_SIZE + GRID_SIZE / 2;
+        const cy = gy * GRID_SIZE + GRID_SIZE / 2;
+        if (isPointInPolygon(cx, cy, pts)) {
+          state.world?.setSpawnAreaTile(gx, gy, isAdding);
+        }
+      }
+    }
+  }
+
+  state.levelEditor.spawnAreaLassoPoints = null;
+  state.levelEditor.isWorldDragActive = false;
+  state.levelEditor.isRightDragActive = false;
+  state.levelEditor.isRightDragOverlayOnly = false;
+  state.levelEditor.isFlagDragActive = false;
+  handlePayGateCostModalRelease();
+  handleSunGeneratorModalRelease();
+  handleInlineTextSignRelease();
 }
 
 export function handleLevelEditorScroll(delta: number) {
@@ -333,6 +331,9 @@ export function handleLevelEditorScroll(delta: number) {
 }
 
 export function serializeLevelLayout() {
+  if (state.world) {
+    state.world.rebuildPayGateGroups();
+  }
   const prog = state.levelEditorAlmanacProgression || createDefaultEditorAlmanacProgression();
   const playerUpgrades = serializeLevelEditorPlayerUpgrades();
   const levelCfg = serializeLevelEditorLevelConfig() || {};
@@ -505,6 +506,10 @@ export function restoreLevelFromCache(layout: any) {
 
   if (layout?.enemies) {
     deserializeLevelEnemies(layout.enemies);
+  }
+
+  if (state.world) {
+    state.world.rebuildPayGateGroups();
   }
 }
 

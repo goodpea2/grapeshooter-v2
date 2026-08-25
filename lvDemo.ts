@@ -4,7 +4,7 @@ import { HOUR_FRAMES, GRID_SIZE } from './constants';
 import { enemyTypes } from './balanceEnemies';
 import { liquidTypes } from './balanceLiquids';
 import { turretTypes } from './balanceTurrets';
-import { getTime } from './ui';
+import { getTime } from './ui/ui';
 import { SunLoot, Enemy } from './entities';
 import { ECONOMY_CONFIG, spawnLootAt } from './economy';
 import { Bullet } from './entities';
@@ -338,6 +338,26 @@ export function spawnFromBudget(amount: number): number {
   return spent;
 }
 
+export function getCurrentLevelHourlyBudget(): number {
+  const t = getTime();
+  const lightLevel = getLightLevel(t.hour);
+  const isNight = lightLevel === 0;
+  const rawHourlyDay = state.currentLevelLayoutData?.hourlyBudgetPerDay;
+  const hourlyPerDay: number[] = Array.isArray(rawHourlyDay) && rawHourlyDay.length > 0
+    ? rawHourlyDay
+    : (typeof rawHourlyDay === 'number' ? [rawHourlyDay] : defaultHourlyBudgetPerDay);
+
+  const rawHourlyNight = state.currentLevelLayoutData?.hourlyBudgetPerNight;
+  const hourlyPerNight: number[] = Array.isArray(rawHourlyNight) && rawHourlyNight.length > 0
+    ? rawHourlyNight
+    : (typeof rawHourlyNight === 'number' ? [rawHourlyNight] : defaultHourlyBudgetPerNight);
+
+  const dayIdx = Math.min(Math.max(0, t.day - 1), hourlyPerDay.length - 1);
+  const nightIdx = Math.min(Math.max(0, t.day - 1), hourlyPerNight.length - 1);
+
+  return isNight ? (hourlyPerNight[nightIdx] ?? 20) : (hourlyPerDay[dayIdx] ?? 3);
+}
+
 export function updateGameSystems() {
   if (state.timeWarpRemaining > 0) {
     state.frames += 120;
@@ -385,7 +405,10 @@ export function updateGameSystems() {
     }
   }
 
-  if (!isNight && state.frames % ECONOMY_CONFIG.sunSpawnInterval === 0) {
+  const sunIntervalHours = state.currentLevelLayoutData?.sunSpawnHourInterval ?? state.currentLevelLayoutData?.SunSpawnHourInterval ?? 0.5;
+  const effectiveSunIntervalFrames = Math.max(1, Math.round(HOUR_FRAMES * sunIntervalHours));
+
+  if (!isNight && state.frames % effectiveSunIntervalFrames === 0) {
     const ang = random(Math.PI * 2);
     const distR = random(ECONOMY_CONFIG.sunSpawnMinDist, ECONOMY_CONFIG.sunSpawnMaxDist) * GRID_SIZE;
     const x = state.player.pos.x + cos(ang) * distR;

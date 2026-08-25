@@ -4,6 +4,18 @@ declare const keyIsDown: any;
 
 export function updateLevelEditorCamera() {
   if (state.currentScreen !== 'level_editor') return;
+  if (state.isAlmanacOpen) return;
+
+  // Disable camera movement while editing any input fields or modals
+  if (
+    state.levelEditor?.editingPaygateModal ||
+    state.levelEditor?.editingTextSign ||
+    state.levelEditor?.activeSpawnerInput ||
+    state.levelEditor?.activePaygateInput ||
+    state.levelEditor?.activeTextSignInput
+  ) {
+    return;
+  }
 
   const speed = keyIsDown(16) ? 24 : 12; // Shift key boosts camera speed
   if (keyIsDown(87) || keyIsDown(38)) state.cameraPos.y -= speed; // W / Up

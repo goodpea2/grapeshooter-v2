@@ -22,6 +22,8 @@ declare const line: any;
 declare const strokeWeight: any;
 declare const textAlign: any;
 declare const textSize: any;
+declare const textWidth: any;
+declare const triangle: any;
 declare const CENTER: any;
 declare const text: any;
 declare const PI: any;
@@ -124,6 +126,27 @@ export function drawOverlay(type: string, block: any, opacity: number) {
     ellipse(0, 0, 18);
     stroke(255, 120, 50, opacity * 0.8); strokeWeight(2); noFill();
     ellipse(0, 0, 24 + 4 * sin(frameCount * 0.15));
+    pop();
+  } else if (type === 'v_textsign') {
+    const rawText = block.customText || 'Hint';
+    push();
+    translate(GRID_SIZE / 2, -6);
+    textSize(8.5);
+    const tw = Math.max(36, textWidth(rawText) + 12);
+    const th = 18;
+    // Tail
+    fill(14, 18, 32, opacity);
+    stroke(240, 190, 80, opacity);
+    strokeWeight(1);
+    triangle(-4, 0, 4, 0, 0, 5);
+    // Bubble Box
+    rectMode(CENTER);
+    rect(0, -th / 2, tw, th, 4);
+    // Text
+    noStroke();
+    fill(255, 235, 170, opacity);
+    textAlign(CENTER, CENTER);
+    text(rawText, 0, -th / 2);
     pop();
   }
 }

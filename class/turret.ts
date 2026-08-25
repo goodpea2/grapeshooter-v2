@@ -530,7 +530,11 @@ export abstract class Turret {
       const tCenter = this.getTargetCenter(); 
       if (tCenter) {
         const dSq = (wPos.x - tCenter.x)**2 + (wPos.y - tCenter.y)**2;
-        let valid = this.target.isFrosted !== undefined ? (this.target.isFrosted && this.target.iceCubeHealth > 0) : (this.target.health !== undefined ? this.target.health > 0 : !this.target.isMined);
+        let valid = this.target.isFrosted !== undefined 
+          ? (this.target.isFrosted && this.target.iceCubeHealth > 0) 
+          : (this.target.health !== undefined 
+              ? this.target.health > 0 
+              : (!this.target.isMined && this.target.config?.isValidTarget !== false && (!this.target.overlay || overlayTypes[this.target.overlay]?.isValidTarget !== false)));
         if (valid && dSq <= rangeSq && (anyActionNoLOS || state.world.checkLOS(wPos.x, wPos.y, tCenter.x, tCenter.y))) return;
       }
       this.target = null;
@@ -626,12 +630,16 @@ export abstract class Turret {
         if (dx*dx + dy*dy > (range + cw)**2) return;
         chunk.blocks.forEach((b: any) => {
           if (b.isMined || b.type === 'o_barrier' || b.config?.isValidTarget === false || b.isValidTarget === false) return;
+          const oCfg = b.overlay ? overlayTypes[b.overlay] : null;
+          if (oCfg?.isValidTarget === false) return;
           const bcx = b.pos.x + GRID_SIZE/2; const bcy = b.pos.y + GRID_SIZE/2;
           const dSq = (wPos.x - bcx)**2 + (wPos.y - bcy)**2; 
           if (dSq <= rangeSq) {
             const d = Math.sqrt(dSq); 
-            const oCfg = b.overlay ? overlayTypes[b.overlay] : null;
             let score = d - (oCfg?.isValuable ? 2000 : 0) - (oCfg?.isEnemy ? 3000 : 0);
+            if (b.overlay === 'sunGenerator') {
+              score += 10000; // Prioritized at the bottom of target priority list
+            }
             if (score < bestObsVal) {
               if (anyActionNoLOS || state.world.checkLOS(wPos.x, wPos.y, bcx, bcy)) { bestObsVal = score; bestObs = b; }
             }

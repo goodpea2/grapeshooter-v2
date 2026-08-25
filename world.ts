@@ -6,7 +6,7 @@ import {
 import { obstacleTypes, overlayTypes, BLOCK_WEIGHTS } from './balanceObstacles';
 import { bulletTypes } from './balanceBullets';
 import { liquidTypes, LIQUID_WEIGHTS, LIQUID_KEYS } from './balanceLiquids';
-import { MuzzleFlash, BlockDebris, BlockHitVFX, LootInFlightVFX } from './vfx/index';
+import { MuzzleFlash, BlockDebris, BlockHitVFX, LootInFlightVFX, PayGateFlyVFX } from './vfx/index';
 import { Enemy, Bullet, NPCEntity } from './entities';
 import { spawnLootAt, ECONOMY_CONFIG } from './economy';
 import { triggerUpgradeHook } from './src/upgrades';
@@ -19,6 +19,8 @@ import { ROOM_PREFABS, RoomPrefab } from './dictionaryRoomPrefab';
 import { generateRoomDirectorData } from './debug/roomDirectorGenerator';
 import { drawAutotile } from './visualAutotiling';
 import { flowField } from './pathfinding';
+import { drawPayGateBubble } from './ui/overlay/TurretMergeOverlay';
+import { drawSpeechBubble } from './uiComponents';
 
 declare const createVector: any;
 declare const dist: any;
@@ -40,6 +42,7 @@ declare const stroke: any;
 declare const rect: any;
 declare const noStroke: any;
 declare const ellipse: any;
+declare const triangle: any;
 declare const map: any;
 declare const sin: any;
 declare const cos: any;
@@ -48,6 +51,7 @@ declare const line: any;
 declare const strokeWeight: any;
 declare const textAlign: any;
 declare const textSize: any;
+declare const textWidth: any;
 declare const CENTER: any;
 declare const LEFT: any;
 declare const TOP: any;
@@ -68,6 +72,104 @@ declare const CORNER: any;
 declare const width: any;
 declare const height: any;
 
+export interface PayGateGroupConfig {
+  resource: string;
+  amount: number;
+  spent: number;
+}
+
+export class PayGateGroup {
+  id: string;
+  blocks: Block[] = [];
+  config: PayGateGroupConfig;
+  centerPos: { x: number; y: number } = { x: 0, y: 0 };
+  lastPayFrame: number = 0;
+
+  constructor(id: string, config?: Partial<PayGateGroupConfig>) {
+    this.id = id;
+    this.config = {
+      resource: config?.resource || 'soil',
+      amount: config?.amount !== undefined ? config?.amount : 10,
+      spent: config?.spent || 0
+    };
+  }
+
+  updateCenter() {
+    if (this.blocks.length === 0) return;
+    let sumX = 0, sumY = 0;
+    for (const b of this.blocks) {
+      sumX += b.pos.x + GRID_SIZE / 2;
+      sumY += b.pos.y + GRID_SIZE / 2;
+    }
+    this.centerPos = {
+      x: sumX / this.blocks.length,
+      y: sumY / this.blocks.length
+    };
+  }
+
+  getRemainingCost(): number {
+    return Math.max(0, this.config.amount - this.config.spent);
+  }
+
+  payOneResource(world: WorldManager): boolean {
+    if (this.getRemainingCost() <= 0) {
+      this.breakGroup(world);
+      return false;
+    }
+    const resKey = this.config.resource;
+    const currencyProp = `${resKey}Currency` as keyof typeof state;
+    const curAmount = (state as any)[currencyProp] || 0;
+    if (curAmount <= 0) return false;
+
+    // Deduct 1 currency from player
+    (state as any)[currencyProp] = curAmount - 1;
+    this.config.spent++;
+
+    // Sync all member blocks and trigger obstacle hit vfx on the whole group
+    for (const b of this.blocks) {
+      b.paygateConfig = {
+        resource: this.config.resource,
+        amount: this.config.amount,
+        spent: this.config.spent
+      };
+      if (!b.isMined) {
+        b.damageGlow = 1.0;
+        state.vfx.push(new BlockHitVFX(b.pos.x + GRID_SIZE / 2, b.pos.y + GRID_SIZE / 2));
+      }
+    }
+
+    // Spawn PayGateFlyVFX from player to paygate
+    const targetBlock = this.blocks[Math.floor(Math.random() * this.blocks.length)];
+    const targetX = targetBlock ? targetBlock.pos.x + GRID_SIZE / 2 : this.centerPos.x;
+    const targetY = targetBlock ? targetBlock.pos.y + GRID_SIZE / 2 : this.centerPos.y;
+    state.vfx.push(new PayGateFlyVFX(
+      state.player.pos.x,
+      state.player.pos.y,
+      targetX,
+      targetY,
+      resKey
+    ));
+
+    // Check if fully paid
+    if (this.config.spent >= this.config.amount) {
+      this.breakGroup(world);
+    }
+    return true;
+  }
+
+  breakGroup(world: WorldManager) {
+    for (const b of this.blocks) {
+      if (!b.isMined) {
+        b.isMined = true;
+        state.vfx.push(new BlockDebris(b.pos.x + GRID_SIZE / 2, b.pos.y + GRID_SIZE / 2, b.config.color || [185, 145, 85]));
+        const cx = Math.floor(b.gx / CHUNK_SIZE);
+        const cy = Math.floor(b.gy / CHUNK_SIZE);
+        world.dirtyChunkAndNeighbors(cx, cy);
+      }
+    }
+  }
+}
+
 export class Block {
   gx: number; gy: number; pos: any; type: string; config: any; overlay: string | null = null;
   isMined: boolean = false; damageGlow: number = 0; health: number; maxHealth: number;
@@ -78,11 +180,16 @@ export class Block {
   lastSpawnTime: number = 0;
   spawnerBudget: number = 0;
   customSpawnerConfig?: any = null;
+  paygateConfig?: { resource: string, amount: number, spent: number };
+  customText?: string;
   turretCooldown: number = 0;
   turretStep: number = 0;
   lockedAngle: number = 0;
   lockedTargetPos: { x: number, y: number } | null = null;
   isBarrelLocked: boolean = false;
+  isWinCondition: boolean = false;
+  sunGeneratorConfig?: { damagePerSun: number; maxSun: number; accumulatedDamage: number; sunsDropped: number };
+  catalystTimer?: number;
 
   constructor(gx: number, gy: number, typeKey = 'o_dirt', overlay: string | null = null, biome: number = 0, liquidType: string | null = null) {
     this.gx = gx; this.gy = gy;
@@ -93,6 +200,14 @@ export class Block {
     this.maxHealth = this.health;
     this.biome = biome;
     this.liquidType = liquidType;
+
+    if (typeKey === 'o_paygate') {
+      this.paygateConfig = {
+        resource: this.config.defaultCost?.resource || 'soil',
+        amount: this.config.defaultCost?.amount || 10,
+        spent: 0
+      };
+    }
 
     if (overlay) {
       this.setOverlay(overlay);
@@ -126,8 +241,17 @@ export class Block {
         this.turretStep = 0;
         this.isBarrelLocked = false;
       }
-      if (this.overlay.startsWith('sun')) {
+      if (this.overlay.startsWith('sun') && this.overlay !== 'sunGenerator') {
         this.initSunBits(this.overlay);
+      }
+      if (this.overlay === 'sunGenerator' && !this.sunGeneratorConfig) {
+        const sgCfg = overlayTypes['sunGenerator'];
+        this.sunGeneratorConfig = {
+          damagePerSun: sgCfg?.damagePerSun || 600,
+          maxSun: sgCfg?.maxSunDropped || 100,
+          accumulatedDamage: 0,
+          sunsDropped: 0
+        };
       }
     }
     if (state.world && state.world.chunks) {
@@ -159,13 +283,233 @@ export class Block {
   }
 
   update() {
-    if (this.isMined || !this.overlay) return;
-    const oCfg = overlayTypes[this.overlay];
-    if (!oCfg) return;
+    // 1. Overlay-based Logic (Only if not mined and has overlay)
+    if (!this.isMined && this.overlay) {
+      const oCfg = overlayTypes[this.overlay];
+      if (oCfg) {
+        if (this.overlay === 'catalyst_clay' || oCfg?.catalystConfig) {
+          const cCfg = oCfg.catalystConfig || (overlayTypes['catalyst_clay'] as any)?.catalystConfig;
+          const matrix = cCfg?.neighborMatrix || [
+            [-1, -1], [0, -1], [1, -1],
+            [-1,  0],          [1,  0],
+            [-1,  1], [0,  1], [1,  1]
+          ];
+          const emptyNeighbors: [number, number][] = [];
+          for (const [dx, dy] of matrix) {
+            const nx = this.gx + dx;
+            const ny = this.gy + dy;
+            const targetBlk = state.world.getBlock(nx, ny);
+            if (!targetBlk || targetBlk.isMined) {
+              emptyNeighbors.push([nx, ny]);
+            }
+          }
 
-    if (oCfg.enemySpawnConfig || this.customSpawnerConfig) {
-      const sCfg = this.customSpawnerConfig ? { ...oCfg.enemySpawnConfig, ...this.customSpawnerConfig } : oCfg.enemySpawnConfig;
+          if (emptyNeighbors.length > 0) {
+            if (this.catalystTimer === undefined) {
+              this.catalystTimer = 0;
+            }
+            this.catalystTimer++;
+            const interval = cCfg?.spawnInterval || 300;
+            if (this.catalystTimer >= interval) {
+              this.catalystTimer = 0;
+              const chosen = emptyNeighbors[floor(random(emptyNeighbors.length))];
+              const spawnObstacle = cCfg?.obstacleToSpawn || 'o_clay';
+              state.world.setBlock(chosen[0], chosen[1], spawnObstacle);
+              const cx = floor(chosen[0] / CHUNK_SIZE);
+              const cy = floor(chosen[1] / CHUNK_SIZE);
+              state.world.dirtyChunkAndNeighbors(cx, cy);
+              state.vfx.push(new BlockDebris(chosen[0] * GRID_SIZE + GRID_SIZE/2, chosen[1] * GRID_SIZE + GRID_SIZE/2, [180, 100, 70]));
+            }
+          }
+        }
+
+        if (oCfg.enemySpawnConfig || (this.customSpawnerConfig && !this.liquidType)) {
+          const sCfg = this.customSpawnerConfig ? { ...oCfg.enemySpawnConfig, ...this.customSpawnerConfig } : oCfg.enemySpawnConfig;
+          if (sCfg && sCfg.spawnInterval > 0) {
+            if (this.lastSpawnTime === undefined) {
+              this.lastSpawnTime = state.frames + floor(random(sCfg.spawnInterval || 60));
+            }
+            if (this.spawnerBudget === undefined) {
+              this.spawnerBudget = sCfg.budget !== undefined ? sCfg.budget : 60;
+            }
+            const dx = this.pos.x + GRID_SIZE/2 - state.player.pos.x;
+            const dy = this.pos.y + GRID_SIZE/2 - state.player.pos.y;
+            const dSq = dx*dx + dy*dy;
+            const trigRad = sCfg.spawnTriggerRadius > 0 ? sCfg.spawnTriggerRadius : 200;
+            if (sCfg.spawnTriggerRadius < 0 || dSq < trigRad * trigRad) {
+              if (state.frames - this.lastSpawnTime >= sCfg.spawnInterval) {
+                const eTypes = (sCfg.enemyTypeKey && sCfg.enemyTypeKey.length > 0) ? sCfg.enemyTypeKey : ['e_basic'];
+                const eKey = eTypes[floor(random(eTypes.length))];
+                const eCfg = enemyTypes[eKey];
+                if (eCfg && (!sCfg.spawnIntervalConsumeBudget || this.spawnerBudget >= eCfg.cost)) {
+                  let spawned = false;
+                  let attempts = 10;
+                  while (attempts > 0 && !spawned) {
+                    attempts--;
+                    const ang = random(TWO_PI);
+                    const r = random(GRID_SIZE, sCfg.spawnRadius || 120);
+                    const sx = this.pos.x + GRID_SIZE/2 + cos(ang) * r;
+                    const sy = this.pos.y + GRID_SIZE/2 + sin(ang) * r;
+                    
+                    if (state.world.hasSpawnArea() && !state.world.isSpawnAreaAt(sx, sy)) {
+                      continue;
+                    }
+                    if (!state.world.checkCollision(sx, sy, eCfg.size/2.2)) {
+                      requestSpawn(sx, sy, eKey);
+                      if (sCfg.spawnIntervalConsumeBudget) this.spawnerBudget -= eCfg.cost;
+                      this.lastSpawnTime = state.frames;
+                      spawned = true;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (oCfg.enemyTurretConfig) {
+          const eCfg = oCfg.enemyTurretConfig;
+          const bcx = this.pos.x + GRID_SIZE / 2;
+          const bcy = this.pos.y + GRID_SIZE / 2;
+
+          const bulletCfg = bulletTypes[eCfg.bulletTypeKey] || {};
+          const isSelfTarget = eCfg.targetMode === 'self' || eCfg.bulletTypeKey === 'b_enemy_healing_pulse' || (bulletCfg.bulletSpeed === 0 && bulletCfg.bulletLifeTime <= 1 && eCfg.shootRange < 200 && !eCfg.drawAimingLine);
+
+          let target: any = null;
+          let targetX = state.player ? state.player.pos.x : bcx;
+          let targetY = state.player ? state.player.pos.y : bcy;
+
+          if (!isSelfTarget) {
+            const candidates: { pos: any, entity: any }[] = [];
+            if (eCfg.targetMode === 'enemies') {
+              for (const enemy of state.enemies) {
+                if (enemy && enemy.health > 0 && !enemy.isDying) {
+                  candidates.push({ pos: enemy.pos, entity: enemy });
+                }
+              }
+            } else {
+              if (state.player && !state.player.isDying) {
+                candidates.push({ pos: state.player.pos, entity: state.player });
+              }
+              if (state.player?.attachments) {
+                for (const att of state.player.attachments) {
+                  candidates.push({ pos: att.getWorldPos(), entity: att });
+                }
+              }
+              if (state.world) {
+                const worldTurrets = state.world.getAllTurrets();
+                for (const wt of worldTurrets) {
+                  candidates.push({ pos: wt.getWorldPos(), entity: wt });
+                }
+              }
+            }
+
+            const maxDist = eCfg.shootRange || eCfg.sightRadius || 300;
+            let bestDistSq = maxDist * maxDist;
+
+            for (const cand of candidates) {
+              const dx = cand.pos.x - bcx;
+              const dy = cand.pos.y - bcy;
+              const dSq = dx * dx + dy * dy;
+              if (dSq <= bestDistSq) {
+                const canSee = eCfg.seeThroughObstacles || state.world.checkLOS(bcx, bcy, cand.pos.x, cand.pos.y);
+                if (canSee) {
+                  bestDistSq = dSq;
+                  target = cand.entity;
+                  targetX = cand.pos.x;
+                  targetY = cand.pos.y;
+                }
+              }
+            }
+          } else {
+            target = this;
+            targetX = bcx;
+            targetY = bcy;
+          }
+
+          if (this.turretCooldown > 0) {
+            this.turretCooldown--;
+          }
+
+          const lockDuration = eCfg.barrelLockDurationBeforeFiring || 0;
+          const isBurstStep = Array.isArray(eCfg.shootFireRate) && this.turretStep > 0;
+          const effectiveLockDuration = isBurstStep ? 0 : lockDuration;
+
+          if (target || isSelfTarget) {
+            if (this.turretCooldown > effectiveLockDuration || !this.isBarrelLocked) {
+              const aimAng = atan2(targetY - bcy, targetX - bcx);
+              this.lockedAngle = aimAng;
+              this.lockedTargetPos = { x: targetX, y: targetY };
+            }
+
+            if (effectiveLockDuration > 0 && this.turretCooldown <= effectiveLockDuration && !this.isBarrelLocked) {
+              this.isBarrelLocked = true;
+            }
+
+            if (this.turretCooldown <= 0) {
+              let fireAngle = this.lockedAngle || 0;
+              if (eCfg.inaccuracy) {
+                fireAngle += random(-radians(eCfg.inaccuracy), radians(eCfg.inaccuracy));
+              }
+
+              let shotTx = targetX;
+              let shotTy = targetY;
+
+              if (bulletCfg.highArcConfig) {
+                shotTx = this.lockedTargetPos ? this.lockedTargetPos.x : bcx + cos(fireAngle) * eCfg.shootRange;
+                shotTy = this.lockedTargetPos ? this.lockedTargetPos.y : bcy + sin(fireAngle) * eCfg.shootRange;
+              } else if (isSelfTarget) {
+                shotTx = bcx;
+                shotTy = bcy;
+              } else {
+                shotTx = bcx + cos(fireAngle) * (eCfg.shootRange || 500);
+                shotTy = bcy + sin(fireAngle) * (eCfg.shootRange || 500);
+              }
+
+              const spawnOffset = isSelfTarget ? 0 : Math.min(GRID_SIZE * 0.5, 14);
+              const sx = bcx + cos(fireAngle) * spawnOffset;
+              const sy = bcy + sin(fireAngle) * spawnOffset;
+
+              const bullet = new Bullet(sx, sy, shotTx, shotTy, eCfg.bulletTypeKey, 'core', this);
+              state.enemyBullets.push(bullet);
+
+              let flashCol = color(255, 50, 50);
+              if (eCfg.muzzleFlashColor) {
+                flashCol = color(...eCfg.muzzleFlashColor);
+              } else if (bulletCfg.bulletColor) {
+                flashCol = color(...bulletCfg.bulletColor);
+              }
+              state.vfx.push(new MuzzleFlash(bcx, bcy, isSelfTarget ? 0 : fireAngle, 30, 8, flashCol));
+
+              if (Array.isArray(eCfg.shootFireRate)) {
+                this.turretStep = (this.turretStep + 1) % eCfg.shootFireRate.length;
+                this.turretCooldown = eCfg.shootFireRate[this.turretStep];
+              } else {
+                this.turretCooldown = eCfg.shootFireRate;
+              }
+              this.isBarrelLocked = false;
+            }
+          } else {
+            if (this.turretCooldown <= effectiveLockDuration) {
+              this.turretCooldown = effectiveLockDuration + 1;
+            }
+            this.isBarrelLocked = false;
+          }
+        }
+      }
+    }
+
+    // 2. Liquid / Ground Spawner Logic (Runs for blocks with liquid spawner, whether mined or unmined)
+    if (this.liquidType && (liquidTypes[this.liquidType]?.enemySpawnConfig || this.customSpawnerConfig)) {
+      const lCfg = liquidTypes[this.liquidType];
+      const sCfg = this.customSpawnerConfig ? { ...lCfg?.enemySpawnConfig, ...this.customSpawnerConfig } : lCfg?.enemySpawnConfig;
       if (sCfg && sCfg.spawnInterval > 0) {
+        if (this.lastSpawnTime === undefined) {
+          this.lastSpawnTime = state.frames + floor(random(sCfg.spawnInterval || 60));
+        }
+        if (this.spawnerBudget === undefined) {
+          this.spawnerBudget = sCfg.budget !== undefined ? sCfg.budget : 60;
+        }
         const dx = this.pos.x + GRID_SIZE/2 - state.player.pos.x;
         const dy = this.pos.y + GRID_SIZE/2 - state.player.pos.y;
         const dSq = dx*dx + dy*dy;
@@ -184,7 +528,6 @@ export class Block {
                 const r = random(GRID_SIZE, sCfg.spawnRadius || 120);
                 const sx = this.pos.x + GRID_SIZE/2 + cos(ang) * r;
                 const sy = this.pos.y + GRID_SIZE/2 + sin(ang) * r;
-                
                 if (state.world.hasSpawnArea() && !state.world.isSpawnAreaAt(sx, sy)) {
                   continue;
                 }
@@ -200,137 +543,6 @@ export class Block {
         }
       }
     }
-
-    if (oCfg.enemyTurretConfig) {
-      const eCfg = oCfg.enemyTurretConfig;
-      const bcx = this.pos.x + GRID_SIZE / 2;
-      const bcy = this.pos.y + GRID_SIZE / 2;
-
-      const bulletCfg = bulletTypes[eCfg.bulletTypeKey] || {};
-      const isSelfTarget = eCfg.targetMode === 'self' || eCfg.bulletTypeKey === 'b_enemy_healing_pulse' || (bulletCfg.bulletSpeed === 0 && bulletCfg.bulletLifeTime <= 1 && eCfg.shootRange < 200 && !eCfg.drawAimingLine);
-
-      let target: any = null;
-      let targetX = state.player ? state.player.pos.x : bcx;
-      let targetY = state.player ? state.player.pos.y : bcy;
-
-      if (!isSelfTarget) {
-        const candidates: { pos: any, entity: any }[] = [];
-        if (eCfg.targetMode === 'enemies') {
-          for (const enemy of state.enemies) {
-            if (enemy && enemy.health > 0 && !enemy.isDying) {
-              candidates.push({ pos: enemy.pos, entity: enemy });
-            }
-          }
-        } else {
-          if (state.player && !state.player.isDying) {
-            candidates.push({ pos: state.player.pos, entity: state.player });
-          }
-          if (state.player?.attachments) {
-            for (const att of state.player.attachments) {
-              candidates.push({ pos: att.getWorldPos(), entity: att });
-            }
-          }
-          if (state.world) {
-            const worldTurrets = state.world.getAllTurrets();
-            for (const wt of worldTurrets) {
-              candidates.push({ pos: wt.getWorldPos(), entity: wt });
-            }
-          }
-        }
-
-        const maxDist = eCfg.shootRange || eCfg.sightRadius || 300;
-        let bestDistSq = maxDist * maxDist;
-
-        for (const cand of candidates) {
-          const dx = cand.pos.x - bcx;
-          const dy = cand.pos.y - bcy;
-          const dSq = dx * dx + dy * dy;
-          if (dSq <= bestDistSq) {
-            const canSee = eCfg.seeThroughObstacles || state.world.checkLOS(bcx, bcy, cand.pos.x, cand.pos.y);
-            if (canSee) {
-              bestDistSq = dSq;
-              target = cand.entity;
-              targetX = cand.pos.x;
-              targetY = cand.pos.y;
-            }
-          }
-        }
-      } else {
-        target = this;
-        targetX = bcx;
-        targetY = bcy;
-      }
-
-      if (this.turretCooldown > 0) {
-        this.turretCooldown--;
-      }
-
-      const lockDuration = eCfg.barrelLockDurationBeforeFiring || 0;
-      const isBurstStep = Array.isArray(eCfg.shootFireRate) && this.turretStep > 0;
-      const effectiveLockDuration = isBurstStep ? 0 : lockDuration;
-
-      if (target || isSelfTarget) {
-        if (this.turretCooldown > effectiveLockDuration || !this.isBarrelLocked) {
-          const aimAng = atan2(targetY - bcy, targetX - bcx);
-          this.lockedAngle = aimAng;
-          this.lockedTargetPos = { x: targetX, y: targetY };
-        }
-
-        if (effectiveLockDuration > 0 && this.turretCooldown <= effectiveLockDuration && !this.isBarrelLocked) {
-          this.isBarrelLocked = true;
-        }
-
-        if (this.turretCooldown <= 0) {
-          let fireAngle = this.lockedAngle || 0;
-          if (eCfg.inaccuracy) {
-            fireAngle += random(-radians(eCfg.inaccuracy), radians(eCfg.inaccuracy));
-          }
-
-          let shotTx = targetX;
-          let shotTy = targetY;
-
-          if (bulletCfg.highArcConfig) {
-            shotTx = this.lockedTargetPos ? this.lockedTargetPos.x : bcx + cos(fireAngle) * eCfg.shootRange;
-            shotTy = this.lockedTargetPos ? this.lockedTargetPos.y : bcy + sin(fireAngle) * eCfg.shootRange;
-          } else if (isSelfTarget) {
-            shotTx = bcx;
-            shotTy = bcy;
-          } else {
-            shotTx = bcx + cos(fireAngle) * (eCfg.shootRange || 500);
-            shotTy = bcy + sin(fireAngle) * (eCfg.shootRange || 500);
-          }
-
-          const spawnOffset = isSelfTarget ? 0 : Math.min(GRID_SIZE * 0.5, 14);
-          const sx = bcx + cos(fireAngle) * spawnOffset;
-          const sy = bcy + sin(fireAngle) * spawnOffset;
-
-          const bullet = new Bullet(sx, sy, shotTx, shotTy, eCfg.bulletTypeKey, 'core', this);
-          state.enemyBullets.push(bullet);
-
-          let flashCol = color(255, 50, 50);
-          if (eCfg.muzzleFlashColor) {
-            flashCol = color(...eCfg.muzzleFlashColor);
-          } else if (bulletCfg.bulletColor) {
-            flashCol = color(...bulletCfg.bulletColor);
-          }
-          state.vfx.push(new MuzzleFlash(bcx, bcy, isSelfTarget ? 0 : fireAngle, 30, 8, flashCol));
-
-          if (Array.isArray(eCfg.shootFireRate)) {
-            this.turretStep = (this.turretStep + 1) % eCfg.shootFireRate.length;
-            this.turretCooldown = eCfg.shootFireRate[this.turretStep];
-          } else {
-            this.turretCooldown = eCfg.shootFireRate;
-          }
-
-          this.isBarrelLocked = false;
-        }
-      } else {
-        if (this.turretCooldown <= effectiveLockDuration) {
-          this.turretCooldown = effectiveLockDuration + 1;
-        }
-        this.isBarrelLocked = false;
-      }
-    }
   }
 
   /**
@@ -344,29 +556,46 @@ export class Block {
     if (this.liquidType) {
       const lCfg = liquidTypes[this.liquidType];
       if (lCfg) {
-        const pulse = 0.5 + 0.5 * sin(state.frames * lCfg.pulseSpeed + (this.gx + this.gy) * 0.5);
-        const ln = state.world.getLiquidAt(this.gx, this.gy - 1);
-        const ls = state.world.getLiquidAt(this.gx, this.gy + 1);
-        const lw = state.world.getLiquidAt(this.gx - 1, this.gy);
-        const le = state.world.getLiquidAt(this.gx + 1, this.gy);
-        const isLiquidExposed = !ln || !ls || !lw || !le;
-        const rad = 8;
-        noStroke();
-        fill(lCfg.color[0], lCfg.color[1], lCfg.color[2], opacity * (lCfg.color[3] / 255));
-        const tl = (ln || lw) ? 0 : rad;
-        const tr = (ln || le) ? 0 : rad;
-        const br = (ls || le) ? 0 : rad;
-        const bl = (ls || lw) ? 0 : rad;
-        rect(0, 0, GRID_SIZE, GRID_SIZE, tl, tr, br, bl);
-        fill(lCfg.glowColor[0], lCfg.glowColor[1], lCfg.glowColor[2], opacity * (lCfg.glowColor[3] / 255) * pulse);
-        ellipse(GRID_SIZE * 0.3, GRID_SIZE * 0.3, GRID_SIZE * 0.6 * pulse);
-        if (this.liquidType === 'l_lava' && random() < 0.005) {
-          fill(255, 200, 50, opacity * 0.5); ellipse((GRID_SIZE)*0.2, (GRID_SIZE)*0.2, random(4, 10));
-        }
-        if (isLiquidExposed) {
-          stroke(lCfg.glowColor[0], lCfg.glowColor[1], lCfg.glowColor[2], opacity * 0.6); strokeWeight(2); noFill();
-          if (!ln) line(tl, 0, GRID_SIZE - tr, 0); if (!ls) line(bl, GRID_SIZE, GRID_SIZE - br, GRID_SIZE); if (!lw) line(0, tl, 0, GRID_SIZE - bl); if (!le) line(GRID_SIZE, tr, GRID_SIZE, GRID_SIZE - br);
-          if (!ln && !lw) arc(rad, rad, rad * 2, rad * 2, PI, PI + HALF_PI); if (!ln && !le) arc(GRID_SIZE - rad, rad, rad * 2, rad * 2, PI + HALF_PI, TWO_PI); if (!ls && !le) arc(GRID_SIZE - rad, GRID_SIZE - rad, rad * 2, rad * 2, 0, HALF_PI); if (!ls && !lw) arc(rad, GRID_SIZE - rad, rad * 2, rad * 2, HALF_PI, PI);
+        const isSpawnerLiquid = this.liquidType === 'l_spawner' || this.liquidType.startsWith('l_spawner') || !!lCfg.isEnemySpawner || !!lCfg.enemySpawnConfig;
+        if (isSpawnerLiquid) {
+          const assetKey = lCfg.assetImgConfig?.idleAssetImg?.[0] || 'img_ground_spawner_a';
+          if (assetKey && state.assets[assetKey]) {
+            push();
+            tint(255, opacity * 0.5);
+            imageMode(CENTER);
+            image(state.assets[assetKey], GRID_SIZE / 2, GRID_SIZE / 2, GRID_SIZE, GRID_SIZE);
+            noTint();
+            pop();
+          }
+        } else {
+          const pulse = 0.5 + 0.5 * sin(state.frames * lCfg.pulseSpeed + (this.gx + this.gy) * 0.5);
+          const ln = state.world.getLiquidAt(this.gx, this.gy - 1);
+          const ls = state.world.getLiquidAt(this.gx, this.gy + 1);
+          const lw = state.world.getLiquidAt(this.gx - 1, this.gy);
+          const le = state.world.getLiquidAt(this.gx + 1, this.gy);
+          const isLiquidExposed = !ln || !ls || !lw || !le;
+          const rad = 8;
+          noStroke();
+          fill(lCfg.color[0], lCfg.color[1], lCfg.color[2], opacity * (lCfg.color[3] / 255));
+          const tl = (ln || lw) ? 0 : rad;
+          const tr = (ln || le) ? 0 : rad;
+          const br = (ls || le) ? 0 : rad;
+          const bl = (ls || lw) ? 0 : rad;
+          rect(0, 0, GRID_SIZE, GRID_SIZE, tl, tr, br, bl);
+          fill(lCfg.glowColor[0], lCfg.glowColor[1], lCfg.glowColor[2], opacity * (lCfg.glowColor[3] / 255) * pulse);
+          ellipse(GRID_SIZE * 0.3, GRID_SIZE * 0.3, GRID_SIZE * 0.6 * pulse);
+          if (lCfg.assetImgConfig?.idleAssetImg?.[0] && state.assets[lCfg.assetImgConfig.idleAssetImg[0]]) {
+            imageMode(CENTER);
+            image(state.assets[lCfg.assetImgConfig.idleAssetImg[0]], GRID_SIZE / 2, GRID_SIZE / 2, GRID_SIZE, GRID_SIZE);
+          }
+          if (this.liquidType === 'l_lava' && random() < 0.005) {
+            fill(255, 200, 50, opacity * 0.5); ellipse((GRID_SIZE)*0.2, (GRID_SIZE)*0.2, random(4, 10));
+          }
+          if (isLiquidExposed) {
+            stroke(lCfg.glowColor[0], lCfg.glowColor[1], lCfg.glowColor[2], opacity * 0.6); strokeWeight(2); noFill();
+            if (!ln) line(tl, 0, GRID_SIZE - tr, 0); if (!ls) line(bl, GRID_SIZE, GRID_SIZE - br, GRID_SIZE); if (!lw) line(0, tl, 0, GRID_SIZE - bl); if (!le) line(GRID_SIZE, tr, GRID_SIZE, GRID_SIZE - br);
+            if (!ln && !lw) arc(rad, rad, rad * 2, rad * 2, PI, PI + HALF_PI); if (!ln && !le) arc(GRID_SIZE - rad, rad, rad * 2, rad * 2, PI + HALF_PI, TWO_PI); if (!ls && !le) arc(GRID_SIZE - rad, GRID_SIZE - rad, rad * 2, rad * 2, 0, HALF_PI); if (!ls && !lw) arc(rad, GRID_SIZE - rad, rad * 2, rad * 2, HALF_PI, PI);
+          }
         }
       }
     }
@@ -540,6 +769,66 @@ export class Block {
     const e = state.world.canConnectTo(this.pos.x + GRID_SIZE, this.pos.y, this.config);
     const isExposed = !n || !s || !w || !e;
 
+    if (this.overlay === 'sunGenerator' && !this.isMined) {
+      const cfg = this.sunGeneratorConfig || { damagePerSun: 600, maxSun: 100, accumulatedDamage: 0, sunsDropped: 0 };
+      const dmgInCycle = cfg.accumulatedDamage % cfg.damagePerSun;
+      const dmgLeft = cfg.damagePerSun - dmgInCycle;
+      const ratio = constrain(dmgLeft / cfg.damagePerSun, 0, 1);
+
+      fill(20, opacity * 0.85); noStroke(); rect(4, GRID_SIZE - 8, GRID_SIZE - 8, 4, 2);
+      fill(255, 215, 0, opacity); rect(4, GRID_SIZE - 8, ratio * (GRID_SIZE - 8), 4, 2);
+
+      if (state.debugHP && isExposed) {
+        fill(255, 230, 100, opacity); textAlign(CENTER, CENTER); textSize(8.5); noStroke();
+        text(`${floor(dmgLeft)}`, GRID_SIZE/2, GRID_SIZE/2);
+      }
+      pop();
+      return;
+    }
+
+    const oCfg = this.overlay ? overlayTypes[this.overlay] : null;
+    if ((this.overlay === 'catalyst_clay' || oCfg?.catalystConfig) && !this.isMined && (state.debugHP || state.currentScreen === 'level_editor')) {
+      const cCfg = oCfg?.catalystConfig || (overlayTypes['catalyst_clay'] as any)?.catalystConfig;
+      const matrix = cCfg?.neighborMatrix || [
+        [-1, -1], [0, -1], [1, -1],
+        [-1,  0],          [1,  0],
+        [-1,  1], [0,  1], [1,  1]
+      ];
+      for (const [dx, dy] of matrix) {
+        const nx = dx * GRID_SIZE;
+        const ny = dy * GRID_SIZE;
+        const targetBlk = state.world.getBlock(this.gx + dx, this.gy + dy);
+        const isEmpty = !targetBlk || targetBlk.isMined;
+        if (isEmpty) {
+          stroke(80, 255, 120, opacity * 0.7);
+          strokeWeight(1);
+          noFill();
+          rect(nx + 2, ny + 2, GRID_SIZE - 4, GRID_SIZE - 4, 4);
+        } else {
+          stroke(255, 100, 100, opacity * 0.4);
+          strokeWeight(1);
+          noFill();
+          rect(nx + 2, ny + 2, GRID_SIZE - 4, GRID_SIZE - 4, 4);
+        }
+      }
+    }
+
+    if (this.isWinCondition && !this.isMined) {
+      push();
+      translate(GRID_SIZE / 2, GRID_SIZE / 2);
+      noFill();
+      stroke(255, 215, 0, 180 + 30 * sin(state.frames * 0.05));
+      strokeWeight(2.5);
+      ellipse(0, 0, GRID_SIZE * 0.85 + 2 * sin(state.frames * 0.05));
+      fill(255, 215, 0, 220);
+      noStroke();
+      triangle(-3, -6, 6, -2, -3, 2);
+      stroke(255, 215, 0, 240);
+      strokeWeight(1.5);
+      line(-3, -6, -3, 7);
+      pop();
+    }
+
     if (state.debugHP && isExposed) {
       fill(255, opacity); textAlign(CENTER, CENTER); textSize(9); noStroke(); text(`${floor(this.health)}`, GRID_SIZE/2, GRID_SIZE/2);
     } else if (this.health < this.maxHealth && isExposed) {
@@ -551,6 +840,69 @@ export class Block {
 
   takeDamage(dmg: number, source?: any) {
     if (this.isMined || this.config?.isIndestructible || this.health === Infinity || this.type === 'o_barrier') return false;
+    const oCfg = this.overlay ? overlayTypes[this.overlay] : null;
+    if (oCfg?.isIndestructible) return false;
+
+    if (this.overlay === 'sunGenerator') {
+      if (!this.sunGeneratorConfig) {
+        const sgCfg = overlayTypes['sunGenerator'];
+        this.sunGeneratorConfig = {
+          damagePerSun: sgCfg?.damagePerSun || 600,
+          maxSun: sgCfg?.maxSunDropped || 100,
+          accumulatedDamage: 0,
+          sunsDropped: 0
+        };
+      }
+      const cfg = this.sunGeneratorConfig;
+      if (cfg.sunsDropped >= cfg.maxSun) {
+        this.isMined = true;
+        state.world.dirtyBlock(this.gx, this.gy);
+        return true;
+      }
+
+      this.damageGlow = 180;
+      state.vfx.push(new BlockHitVFX(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2));
+
+      const prevDrops = Math.floor(cfg.accumulatedDamage / cfg.damagePerSun);
+      cfg.accumulatedDamage += dmg;
+      const newDrops = Math.floor(cfg.accumulatedDamage / cfg.damagePerSun);
+      const toDrop = Math.min(newDrops - prevDrops, cfg.maxSun - cfg.sunsDropped);
+
+      if (toDrop > 0) {
+        cfg.sunsDropped += toDrop;
+        for (let i = 0; i < toDrop; i++) {
+          spawnLootAt(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, 'sun');
+        }
+        state.needsTargetReScan = true;
+        if (state.player?.target === this) {
+          state.player.target = null;
+        }
+        if (state.player?.attachments) {
+          for (const att of state.player.attachments) {
+            if (att.target === this) att.target = null;
+          }
+        }
+        if (state.world) {
+          for (const wt of state.world.getAllTurrets()) {
+            if (wt.target === this) wt.target = null;
+          }
+        }
+      }
+
+      if (cfg.sunsDropped >= cfg.maxSun) {
+        this.isMined = true;
+        state.world.dirtyBlock(this.gx, this.gy);
+        flowField.markDirty();
+        state.needsTargetReScan = true;
+        state.vfx.push(new BlockDebris(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, [255, 215, 0]));
+      }
+
+      if (source) {
+        triggerUpgradeHook('onMine', source, { target: this, targetType: 'block', typeName: 'sunGenerator' });
+      }
+      return true;
+    }
+
     this.health -= dmg; this.damageGlow = 180;
     state.vfx.push(new BlockHitVFX(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2));
     if (this.health <= 0) {
@@ -1123,6 +1475,22 @@ export class Chunk {
         // if (b.liquidType) b.renderBase(opacity); // MOVED TO PASS 0
         b.renderSparkles(opacity);
 
+        if (b.isWinCondition && !b.isMined) {
+          push();
+          translate(b.pos.x + GRID_SIZE / 2, b.pos.y + GRID_SIZE / 2);
+          noFill();
+          stroke(255, 215, 0, (180 + 40 * sin(state.frames * 0.08)) * (opacity / 255));
+          strokeWeight(2.5);
+          ellipse(0, 0, GRID_SIZE * 0.85 + 2 * sin(state.frames * 0.08));
+          fill(255, 215, 0, 230 * (opacity / 255));
+          noStroke();
+          triangle(-3, -6, 6, -2, -3, 2);
+          stroke(255, 215, 0, 250 * (opacity / 255));
+          strokeWeight(1.5);
+          line(-3, -6, -3, 7);
+          pop();
+        }
+
         if (state.showDebug && state.showObstacleOutline && !b.isMined) {
           push();
           noFill();
@@ -1279,7 +1647,14 @@ export class WorldManager {
     }
   }
 
+  payGateGroupsDirty: boolean = true;
+
+  markPayGateGroupsDirty() {
+    this.payGateGroupsDirty = true;
+  }
+
   dirtyChunkAndNeighbors(cx: number, cy: number) {
+    this.markPayGateGroupsDirty();
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         const chunk = this.chunks.get(`${cx + dx},${cy + dy}`);
@@ -1311,9 +1686,19 @@ export class WorldManager {
     const cy = floor(gy / CHUNK_SIZE);
     const chunk = this.getChunk(cx, cy);
     if (!chunk) return;
+    const existing = chunk.blockMap.get(`${gx},${gy}`);
+    if (existing && existing.type === 'o_paygate') {
+      this.markPayGateGroupsDirty();
+    }
+    if (typeKey === 'o_paygate') {
+      this.markPayGateGroupsDirty();
+    }
     if (typeKey === null) {
       const b = chunk.blockMap.get(`${gx},${gy}`);
-      if (b) b.isMined = true;
+      if (b) {
+        if (b.type === 'o_paygate') this.markPayGateGroupsDirty();
+        b.isMined = true;
+      }
     } else {
       let b = chunk.blockMap.get(`${gx},${gy}`);
       if (!b) {
@@ -1466,35 +1851,250 @@ export class WorldManager {
     for (let i=0; i<LEVEL_THRESHOLDS.length; i++) { if (count >= LEVEL_THRESHOLDS[i]) state.currentChunkLevel = i + 1; else break; }
     const lv = floor(constrain(state.currentChunkLevel, 0, 10)); state.currentNightWaveBudget = Math.max(state.currentNightWaveBudget, LEVEL_BUDGET[lv]);
   }
-  checkLOS(x1: number, y1: number, x2: number, y2: number) {
-    let dx = x2 - x1; let dy = y2 - y1; let dSq = dx*dx + dy*dy;
-    if (dSq < 1) return true;
-    let d = Math.sqrt(dSq);
-    // Use smaller steps for better coverage, but not so small it's slow
-    let steps = floor(d / (GRID_SIZE * 0.4));
-    if (steps < 2) steps = 2; // Ensure at least one midpoint check for very close targets
-    
-    const startGx = floor(x1 / GRID_SIZE);
-    const startGy = floor(y1 / GRID_SIZE);
+  checkLOS(x1: number, y1: number, x2: number, y2: number): boolean {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    if (dx === 0 && dy === 0) return true;
+
+    let gx = floor(x1 / GRID_SIZE);
+    let gy = floor(y1 / GRID_SIZE);
     const targetGx = floor(x2 / GRID_SIZE);
     const targetGy = floor(y2 / GRID_SIZE);
 
-    for (let i = 1; i < steps; i++) {
-      let t = i / steps;
-      let px = x1 + dx * t;
-      let py = y1 + dy * t;
-      
-      let gx = floor(px / GRID_SIZE);
-      let gy = floor(py / GRID_SIZE);
-      
-      // Ignore the block the ray starts in and the block it ends in
-      if (gx === startGx && gy === startGy) continue;
-      if (gx === targetGx && gy === targetGy) continue;
-      
-      if (this.isBlockAt(px, py)) return false;
+    if (gx === targetGx && gy === targetGy) return true;
+
+    const stepX = dx > 0 ? 1 : (dx < 0 ? -1 : 0);
+    const stepY = dy > 0 ? 1 : (dy < 0 ? -1 : 0);
+
+    const tDeltaX = dx !== 0 ? Math.abs(GRID_SIZE / dx) : Infinity;
+    const tDeltaY = dy !== 0 ? Math.abs(GRID_SIZE / dy) : Infinity;
+
+    let tMaxX = dx > 0 ? ((gx + 1) * GRID_SIZE - x1) / dx : (dx < 0 ? (gx * GRID_SIZE - x1) / dx : Infinity);
+    let tMaxY = dy > 0 ? ((gy + 1) * GRID_SIZE - y1) / dy : (dy < 0 ? (gy * GRID_SIZE - y1) / dy : Infinity);
+
+    let safety = 0;
+    while ((gx !== targetGx || gy !== targetGy) && safety++ < 200) {
+      let prevGx = gx;
+      let prevGy = gy;
+
+      if (Math.abs(tMaxX - tMaxY) < 1e-6) {
+        // Hitting exact corner: step both X and Y
+        tMaxX += tDeltaX;
+        tMaxY += tDeltaY;
+        gx += stepX;
+        gy += stepY;
+
+        // Diagonal passage check: if either corner neighbor is solid, LOS is blocked
+        if (this.isBlockAtTile(gx, prevGy) || this.isBlockAtTile(prevGx, gy)) {
+          return false;
+        }
+      } else if (tMaxX < tMaxY) {
+        tMaxX += tDeltaX;
+        gx += stepX;
+      } else {
+        tMaxY += tDeltaY;
+        gy += stepY;
+      }
+
+      // Check current cell if not destination
+      if (gx !== targetGx || gy !== targetGy) {
+        if (this.isBlockAtTile(gx, gy)) {
+          return false;
+        }
+      }
+
+      // Check diagonal gap penetration: if ray crossed diagonally between two diagonal blocks
+      if (gx !== prevGx && gy !== prevGy) {
+        if (this.isBlockAtTile(gx, prevGy) && this.isBlockAtTile(prevGx, gy)) {
+          return false;
+        }
+      }
     }
+
     return true;
   }
+
+  isBlockAtTile(gx: number, gy: number): boolean {
+    const cx = floor(gx / CHUNK_SIZE);
+    const cy = floor(gy / CHUNK_SIZE);
+    const chunk = this.chunks.get(`${cx},${cy}`);
+    if (!chunk) return false;
+    const b = chunk.blockMap.get(`${gx},${gy}`);
+    return !!(b && !b.isMined && (b.config.blocksLOS !== false));
+  }
+
+  payGateGroups: PayGateGroup[] = [];
+  blockToPayGateGroup: Map<string, PayGateGroup> = new Map();
+
+  getPayGateGroup(block: Block): PayGateGroup | null {
+    if (!block || block.type !== 'o_paygate') return null;
+    const key = `${block.gx},${block.gy}`;
+    let grp: PayGateGroup | null = this.blockToPayGateGroup.get(key) || null;
+    if (!grp || this.payGateGroupsDirty) {
+      this.rebuildPayGateGroups();
+      grp = this.blockToPayGateGroup.get(key) || null;
+    }
+    return grp;
+  }
+
+  rebuildPayGateGroups() {
+    this.payGateGroupsDirty = false;
+    this.payGateGroups = [];
+    this.blockToPayGateGroup.clear();
+
+    const allPayBlocks: Block[] = [];
+    this.chunks.forEach(chunk => {
+      for (const b of chunk.blocks) {
+        if (b.type === 'o_paygate' && !b.isMined) {
+          allPayBlocks.push(b);
+        }
+      }
+    });
+
+    if (allPayBlocks.length === 0) return;
+
+    const map = new Map<string, Block>();
+    for (const b of allPayBlocks) {
+      map.set(`${b.gx},${b.gy}`, b);
+    }
+
+    const visited = new Set<string>();
+    let groupIndex = 0;
+
+    for (const b of allPayBlocks) {
+      const key = `${b.gx},${b.gy}`;
+      if (visited.has(key)) continue;
+
+      const cluster: Block[] = [];
+      const queue: Block[] = [b];
+      visited.add(key);
+
+      let sharedConfig: any = null;
+
+      while (queue.length > 0) {
+        const curr = queue.shift()!;
+        cluster.push(curr);
+        if (!sharedConfig && curr.paygateConfig) {
+          sharedConfig = { ...curr.paygateConfig };
+        }
+
+        // Check 8-way neighbors for interconnecting blocks
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            if (dx === 0 && dy === 0) continue;
+            const nKey = `${curr.gx + dx},${curr.gy + dy}`;
+            if (!visited.has(nKey) && map.has(nKey)) {
+              visited.add(nKey);
+              queue.push(map.get(nKey)!);
+            }
+          }
+        }
+      }
+
+      const group = new PayGateGroup(`paygate_group_${groupIndex++}`, sharedConfig || { resource: 'soil', amount: 10, spent: 0 });
+      group.blocks = cluster;
+      group.updateCenter();
+
+      for (const member of cluster) {
+        member.paygateConfig = {
+          resource: group.config.resource,
+          amount: group.config.amount,
+          spent: group.config.spent
+        };
+        this.blockToPayGateGroup.set(`${member.gx},${member.gy}`, group);
+      }
+
+      this.payGateGroups.push(group);
+    }
+  }
+
+  getPayGateGroupByWorldPos(wx: number, wy: number): PayGateGroup | null {
+    if (this.payGateGroupsDirty || !this.payGateGroups || this.payGateGroups.length === 0) {
+      this.rebuildPayGateGroups();
+    }
+    if (!this.payGateGroups || this.payGateGroups.length === 0) return null;
+
+    for (const grp of this.payGateGroups) {
+      const remaining = grp.getRemainingCost();
+      if (remaining <= 0) continue;
+      const unminedBlocks = grp.blocks.filter(b => !b.isMined);
+      if (unminedBlocks.length === 0) continue;
+
+      const costText = `${remaining}`;
+      textSize(14);
+      const tw = textWidth(costText);
+      const bubbleW = Math.max(42, 16 + 4 + tw + 16);
+      const bubbleH = 24;
+      const bubbleCenterX = grp.centerPos.x;
+      const bubbleCenterY = grp.centerPos.y - 20;
+
+      if (
+        wx >= bubbleCenterX - bubbleW / 2 &&
+        wx <= bubbleCenterX + bubbleW / 2 &&
+        wy >= bubbleCenterY - bubbleH / 2 &&
+        wy <= bubbleCenterY + bubbleH / 2 + 8
+      ) {
+        return grp;
+      }
+    }
+    return null;
+  }
+
+  drawPayGateCostBubbles(playerPos?: any, isEditorMode: boolean = false, hoveredGroup?: PayGateGroup | null) {
+    if (this.payGateGroupsDirty || !this.payGateGroups || this.payGateGroups.length === 0) {
+      this.rebuildPayGateGroups();
+    }
+    if (!this.payGateGroups || this.payGateGroups.length === 0) return;
+
+    const pX = playerPos?.x ?? state.player?.pos?.x ?? 0;
+    const pY = playerPos?.y ?? state.player?.pos?.y ?? 0;
+
+    for (const grp of this.payGateGroups) {
+      const remaining = grp.getRemainingCost();
+      if (remaining <= 0) continue;
+      const unminedBlocks = grp.blocks.filter(b => !b.isMined);
+      if (unminedBlocks.length === 0) continue;
+
+      const isHovered = hoveredGroup === grp;
+      if (isEditorMode) {
+        drawPayGateBubble(grp.centerPos.x, grp.centerPos.y, grp.config.resource, remaining, true, 255, isHovered);
+      } else {
+        const d = dist(pX, pY, grp.centerPos.x, grp.centerPos.y);
+        if (d < 220) {
+          const resKey = grp.config.resource;
+          const curAmount = (state as any)[`${resKey}Currency`] || 0;
+          const canAfford = curAmount > 0;
+          drawPayGateBubble(grp.centerPos.x, grp.centerPos.y, resKey, remaining, canAfford, 255, false);
+        }
+      }
+    }
+  }
+
+  drawSunGeneratorHoverBubbles(mWorldX: number, mWorldY: number) {
+    const mgx = floor(mWorldX / GRID_SIZE);
+    const mgy = floor(mWorldY / GRID_SIZE);
+    const blk = this.getBlock(mgx, mgy);
+    if (blk && !blk.isMined && blk.overlay === 'sunGenerator') {
+      const cfg = blk.sunGeneratorConfig || { damagePerSun: 600, maxSun: 100, accumulatedDamage: 0, sunsDropped: 0 };
+      const left = Math.max(0, cfg.maxSun - cfg.sunsDropped);
+      const textLabel = `${left} left`;
+      
+      const bcx = blk.pos.x + GRID_SIZE / 2;
+      const bcy = blk.pos.y - 12;
+
+      drawSpeechBubble(bcx, bcy, 76, 24, textLabel, {
+        icon: state.assets['img_icon_sun'],
+        iconSize: 16,
+        fontSize: 11,
+        radius: 8,
+        tailDirection: 'bottom',
+        tailSize: 6,
+        bgColor: [15, 18, 35, 230],
+        textColor: [255, 240, 180, 255]
+      });
+    }
+  }
+
   getNearestBlock(pos: any, range: number) {
     let nearest = null; let minDistSq = range*range;
     const viewportMargin = range + 200;

@@ -1,8 +1,8 @@
 
-import { state } from './state';
-import { turretTypes } from './balanceTurrets';
-import { TYPE_MAP } from './assetTurret';
-import { TURRET_RECIPES } from './dictionaryTurretMerging';
+import { state } from '../state';
+import { turretTypes } from '../balanceTurrets';
+import { TYPE_MAP } from '../assetTurret';
+import { TURRET_RECIPES } from '../dictionaryTurretMerging';
 
 declare const push: any;
 declare const pop: any;
