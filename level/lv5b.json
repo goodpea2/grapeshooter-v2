@@ -1,9 +1,9 @@
 {
   "version": 2,
-  "levelId": "lv4",
-  "levelName": "Level 4: Tatical Mine",
+  "levelId": "lvTut5",
+  "levelName": "Level 5: Tatical Mine",
   "levelDescription": "Use the landmines to snipe tough enemies!",
-  "tag": "Adventure",
+  "tag": "ADVENTURE",
   "enableWorldGen": false,
   "almanacProgression": {
     "StartingTurret": [
@@ -11,16 +11,16 @@
       "t_laser",
       "t_wall",
       "t_mine",
-      "t_ice",
-      "t2_repeater",
-      "t2_laser2"
+      "t2_repeater"
     ],
     "UnlockedByDiscoverTurret": [
-      "t2_minespawner",
-      "t2_stun"
     ],
     "LockedTurret": [],
     "BannedTurrets": [
+      "t_ice",
+      "t2_laser2",
+      "t2_minespawner",
+      "t2_stun",
       "t_dummy",
       "t0_cherrybomb",
       "t0_firecherry",
@@ -126,14 +126,6 @@
         0
       ]
     },
-    "magnetRadius": {
-      "values": [
-        85
-      ],
-      "costs": [
-        0
-      ]
-    },
     "damageMultAdd": {
       "values": [
         0,
@@ -146,8 +138,41 @@
         15,
         30
       ]
+    },
+    "magnetRadius": {
+      "values": [
+        85
+      ],
+      "costs": [
+        0
+      ]
+    },
+    "movementSpeed": {
+      "values": [
+        0.1
+      ],
+      "costs": [
+        0
+      ]
+    },
+    "maxStamina": {
+      "values": [
+        100
+      ],
+      "costs": [
+        0
+      ]
+    },
+    "clickHoldBoost": {
+      "values": [
+        3
+      ],
+      "costs": [
+        0
+      ]
     }
   },
+  "sunSpawnHourInterval": 0.5,
   "customBudgetPerNight": [
     100,
     200
@@ -627,7 +652,12 @@
       0
     ]
   },
-  "timestamp": "2026-08-19T19:08:08.960Z",
+  "starRatingTargets": {
+    "star1": 540,
+    "star2": 420,
+    "star3": 300
+  },
+  "timestamp": "2026-08-25T19:08:31.620Z",
   "playerSpawn": {
     "x": 289,
     "y": 289
@@ -993,6 +1023,35 @@
               15
             ]
           ]
+        },
+        {
+          "type": "o_dirt",
+          "overlay": "ov_textsign",
+          "customText": "Landmine is effective against high HP targets",
+          "pos": [
+            [
+              -5,
+              1,
+              8
+            ]
+          ]
+        },
+        {
+          "type": "o_dirt",
+          "overlay": "sunGenerator",
+          "sunGeneratorConfig": {
+            "damagePerSun": 600,
+            "maxSun": 50,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              -14,
+              1,
+              14
+            ]
+          ]
         }
       ],
       "turrets": [
@@ -1316,16 +1375,6 @@
               -1
             ]
           ]
-        },
-        {
-          "type": "o_stone",
-          "pos": [
-            [
-              -20,
-              3,
-              -1
-            ]
-          ]
         }
       ],
       "turrets": []
@@ -1422,57 +1471,54 @@
           ]
         },
         {
-          "type": "o_stone",
+          "type": "o_paygate",
+          "paygateConfig": {
+            "resource": "sun",
+            "amount": 1,
+            "spent": 0
+          },
           "pos": [
-            [
-              -20,
-              3,
-              0
-            ],
-            [
-              -20,
-              3,
-              1
-            ],
             [
               -20,
               3,
               2
             ],
             [
-              -30,
-              4,
+              -29,
+              2,
               6
             ],
             [
-              -30,
-              4,
+              -29,
+              2,
               7
             ],
             [
-              -30,
-              4,
+              -29,
+              2,
               8
             ],
             [
-              -30,
-              4,
+              -29,
+              2,
               9
             ],
             [
               -20,
               3,
               13
-            ],
+            ]
+          ]
+        },
+        {
+          "type": "o_dirt",
+          "overlay": "ov_textsign",
+          "customText": "Try and clear before the level drags on too long!",
+          "pos": [
             [
-              -20,
-              3,
-              14
-            ],
-            [
-              -20,
-              3,
-              15
+              -24,
+              1,
+              8
             ]
           ]
         }
@@ -1517,16 +1563,6 @@
               -32,
               16,
               21
-            ]
-          ]
-        },
-        {
-          "type": "o_stone",
-          "pos": [
-            [
-              -20,
-              3,
-              16
             ]
           ]
         }
