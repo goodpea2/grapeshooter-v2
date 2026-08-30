@@ -25,10 +25,11 @@ export class ActionShootMultiTarget extends TurretAction {
     
     let effectiveFireRate = baseFR / (frDivider * frMultiplier);
     let bulletsToSpawn = 1;
-
-    if (effectiveFireRate < 2) {
-      bulletsToSpawn = Math.floor(2 / effectiveFireRate);
-      effectiveFireRate = 2;
+    if (effectiveFireRate > 0) {
+      while (effectiveFireRate < 4) {
+        effectiveFireRate *= 2;
+        bulletsToSpawn *= 2;
+      }
     }
 
     return { effectiveFireRate, bulletsToSpawn };

@@ -107,7 +107,8 @@ export function drawAutotile(pg: any, vx: number, vy: number, gx: number, gy: nu
     // Add other materials here as assets are provided
     
     const img = state.assets[assetKey];
-    const tileDrawSize = GRID_SIZE + 0.6;
+    const tileDrawSize = GRID_SIZE + 0.8;
+    const tileDrawOffset = (GRID_SIZE - tileDrawSize) / 2;
     if (img && img.width > 0) {
       if (mask === 15) {
         const seed = (gx * 31 + gy * 7);
@@ -119,7 +120,7 @@ export function drawAutotile(pg: any, vx: number, vy: number, gx: number, gy: nu
                  coords.x * tileSize, coords.y * tileSize, tileSize, tileSize);
         pg.pop();
       } else {
-        pg.image(img, drawX, drawY, tileDrawSize, tileDrawSize, 
+        pg.image(img, drawX + tileDrawOffset, drawY + tileDrawOffset, tileDrawSize, tileDrawSize, 
                  coords.x * tileSize, coords.y * tileSize, tileSize, tileSize);
       }
     }
@@ -135,8 +136,8 @@ export function drawAutotile(pg: any, vx: number, vy: number, gx: number, gy: nu
   if (concealedMask > 0) {
     const concealedCoords = BITMASK_MAP[concealedMask];
     const concealedImg = state.assets['img_tileset_concealed'];
-    const concealedDrawSize = GRID_SIZE + 0.4;
-    const concealedDrawOffset = -0.4;
+    const concealedDrawSize = GRID_SIZE + 0.8;
+    const concealedDrawOffset = (GRID_SIZE - concealedDrawSize) / 2;
     if (concealedImg && concealedImg.width > 0) {
       pg.blendMode((window as any).MULTIPLY);
       pg.image(concealedImg, drawX + concealedDrawOffset, drawY + concealedDrawOffset, concealedDrawSize, concealedDrawSize,

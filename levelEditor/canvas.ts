@@ -1,5 +1,5 @@
 import { state } from '../state';
-import { GRID_SIZE } from '../constants';
+import { GRID_SIZE, CHUNK_SIZE } from '../constants';
 import { overlayTypes } from '../balanceObstacles';
 import { liquidTypes } from '../balanceLiquids';
 import { PaletteItem } from './types';
@@ -100,12 +100,32 @@ export function drawLevelEditor() {
   // Clear canvas background every frame (fixes ghosting bug)
   background(10, 10, 25);
 
+  const zoom = state.levelEditor.cameraZoom || 1.0;
+
+  // Flexible dynamic render distance: ensure everything is rendered regardless of camera position and zoom level
+  const halfViewW = (width / (2 * zoom)) + 300;
+  const halfViewH = (height / (2 * zoom)) + 300;
+  state.viewportBounds = {
+    minX: state.cameraPos.x - halfViewW,
+    maxX: state.cameraPos.x + halfViewW,
+    minY: state.cameraPos.y - halfViewH,
+    maxY: state.cameraPos.y + halfViewH
+  };
+
   // Keep world chunks around camera loaded and updated
   if (state.world) {
+    const chunkW = CHUNK_SIZE * GRID_SIZE;
+    const minCx = floor((state.cameraPos.x - halfViewW) / chunkW);
+    const maxCx = floor((state.cameraPos.x + halfViewW) / chunkW);
+    const minCy = floor((state.cameraPos.y - halfViewH) / chunkW);
+    const maxCy = floor((state.cameraPos.y + halfViewH) / chunkW);
+    for (let cx = minCx; cx <= maxCx; cx++) {
+      for (let cy = minCy; cy <= maxCy; cy++) {
+        state.world.getChunk(cx, cy);
+      }
+    }
     state.world.update(state.cameraPos);
   }
-
-  const zoom = state.levelEditor.cameraZoom || 1.0;
 
   // Layout dimensions
   const topBarH = 44;
@@ -200,12 +220,12 @@ export function drawLevelEditor() {
   }
 
   // Draw grid lines over camera view accounting for zoom
-  const halfViewW = (width / 2) / zoom;
-  const halfViewH = (height / 2) / zoom;
-  const startX = floor((state.cameraPos.x - halfViewW) / GRID_SIZE) * GRID_SIZE;
-  const endX = startX + halfViewW * 2 + GRID_SIZE * 2;
-  const startY = floor((state.cameraPos.y - halfViewH) / GRID_SIZE) * GRID_SIZE;
-  const endY = startY + halfViewH * 2 + GRID_SIZE * 2;
+  const gridHalfW = (width / 2) / zoom;
+  const gridHalfH = (height / 2) / zoom;
+  const startX = floor((state.cameraPos.x - gridHalfW) / GRID_SIZE) * GRID_SIZE;
+  const endX = startX + gridHalfW * 2 + GRID_SIZE * 2;
+  const startY = floor((state.cameraPos.y - gridHalfH) / GRID_SIZE) * GRID_SIZE;
+  const endY = startY + gridHalfH * 2 + GRID_SIZE * 2;
 
   stroke(255, 255, 255, 8);
   strokeWeight(1 / zoom);

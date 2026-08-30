@@ -72,11 +72,16 @@ export abstract class Turret {
   firstStrikeCount: number = 0;
   targetScanTimer: number;
   customData: any = {};
+  customAssetImg?: string;
 
   // Jump tracking
   jumpOffset: any = null;
   jumpFrames: number = 0;
+  jumpPhase: 'toTarget' | 'toHome' | null = null;
   jumpTargetPos: any = null;
+  jumpCurrentPos: any = null;
+  mustExitProximityFirst: boolean = false;
+  isRelocating: boolean = false;
 
   // Farm tracking
   farmStage: number = 0;
@@ -103,6 +108,9 @@ export abstract class Turret {
   get stats() {
     return this.activeStats;
   }
+  set stats(val: any) {
+    this.activeStats = val ? { ...val } : this.activeStats;
+  }
 
   parent: any; // Added parent to base class to support both attached and world turrets
 
@@ -112,8 +120,8 @@ export abstract class Turret {
     this.parent = parent;
     this.config = turretTypes[type];
     this.size = this.config.size;
-    this.health = this.config.health;
-    this.maxHealth = this.health;
+    this.maxHealth = this.config.maxHealth !== undefined ? this.config.maxHealth : this.config.health;
+    this.health = this.config.initialHealth !== undefined ? this.config.initialHealth : this.config.health;
     this.targetScanTimer = floor(random(TurretMinScanRate));
     
     // Initialize base ingredients for T1 turrets
@@ -179,6 +187,30 @@ export abstract class Turret {
     }
   }
 
+  onTargetMined(target: any, context?: any) {
+    for (const action of this.actions) {
+      if ((action as any).onTargetMined) {
+        (action as any).onTargetMined(target, context);
+      }
+    }
+  }
+
+  heal(amount: number, bypassMaxHealth: boolean = false) {
+    if (this.health <= 0) return;
+    if (bypassMaxHealth) {
+      this.health += amount;
+    } else {
+      this.health = Math.min(this.maxHealth, this.health + amount);
+    }
+    this.flashTimer = 8;
+    this.flashType = 'heal';
+
+    if (amount > 0) {
+      const wPos = this.getWorldPos();
+      state.vfx.push(new DamageNumberVFX(wPos.x, wPos.y, amount, [80, 255, 120]));
+    }
+  }
+
   isActionLocked(tags: string[]): boolean {
     for (const tag of tags) {
       if (this.actionLocks.has(tag)) return true;
@@ -226,10 +258,18 @@ export abstract class Turret {
     if (!state.isStationary && !this.config.isActiveWhileMoving && this.isAttachedToPlayer()) {
       return false;
     }
+    if ((this.isRelocating || this.jumpPhase !== null) && !this.config.isActiveWhileMoving) {
+      return false;
+    }
     return true;
   }
 
   customIsActive(): boolean | null { return null; }
+
+  isCharged(): boolean {
+    if (!this.isAttachedToPlayer()) return false;
+    return !!(state.player && state.player.isBoosting && state.player.stamina > 0);
+  }
 
   update() {
     if (this.health <= 0) {
@@ -251,6 +291,10 @@ export abstract class Turret {
     if (this.hurtAnimTimer > 0) this.hurtAnimTimer--;
     if (this.pulseAnimTimer > 0) this.pulseAnimTimer--;
     this.shieldImpactAngles = [];
+
+    if (this.isCharged() && this.config.whileCharged && Object.keys(this.config.whileCharged).length > 0) {
+      this.applyCondition('c_raged_visualonly', 4);
+    }
 
     const wPos = this.getWorldPos();
     const gx = floor(wPos.x / GRID_SIZE);
@@ -302,7 +346,8 @@ export abstract class Turret {
     this.alpha = lerp(this.alpha, targetAlpha, 0.1);
     this.recoil = (this.recoil || 0) * 0.85;
 
-    const shouldBeSpecialActive = powered && state.isStationary && !this.isWaterlogged && !this.isFrosted;
+    const isWorldPlaced = !this.isAttachedToPlayer();
+    const shouldBeSpecialActive = powered && (state.isStationary || isWorldPlaced) && !this.isWaterlogged && !this.isFrosted;
     this.specialActivityLevel = lerp(this.specialActivityLevel, shouldBeSpecialActive ? 1 : 0, 0.1);
 
     if (!powered || isRetracted || this.isFrosted) return;
@@ -415,9 +460,7 @@ export abstract class Turret {
     }
 
     if (dmg < 0) {
-      this.health = Math.min(this.maxHealth, this.health - dmg);
-      this.flashTimer = 8;
-      this.flashType = 'heal';
+      this.heal(-dmg, false);
       return false;
     }
 
@@ -571,19 +614,14 @@ export abstract class Turret {
     }
 
     if (tTypes.includes('enemy')) {
-      const cs = state.spatialHashCellSize; const gx = floor(wPos.x / cs); const gy = floor(wPos.y / cs);
-      const searchRadius = Math.ceil(range / cs);
       const candidates: { e: any, dSq: number }[] = [];
-      for (let i = -searchRadius; i <= searchRadius; i++) {
-        for (let j = -searchRadius; j <= searchRadius; j++) {
-          const cell = state.spatialHash.get(`${gx + i},${gy + j}`);
-          if (!cell) continue;
-          for (const e of cell) {
-            if (!(e instanceof Enemy) || e.health <= 0 || e.isDying || e.conditions.has('c_hypnotized')) continue;
-            const dSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
-            if (dSq <= rangeSq) candidates.push({ e, dSq });
-          }
-        }
+      const grid = state.spatialGrid;
+      if (grid) {
+        grid.queryCircleEnemies(wPos.x, wPos.y, range, (e: any) => {
+          if (e.conditions.has('c_hypnotized')) return;
+          const dSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
+          if (dSq <= rangeSq) candidates.push({ e, dSq });
+        });
       }
       state.world.chunks.forEach((chunk: any) => {
         const cw = CHUNK_SIZE * GRID_SIZE; const dx = (chunk.cx * cw + cw/2) - wPos.x; const dy = (chunk.cy * cw + cw/2) - wPos.y;
@@ -650,6 +688,21 @@ export abstract class Turret {
         this.target = bestObs; 
         const tc = this.getTargetCenter(); 
         if (tc && !anyActionRotationLock) this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x); 
+      }
+    }
+
+    // While charged, if there's no target within own range, follow player's current target
+    if (!this.target && this.isCharged() && this.config.whileCharged?.followPlayerTarget && state.player?.target) {
+      const pTarget = state.player.target;
+      let valid = pTarget.isFrosted !== undefined 
+        ? (pTarget.isFrosted && pTarget.iceCubeHealth > 0) 
+        : (pTarget.health !== undefined 
+            ? pTarget.health > 0 
+            : (!pTarget.isMined && pTarget.config?.isValidTarget !== false));
+      if (valid) {
+        this.target = pTarget;
+        const tc = this.getTargetCenter();
+        if (tc && !anyActionRotationLock) this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x);
       }
     }
   }

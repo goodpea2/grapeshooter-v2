@@ -27,7 +27,9 @@ declare const triangle: any;
 declare const CENTER: any;
 declare const text: any;
 declare const PI: any;
+declare const HALF_PI: any;
 declare const TWO_PI: any;
+declare const arc: any;
 declare const atan2: any;
 declare const noise: any;
 declare const random: any;
@@ -35,22 +37,40 @@ declare const image: any;
 declare const imageMode: any;
 declare const scale: any;
 declare const rectMode: any;
-declare const HALF_PI: any;
 
 export function drawTickingExplosive(tex: any) {
     const progress = 1 - (tex.timer / tex.maxTimer);
     const eased = progress * progress; // quadratic easing
-    const pulseFreq = 0.02 + eased * 0.4;
-    const p = 0.5 + 0.5 * sin(frameCount * pulseFreq*0.1);
+    const pulseFreq = 0.2 + eased * 1.5;
+    const currentFrame = state.frames || (window as any).frameCount || 0;
+    const p = 0.5 + 0.5 * Math.sin(currentFrame * pulseFreq);
     push();
     translate(tex.x, tex.y);
     rectMode(CENTER);
-    const cRed = color(255, 30, 30);
-    const cWhite = color(255, 200, 200);
-    const lerpedCol = lerpColor(cRed, cWhite, p);
+    imageMode(CENTER);
+
+    const sprite = state.assets['img_tnt_a'];
+    if (sprite) {
+      image(sprite, 0, 0, GRID_SIZE, GRID_SIZE);
+    } else {
+      const cRed = color(255, 30, 30);
+      const cWhite = color(255, 200, 200);
+      fill(lerpColor(cRed, cWhite, p));
+      noStroke();
+      rect(0, 0, GRID_SIZE, GRID_SIZE, 6);
+    }
+
+    // Flashing danger warning overlay
     noStroke();
-    fill(lerpedCol);
-    rect(0, 0, GRID_SIZE, GRID_SIZE, 8);
+    fill(255, 50, 50, 60 + p * 140);
+    rect(0, 0, GRID_SIZE, GRID_SIZE, 6);
+
+    // Fuse countdown arc
+    noFill();
+    stroke(255, 220, 0, 220);
+    strokeWeight(2.5);
+    arc(0, 0, GRID_SIZE + 6, GRID_SIZE + 6, -HALF_PI, -HALF_PI + TWO_PI * (1 - progress));
+
     pop();
 }
 

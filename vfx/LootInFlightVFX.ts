@@ -25,10 +25,11 @@ export class LootInFlightVFX {
   itemKey: string;
   type: string;
   turretHP?: number;
+  turretData?: any;
 
   startPos: any;
 
-  constructor(startX: number, startY: number, targetX: number, targetY: number, assetKey: string, size: number, value: number, itemKey: string, type: string, turretHP?: number) {
+  constructor(startX: number, startY: number, targetX: number, targetY: number, assetKey: string, size: number, value: number, itemKey: string, type: string, turretHP?: number, turretData?: any) {
     this.pos = createVector(startX, startY);
     this.startPos = createVector(startX, startY);
     this.targetPos = createVector(targetX, targetY);
@@ -38,6 +39,7 @@ export class LootInFlightVFX {
     this.itemKey = itemKey;
     this.type = type;
     this.turretHP = turretHP;
+    this.turretData = turretData;
   }
 
   update() {
@@ -70,10 +72,10 @@ export class LootInFlightVFX {
       } else if (this.type === 'item') {
         state.inventory.items[this.itemKey] = (state.inventory.items[this.itemKey] || 0) + 1;
       } else if (this.type === 'turret') {
-        state.player.addStrayTurret(this.itemKey, this.turretHP);
+        state.player.addStrayTurret(this.itemKey, this.turretHP, this.turretData);
       } else if (this.type === 'turretAsItem') {
         state.inventory.items[this.itemKey] = (state.inventory.items[this.itemKey] || 0) + 1;
-        state.inventory.specList.push({ key: this.itemKey, type: 'turret', hp: this.turretHP, timestamp: Date.now() });
+        state.inventory.specList.push({ key: this.itemKey, type: 'turret', hp: this.turretHP, turretData: this.turretData, timestamp: Date.now() });
         state.totalTurretsAcquired += 1;
         state.uiAlpha = 255;
       }

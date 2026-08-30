@@ -52,7 +52,7 @@ export class FrostFieldAuraVFX {
   constructor(target: any, radius: number) {
     this.target = target;
     this.radius = radius;
-    for(let i=0; i<20; i++) {
+    for(let i=0; i<16; i++) {
       this.flakes.push({
         x: random(-radius, radius),
         y: random(-radius, radius),
@@ -71,16 +71,34 @@ export class FrostFieldAuraVFX {
       if (f.x < -this.radius) f.x = this.radius;
     }
   }
-  isDone() { return !this.target || this.target.health <= 0; }
+  isDone() { return !this.target || this.target.health <= 0 || (this.target.isMined === true); }
   display() {
-    const p = this.target.getWorldPos();
+    if (!this.target) return;
+    const p = this.target.getWorldPos ? this.target.getWorldPos() : this.target.pos;
+    if (!p || p.x === undefined || p.y === undefined) return;
     const activity = this.target.specialActivityLevel || 0;
     if (activity <= 0.01) return;
+
+    // Viewport Culling Optimization for large number of auras
+    const camX = state.cameraPos ? state.cameraPos.x : (state.player ? state.player.pos.x : 0);
+    const camY = state.cameraPos ? state.cameraPos.y : (state.player ? state.player.pos.y : 0);
+    const zoom = state.levelEditor?.cameraZoom || 1.0;
+    const w = typeof width !== 'undefined' ? width : 1000;
+    const h = typeof height !== 'undefined' ? height : 800;
+    const margin = this.radius + 60;
+
+    if (
+      p.x + margin < camX - w / (2 * zoom) ||
+      p.x - margin > camX + w / (2 * zoom) ||
+      p.y + margin < camY - h / (2 * zoom) ||
+      p.y - margin > camY + h / (2 * zoom)
+    ) {
+      return;
+    }
 
     push(); translate(p.x, p.y);
     const pulse = 1.0 + 0.05 * sin(state.frames * 0.02);
     const currentRadius = this.radius * activity;
-    const currentAlpha = 255 * activity;
     
     // Subtle glow floor
     noStroke();

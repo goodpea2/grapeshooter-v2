@@ -56,8 +56,10 @@ export function detachAllTurrets() {
     }
 
     const wt = createWorldTurret(att.type, placedGx, placedGy);
+    wt.pos = att.getWorldPos().copy();
     wt.health = att.health;
     wt.baseIngredients = att.baseIngredients ? [...att.baseIngredients] : [att.type];
+    wt.mustExitProximityFirst = true;
     state.world.addTurret(wt);
 
     triggerUpgradeHook('onDetach', att, {});

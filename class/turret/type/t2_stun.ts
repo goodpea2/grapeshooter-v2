@@ -7,7 +7,7 @@ export const t2_stun: TurretConfig = {
   actionType: ['pulse'],
   actionConfig: { 
     pulseBulletTypeKey: 'b_stun_gas_projectile', 
-    pulseTriggerRadius: GRID_SIZE * 2.0, 
+    pulseTriggerRadius: GRID_SIZE * 3.5, 
     pulseTriggerBy: ['enemy'], 
     pulseCooldown: HOUR_FRAMES * 1, 
     pulseCenteredAtTriggerSource: true, 
@@ -15,5 +15,5 @@ export const t2_stun: TurretConfig = {
     pulseTurretJumpAtTriggerSource: true 
   },
   targetType: ['enemy'],
-  targetConfig: { enemyPriority: 'closest' }
+  targetConfig: { enemyPriority: 'highestHealth' }
 };

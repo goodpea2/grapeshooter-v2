@@ -188,7 +188,7 @@ function drawGameplayUpgradesPanel(w: number, h: number, globalPanelX: number, g
   textAlign(CENTER, CENTER);
   textSize(22);
   noStroke();
-  text("Player Upgrades", w / 2, 22);
+  text("Player Upgrades", w / 2, 18);
 
   const padX = 24;
   const topY = 0;
@@ -216,7 +216,7 @@ function drawGameplayUpgradesPanel(w: number, h: number, globalPanelX: number, g
   state.playerUpgradesMaxScroll = maxScroll;
 
   // Scroll Drag & Velocity Physics
-  const isInside = mouseX >= globalPanelX && mouseX <= globalPanelX + w && mouseY >= globalPanelY + topY && mouseY <= globalPanelY + h;
+  const isInside = mouseX >= globalPanelX && mouseX <= globalPanelX + w && mouseY >= globalPanelY + topY && mouseY <= globalPanelY + topY + visibleH;
   if (mouseIsPressed && isInside) {
     const dy = mouseY - ((window as any).pmouseY || mouseY);
     if (Math.abs(dy) > 0.5) {

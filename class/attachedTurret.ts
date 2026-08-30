@@ -48,10 +48,7 @@ export class AttachedTurret extends Turret {
   isFollowingTrail: boolean = false;
   perpendicularOffset: number = 0; // Natural "wiggle" in the line
 
-  // Animation states
-  jumpOffset: any = null;
-  jumpFrames: number = 0;
-  jumpTargetPos: any = null;
+  // Animation states inherited from Turret (jumpOffset, jumpFrames, jumpPhase, jumpTargetPos, jumpCurrentPos)
 
   constructor(type: string, parent: any, hq: number, hr: number) {
     super(type, parent);
@@ -437,18 +434,13 @@ export class AttachedTurret extends Turret {
     const wPos = this.getWorldPos(); const rangeSq = range * range;
     const tTypes = this.config.targetType || []; const results: any[] = [];
     if (tTypes.includes('enemy')) {
-      const cs = state.spatialHashCellSize; const gx = floor(wPos.x / cs); const gy = floor(wPos.y / cs);
-      const searchRadius = Math.ceil(range / cs);
-      for (let i = -searchRadius; i <= searchRadius; i++) {
-        for (let j = -searchRadius; j <= searchRadius; j++) {
-          const neighbors = state.spatialHash.get(`${gx + i},${gy + j}`);
-          if (!neighbors) continue;
-          for (const e of neighbors) {
-            if (!(e instanceof Enemy) || e.health <= 0 || e.isDying || e.conditions.has('c_hypnotized')) continue;
-            const dSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
-            if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, e.pos.x, e.pos.y)) results.push(e);
-          }
-        }
+      const grid = state.spatialGrid;
+      if (grid) {
+        grid.queryCircleEnemies(wPos.x, wPos.y, range, (e: any) => {
+          if (e.conditions.has('c_hypnotized')) return;
+          const dSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
+          if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, e.pos.x, e.pos.y)) results.push(e);
+        });
       }
       // Also check spawner overlays which are treated as enemies
       state.world.chunks.forEach((chunk: any) => {

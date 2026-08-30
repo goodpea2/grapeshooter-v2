@@ -30,14 +30,14 @@ export const bulletTypes: any = {
   },
   b_player: {
     initialPierceChance: 0, pierceChanceDecayPerHit: 0,
-    bulletDamage: 4, bulletSpeed: 10, bulletColor: [225, 225, 100], bulletLifeTime: 180, bulletSize: 4, bulletLength: 8,
+    bulletDamage: 8, bulletSpeed: 15, bulletColor: [225, 225, 100], bulletLifeTime: 180, bulletSize: 3, bulletLength: 8,
     aoeConfig: { isAoe: false, aoeRadiusGradient: [], aoeDamageGradient: [], dealAoeOnObstacle: false, dealAoeAfterLifetime: false, aoeObstacleDamageMultiplier: 0 },
     stunDuration: 0, slowDuration: 0, slowFactor: 1, obstacleDamageMultiplier: 0,
     spawnGroundFeatureOnContact: [], spawnGroundFeaturePerFrame: -1, spawnGroundFeatureInRadius: 0,
     damageTargets: ['enemy', 'obstacle', 'icecube']
   },
   b_player_mining: {
-    bulletDamage: 8, bulletSpeed: 10, bulletColor: [255, 255, 100], bulletLifeTime: 180, bulletSize: 4, bulletLength: 8,
+    bulletDamage: 10, bulletSpeed: 10, bulletColor: [255, 255, 100], bulletLifeTime: 180, bulletSize: 4, bulletLength: 8,
     aoeConfig: { isAoe: false, aoeRadiusGradient: [], aoeDamageGradient: [], dealAoeOnObstacle: false, dealAoeAfterLifetime: false, aoeObstacleDamageMultiplier: 1 },
     stunDuration: 0, slowDuration: 0, slowFactor: 1, obstacleDamageMultiplier: 1,
     spawnGroundFeatureOnContact: [], spawnGroundFeaturePerFrame: -1, spawnGroundFeatureInRadius: 0,
@@ -82,7 +82,7 @@ export const bulletTypes: any = {
     damageTargets: ['enemy', 'obstacle', 'icecube']
   },
   b_firepea: {
-    bulletDamage: 10, bulletSpeed: 6, bulletColor: [255, 180, 50], bulletLifeTime: 90, bulletSize: 10, bulletLength: 10,
+    bulletDamage: 5, bulletSpeed: 6, bulletColor: [255, 180, 50], bulletLifeTime: 90, bulletSize: 6, bulletLength: 6,
     spawnGroundFeatureOnContact: ['gf_fire_puddle'],
     spawnGroundFeaturePerFrame: -1,
     spawnGroundFeatureInRadius: 0,
@@ -108,7 +108,15 @@ export const bulletTypes: any = {
   },
   b_snowpea: {
     bulletDamage: 10, bulletSpeed: 6, bulletColor: [150, 220, 255], bulletLifeTime: 90, bulletSize: 8, bulletLength: 8,
-    appliedConditions: [{ type: 'c_chilled', duration: 150 }],
+    appliedConditions: [{ type: 'c_chilled', duration: 240 }],
+    aoeConfig: { isAoe: false, aoeRadiusGradient: [], aoeDamageGradient: [], dealAoeOnObstacle: false, dealAoeAfterLifetime: false, aoeObstacleDamageMultiplier: 0 },
+    stunDuration: 0, slowDuration: 0, slowFactor: 1, obstacleDamageMultiplier: 0,
+    spawnGroundFeatureOnContact: [], spawnGroundFeaturePerFrame: -1, spawnGroundFeatureInRadius: 0,
+    damageTargets: ['enemy', 'icecube', 'obstacle']
+  },
+  b_snowpea2: {
+    bulletDamage: 10, bulletSpeed: 6, bulletColor: [0, 125, 255], bulletLifeTime: 90, bulletSize: 8, bulletLength: 8,
+    appliedConditions: [{ type: 'c_chilled', duration: 600 },{ type: 'c_stun', duration: 90 }],
     aoeConfig: { isAoe: false, aoeRadiusGradient: [], aoeDamageGradient: [], dealAoeOnObstacle: false, dealAoeAfterLifetime: false, aoeObstacleDamageMultiplier: 0 },
     stunDuration: 0, slowDuration: 0, slowFactor: 1, obstacleDamageMultiplier: 0,
     spawnGroundFeatureOnContact: [], spawnGroundFeaturePerFrame: -1, spawnGroundFeatureInRadius: 0,
@@ -124,7 +132,7 @@ export const bulletTypes: any = {
   },
   b_mortar_shell_t3: {
     bulletDamage: 10, bulletSpeed: 4, bulletColor: [255, 80, 0], bulletLifeTime: 120, bulletSize: 16, bulletLength: 16,
-    aoeConfig: { isAoe: true, aoeRadiusGradient: [GRID_SIZE*1,GRID_SIZE*2], aoeDamageGradient: [40,10], dealAoeOnObstacle: true, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 1.0 },
+    aoeConfig: { isAoe: true, aoeRadiusGradient: [GRID_SIZE*2,GRID_SIZE*2.5], aoeDamageGradient: [40,10], dealAoeOnObstacle: true, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 1.0 },
     cameraShakeOnDeath: [5, 8, 0.85],
     damageTargets: ['enemy', 'icecube', 'obstacle']
   },
@@ -273,6 +281,18 @@ export const bulletTypes: any = {
     },
     damageTargets: ['turret']
   },
+  b_healing_pulse_dense: {
+    bulletDamage: -10, bulletSpeed: 0, bulletColor: [100, 255, 100], bulletLifeTime: 1, bulletSize: 1, bulletLength: 1,
+    aoeConfig: { 
+      isAoe: true, 
+      aoeRadiusGradient: [GRID_SIZE * 1.5], 
+      aoeDamageGradient: [-10], 
+      dealAoeOnObstacle: false, 
+      dealAoeAfterLifetime: true, 
+      aoeObstacleDamageMultiplier: 0 
+    },
+    damageTargets: ['turret']
+  },
   b_enemy_healing_pulse: {
     bulletDamage: -5, bulletSpeed: 0, bulletColor: [100, 255, 100], bulletLifeTime: 1, bulletSize: 1, bulletLength: 1,
     aoeConfig: { 
@@ -298,6 +318,54 @@ export const bulletTypes: any = {
     stunDuration: 0, slowDuration: 0, slowFactor: 1, obstacleDamageMultiplier: 1,
     spawnGroundFeatureOnContact: [], spawnGroundFeaturePerFrame: -1, spawnGroundFeatureInRadius: 0,
     cameraShakeOnDeath: [10, 12, 0.95],
+    damageTargets: ['enemy', 'obstacle', 'icecube']
+  },
+  b_mine_explosion2: {
+    bulletDamage: 0, bulletSpeed: 0, bulletColor: [255, 60, 0], bulletLifeTime: 1, bulletSize: 1, bulletLength: 1,
+    aoeConfig: { 
+      isAoe: true, 
+      aoeRadiusGradient: [GRID_SIZE * 0.8, GRID_SIZE * 2.5], 
+      aoeDamageGradient: [1200,100], 
+      dealAoeOnObstacle: true, 
+      dealAoeAfterLifetime: true, 
+      aoeObstacleDamageMultiplier: 1.0 
+    },
+    stunDuration: 0, slowDuration: 0, slowFactor: 1, obstacleDamageMultiplier: 1,
+    spawnGroundFeatureOnContact: [], spawnGroundFeaturePerFrame: -1, spawnGroundFeatureInRadius: 0,
+    cameraShakeOnDeath: [14, 18, 0.95],
+    damageTargets: ['enemy', 'obstacle', 'icecube']
+  },
+  b_mine_explosion3: {
+    bulletDamage: 0, bulletSpeed: 0, bulletColor: [255, 30, 0], bulletLifeTime: 1, bulletSize: 1, bulletLength: 1,
+    aoeConfig: { 
+      isAoe: true, 
+      aoeRadiusGradient: [GRID_SIZE * 1.2, GRID_SIZE * 3.5], 
+      aoeDamageGradient: [2400,100], 
+      dealAoeOnObstacle: true, 
+      dealAoeAfterLifetime: true, 
+      aoeObstacleDamageMultiplier: 1.0 
+    },
+    stunDuration: 0, slowDuration: 0, slowFactor: 1, obstacleDamageMultiplier: 1,
+    spawnGroundFeatureOnContact: [], spawnGroundFeaturePerFrame: -1, spawnGroundFeatureInRadius: 0,
+    cameraShakeOnDeath: [18, 24, 0.95],
+    damageTargets: ['enemy', 'obstacle', 'icecube']
+  },
+  b_firecharge_shell: {
+    bulletDamage: 0, bulletSpeed: 0, bulletLifeTime: 1, bulletSize: 6, bulletLength: 6, bulletColor: [255, 120, 0],
+    bulletAssetImg: 'img_b_flame_shot',
+    highArcConfig: { arcHeight: 120, arcTravelTime: 45 },
+    spawnGroundFeatureOnContact: ['gf_fire_puddle_firecharge'],
+    spawnGroundFeatureKeys: ['gf_fire_puddle_firecharge'],
+    aoeConfig: { 
+      isAoe: true, 
+      aoeRadiusGradient: [GRID_SIZE * 1.5], 
+      aoeDamageGradient: [10], 
+      dealAoeOnObstacle: true, 
+      dealAoeAfterLifetime: true, 
+      aoeObstacleDamageMultiplier: 0.5,
+      aoeKnockbackStrength: 0
+    },
+    cameraShakeOnDeath: [4, 6, 0.8],
     damageTargets: ['enemy', 'obstacle', 'icecube']
   },
   b_minefield_explosion: {
@@ -352,10 +420,10 @@ export const bulletTypes: any = {
     aoeConfig: { 
       isAoe: true, 
       aoeRadiusGradient: [GRID_SIZE * 1.5, GRID_SIZE * 2.5], 
-      aoeDamageGradient: [30,5], 
+      aoeDamageGradient: [80,20], 
       dealAoeOnObstacle: true, 
       dealAoeAfterLifetime: true, 
-      aoeObstacleDamageMultiplier: 1 
+      aoeObstacleDamageMultiplier: 0.25 
     },
     cameraShakeOnDeath: [3, 4, 0.8],
     damageTargets: ['enemy', 'obstacle']
@@ -419,10 +487,10 @@ export const bulletTypes: any = {
   },
   b_pulse_tier2: {
     bulletDamage: 0, bulletSpeed: 0, bulletColor: [180, 220, 255], bulletLifeTime: 1, bulletSize: 1, bulletLength: 1,
-    aoeConfig: { isAoe: true, aoeRadiusGradient: [GRID_SIZE * 1.5], aoeDamageGradient: [45], dealAoeOnObstacle: true, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 1 },
+    aoeConfig: { isAoe: true, aoeRadiusGradient: [GRID_SIZE * 2.0], aoeDamageGradient: [45], dealAoeOnObstacle: true, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 1 },
     stunDuration: 0, slowDuration: 0, slowFactor: 1, obstacleDamageMultiplier: 1,
     spawnGroundFeatureOnContact: [], spawnGroundFeaturePerFrame: -1, spawnGroundFeatureInRadius: 0,
-    cameraShakeOnDeath: [6, 9, 0.8],
+    cameraShakeOnDeath: [4, 6, 0.8],
     damageTargets: ['enemy', 'obstacle', 'icecube']
   },
   b_enemy_pulse: {
@@ -443,10 +511,10 @@ export const bulletTypes: any = {
     bulletDamage: 0, bulletSpeed: 0, bulletColor: [100, 255, 150], bulletLifeTime: 1, bulletSize: 1, bulletLength: 1,
     knockBackDuration: 15,
     aoeConfig: { 
-      isAoe: true, aoeRadiusGradient: [GRID_SIZE * 1.5], aoeDamageGradient: [30], dealAoeOnObstacle: true, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 1,
-      aoeKnockbackStrength: 20.0 
+      isAoe: true, aoeRadiusGradient: [GRID_SIZE * 2.0], aoeDamageGradient: [30], dealAoeOnObstacle: true, dealAoeAfterLifetime: true, aoeObstacleDamageMultiplier: 1,
+      aoeKnockbackStrength: 30.0 
     },
-    cameraShakeOnDeath: [4, 6, 0.8],
+    cameraShakeOnDeath: [3, 4, 0.8],
     damageTargets: ['enemy', 'obstacle', 'icecube']
   },
   b_bowling_bulb: {

@@ -27,10 +27,24 @@ export class ActionSpawnOnTargetDeath extends TurretAction {
   }
 
   onTargetKilled(target: any) {
+    // If target is a mined block / tile, block death is handled exclusively by onTargetMined
+    if (target && (target.gx !== undefined || target.isMined !== undefined || target.overlay !== undefined)) {
+      return;
+    }
     const config = this.turret.config.actionConfig;
     const vConfig = config.spawnOnTargetDeathConfig;
     if (!vConfig) return;
+    this.spawnBullets(target, vConfig);
+  }
 
+  onTargetMined(target: any, context?: any) {
+    const config = this.turret.config.actionConfig;
+    const vConfig = config.spawnOnTargetDeathConfig;
+    if (!vConfig || !vConfig.triggerOnMine) return;
+    this.spawnBullets(target, vConfig);
+  }
+
+  private spawnBullets(target: any, vConfig: any) {
     if (vConfig.onlyTriggerFromIntendedTargetDeath && target !== this.turret.target) {
       return;
     }

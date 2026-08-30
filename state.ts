@@ -84,8 +84,11 @@ export const state: any = {
   almanacUnlockCycleTimer: 0,
   almanacUnlockCycleIndex: 0,
   cameraPos: { x: 0, y: 0 },
+  cameraZoom: 1.0,
+  targetCameraZoom: 1.0,
   cameraShake: 0, // Current camera shake intensity
   cameraShakeFalloff: 0.95, // Default decay rate
+  viewportBounds: { minX: 0, maxX: 0, minY: 0, maxY: 0 },
   exploredChunks: new Set(),
   activeChunkKeys: new Set(),
   chunkAccessOrder: [],
@@ -114,6 +117,12 @@ export const state: any = {
   })(),
   lastLevelStarsEarned: 0,
   winConditionActive: false,
+  levelWonSequence: null as {
+    active: boolean;
+    pendingDestructions: Array<{ type: 'enemy' | 'block'; target: any }>;
+    destructionTimer: number;
+    postSequenceTimer: number;
+  } | null,
   showGameOverPopup: false,
   gameOverProgress: 0, // Used for lighting and modal animation
   totalElixirLootCollected: 0,
@@ -122,8 +131,7 @@ export const state: any = {
   killsByType: {}, // Tracks kills per enemy key
 
   // Spatial Partitioning
-  spatialHash: new Map(),
-  spatialHashCellSize: SPATIAL_HASH_CELL_SIZE,
+  spatialGrid: null as any,
   needsTargetReScan: false,
 
   // Loaded Assets

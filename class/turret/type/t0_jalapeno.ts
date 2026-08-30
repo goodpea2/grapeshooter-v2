@@ -3,9 +3,6 @@ import { HOUR_FRAMES } from '../../../constants';
 import { AttachedTurret } from '../../attachedTurret';
 import { WorldTurret } from '../../worldTurret';
 
-export class JalapenoAttachedTurret extends AttachedTurret {}
-export class JalapenoWorldTurret extends WorldTurret {}
-
 export const t0_jalapeno: TurretConfig = {
   name: 'Rage Chili', costs: { elixir: 20 }, health: 50, color: [255, 50, 50], size: 22, tier: 0, isSpecial: true,
   tooltip: "Allows the player to shoot while moving and gain x4 fire rate for 2h",

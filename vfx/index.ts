@@ -3,6 +3,7 @@ export { PayGateFlyVFX } from './PayGateFlyVFX';
 export { MagicLinkVFX } from './MagicLinkVFX';
 export { FirstStrikeVFX } from './FirstStrikeVFX';
 export { FrostFieldAuraVFX } from './FrostFieldAuraVFX';
+export { TorchwoodAuraVFX } from './TorchwoodAuraVFX';
 export { WeldingHitVFX } from './WeldingHitVFX';
 export { ShopFlyVFX } from './ShopFlyVFX';
 export { LiquidTrailVFX } from './LiquidTrailVFX';

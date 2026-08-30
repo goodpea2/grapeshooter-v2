@@ -4,6 +4,7 @@ export const conditionTypes: any = {
     name: 'Chilled',
     conditionVfx: 'condition_chill',
     enemyMovementSpeedMultiplier: 0.5,
+    enemyAttackSpeedMultiplier: 2,
     conditionClashesConfig: {
       override: ['c_burning']
     }

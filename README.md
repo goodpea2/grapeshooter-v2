@@ -57,6 +57,10 @@ Base expansion is built on a **Hex-Axial Coordinate System** (q, r).
     - **First Strike**: The `t3_minefield` performs a rapid-fire sequence of 8 mine launches immediately upon placement, accompanied by a power-up visual effect.
     - **Aura**: The `t3_frostfield` emits a continuous chilling field that slows all enemies within a 2.8 tile radius, providing constant crowd control regardless of arming state.
     - **Gas Barrage**: The `t3_triberg` has been upgraded from a trap to a multi-target ranged lobber, capable of dropping 3 high-duration stun gas puddles on different enemies simultaneously.
+    - **Gatling Pea (`t3_gatling`)**: Rapid burst shooter with `whileCharged` mechanics. When the player is boosted via click-hold, it overrides fire rate down to 3 frames and locks onto the player's current target if no enemies are within its standard radius.
+    - **Fire Launcher (`t3_firecharge`)**: High-arc lobber targeting random enemies with lingering fire puddles (`gf_fire_puddle_firecharge`). While charged, increases range to 8 tiles, increases fire rate, and barrages random ground positions when no target is present.
+    - **Mine Charger (`t3_minecharge`)**: Channeling explosive trap that consumes player stamina while holding click to grow in size and explosive radius (up to 500 growth points). At high charges, triggers screen-clearing explosions (`b_mine_explosion2` / `b_mine_explosion3`).
+    - **Dynamic Charge Integration (`whileCharged` / `c_raged_visualonly`)**: Centralized `isCharged()` state hook across attached and world turrets, synchronizing burst fire rate, rage visual aura, and stacked bullet mechanics when fire rate drops below 4 frames.
 
 ---
 
@@ -418,4 +422,188 @@ The Main Menu features a sleek layout pairing level navigation with a responsive
   - **Reachable Tile Placement & Turret Interaction**: World turret selection, placement preview snapping, and drag-and-drop merging enforce `flowField.isTileAccessible` checks relative to the player's location.
 - **Sun Generator Harvest Rescan**:
   - Harvesting Sun currency from a Sun Generator automatically dispatches an obstacle update event, clearing targeting locks and refreshing target scans for both the player core and surrounding turrets.
+
+---
+
+## ⏳ Hourly Spawning Mechanics, Spawner Gizmos & Pre-Spawned Loot
+- **`hourlySpawnConfig` Spawning Pipeline**:
+  - `l_spawner` and custom spawners can configure `hourlySpawnConfig: { enabled: true, hourlyBudgetMultiplier, hourlyBudgetAdd, selfDestructAfterBudgetSpawned }`.
+  - When enabled, the spawner derives its dynamic wave budget from the level's current hourly budget (`levelCurrentHourlyBudget * hourlyBudgetMultiplier + hourlyBudgetAdd`), bypassing fixed `budget` and `spawnIntervalConsumeBudget` limits while respecting minimum `spawnInterval`.
+  - Spawners automatically self-destruct into explosion debris and splash VFX once their cumulative spawned budget exceeds `selfDestructAfterBudgetSpawned`.
+- **DebugMode Spawner Gizmos**:
+  - Hovering over `ov_spawner` and `l_spawner` in Debug Mode (`state.showDebug`) renders their exact trigger radius and spawn radius world circles.
+  - Displays a detailed debug tooltip overlay showing current budget, hourly config, remaining lifetime, and configured enemy types.
+- **LevelEditor Pre-Spawned Loot Support**:
+  - Designers can pre-place any resource loot drop (Sun, Elixir, Soil, Raisin, Shard, Leaf, Shell, Fuel, Ice) directly onto the world canvas via the Level Editor `Entities > Loot` palette.
+  - Pre-spawned loots are saved with `neverDespawn: true` and serialized under `levelData.loots`, restoring seamlessly during test plays, level loads, and JSON imports.
+- **Player Upgrades UI Alignment**:
+  - Refined the layout and vertical spacing of the Player Upgrades panel in the Almanac, aligning cards, headers, and scroll bounds to eliminate visual offsets.
+
+---
+
+## 🚀 Canvas Performance Readbacks & Jump-At-Trigger Animation Overhauls
+- **Hardware-Accelerated 2D Canvas Readbacks (`willReadFrequently: true`)**:
+  - Automatically configures all 2D HTML Canvas contexts (`getContext('2d')`) with `{ willReadFrequently: true }` across `index.html` and `index.tsx`.
+  - Optimizes `getImageData` pixel readbacks from GPU/CPU buffers, eliminates Chrome/Edge readback console warnings, and speeds up p5.js text metric calculations and offscreen buffer compositing.
+- **Physical Run & Return Sequence for `pulseTurretJumpAtTriggerSource`**:
+  - Turrets with jump-trigger actions (e.g., Potato Mine `t_mine`, Ice Mine `t2_icebomb`, Stun Mine `t2_stun`) execute a dynamic 2-phase run: they physically run toward their target at squad follow speed (with duration proportional to target distance), detonate their pulse at the target point, and then physically run back to their home spot.
+  - While running in both directions, units trigger their full run-hopping wobble/bob animation (`isMoving = true`) and orient facing their travel vector.
+  - Units with `hasUnarmedAsset: true` display their **armed** sprite while charging toward the target, switch to their unarmed/cooldown state upon detonation, and maintain the unarmed sprite while running home.
+
+---
+
+## 🛡️ Detach All Proximity-Exit Trigger & Off-Screen World Simulation
+- **Proximity-Exit ("Step-Away") Detach Trigger**:
+  - Detaching all turrets via the HUD `DetachAllTurrets` action flags placed units with `mustExitProximityFirst: true`.
+  - The player and base attachments are barred from immediately re-colliding and picking up newly placed world turrets until they have physically stepped away beyond the detachment footprint (`safeExitDist`).
+  - Once the player moves away, the proximity flag clears seamlessly, restoring standard collision pickup when the player returns.
+- **Persistent Loot Pipeline (`neverDespawn: true`)**:
+  - All dropped resource entities (Sun, Elixir, Soil, Raisin, Rare Components, Turret drops) default to persistent lifetime (`neverDespawn = true`).
+  - Resources dropped by world turrets, mining operations, and sun generators remain safely cached in chunk memory without despawning or fading out, regardless of how far the player roams.
+- **Active Chunks Registry & Off-Screen Simulation**:
+  - `WorldManager.update()` decouples visual viewport culling from world simulation. Chunks containing active world buildings (player turrets, sun generators, active spawners, catalyst nodes) are registered into the simulation tick.
+  - Placed world turrets continue auto-firing and mining sun generators offscreen, accumulating loot in chunk arrays with zero render CPU/GPU overhead until the player returns.
+
+---
+
+## 🧪 Modular Test Turrets & Action Expansions
+- **`t2_wallaser` (Wallaser)**:
+  - *Tooltip*: "For every blocks mined on its own, this turret heals 50 HP, bypassing's own MaxHP".
+  - *Base & Stats*: 300 HP, `beamMaxLength: GRID_SIZE * 4`, reuses `t2_puncher`'s asset sprites.
+  - *Mechanic*: Modular `onMineHealSelf: 50` and `onMineHealBypassMaxHP: true` configured on `ActionLaserBeam`. Automatically triggers when mining blocks or extracting Sun from Sun Generators.
+- **`t2_heallaser` (Heallaser)**:
+  - *Tooltip*: "For every blocks mined on its own, release a 10-hp heal pulse to nearby turrets".
+  - *Base & Stats*: 50 HP, base laser range (`GRID_SIZE * 8`), reuses `t2_iceray`'s asset sprites.
+  - *Mechanic*: Extends `ActionSpawnOnTargetDeath` with `triggerOnMine: true`, spawning `b_healing_pulse_10` at the turret to emit an AoE heal pulse to nearby friendly turrets.
+  - *Costs*: 25 Sun (Almanac: 3 Shards, 5 Ice).
+- **`t2_icewall` (Ice Wallnut)**:
+  - *Tooltip*: "Emits a small chilling field".
+  - *Base & Stats*: 300 HP wall defensive unit with `ActionAura` chilling aura (`radius: GRID_SIZE * 1.5`, `c_chilled` condition, `aura_frostfield` VFX).
+  - *Costs*: 15 Sun (Almanac: 3 Shells, 2 Ice).
+- **`t2_torchwood` (Torchwood)**:
+  - *Tooltip*: "Emits a field that boost bullet's damage".
+  - *Base & Stats*: 200 HP support unit, reuses `t3_flamethrower`'s asset sprites with custom animated ember particle `TorchwoodAuraVFX`.
+  - *Mechanic*: Emits a 1.5-tile damage-boost field (`radius: GRID_SIZE * 1.5`). Projectiles passing through unique Torchwood fields receive `+3` stacked damage (`boostsBulletFromEmitter: ['turret', 'player']`) with visual fiery color tinting.
+  - *Costs*: 30 Sun (Almanac: 5 Fuel, 5 Ice).
+
+---
+
+## ✨ Aura VFX Lifecycle, Grid Aura Persistence & Healing Visuals
+- **Aura VFX Optimization & Stacking Prevention**:
+  - `ActionAura` now registers a single, persistent aura instance per emitting turret (`FrostFieldAuraVFX` or `TorchwoodAuraVFX`), completely eliminating frame-based re-instantiation and infinite memory/stacking overhead.
+  - Added robust spatial viewport culling (resolving `state.cameraPos` coordinates) and particle cap optimizations to `FrostFieldAuraVFX` and `TorchwoodAuraVFX` to ensure smooth 60fps rendering even with dozens of active aura fields across the map.
+- **Continuous Grid Aura State**:
+  - Turrets placed on the world grid (`WorldTurret`) now maintain continuous `specialActivityLevel = 1.0` while powered, keeping their chilling fields and projectile damage-boost auras permanently active regardless of whether the mobile squad is walking or stationary.
+- **Standardized HP Bar Rendering**:
+  - Reverted `visualTurrets.ts` to use uniform, standard HP bar display behavior across all turrets (rendered in clean red on dark backdrop when `health < maxHealth`).
+- **Smooth Positional Movement Across World Grid & Attached Squad**:
+  - `WorldTurret` now features smooth positional interpolation (`updateMovement`), smoothly gliding to target grid coordinates when placed or repositioned across the world grid.
+  - Moving turrets between world grid tiles and the mobile attached squad now carries over the starting world position, allowing turrets to smoothly leap and glide to their new positions across all placement modes.
+- **Green Healing Feedback Numbers**:
+  - Reused `DamageNumberVFX` to render dynamic green text indicators (`[80, 255, 120]`) upon any turret, enemy, or player healing event without adding redundant UI elements.
+
+---
+
+## ⚡ Turret Movement, Chill Attack Slowdown & Balance Updates
+- **Single-Trigger `t2_heallaser` Mining Fix**:
+  - Block destruction now invokes `onTargetMined` exclusively without redundant firing from generic `onTargetKilled` hooks, ensuring `t2_heallaser` only heals once per block mined.
+- **Physical Grid Movement & Aura VFX Retargeting**:
+  - Picking up and moving turrets between world grid coordinates now physically repositions the turret instance, immediately updating its coordinate vectors (`gx`, `gy`, `pos`) and automatically carrying over active aura VFX (`FrostFieldAuraVFX`, `TorchwoodAuraVFX`), conditions, and stats.
+  - Moving turrets between attached squad slots and the world grid seamlessly transfers health, max health, stat modifiers, and reparents existing VFX bindings.
+- **Chill Condition Attack Slowdown (`c_chilled`)**:
+  - Added `enemyAttackSpeedMultiplier: 2` to `c_chilled` in `conditionTypes`.
+  - Enemies afflicted with `c_chilled` now experience a 2x slowdown on melee attack animation windups, melee cooldowns, and projectile firing rates.
+- **`t2_wallaser` Balancing & Health Scaling**:
+  - Updated `t2_wallaser` to feature a `maxHealth` of 1200 while starting at 150 HP upon placement.
+  - Self-healing from mining blocks now strictly caps at `maxHealth` (1200 HP) without bypassing the maximum health ceiling.
+
+---
+
+## ⚡ Performance Optimizations: Spatial Grid, LOS Caching & Enemy Sprite Pipeline
+- **Spatial Hash Bucket Grid (`SpatialHashGrid`)**:
+  - Implemented high-performance spatial bucket grid in `class/spatialGrid.ts` with packed 32-bit integer coordinate hashing and recycled bucket array pools to eliminate Garbage Collection allocations.
+  - Automatically indexes all alive enemies, player attachments, world turrets, and player entities into spatial buckets for $O(1)$ spatial queries.
+  - Accelerated bullet collision detection and turret enemy target scanning via zero-allocation `queryCircleEnemies`.
+- **LOS (Line-of-Sight) Cache & World Mutation Versioning**:
+  - Added `obstacleVersion` tracking to `WorldManager`. Raycasts in `checkLOS` are now memoized across identical grid coordinates and invalidated only when world blocks are mined, modified, or placed.
+- **Streamlined Enemy Sprite & Gizmo Fallback**:
+  - `visualEnemies.ts` now directly renders hardware-accelerated sprite assets with minimal draw overhead, falling back to lightweight circular gizmos with directional ticks only if no sprite asset is loaded.
+- **Dynamic Viewport Frustum Culling & Seamless Camera Zoom**:
+  - Active rendering passes for world chunks, Y-sorted entities (turrets, enemies, NPCs), projectiles, and particle VFX dynamically cull objects outside the current visible viewport bounds plus safety buffer margins.
+  - Integrated smooth mouse-wheel camera zooming (clamped between 0.65x wide view and 1.5x close view) with automatic mouse-to-world coordinate conversion and turret drag placement scaling.
+  - Fixed click and drag picking areas in zoomed states across world interaction and drag-to-move handlers.
+- **Unified Turret Relocation Animation Sequence**:
+  - `WorldTurret` positions and movements between positions now use constant-speed steering physics matching following-player sequences with natural jump-hopping squash and stretch animations.
+  - While turrets are relocating between tiles, they remain in an inactive state and ignore player collision to prevent accidental pick-up interruptions.
+
+---
+
+## 🏛️ Modular World Engine Architecture & Refined Systems
+- **Modular `/world/` Engine Architecture**:
+  - Refactored `world.ts` into isolated, maintainable modules under `/world/`:
+    - **`paygate.ts`**: Encapsulates `PayGateGroup` clustering, multi-block link synchronization, proximity cost calculations, resource deductions, and break events.
+    - **`block.ts`**: `Block` lifecycle management including layered rendering passes (`renderBase`, `renderSparkles`, `renderOverlay`), overlay weapon aiming/lasers, health bars, and enemy spawner logic.
+    - **`chunk.ts`**: Dual-grid procedural world generation, room prefab processing, and 17×17 autotiling junction offscreen buffering.
+    - **`worldManager.ts`**: `WorldManager` streaming, LRU chunk cache (127-chunk ceiling), DDA raycasting with versioned Line-of-Sight (LOS) memoization, and spatial indexing.
+    - **`world.ts`**: Clean barrel file re-exporting all world classes, types, and constants.
+- **Subpixel Autotile Junction Gap Elimination**:
+  - Corrected tile centering in `visualAutotiling.ts` with `tileDrawOffset = (GRID_SIZE - tileDrawSize) / 2` and a slight subpixel bleed `GRID_SIZE + 0.8`, completely eliminating visual seams between 2×2 obstacle clusters.
+- **Touch-Friendly Swipable Main Menu UI**:
+  - Integrated touch and drag input handlers (`handleMainMenuPress`, `handleMainMenuDrag`, `handleMainMenuRelease`) into `ui/uiMainMenu.ts` and `index.tsx`, enabling seamless momentum dragging and swipe scrolling through the custom level list on touch screens and mobile devices.
+- **Steep Ease-Out Dynamic Camera Zooming**:
+  - Updated camera zoom interpolation curve to a steep `easeOut` curve for instant, snappy zooming responsiveness.
+  - Selecting a turret from the hotbar or dragging a turret now dynamically calculates the exact viewport zoom scale needed to frame the player, all existing attachments, and all valid adjacent hex placement candidate spots with generous padding.
+- **Level Export Default Progression**:
+  - Standardized `AllTurretCrafting` to default to `false` when exporting level data from the Level Editor and when initializing new level configurations.
+- **Relentless Pulse Turret Jump Chasing & Target Death Handling**:
+  - `ActionPulse` with `pulseTurretJumpAtTriggerSource` now dynamically tracks and chases moving enemy targets in real-time until reaching the target for a successful detonation.
+  - If a target dies or despawns during the chase, the jumping turret continues to the target's last known coordinates, emits the pulse detonation at that position, enters cooldown, and leaps back to its home attachment/world position.
+- **Unrestricted Player Movement During Turret Selection & Placement**:
+  - Players can now move normally with WASD, keyboard controls, or touch/mouse dragging while selecting or picking turrets from the hotbar or squad.
+  - Placement candidate spots, ghost previews, and drag tethers dynamically follow the moving player and squad in real-time.
+
+---
+
+## 🎯 Level-Won Sequence, Stamina Boost Overhaul & Turret Refinements
+- **Stamina Boost & Activation Threshold**:
+  - `isClickHolding` boost mechanic requires a minimum of **25 stamina** to activate boosting and broadcast `isCharged()` state to attached turrets.
+  - Once active, boosting continues smoothly until stamina is fully depleted (`stamina <= 0`), at which point boosting stops and `isCharged()` state ceases until stamina recovers to at least 25.
+- **`t2_laserexplode` Block Destruction Bullet Spawning**:
+  - Fixed bullet spawn coordinates for `t2_laserexplode` to spawn the `b_laser_explosion` bullet directly at the center coordinates of the mined/destroyed obstacle or target without duplicate spawning.
+- **`t3_minecharge` Growth Bar & Stamina Gizmos**:
+  - Added dedicated growth/charge bar rendering above `t3_minecharge` to visualize charging progression up to 500 stamina.
+  - Updated `TurretGizmos` in Debug Mode (`state.debugGizmosTurrets`) to display the live stamina charge amount (`Charge: X/500`) and added detailed stamina charge tracking to mouse hover debug tooltips.
+- **`ov_tnt` Explosion Fix & Chain Reactions**:
+  - Improved `ov_tnt` explosive detonation with immediate AoE damage execution upon fuse completion.
+  - Explosions within range of nearby ticking TNT explosives trigger chain-reaction detonations with rapid 4–6 frame detonation delays.
+  - Upgraded `drawTickingExplosive` visuals with dynamic danger pulse overlays, smooth sprite rendering, and animated countdown fuse arcs.
+- **Turret Debug HP Display**:
+  - Debug Mode `HP Info` (`state.debugHP`) now renders HP bars and exact numerical health overlays (`${floor(health)}/${maxHealth}`) on all placed and attached turrets.
+- **Dramatic Level-Won Sequence**:
+  - Upon clearing all WinCondition objectives, the game initiates a sequential self-destruction sequence for all remaining active enemies and enemy obstacles (`isEnemy: true`), destroying one target every 6 frames with localized explosion VFX.
+  - After all enemy entities and structures have self-destructed, a 15-frame pause precedes the victory screen and star rating calculations.
+- **`ActionPulse` & Radial Wave Fixes (`t2_pulse`, `t3_repulser`)**:
+  - Set `needsLOS(): false` on `ActionPulse` so line-of-sight raycasts no longer block radial pulses from targeting nearby enemies or adjacent obstacles.
+  - Implemented a proximity fallback scan that detonates the pulse whenever valid targets enter the trigger radius even if target lock-on is momentary or obstructed.
+- **`t2_laserexplode` Target Mined & Killed Bullet Spawning**:
+  - Implemented `onTargetMined` and `onTargetKilled` hooks on `ActionLaserBeam` to ensure `b_laser_explosion` always spawns at the exact center of mined blocks and defeated entities.
+- **Level Editor Flexible Render Distance & Zoom Clamping**:
+  - Dynamically calculates `state.viewportBounds` in Level Editor mode with generous margins and loads all chunks encompassing the visible viewport, guaranteeing full rendering without clipping regardless of camera position or zoom scale.
+  - Restricted dynamic turret selection camera zoom to zoom-in only (clamped to at least the player's base camera zoom level).
+- **Turret Loot State Preservation & Direct Player Collision Attachment**:
+  - Turrets as loot objects preserve their exact state (HP, conditions, arming progress) and automatically attempt to place themselves on the nearest clear grid cell within 5 tiles if `dieAfterDuration` is not set.
+  - Player collision with world turrets immediately attaches them to the next available formation slot instead of dropping them as loot objects.
+- **`t3_minecharger` Dynamic Step-Based Growth Bar**:
+  - Reuses the cyan-flashing growth bar visuals to display charge progress towards the `nextStaminaStep` (`currentCharge / nextStaminaStep`) and automatically hides the bar once the final stamina step is reached.
+- **`dealAoeAfterLifetime` Bullet Expiration Explosion Fix**:
+  - Fixed an issue where projectiles with `dealAoeAfterLifetime: true` (and lifetime 1 explosion bullets) did not spawn their visual explosion or trigger their AoE radius effects upon reaching 0 lifetime.
+  - Implemented `checkLifetimeExplode()` lifecycle checks in `Bullet.update()` across all early return paths and at the end of the update loop.
+  - Added safe fallbacks in `Bullet.explode()` and `Bullet.getLerpedAoeDamage()` for missing/empty radius gradients and color palettes, ensuring explosions reliably detonate and apply area effects upon bullet expiration without duplicate triggers.
+
+
+
+
+
+
+
 

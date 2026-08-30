@@ -48,6 +48,10 @@ export const TYPE_MAP: Record<string, string> = {
   't2_icebomb': 't_icebomb',
   't2_stun': 't_stun',
   't2_spike': 't_spike',
+  't2_wallaser': 't_puncher',
+  't2_heallaser': 't_iceray',
+  't2_icewall': 't_wall',
+  't2_torchwood': 't_flamethrower',
   // Tier 3
   't3_triplepea': 't_triplepea',
   't3_firepea2': 't_firepea2',
@@ -62,6 +66,9 @@ export const TYPE_MAP: Record<string, string> = {
   't3_skymortar': 't_skymortar',
   't3_laser3': 't_laser3',
   't3_puncher2': 't_puncher2',
+  't3_gatling': 't_triplepea',
+  't3_firecharge': 't_flamethrower',
+  't3_minecharge': 't_mine',
   't3_aoelaser': 't_aoelaser',
   't3_iceray2': 't_iceray2',
   't3_miningbomb': 't_miningbomb',
@@ -108,7 +115,8 @@ export function hasTurretSprite(type: string): boolean {
 }
 
 export function drawTurretSprite(t: any) {
-  const baseKey = TYPE_MAP[t.type];
+  const customKey = t.customAssetImg || t.config?.assetImg;
+  const baseKey = customKey ? (TYPE_MAP[customKey] || customKey) : TYPE_MAP[t.type];
   if (!baseKey) return;
 
   push();
@@ -169,6 +177,11 @@ export function drawTurretSprite(t: any) {
         }
       }
     }
+  }
+
+  // When running towards a trigger target, always render armed sprite. Once detonated and running home, onCooldown naturally displays unarmed sprite
+  if (t.jumpPhase === 'toTarget') {
+    onCooldown = false;
   }
 
   let spriteKey = `img_${baseKey}_front`;

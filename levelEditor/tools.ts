@@ -7,7 +7,7 @@ import { npcTypes } from '../balanceNPC';
 import { lootTypes } from '../balanceLootTable';
 import { turretTypes } from '../balanceTurrets';
 import { Block } from '../world';
-import { GroundFeature, NPCEntity, Enemy } from '../entities';
+import { GroundFeature, NPCEntity, Enemy, LootEntity } from '../entities';
 import { createWorldTurret } from '../class/turret/TurretRegistry';
 import { spawnLootAt } from '../economy';
 
@@ -292,7 +292,9 @@ export function placeSelectedItem(mWorldX: number, mWorldY: number) {
       if (chunk) {
         const existing = chunk.loot.find((l: any) => dist(l.pos.x, l.pos.y, mWorldX, mWorldY) < 15);
         if (!existing) {
-          spawnLootAt(mWorldX, mWorldY, key, 1);
+          const loot = new LootEntity(mWorldX, mWorldY, key);
+          loot.neverDespawn = true;
+          chunk.loot.push(loot);
         }
       }
     }

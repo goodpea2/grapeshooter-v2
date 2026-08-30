@@ -8,6 +8,8 @@ export interface TurretConfig {
   costAlmanac?: { [key: string]: number };
   drops?: { [key: string]: number };
   health: number;
+  maxHealth?: number;
+  initialHealth?: number;
   color: number[];
   size: number;
   tier: number;
@@ -35,5 +37,7 @@ export interface TurretConfig {
   specialActivityLevel?: number;
   countTowardAttachedCapacity?: boolean;
   CountTowardAttachedCapacity?: boolean;
+  assetImg?: string;
+  whileCharged?: any;
   getActions?: (turret: Turret) => TurretAction[];
 }

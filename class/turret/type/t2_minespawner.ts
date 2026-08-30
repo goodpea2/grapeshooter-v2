@@ -8,7 +8,7 @@ export const t2_minespawner: TurretConfig = {
   actionType: ['pulse', 'spawnBulletAtRandom'],
   actionConfig: { 
       pulseBulletTypeKey: 'b_mine_explosion',
-      pulseTriggerRadius: GRID_SIZE * 1.5, 
+      pulseTriggerRadius: GRID_SIZE * 3.5, 
       pulseTriggerBy: ['enemy'], 
       pulseCooldown: HOUR_FRAMES * 2, 
       pulseCenteredAtTriggerSource: true,

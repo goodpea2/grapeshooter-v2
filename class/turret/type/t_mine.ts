@@ -7,7 +7,7 @@ export const t_mine: TurretConfig = {
   actionType: ['pulse'],
   actionConfig: { 
     pulseBulletTypeKey: 'b_mine_explosion', 
-    pulseTriggerRadius: GRID_SIZE * 1.5, 
+    pulseTriggerRadius: GRID_SIZE * 3.5, 
     pulseTriggerBy: ['enemy'], 
     pulseCooldown: HOUR_FRAMES * 2, 
     pulseCenteredAtTriggerSource: true, 
@@ -15,5 +15,5 @@ export const t_mine: TurretConfig = {
     pulseTurretJumpAtTriggerSource: true 
   },
   targetType: ['enemy'],
-  targetConfig: { enemyPriority: 'closest' }
+  targetConfig: { enemyPriority: 'highestHealth' }
 };

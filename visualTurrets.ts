@@ -76,7 +76,11 @@ export function drawTurret(t: any) {
   }
 
   // ANIMATION CALCULATION
-  const isMoving = !state.isStationary && t.isAttachedToPlayer();
+  const isMoving = (!state.isStationary && t.isAttachedToPlayer()) || 
+                   (t.jumpPhase !== null) || 
+                   (t.jumpFrames > 0) || 
+                   t.isRelocating || 
+                   (t.vel && t.vel.magSq && t.vel.magSq() > 0.04);
   const frames = state.frames;
 
   // Sync Lilypad body type with occupant
@@ -217,7 +221,10 @@ export function drawTurret(t: any) {
     }
 
     let lifeInfo = "";
-    if (actionConfig.dieAfterDuration) {
+    if (t.staminaSpent !== undefined || t.type === 't3_minecharge') {
+      const maxStam = actionConfig.maxGrowth || 500;
+      lifeInfo = `Charge: ${floor(t.staminaSpent || t.growthProgress || 0)}/${maxStam}`;
+    } else if (actionConfig.dieAfterDuration) {
         const rem = actionConfig.dieAfterDuration - t.framesAlive;
         lifeInfo = `Life: ${floor(rem)}f`;
     } else if (actionConfig.dieAfterActionCount) {
@@ -245,7 +252,7 @@ export function drawTurret(t: any) {
       const ty = -70;
       fill(0, 220);
       stroke(255, 100);
-      rect(tx, ty, 140, 85, 4);
+      rect(tx, ty, 140, 95, 4);
       noStroke();
       fill(255);
       textSize(10);
@@ -254,7 +261,10 @@ export function drawTurret(t: any) {
       let info = `dmgMult: ${s.damageMult?.toFixed(2)}\n`;
       info += `frMult: ${s.firerateDivider?.toFixed(2)}\n`;
       info += `rangeMult: ${s.rangeMult?.toFixed(2)}\n`;
-      info += `maxHp: ${t.maxHealth?.toFixed(0)}\n`;
+      info += `hp: ${floor(t.health)}/${t.maxHealth?.toFixed(0)}\n`;
+      if (t.staminaSpent !== undefined || t.growthProgress > 0) {
+        info += `charge: ${floor(t.staminaSpent || t.growthProgress || 0)}/500\n`;
+      }
       info += `pAtkFR: ${state.playerBonuses.attackFirerateMult?.toFixed(2)}x\n`;
       info += `pMinFR: ${state.playerBonuses.miningFirerateMult?.toFixed(2)}x`;
       text(info, tx + 5, ty + 5);
@@ -368,6 +378,44 @@ export function drawTurret(t: any) {
     pop();
   }
 
+  // t3_minecharge Stamina Step Charge Bar (exact growthBar cyan-flashing visuals)
+  if (t.type === 't3_minecharge') {
+    const currentCharge = (t as any).staminaSpent || t.growthProgress || 0;
+    const thresholds: number[] = t.config.whileCharged?.staminaSpentThresholds?.map((x: any) => x.staminaSpent) || [200, 500];
+    const lastStep = thresholds[thresholds.length - 1] || 500;
+
+    // Upon reaching the last staminaStep, the bar no longer shows up
+    if (currentCharge > 0 && currentCharge < lastStep) {
+      let prevStep = 0;
+      let nextStep = lastStep;
+      for (const step of thresholds) {
+        if (currentCharge < step) {
+          nextStep = step;
+          break;
+        }
+        prevStep = step;
+      }
+
+      const gRatio = Math.max(0, Math.min(1.0, (currentCharge - prevStep) / (nextStep - prevStep)));
+      const barW = t.size + 10;
+      const barH = 4;
+      const glowAlpha = 150 + 100 * sin(state.frames * 0.2);
+
+      push();
+      const hRatio = t.health / t.maxHealth;
+      const verticalOffset = hRatio < 1.0 ? -t.size/2 - 18 : -t.size/2 - 12;
+      translate(0, verticalOffset);
+      noStroke();
+      fill(20, 180);
+      rectMode(CENTER);
+      rect(0, 0, barW, barH, 2);
+      fill(150, 255, 200, glowAlpha);
+      rectMode(CORNER);
+      rect(-barW/2, -barH/2, barW * gRatio, barH, 2);
+      pop();
+    }
+  }
+
   if (t.frostLevel > 0 && !t.isFrosted) {
     noFill();
     stroke(180, 240, 255, 200);
@@ -391,18 +439,47 @@ export function drawTurret(t: any) {
   }
 
   let hRatio = t.health / t.maxHealth;
-  if (hRatio < 1.0) {
+
+  // Growth / Stamina Charge Bar (for non-seed, non-minecharge turrets)
+  if (t.growthProgress > 0 && t.type !== 't_seed' && t.type !== 't_seed2' && t.type !== 't3_minecharge') {
+    const maxG = t.config.actionConfig?.maxGrowth || 500;
+    const gRatio = Math.min(1.0, t.growthProgress / maxG);
     push();
-    const barW = t.size + 6;
+    const barW = t.size + 8;
+    const barH = 3;
+    const verticalOffset = (hRatio < 1.0 || state.debugHP) ? -t.size/2 - 16 : -t.size/2 - 8;
+    translate(0, verticalOffset);
+    noStroke();
+    fill(20, 20, 40, t.alpha * 0.85);
+    rectMode(CENTER);
+    rect(0, 0, barW, barH, 2);
+
+    fill(255, 180, 0, t.alpha);
+    rectMode(CORNER);
+    rect(-barW/2, -barH/2, barW * gRatio, barH, 2);
+    pop();
+  }
+
+  if (hRatio < 1.0 || state.debugHP) {
+    push();
+    const barW = t.size + 8;
     const barH = 4;
     translate(0, -t.size/2 - 8);
     noStroke();
-    fill(20, 20, 40, t.alpha * 0.8);
+    fill(20, 20, 40, t.alpha * 0.85);
     rectMode(CENTER);
     rect(0, 0, barW, barH, 2);
-    fill(255, 100, 100, t.alpha);
+
+    fill(255, 90, 90, t.alpha);
     rectMode(CORNER);
-    rect(-barW/2, -barH/2, barW * hRatio, barH, 2);
+    rect(-barW/2, -barH/2, barW * Math.max(0, hRatio), barH, 2);
+
+    if (state.debugHP) {
+      fill(255);
+      textAlign(CENTER, CENTER);
+      textSize(9);
+      text(`${floor(t.health)}/${t.maxHealth}`, 0, -8);
+    }
     pop();
   }
 

@@ -8,7 +8,7 @@ export const WORLD_TURRET_ACTIVE_RANGE = 20; // tiles
 export const VERSION = "Grapeshooter - build 26/8 2:23am"; // absolute time from gmt+7, don't :remove this comment
 export const LEVEL_THRESHOLDS = [15, 25, 35, 50, 65, 80, 100, 120, 140, 160];
 export const HOUR_FRAMES = 600;
-export const MAX_VFX = 400;
+export const MAX_VFX = 10;
 export const LEVEL_BUDGET = [30, 60, 60, 90, 120, 150, 200, 250, 300, 350, 400];
 
 // Optimization Tuning

@@ -8,7 +8,8 @@ export const EnabledTurrets: string[] = [
   't3_puncher2', 't3_aoelaser', 't3_iceray2', 't3_miningbomb', 't3_tesla', 't3_icepuncher',
   't3_densnut', 't3_durian', 't3_spike2', 't3_holonut',
   't3_firepea2', 't3_spinnut', 't3_mortar2', 't3_snowpea2', 't3_inferno',
-  't3_flamethrower', 't3_laser3', 't3_minefield', 't3_frostfield', 't3_triberg'
+  't3_flamethrower', 't3_laser3', 't3_minefield', 't3_frostfield', 't3_triberg',
+  't3_gatling', 't3_firecharge', 't3_minecharge'
 ];
 
 export const DisabledTurrets: string[] = [

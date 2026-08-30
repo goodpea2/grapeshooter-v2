@@ -56,7 +56,9 @@ import {
   deserializeSpawnAreaTiles,
   restoreCustomSpawnerPrefabs,
   serializeLevelEnemies,
-  deserializeLevelEnemies
+  deserializeLevelEnemies,
+  serializeLevelLoots,
+  deserializeLevelLoots
 } from '../levelManager';
 import { handleAlmanacClick } from '../ui/almanac/mainLayout';
 import { createDefaultEditorAlmanacProgression, AlmanacProgression } from '../lvDemo';
@@ -351,7 +353,7 @@ export function serializeLevelLayout() {
       LockedTurret: [...(prog.LockedTurret || [])],
       BannedTurrets: [...(prog.BannedTurrets || [])],
       UnlockCost: [...(prog.UnlockCost || [])],
-      AllTurretCrafting: prog.AllTurretCrafting !== false,
+      AllTurretCrafting: prog.AllTurretCrafting === true,
       AllTurretUpgrade: prog.AllTurretUpgrade !== false,
       CraftingCostOverride: [...(prog.CraftingCostOverride || [])]
     },
@@ -404,6 +406,7 @@ export function serializeLevelLayout() {
   }));
 
   levelData.enemies = serializeLevelEnemies(state.enemies);
+  levelData.loots = serializeLevelLoots(state.world);
 
   if (state.world && state.world.spawnAreaSet && state.world.spawnAreaSet.size > 0) {
     levelData.spawnAreaTiles = serializeSpawnAreaTiles(state.world.spawnAreaSet);
@@ -432,7 +435,7 @@ export function restoreLevelFromCache(layout: any) {
       LockedTurret: (raw.LockedTurret || []).map((t: any) => typeof t === 'string' ? { type: t, weight: 10 } : t),
       BannedTurrets: [...(raw.BannedTurrets || [])],
       UnlockCost: raw.UnlockCost !== undefined ? JSON.parse(JSON.stringify(raw.UnlockCost)) : [],
-      AllTurretCrafting: raw.AllTurretCrafting !== false,
+      AllTurretCrafting: raw.AllTurretCrafting === true,
       AllTurretUpgrade: raw.AllTurretUpgrade !== false,
       CraftingCostOverride: raw.CraftingCostOverride ? JSON.parse(JSON.stringify(raw.CraftingCostOverride)) : []
     };
@@ -507,6 +510,9 @@ export function restoreLevelFromCache(layout: any) {
   if (layout?.enemies) {
     deserializeLevelEnemies(layout.enemies);
   }
+
+  // Load Loots if provided
+  deserializeLevelLoots(state.world, layout?.loots || layout?.loot || layout?.Loots);
 
   if (state.world) {
     state.world.rebuildPayGateGroups();

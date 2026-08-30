@@ -146,7 +146,7 @@ export function drawTurretInfoPanel(x: number, y: number, w: number, h: number, 
   textSize(16);
   text(tr.name, -80, 0);
 
-  const showBuy = prog.AllTurretCrafting !== false;
+  const showBuy = prog.AllTurretCrafting === true;
   const showUpgrade = prog.AllTurretUpgrade !== false;
 
   let btnY = 38;

@@ -44,7 +44,7 @@ export const AlmanacProgression: AlmanacProgressionConfig = {
     't_farm_bush', 't_farm_crystal', 't_farm_mob'
   ],
   LockedTurret: [
-    { type: 't2_firepea', weight: 10 }, { type: 't2_peanut', weight: 10 }, { type: 't2_mortar', weight: 10 }, { type: 't2_snowpea', weight: 10 }, { type: 't2_puncher', weight: 10 }, { type: 't2_laserexplode', weight: 10 }, { type: 't2_iceray', weight: 10 }, { type: 't2_pulse', weight: 10 }, { type: 't2_spike', weight: 10 }, { type: 't2_icebomb', weight: 10 },
+    { type: 't2_firepea', weight: 10 }, { type: 't2_peanut', weight: 10 }, { type: 't2_mortar', weight: 10 }, { type: 't2_snowpea', weight: 10 }, { type: 't2_wallaser', weight: 10 }, { type: 't2_laserexplode', weight: 10 }, { type: 't2_heallaser', weight: 10 }, { type: 't2_pulse', weight: 10 }, { type: 't2_icewall', weight: 10 }, { type: 't2_torchwood', weight: 10 },
     { type: 't3_triplepea', weight: 3 }, { type: 't3_firepea2', weight: 3 }, { type: 't3_spinnut', weight: 3 }, { type: 't3_mortar2', weight: 3 }, { type: 't3_snowpea2', weight: 3 }, { type: 't3_inferno', weight: 3 }, { type: 't3_flamethrower', weight: 3 }, { type: 't3_bowling', weight: 3 }, { type: 't3_repulser', weight: 3 }, { type: 't3_snowpeanut', weight: 3 }, { type: 't3_skymortar', weight: 3 }, { type: 't3_laser3', weight: 3 }, { type: 't3_puncher2', weight: 3 }, { type: 't3_aoelaser', weight: 3 }, { type: 't3_iceray2', weight: 3 }, { type: 't3_miningbomb', weight: 3 }, { type: 't3_tesla', weight: 3 }, { type: 't3_icepuncher', weight: 3 }, { type: 't3_densnut', weight: 3 }, { type: 't3_durian', weight: 3 }, { type: 't3_spike2', weight: 3 }, { type: 't3_holonut', weight: 3 }, { type: 't3_minefield', weight: 3 }, { type: 't3_frostfield', weight: 3 }, { type: 't3_triberg', weight: 3 }
   ],
   BannedTurrets: [],
@@ -108,7 +108,7 @@ export function createDefaultEditorAlmanacProgression(): AlmanacProgressionConfi
     LockedTurret: [],
     BannedTurrets: defaultBanned,
     UnlockCost: [],
-    AllTurretCrafting: true,
+    AllTurretCrafting: false,
     AllTurretUpgrade: true,
     CraftingCostOverride: []
   };
@@ -131,7 +131,7 @@ export function getActiveAlmanacProgression(): AlmanacProgressionConfig {
       LockedTurret: (customProg.LockedTurret || []).map((t: any) => typeof t === 'string' ? { type: t, weight: 10 } : t),
       BannedTurrets: customProg.BannedTurrets || [],
       UnlockCost: customProg.UnlockCost !== undefined ? customProg.UnlockCost : [],
-      AllTurretCrafting: customProg.AllTurretCrafting !== false,
+      AllTurretCrafting: customProg.AllTurretCrafting === true,
       AllTurretUpgrade: customProg.AllTurretUpgrade !== false,
       CraftingCostOverride: customProg.CraftingCostOverride || []
     };
@@ -399,8 +399,9 @@ export function updateGameSystems() {
     if (tex.timer <= 0) {
       // Explode
       let b = new Bullet(tex.x, tex.y, tex.x, tex.y, 'b_tnt_explosion', 'none');
-      b.life = 0; 
       state.bullets.push(b);
+      b.explode();
+      b.life = 0;
       state.tickingExplosives.splice(i, 1);
     }
   }

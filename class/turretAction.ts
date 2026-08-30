@@ -43,6 +43,7 @@ export abstract class TurretAction {
   abstract performExecute(): void;
 
   onTargetKilled(target: any) {}
+  onTargetMined(target: any, context?: any) {}
 
   onDamage(dmg: number, source?: any): boolean {
     return false;

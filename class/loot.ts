@@ -4,6 +4,9 @@ import { ECONOMY_CONFIG } from '../economy';
 import { GRID_SIZE } from '../constants';
 import { lootTypes, LootType } from '../balanceLootTable';
 import { getPlayerUpgradeStat } from '../src/playerUpgrades';
+import { turretTypes } from '../balanceTurrets';
+import { createWorldTurret, restoreTurretData } from './turret/TurretRegistry';
+import { Explosion } from '../vfx';
 
 declare const p5: any;
 declare const createVector: any;
@@ -14,6 +17,7 @@ declare const push: any;
 declare const pop: any;
 declare const translate: any;
 declare const noStroke: any;
+declare const color: any;
 declare const fill: any;
 declare const ellipse: any;
 declare const map: any;
@@ -43,6 +47,7 @@ export class LootEntity {
   typeKey: string;
   config: LootType;
   renderSize: number;
+  neverDespawn: boolean = true;
   isBeingAttractedByFarm: boolean = false;
   farmAttractor: any = null;
 
@@ -91,13 +96,18 @@ export class LootEntity {
     const attractRangeSq = magnetRadius * magnetRadius;
     
     if (canBeAttracted && dSq < attractRangeSq) {
-      this.vel.add(p5.Vector.sub(playerPos, this.pos).normalize().mult(0.8));
-      this.vel.limit(8);
+      const isBlockedByPayGate = state.world ? state.world.hasPayGateObstruction(this.pos.x, this.pos.y, playerPos.x, playerPos.y) : false;
+      if (!isBlockedByPayGate) {
+        this.vel.add(p5.Vector.sub(playerPos, this.pos).normalize().mult(0.8));
+        this.vel.limit(8);
+      }
     }
     
     this.pos.add(this.vel); 
     this.vel.mult(0.94); 
-    this.life--;
+    if (!this.neverDespawn) {
+      this.life--;
+    }
     
     const collectionRangeSq = ECONOMY_CONFIG.sunLootCollectionRange * ECONOMY_CONFIG.sunLootCollectionRange;
     if (dSq < collectionRangeSq) {
@@ -106,7 +116,7 @@ export class LootEntity {
       }
       return 'collected';
     }
-    if (this.life <= 0) return 'missed';
+    if (!this.neverDespawn && this.life <= 0) return 'missed';
     return 'none';
   }
 
@@ -126,7 +136,7 @@ export class LootEntity {
     // ALPHA OPTIMIZATION: Use native globalAlpha instead of p5 tint()
     // tint() is very slow because it creates offscreen buffers for pixel manipulation
     let alpha = 1.0;
-    if (this.life < 100) alpha = this.life / 100;
+    if (!this.neverDespawn && this.life < 100) alpha = this.life / 100;
     ctx.globalAlpha = alpha;
 
     // MATH SIMPLIFICATION: Combined pulse and state logic
@@ -154,17 +164,74 @@ export class SunLoot extends LootEntity {
 export class TurretLoot extends LootEntity {
   turretType: string;
   turretHP: number;
+  turretData?: any;
 
-  constructor(x: number, y: number, turretType: string, hp: number) {
+  constructor(x: number, y: number, turretType: string, hp: number, turretData?: any) {
     // Attempt to use the specific turret type key if it exists in lootTypes, otherwise fallback to 'turret'
     const typeKey = lootTypes[turretType] ? turretType : 'turret';
     super(x, y, typeKey); 
     this.turretType = turretType;
     this.turretHP = hp;
+    this.turretData = turretData;
     
     // Ensure the config reflects the specific turret type for collection logic
     if (this.config) {
       this.config = { ...this.config, item: turretType, itemValue: turretType };
     }
+  }
+
+  tryAutoPlace(): boolean {
+    const config = turretTypes[this.turretType];
+    if (!config) return false;
+    if (config.actionConfig?.dieAfterDuration > 0) return false;
+
+    const baseGx = Math.floor(this.pos.x / GRID_SIZE);
+    const baseGy = Math.floor(this.pos.y / GRID_SIZE);
+    let bestGx = baseGx;
+    let bestGy = baseGy;
+    let minDist = Infinity;
+    const searchRadius = 5;
+
+    for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+      for (let dy = -searchRadius; dy <= searchRadius; dy++) {
+        if (dx * dx + dy * dy > searchRadius * searchRadius) continue;
+        const gx = baseGx + dx;
+        const gy = baseGy + dy;
+        const wx = gx * GRID_SIZE + GRID_SIZE / 2;
+        const wy = gy * GRID_SIZE + GRID_SIZE / 2;
+
+        if (state.world && !state.world.isBlockAt(wx, wy) && !state.world.getTurretAt(gx, gy)) {
+          const d = dist(this.pos.x, this.pos.y, wx, wy);
+          if (d <= searchRadius * GRID_SIZE && d < minDist) {
+            minDist = d;
+            bestGx = gx;
+            bestGy = gy;
+          }
+        }
+      }
+    }
+
+    if (minDist !== Infinity && state.world) {
+      const worldX = bestGx * GRID_SIZE + GRID_SIZE / 2;
+      const worldY = bestGy * GRID_SIZE + GRID_SIZE / 2;
+      const newTurret = createWorldTurret(this.turretType, bestGx, bestGy);
+      if (this.turretData) {
+        restoreTurretData(newTurret, this.turretData);
+      } else if (this.turretHP !== undefined) {
+        newTurret.health = this.turretHP;
+      }
+      state.world.addTurret(newTurret);
+      state.totalTurretsAcquired++;
+      state.vfx.push(new Explosion(worldX, worldY, 40, color(100, 255, 200)));
+      return true;
+    }
+    return false;
+  }
+
+  update(playerPos: any): 'none' | 'collected' | 'missed' | 'consumed' {
+    if (this.tryAutoPlace()) {
+      return 'consumed';
+    }
+    return super.update(playerPos);
   }
 }

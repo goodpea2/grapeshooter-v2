@@ -196,6 +196,14 @@ export function drawEnemy(e: any) {
       }
       pop();
     }
+  } else {
+    // Lightweight gizmo fallback if no asset image exists
+    noStroke();
+    fill(e.col ? e.col[0] : 180, e.col ? e.col[1] : 60, e.col ? e.col[2] : 60, 220);
+    ellipse(0, 0, s, s);
+    stroke(255, 180);
+    strokeWeight(2);
+    line(0, 0, s * 0.5, 0); // Direction pointer
   }
   pop();
 

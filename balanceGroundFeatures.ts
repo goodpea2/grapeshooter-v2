@@ -6,33 +6,44 @@ export const groundFeatureTypes: any = {
     name: 'Fire Puddle',
     life: 60,
     radius: 16,
-    damage: 1, // firepea's fire puddle also damages obstacles
-    tickRate: 6,
+    damage: 3, // firepea's fire puddle also damages obstacles
+    tickRate: 15,
     vfxType: 'fire_puddle',
     color: [255, 100, 50],
-    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 1 }], // this damage is its own source
+    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 2 }], // this damage is its own source
     conditionDuration: 60
   },
   gf_fire_puddle_t3: {
     name: 'T3 Fire Puddle',
-    life: 180, // 3 seconds
+    life: 240, // 4 seconds
     radius: 20,
-    damage: 1,
-    tickRate: 6,
+    damage: 3,
+    tickRate: 15,
     vfxType: 'fire_puddle',
     color: [255, 120, 0],
-    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 1 }],
+    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 2 }],
     conditionDuration: 60
   },
   gf_fire_puddle_flamethrower: {
     name: 'Flamethrower fire',
     life: 60,
     radius: 20,
-    damage: 0.25, // lower dmg to obstacles but stackable
-    tickRate: 6,
+    damage: 2, // lower dmg to obstacles but stackable
+    tickRate: 15,
     vfxType: 'fire_puddle',
     color: [255, 120, 0],
-    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 1 }], // mainly burn dmg to enemies
+    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 5 }], // mainly burn dmg to enemies
+    conditionDuration: 60
+  },
+  gf_fire_puddle_firecharge: {
+    name: 'Firecharge fire',
+    life: 180,
+    radius: 24,
+    damage: 5, // same dmg to both enemies and obstacles
+    tickRate: 15,
+    vfxType: 'fire_puddle',
+    color: [255, 120, 0],
+    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 0 }], // mainly burn dmg to enemies
     conditionDuration: 60
   },
   gf_firecherry_puddle: {

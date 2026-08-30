@@ -135,9 +135,11 @@ export class Enemy {
 
 
     let speedMult = 1.0;
+    let attackSpeedMult = 1.0;
     let targetMoveVec = createVector(0, 0);
     for (let [cKey, life] of this.conditions) {
       const cfg = conditionTypes[cKey];
+      if (!cfg) continue;
       
       if (cKey === 'c_burning') {
           const dmg = this.conditionData.get('c_burning_dmg') || cfg.damage || 0;
@@ -146,7 +148,12 @@ export class Enemy {
           this.takeDamage(cfg.damage);
       }
 
-      speedMult *= cfg.enemyMovementSpeedMultiplier;
+      if (cfg.enemyMovementSpeedMultiplier !== undefined) {
+        speedMult *= cfg.enemyMovementSpeedMultiplier;
+      }
+      if (cfg.enemyAttackSpeedMultiplier !== undefined) {
+        attackSpeedMult *= cfg.enemyAttackSpeedMultiplier;
+      }
       this.conditions.set(cKey, life - 1);
       if (life <= 0) {
           this.conditions.delete(cKey);
@@ -200,9 +207,6 @@ export class Enemy {
       this.attackOffset.set(0, 0);
     }
 
-    const cs = state.spatialHashCellSize;
-    const hgx = floor(this.pos.x / cs);
-    const hgy = floor(this.pos.y / cs);
     const checkLimitSq = EnemyCollideRadiusCheck * EnemyCollideRadiusCheck;
     let shouldMove = true;
     
@@ -214,37 +218,34 @@ export class Enemy {
       const isHypnotized = this.conditions.has('c_hypnotized');
 
       // Use spatial hash to find nearest target
-      for (let i = -1; i <= 1; i++) {
-        for (let j = -1; j <= 1; j++) {
-          const key = `${hgx + i},${hgy + j}`;
-          const cellEntities = state.spatialHash.get(key);
-          if (cellEntities) {
-            for (const ent of cellEntities) {
-              if (ent === this || ent.isDying || ent.isValidTarget === false || ent.config?.isValidTarget === false || ent.type === 'o_barrier') continue;
+      const grid = state.spatialGrid;
+      if (grid) {
+        grid.forEachNeighborCell(this.pos.x, this.pos.y, 1, (cellEntities: any[]) => {
+          for (const ent of cellEntities) {
+            if (ent === this || ent.isDying || ent.isValidTarget === false || ent.config?.isValidTarget === false || ent.type === 'o_barrier') continue;
 
-              if (isHypnotized) {
-                // Hypnotized enemies target other enemies
-                if (!(ent instanceof Enemy) || ent.conditions.has('c_hypnotized')) continue;
+            if (isHypnotized) {
+              // Hypnotized enemies target other enemies
+              if (!(ent instanceof Enemy) || ent.conditions.has('c_hypnotized')) continue;
+            } else {
+              // Normal enemies target hypnotized enemies, player, or turrets
+              if (ent instanceof Enemy) {
+                if (!ent.conditions.has('c_hypnotized')) continue;
               } else {
-                // Normal enemies target hypnotized enemies, player, or turrets
-                if (ent instanceof Enemy) {
-                  if (!ent.conditions.has('c_hypnotized')) continue;
-                } else {
-                   // If it's a turret, check if it's active
-                   if (ent.config && ent.config.collideWithEnemy === false) continue;
-                   if (ent.isWaterlogged || ent.isFrosted) continue;
-                   if (ent.isActive && !ent.isActive()) continue;
-                }
-              }
-
-              const twPos = ent.getWorldPos ? ent.getWorldPos() : ent.pos;
-              const dSq = (this.pos.x - twPos.x)**2 + (this.pos.y - twPos.y)**2;
-              if (dSq < minDistTSq && state.world.checkLOS(this.pos.x, this.pos.y, twPos.x, twPos.y)) { 
-                  nearestT = ent; minDistTSq = dSq; 
+                 // If it's a turret, check if it's active
+                 if (ent.config && ent.config.collideWithEnemy === false) continue;
+                 if (ent.isWaterlogged || ent.isFrosted) continue;
+                 if (ent.isActive && !ent.isActive()) continue;
               }
             }
+
+            const twPos = ent.getWorldPos ? ent.getWorldPos() : ent.pos;
+            const dSq = (this.pos.x - twPos.x)**2 + (this.pos.y - twPos.y)**2;
+            if (dSq < minDistTSq && state.world.checkLOS(this.pos.x, this.pos.y, twPos.x, twPos.y)) { 
+                nearestT = ent; minDistTSq = dSq; 
+            }
           }
-        }
+        });
       }
       
       if (isHypnotized) {
@@ -316,26 +317,24 @@ export class Enemy {
     this.rot = lerpAngle(this.rot, flow.mode === 'los' ? dirHeading : moveHeading, 0.12);
 
     // Enemy-Enemy collision avoidance
-    for (let i = -1; i <= 1; i++) {
-      for (let j = -1; j <= 1; j++) {
-        const neighbors = state.spatialHash.get(`${hgx+i},${hgy+j}`);
-        if (neighbors) {
-          for (const other of neighbors) {
-            if (other === this || other.isDying || !(other instanceof Enemy)) continue;
-            const odx = this.pos.x - other.pos.x;
-            const ody = this.pos.y - other.pos.y;
-            const distSq = odx*odx + ody*ody;
-            
-            if (distSq > checkLimitSq) continue;
-            
-            const md = (this.size + other.size)*0.55;
-            if (distSq < md*md && distSq > 0) {
-              const od = Math.sqrt(distSq);
-              this.moveWithCollisions(createVector(odx/od * 0.2, ody/od * 0.2));
-            }
+    const grid = state.spatialGrid;
+    if (grid) {
+      grid.forEachNeighborCell(this.pos.x, this.pos.y, 1, (neighbors: any[]) => {
+        for (const other of neighbors) {
+          if (other === this || other.isDying || !(other instanceof Enemy)) continue;
+          const odx = this.pos.x - other.pos.x;
+          const ody = this.pos.y - other.pos.y;
+          const distSq = odx*odx + ody*ody;
+          
+          if (distSq > checkLimitSq) continue;
+          
+          const md = (this.size + other.size)*0.55;
+          if (distSq < md*md && distSq > 0) {
+            const od = Math.sqrt(distSq);
+            this.moveWithCollisions(createVector(odx/od * 0.2, ody/od * 0.2));
           }
         }
-      }
+      });
     }
 
     let targetRadius = (this.target.size || 32) * 0.5;
@@ -355,9 +354,9 @@ export class Enemy {
     }
 
     if (this.actionType.includes('meleeAttack') && inMeleeRange && this.meleeCooldown <= 0) { 
-        this.attackAnimDuration = Math.max(20, this.actionConfig.attackFireRate || 30);
+        this.attackAnimDuration = Math.max(20, Math.round((this.actionConfig.attackFireRate || 30) * attackSpeedMult));
         this.attackAnimTimer = this.attackAnimDuration;
-        this.meleeCooldown = this.actionConfig.attackFireRate;
+        this.meleeCooldown = Math.round((this.actionConfig.attackFireRate || 30) * attackSpeedMult);
     }
     if (this.meleeCooldown > 0) this.meleeCooldown--;
 
@@ -369,10 +368,10 @@ export class Enemy {
         
         if (Array.isArray(this.actionConfig.shootFireRate)) {
           const step = this.actionSteps.get('shoot') || 0;
-          this.shootCooldown = this.actionConfig.shootFireRate[step % this.actionConfig.shootFireRate.length];
+          this.shootCooldown = Math.round((this.actionConfig.shootFireRate[step % this.actionConfig.shootFireRate.length]) * attackSpeedMult);
           this.actionSteps.set('shoot', step + 1);
         } else {
-          this.shootCooldown = this.actionConfig.shootFireRate; 
+          this.shootCooldown = Math.round((this.actionConfig.shootFireRate || 60) * attackSpeedMult); 
         }
     }
     if (this.shootCooldown > 0) this.shootCooldown--;
@@ -617,8 +616,8 @@ export class Enemy {
     const lastTick = state.lastDamageTick.get(this.uid) || 0;
     const pending = state.pendingDamage.get(this.uid) || 0;
 
-    // no more delayed damage numbers
-        state.vfx.push(new DamageNumberVFX(this.pos.x, this.pos.y - this.size * 0.5, dmg, [255, 255, 255]));
+    const numColor = dmg < 0 ? [80, 255, 120] : [255, 255, 255];
+    state.vfx.push(new DamageNumberVFX(this.pos.x, this.pos.y - this.size * 0.5, Math.abs(dmg), numColor));
 
     if (this.health <= 0) { 
       this.health = 0;

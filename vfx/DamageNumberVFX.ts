@@ -84,7 +84,7 @@ export class DamageNumberVFX {
         textSize(currentSize);
         noStroke();
         fill(this.color[0], this.color[1], this.color[2], alpha);
-        text(floor(this.damage), 0, 0);
+        text(Math.round(Math.abs(this.damage)), 0, 0);
         pop();
     }
 }

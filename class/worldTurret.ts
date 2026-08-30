@@ -17,17 +17,76 @@ declare const atan2: any;
 declare const radians: any;
 declare const TWO_PI: any;
 declare const color: any;
+declare const lerp: any;
+declare const p5: any;
 
 export class WorldTurret extends Turret {
   gx: number;
   gy: number;
   pos: any;
+  vel: any = createVector(0, 0);
 
   constructor(type: string, gx: number, gy: number) {
     super(type);
     this.gx = gx;
     this.gy = gy;
     this.pos = createVector(gx * GRID_SIZE + GRID_SIZE / 2, gy * GRID_SIZE + GRID_SIZE / 2);
+  }
+
+  update() {
+    this.updateMovement();
+    super.update();
+  }
+
+  private updateMovement() {
+    const targetX = this.gx * GRID_SIZE + GRID_SIZE / 2;
+    const targetY = this.gy * GRID_SIZE + GRID_SIZE / 2;
+    if (!this.pos) {
+      this.pos = createVector(targetX, targetY);
+      return;
+    }
+    if (!this.vel) {
+      this.vel = createVector(0, 0);
+    }
+
+    const dX = targetX - this.pos.x;
+    const dY = targetY - this.pos.y;
+    const d = Math.sqrt(dX * dX + dY * dY);
+
+    if (d > 0.5) {
+      this.isRelocating = true;
+      const targetVec = createVector(targetX, targetY);
+      const desired = p5.Vector.sub(targetVec, this.pos);
+      const maxSpeed = 4.5;
+      const maxForce = 0.4;
+
+      if (d < 30) {
+        const m = lerp(1.5, maxSpeed, d / 30);
+        desired.setMag(m);
+      } else {
+        desired.setMag(maxSpeed);
+      }
+
+      const steer = p5.Vector.sub(desired, this.vel);
+      steer.limit(maxForce);
+      this.vel.add(steer);
+      this.vel.mult(0.92);
+
+      this.pos.x += this.vel.x;
+      this.pos.y += this.vel.y;
+
+      if (d < 1.0) {
+        this.pos.x = targetX;
+        this.pos.y = targetY;
+        this.vel.set(0, 0);
+        this.isRelocating = false;
+      }
+    } else {
+      this.pos.x = targetX;
+      this.pos.y = targetY;
+      this.vel.set(0, 0);
+      this.isRelocating = false;
+    }
   }
 
   getWorldPos() {

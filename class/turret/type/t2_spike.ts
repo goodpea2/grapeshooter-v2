@@ -2,7 +2,7 @@ import { TurretConfig } from '../turretConfig';
 import { GRID_SIZE } from '../../../constants';
 
 export const t2_spike: TurretConfig = {
-  name: 'Spikerock', costs: { sun: 20 }, costAlmanac: { shell: 4, ice: 3 }, drops: { shell: 1, ice: 1 }, health: 5, color: [220, 220, 240], size: 24, tier: 2,
+  name: 'Spikerock', costs: { sun: 10 }, costAlmanac: { shell: 4, ice: 3 }, drops: { shell: 1, ice: 1 }, health: 5, color: [220, 220, 240], size: 24, tier: 2,
   tooltip: "Stay underground and damages enemies stepping over it", animationBodyType: 'tough',
   collideWithEnemy: false,
   renderBehindEnemy: true,

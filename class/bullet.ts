@@ -32,9 +32,12 @@ export class Bullet {
   rotation: number = 0;
   source: any = null;
   seeThroughObstacles: boolean = false;
+  hasExploded: boolean = false;
   
   // Track unique hits for piercing consistency
   hitTargets: Set<string> = new Set();
+  // Track unique turrets that buffed/boosted this projectile (e.g. Torchwood)
+  boostedByTurrets: Set<string> = new Set();
 
   constructor(x: number, y: number, tx: number, ty: number, typeKey: string, targetType: string, source?: any) {
     this.source = source;
@@ -95,6 +98,17 @@ export class Bullet {
     }
   }
 
+  checkLifetimeExplode() {
+    if (this.life <= 0 && !this.hasExploded) {
+      const aoe = this.config.aoeConfig;
+      const isAoeLifetime = aoe?.dealAoeAfterLifetime || this.config.dealAoeAfterLifetime || (aoe?.isAoe && (aoe.dealAoeAfterLifetime || this.config.bulletLifeTime === 1));
+      if (isAoeLifetime) {
+        this.explode();
+        this.spawnFeatures(null);
+      }
+    }
+  }
+
   update() {
     this.prevPos.set(this.pos); this.pos.add(this.vel); this.life--;
     this.rotation += (this.config.selfRotateVelocity !== undefined ? this.config.selfRotateVelocity : 0.2); // Self-spin
@@ -140,7 +154,10 @@ export class Bullet {
             this.hitTargets.add(a.uid);
             a.takeDamage(this.dmg, this.source);
             this.handleCollision();
-            if (this.life <= 0) return;
+            if (this.life <= 0) {
+              this.checkLifetimeExplode();
+              return;
+            }
           }
         }
       }
@@ -155,10 +172,7 @@ export class Bullet {
         if (block) {
           this.hitTargets.add(blockKey);
           if (!this.seeThroughObstacles) {
-            const killed = block.takeDamage(this.dmg * (this.config.obstacleDamageMultiplier || 1), this.source);
-            if (killed && this.source && this.source.onTargetKilled) {
-              this.source.onTargetKilled(block);
-            }
+            block.takeDamage(this.dmg * (this.config.obstacleDamageMultiplier || 1), this.source);
             
             // Trigger sparking Hit VFX on obstacle impact
             const hitVfx = this.config.bulletHitVfx || 'v_hit_spark';
@@ -176,59 +190,57 @@ export class Bullet {
             } else {
                this.handleCollision(true);
             }
-            if (this.life <= 0) return;
+            if (this.life <= 0) {
+              this.checkLifetimeExplode();
+              return;
+            }
           }
         }
       }
     } else {
         if (!this.seeThroughObstacles && state.world.isBlockAt(this.pos.x, this.pos.y)) {
            this.handleCollision();
-           if (this.life <= 0) return;
+           if (this.life <= 0) {
+             this.checkLifetimeExplode();
+             return;
+           }
         }
     }
 
     if (this.damageTargets.includes('enemy')) {
-      const cs = state.spatialHashCellSize;
-      const hgx = floor(this.pos.x / cs);
-      const hgy = floor(this.pos.y / cs);
-      
-      for (let i = -1; i <= 1; i++) {
-        for (let j = -1; j <= 1; j++) {
-          const cell = state.spatialHash.get(`${hgx+i},${hgy+j}`);
-          if (cell) {
-            for (const e of cell) {
-              if (!(e instanceof Enemy) || e.health <= 0 || e.isDying || this.hitTargets.has(e.uid)) continue;
-              const dSq = (this.pos.x - e.pos.x)**2 + (this.pos.y - e.pos.y)**2;
-              const minDist = e.size / 2;
-              if (dSq < minDist*minDist) {
-                this.hitTargets.add(e.uid);
-                this.applyBulletConditions(e);
-                
-                // Direct Knockback
-                if (this.config.knockBackStrength) {
-                   const dir = p5.Vector.sub(e.pos, this.prevPos).normalize();
-                   const strength = this.config.knockBackStrength / Math.max(0.2, (e.size / 30));
-                   e.kbVel.add(dir.mult(strength));
-                   if (this.config.knockBackDuration) {
-                      e.kbTimer = Math.max(e.kbTimer || 0, this.config.knockBackDuration);
-                   }
-                }
-
-                // Satisfying Hit VFX
-                const hitVfx = this.config.bulletHitVfx || 'v_hit_spark';
-                if (hitVfx === 'v_hit_spark') {
-                   state.vfx.push(new HitSpark(this.pos.x, this.pos.y, this.col));
-                }
-
-                const killed = e.takeDamage(this.dmg, this.source); 
-                if (killed && this.source && this.source.onTargetKilled) {
-                  this.source.onTargetKilled(e);
-                }
-                this.handleCollision(); // Process pierce and lifetime
-                if (this.life <= 0) return;
-              }
-            }
+      const grid = state.spatialGrid;
+      if (grid) {
+        grid.queryCircleEnemies(this.pos.x, this.pos.y, 4, (e: any) => {
+          if (this.hitTargets.has(e.uid)) return;
+          this.hitTargets.add(e.uid);
+          this.applyBulletConditions(e);
+          
+          // Direct Knockback
+          if (this.config.knockBackStrength) {
+             const dir = p5.Vector.sub(e.pos, this.prevPos).normalize();
+             const strength = this.config.knockBackStrength / Math.max(0.2, (e.size / 30));
+             e.kbVel.add(dir.mult(strength));
+             if (this.config.knockBackDuration) {
+                e.kbTimer = Math.max(e.kbTimer || 0, this.config.knockBackDuration);
+             }
           }
+
+          // Satisfying Hit VFX
+          const hitVfx = this.config.bulletHitVfx || 'v_hit_spark';
+          if (hitVfx === 'v_hit_spark') {
+             state.vfx.push(new HitSpark(this.pos.x, this.pos.y, this.col));
+          }
+
+          const killed = e.takeDamage(this.dmg, this.source); 
+          if (killed && this.source && this.source.onTargetKilled) {
+            this.source.onTargetKilled(e);
+          }
+          this.handleCollision(); // Process pierce and lifetime
+          if (this.life <= 0) return true; // Stop query traversal if bullet expired
+        });
+        if (this.life <= 0) {
+          this.checkLifetimeExplode();
+          return;
         }
       }
     }
@@ -251,7 +263,10 @@ export class Bullet {
               }
             }
             this.handleCollision();
-            if (this.life <= 0) return;
+            if (this.life <= 0) {
+              this.checkLifetimeExplode();
+              return;
+            }
           }
         }
       }
@@ -264,14 +279,14 @@ export class Bullet {
         this.hitTargets.add('player');
         state.player.takeDamage(this.dmg); 
         this.handleCollision();
-        if (this.life <= 0) return;
+        if (this.life <= 0) {
+          this.checkLifetimeExplode();
+          return;
+        }
       }
     }
 
-    if (this.life <= 0 && this.config.aoeConfig?.isAoe && (this.config.aoeConfig.dealAoeAfterLifetime || this.config.bulletLifeTime === 1)) { 
-        this.explode(); 
-        this.spawnFeatures(null);
-    }
+    this.checkLifetimeExplode();
   }
 
   handleCollision(isObstacle: boolean = false) {
@@ -327,8 +342,10 @@ export class Bullet {
   }
 
   getLerpedAoeDamage(d: number, aoe: any) {
-    const radii = aoe.aoeRadiusGradient;
-    const damages = aoe.aoeDamageGradient;
+    if (!aoe) return 0;
+    const radii = aoe.aoeRadiusGradient || [];
+    const damages = aoe.aoeDamageGradient || [];
+    if (radii.length === 0 || damages.length === 0) return 0;
     const maxR = radii[radii.length - 1];
     
     if (d > maxR) return 0;
@@ -345,6 +362,9 @@ export class Bullet {
   }
 
   explode() {
+    if (this.hasExploded && !this.config.aoeConfig?.dealAoeOnEveryHit) return;
+    this.hasExploded = true;
+
     if (this.config.cameraShakeOnDeath) {
       const [min, max, falloff] = this.config.cameraShakeOnDeath;
       state.cameraShake = Math.max(state.cameraShake, random(min, max));
@@ -353,15 +373,18 @@ export class Bullet {
       }
     }
 
-    const aoe = this.config.aoeConfig; if (!aoe) return;
-    const radii = aoe.aoeRadiusGradient;
+    const aoe = this.config.aoeConfig;
+    const radii = (aoe && aoe.aoeRadiusGradient && aoe.aoeRadiusGradient.length > 0) ? aoe.aoeRadiusGradient : [GRID_SIZE * 1.5];
     const maxR = radii[radii.length - 1] || 10;
     
     if (this.config.bulletDeathVfx === 'v_goldengrape_firework') {
       state.vfx.push(new FireworkVFX(this.pos.x, this.pos.y));
     } else {
-      state.vfx.push(new Explosion(this.pos.x, this.pos.y, maxR*2, color(this.col)));
+      const bulletColor = this.col ? color(this.col) : color(255, 200, 50);
+      state.vfx.push(new Explosion(this.pos.x, this.pos.y, maxR*2, bulletColor));
     }
+    
+    if (!aoe) return;
     
     if (this.damageTargets.includes('enemy')) {
       for (let e of state.enemies) {
@@ -440,6 +463,16 @@ export class Bullet {
             const d = Math.sqrt(dSq);
             const lerpDmg = this.getLerpedAoeDamage(d, aoe);
             if (lerpDmg > 0) block.takeDamage(lerpDmg * (aoe.aoeObstacleDamageMultiplier || 1)); 
+          }
+        }
+      }
+
+      // Chain reaction on ticking explosives
+      if (state.tickingExplosives && state.tickingExplosives.length > 0) {
+        for (const tex of state.tickingExplosives) {
+          const dSq = (this.pos.x - tex.x)**2 + (this.pos.y - tex.y)**2;
+          if (dSq < maxR * maxR) {
+            tex.timer = Math.min(tex.timer, 6);
           }
         }
       }

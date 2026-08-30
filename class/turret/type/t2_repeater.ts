@@ -7,5 +7,5 @@ export const t2_repeater: TurretConfig = {
   tooltip: "Shoots 2 bullets at once", animationBodyType: 'soft',
   actionConfig: { 
     ...t_pea.actionConfig,
-    shootFireRate: [50, 10] }
+    shootFireRate: [33,6,6] }
 };

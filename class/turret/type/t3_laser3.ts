@@ -8,6 +8,6 @@ export const t3_laser3: TurretConfig = {
   tooltip: "Laser breaks obstacles super fast", animationBodyType: 'tough',
   actionConfig: { 
     ...t2_laser2.actionConfig,
-    beamDamage: 20, beamWidth: 8, beamFireRate: 6, beamMaxLength: GRID_SIZE * 10 
+    beamDamage: 20, beamWidth: 8, beamFireRate: 6, beamMaxLength: GRID_SIZE * 4 
   },
 };

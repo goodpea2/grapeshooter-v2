@@ -24,7 +24,11 @@ export class ActionShoot extends TurretAction {
     const type = 'shoot';
     const step = this.turret.actionSteps.get(type) || 0;
     
-    const frValue = config.shootFireRate;
+    const isCharged = this.turret.isCharged ? this.turret.isCharged() : false;
+    let frValue = config.shootFireRate;
+    if (isCharged && this.turret.config.whileCharged?.shootFireRate !== undefined) {
+      frValue = this.turret.config.whileCharged.shootFireRate;
+    }
     const fr = Array.isArray(frValue) ? frValue[step % frValue.length] : frValue;
     
     let frDivider = (this.turret as any).activeStats?.firerateDivider || 1.0;
@@ -58,7 +62,12 @@ export class ActionShoot extends TurretAction {
   }
 
   getRange(): number {
-    return (this.turret.config.actionConfig.shootRange || 300) * (this.turret.stats.rangeMult || 1);
+    const isCharged = this.turret.isCharged ? this.turret.isCharged() : false;
+    let baseRange = this.turret.config.actionConfig.shootRange || 300;
+    if (isCharged && this.turret.config.whileCharged?.shootRange !== undefined) {
+      baseRange = this.turret.config.whileCharged.shootRange;
+    }
+    return baseRange * (this.turret.stats.rangeMult || 1);
   }
 
   canExecute(): boolean {

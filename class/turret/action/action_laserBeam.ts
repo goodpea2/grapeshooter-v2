@@ -3,6 +3,7 @@ import { state } from '../../../state';
 import { TurretAction } from '../../turretAction';
 import { WeldingHitVFX } from '../../../vfx/index';
 import { Bullet } from '../../bullet';
+import { GRID_SIZE } from '../../../constants';
 
 declare const createVector: any;
 declare const random: any;
@@ -67,8 +68,13 @@ export class ActionLaserBeam extends TurretAction {
       const lastDamageFrame = (this.turret as any).lastDamageFrame || 0;
       if (state.frames - lastDamageFrame >= damageRate) {
         (this.turret as any).lastDamageFrame = state.frames;
+        
+        // Save target center coordinates before takeDamage might clear target or mine block
+        const targetPosBackup = tCenter ? tCenter.copy() : (target.gx !== undefined ? createVector(target.gx * GRID_SIZE + GRID_SIZE / 2, target.gy * GRID_SIZE + GRID_SIZE / 2) : (target.pos ? target.pos.copy() : null));
+
         const killed = target.takeDamage(currentDamage, this.turret);
-        if (killed) {
+        const isBlock = target && (target.gx !== undefined || target.isMined !== undefined);
+        if (killed && !isBlock) {
           this.turret.onTargetKilled(target);
         }
         
@@ -78,18 +84,8 @@ export class ActionLaserBeam extends TurretAction {
           }
         }
 
-        if (killed && config.spawnBulletOnTargetDeath) {
-          const tc = this.turret.getTargetCenter();
-          if (tc) {
-            state.bullets.push(new Bullet(tc.x, tc.y, tc.x, tc.y, config.spawnBulletOnTargetDeath, 'none', this.turret));
-          }
-        }
-
-        if (config.beamBulletTypeKey) {
-          const tc = this.turret.getTargetCenter();
-          if (tc) {
-            state.bullets.push(new Bullet(tc.x, tc.y, tc.x, tc.y, config.beamBulletTypeKey, 'none', this.turret));
-          }
+        if (config.beamBulletTypeKey && targetPosBackup) {
+          state.bullets.push(new Bullet(targetPosBackup.x, targetPosBackup.y, targetPosBackup.x, targetPosBackup.y, config.beamBulletTypeKey, 'none', this.turret));
         }
 
         if (config.beamDamageWidth > 0) {
@@ -109,6 +105,31 @@ export class ActionLaserBeam extends TurretAction {
       
       this.turret.recoil = 2; 
       this.turret.actionTimers.set(type, state.frames);
+    }
+  }
+
+  onTargetKilled(target: any) {
+    const config = this.turret.config.actionConfig;
+    if (config.spawnBulletOnTargetDeath && target) {
+      const tc = target.getWorldPos ? target.getWorldPos() : (target.pos ? target.pos.copy() : null);
+      if (tc) {
+        state.bullets.push(new Bullet(tc.x, tc.y, tc.x, tc.y, config.spawnBulletOnTargetDeath, 'none', this.turret));
+      }
+    }
+  }
+
+  onTargetMined(target: any, context?: any) {
+    const config = this.turret.config.actionConfig;
+    if (config.onMineHealSelf) {
+      this.turret.heal(config.onMineHealSelf, config.onMineHealBypassMaxHP ?? false);
+    }
+    if (config.spawnBulletOnTargetDeath && target) {
+      const tc = (target.gx !== undefined && target.gy !== undefined)
+        ? createVector(target.gx * GRID_SIZE + GRID_SIZE / 2, target.gy * GRID_SIZE + GRID_SIZE / 2)
+        : (target.getWorldPos ? target.getWorldPos() : (target.pos ? createVector(target.pos.x + GRID_SIZE / 2, target.pos.y + GRID_SIZE / 2) : null));
+      if (tc) {
+        state.bullets.push(new Bullet(tc.x, tc.y, tc.x, tc.y, config.spawnBulletOnTargetDeath, 'none', this.turret));
+      }
     }
   }
 

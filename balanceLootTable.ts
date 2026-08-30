@@ -153,6 +153,9 @@ export const lootTypes: Record<string, LootType> = {
   t3_minefield: { type: 'turret', item: 't3_minefield', idleAssetImg: 'img_t_minefield_front', idleAssetImgSize: [50, 50] },
   t3_frostfield: { type: 'turret', item: 't3_frostfield', idleAssetImg: 'img_t_frostfield_front', idleAssetImgSize: [50, 50] },
   t3_triberg: { type: 'turret', item: 't3_triberg', idleAssetImg: 'img_t_triberg_front', idleAssetImgSize: [50, 50] },
+  t3_gatling: { type: 'turret', item: 't3_gatling', idleAssetImg: 'img_t_triplepea_front', idleAssetImgSize: [50, 50] },
+  t3_firecharge: { type: 'turret', item: 't3_firecharge', idleAssetImg: 'img_t_flamethrower_front', idleAssetImgSize: [50, 50] },
+  t3_minecharge: { type: 'turret', item: 't3_minecharge', idleAssetImg: 'img_t_mine_front', idleAssetImgSize: [50, 50] },
   tx_goldengrape: { type: 'turret', item: 'tx_goldengrape', idleAssetImg: 'img_tx_goldengrape_front', idleAssetImgSize: [50, 50] },
 
   // Special T0 Loot Definitions - Ensure all are turretAsItem

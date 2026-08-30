@@ -1,12 +1,14 @@
 import { state } from './state';
 import { WorldManager, Block } from './world';
-import { Player, GroundFeature, NPCEntity, Enemy } from './entities';
-import { GRID_SIZE, HOUR_FRAMES } from './constants';
+import { Player, GroundFeature, NPCEntity, Enemy, LootEntity, TurretLoot } from './entities';
+import { GRID_SIZE, CHUNK_SIZE, HOUR_FRAMES } from './constants';
 import { customStartingHour, AlmanacProgression, getActiveAlmanacProgression } from './lvDemo';
 import { createWorldTurret } from './class/turret/TurretRegistry';
 import { obstacleTypes, overlayTypes } from './balanceObstacles';
 import { resetPlayerUpgrades } from './src/playerUpgrades';
 import { serializeLevelEditorPlayerUpgrades } from './ui/almanac/playerUpgradesPanel';
+
+declare const floor: any;
 
 import { serializeLevelEditorLevelConfig } from './ui/almanac/levelConfigPanel';
 
@@ -182,6 +184,7 @@ export function startLevel(levelId: string, customLayoutData?: any) {
   state.isGameOver = false;
   state.isLevelCompleted = false;
   state.winConditionActive = false;
+  state.levelWonSequence = null;
   state.showGameOverPopup = false;
   state.gameOverProgress = 0;
   state.isPaused = false;
@@ -293,6 +296,9 @@ export function startLevel(levelId: string, customLayoutData?: any) {
   if (layout?.enemies) {
     deserializeLevelEnemies(layout.enemies);
   }
+
+  // Load Loots if provided (supports new grouped pos format and legacy format)
+  deserializeLevelLoots(state.world, layout?.loots || layout?.loot || layout?.Loots);
 
   // Load Spawn Area Tiles if provided
   deserializeSpawnAreaTiles(state.world, layout?.spawnAreaTiles);
@@ -648,6 +654,82 @@ export function serializeChunkTurrets(turrets: any[]): any[] {
   return Array.from(groups.values());
 }
 
+export function serializeLevelLoots(world: any): any[] {
+  if (!world || !world.chunks) return [];
+  const groups = new Map<string, { lootType: string; pos: [number, number][] }>();
+
+  world.chunks.forEach((chunk: any) => {
+    if (!chunk || !chunk.loot || !Array.isArray(chunk.loot)) return;
+    for (const l of chunk.loot) {
+      if (!l) continue;
+      const typeKey = l.typeKey || l.config?.item || 'sun';
+      let g = groups.get(typeKey);
+      if (!g) {
+        g = {
+          lootType: typeKey,
+          pos: []
+        };
+        groups.set(typeKey, g);
+      }
+      const lx = Math.round(l.pos?.x ?? l.x ?? 0);
+      const ly = Math.round(l.pos?.y ?? l.y ?? 0);
+      g.pos.push([lx, ly]);
+    }
+  });
+
+  return Array.from(groups.values());
+}
+
+export function deserializeLevelLoots(world: any, lootsData: any[] | undefined | null): void {
+  if (!world || !lootsData || !Array.isArray(lootsData)) return;
+
+  for (const item of lootsData) {
+    if (!item) continue;
+    const type = item.lootType || item.type || 'sun';
+
+    if (Array.isArray(item.pos)) {
+      if (item.pos.length > 0 && Array.isArray(item.pos[0])) {
+        for (const pt of item.pos) {
+          if (Array.isArray(pt) && pt.length >= 2) {
+            const px = pt[0];
+            const py = pt[1];
+            const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
+            const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
+            const chunk = world.getChunk(cx, cy);
+            if (chunk) {
+              const loot = new LootEntity(px, py, type);
+              loot.neverDespawn = true;
+              chunk.loot.push(loot);
+            }
+          }
+        }
+      } else if (item.pos.length >= 2 && typeof item.pos[0] === 'number') {
+        const px = item.pos[0];
+        const py = item.pos[1];
+        const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
+        const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
+        const chunk = world.getChunk(cx, cy);
+        if (chunk) {
+          const loot = new LootEntity(px, py, type);
+          loot.neverDespawn = true;
+          chunk.loot.push(loot);
+        }
+      }
+    } else if (typeof item.x === 'number' && typeof item.y === 'number') {
+      const px = item.x;
+      const py = item.y;
+      const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
+      const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
+      const chunk = world.getChunk(cx, cy);
+      if (chunk) {
+        const loot = new LootEntity(px, py, type);
+        loot.neverDespawn = true;
+        chunk.loot.push(loot);
+      }
+    }
+  }
+}
+
 export function deserializeChunkTurrets(chunk: any, turretsData: any[]): void {
   chunk.turrets = [];
   if (!turretsData || !Array.isArray(turretsData)) return;
@@ -693,7 +775,7 @@ export function saveLevelLayout(customName?: string, customDescription?: string)
       LockedTurret: [...(prog.LockedTurret || [])],
       BannedTurrets: [...(prog.BannedTurrets || [])],
       UnlockCost: [...(prog.UnlockCost || AlmanacProgression.UnlockCost || [])],
-      AllTurretCrafting: prog.AllTurretCrafting !== false,
+      AllTurretCrafting: prog.AllTurretCrafting === true,
       AllTurretUpgrade: prog.AllTurretUpgrade !== false,
       CraftingCostOverride: [...(prog.CraftingCostOverride || AlmanacProgression.CraftingCostOverride || [])]
     },
@@ -744,6 +826,7 @@ export function saveLevelLayout(customName?: string, customDescription?: string)
   }));
 
   levelData.enemies = serializeLevelEnemies(state.enemies);
+  levelData.loots = serializeLevelLoots(state.world);
 
   if (state.world && state.world.spawnAreaSet && state.world.spawnAreaSet.size > 0) {
     levelData.spawnAreaTiles = serializeSpawnAreaTiles(state.world.spawnAreaSet);

@@ -192,9 +192,9 @@ function drawTabs(x: number, y: number, modalX: number, modalY: number) {
   const tabW = 100;
   const tabH = 60;
   const tabs = [
-    { id: 'Turrets', icon: 'img_npc_farmer_front' },
+    { id: 'Turrets', icon: 'img_icon_almanac' },
     // { id: 'Enemies', icon: 'img_npc_shadie_front' },
-    { id: 'Upgrades', icon: 'img_player_front_right' }
+    { id: 'Upgrades', icon: 'img_icon_playerupgrade' }
   ];
 
   if (state.isAlmanacEditorMode || state.currentScreen === 'level_editor') {
@@ -242,7 +242,7 @@ function drawTabs(x: number, y: number, modalX: number, modalY: number) {
       if (icon) {
         imageMode(CENTER);
         if (!isSel) tint(255, 150);
-        image(icon, tabW/2-10, tabH/2-10, 104, 104);
+        image(icon, tabW/2-10, tabH/2-10, 64, 64);
         noTint();
       }
     }

@@ -8,6 +8,6 @@ export const t3_firepea2: TurretConfig = {
   tooltip: "Shoots and leaves a bigger-longer lasting flame puddle", animationBodyType: 'soft',
   actionConfig: { 
     ...t2_firepea.actionConfig,
-    bulletTypeKey: 'b_firepea_t3', shootRange: GRID_SIZE * 10, shootFireRate: 60 
+    bulletTypeKey: 'b_firepea_t3' 
   },
 };

@@ -649,6 +649,50 @@ export function drawMainMenu() {
   pop();
 }
 
+// Touch & Drag interaction state for Main Menu Level List
+let menuTouchStartY = 0;
+let menuTouchLastY = 0;
+let menuTouchStartScrollY = 0;
+let menuIsDragging = false;
+let menuTouchMovedDist = 0;
+
+export function handleMainMenuPress(mx: number, my: number): void {
+  menuTouchStartY = my;
+  menuTouchLastY = my;
+  menuTouchStartScrollY = state.mainMenuScrollY || 0;
+  menuIsDragging = false;
+  menuTouchMovedDist = 0;
+  state.mainMenuScrollVelocity = 0;
+}
+
+export function handleMainMenuDrag(mx: number, my: number): boolean {
+  const dy = my - menuTouchLastY;
+  menuTouchMovedDist += Math.abs(dy);
+  menuTouchLastY = my;
+
+  if (menuTouchMovedDist > 6) {
+    menuIsDragging = true;
+  }
+
+  if (menuIsDragging) {
+    state.mainMenuScrollY = (state.mainMenuScrollY || 0) + dy;
+    state.mainMenuScrollVelocity = dy * 0.75;
+    return true;
+  }
+  return false;
+}
+
+export function handleMainMenuRelease(mx: number, my: number): boolean {
+  if (menuIsDragging || menuTouchMovedDist > 8) {
+    menuIsDragging = false;
+    menuTouchMovedDist = 0;
+    return true;
+  }
+  menuIsDragging = false;
+  menuTouchMovedDist = 0;
+  return handleMainMenuClick();
+}
+
 export function handleMainMenuClick(): boolean {
   refreshLevels();
 

@@ -8,11 +8,13 @@ import { turretTypes } from '../balanceTurrets';
 import { Explosion, LiquidTrailVFX, MuzzleFlash, ConditionVFX } from '../vfx';
 import { AttachedTurret } from './attachedTurret';
 import { WorldTurret } from './worldTurret';
+import { createAttachedTurret, createWorldTurret, copyTurretState, restoreTurretData } from './turret/TurretRegistry';
 import { getPlayerUpgradeStat } from '../src/playerUpgrades';
 import { LootEntity, TurretLoot } from './loot';
 import { spawnLootAt } from '../economy';
 import { Bullet } from './bullet';
 import { drawPlayer } from '../visualPlayer';
+import { triggerUpgradeHook } from '../src/upgrades';
 
 declare const p5: any;
 declare const createVector: any;
@@ -36,6 +38,7 @@ export class Player {
   staminaDepletingTimer = 0;
   hurtAnimTimer = 0;
   isClickHolding: boolean = false;
+  isBoosting: boolean = false;
   autoTurretClickMiningBoost = 2; // +200% mining speed
   autoTurretClickAttackBoost = 2; // +200% attack speed
   pulseAnimTimer = 0;
@@ -74,6 +77,21 @@ export class Player {
     if (this.hurtAnimTimer > 0) this.hurtAnimTimer--;
     if (this.pulseAnimTimer > 0) this.pulseAnimTimer--;
     if (this.staminaDepletingTimer > 0) this.staminaDepletingTimer--;
+
+    // Update Boosting state: requires >= 25 stamina to start, stops when stamina runs out (<= 0)
+    if (this.isClickHolding) {
+      if (!this.isBoosting) {
+        if (this.stamina >= 25) {
+          this.isBoosting = true;
+        }
+      } else {
+        if (this.stamina <= 0) {
+          this.isBoosting = false;
+        }
+      }
+    } else {
+      this.isBoosting = false;
+    }
 
     // Update Max Stamina from upgrades
     const currentMaxStam = getPlayerUpgradeStat('maxStamina') || 100;
@@ -137,7 +155,7 @@ export class Player {
     this.isMovingIntent = this.moveInputVec.mag() > 0;
 
     // 2. Perform Movement
-    if (this.isMovingIntent && !isTurretSelected) { 
+    if (this.isMovingIntent) { 
       let effectiveSpeedMultiplier = state.isWASDInput ? 1.0 : state.playerSpeedMultiplier;
       const moveSpeedBonus = getPlayerUpgradeStat('movementSpeed') || 0;
       const totalSpeedMultiplier = (state.playerBonuses.speedMult || 1.0) * (1.0 + moveSpeedBonus);
@@ -260,14 +278,40 @@ export class Player {
     
     for (let i = worldTurrets.length - 1; i >= 0; i--) {
       const wt = worldTurrets[i];
+      if (wt.isRelocating || wt.jumpPhase !== null) {
+        continue;
+      }
       const wtPos = wt.getWorldPos();
       const wtRadius = wt.size * 0.5;
+
+      // Proximity-Exit Trigger: turret cannot be re-picked up until player & squad step away
+      if (wt.mustExitProximityFirst) {
+        const dPlayerSq = (this.pos.x - wtPos.x)**2 + (this.pos.y - wtPos.y)**2;
+        let minAttachmentDistSq = Infinity;
+        for (const a of this.attachments) {
+          const aPos = a.getWorldPos();
+          const d = (aPos.x - wtPos.x)**2 + (aPos.y - wtPos.y)**2;
+          if (d < minAttachmentDistSq) minAttachmentDistSq = d;
+        }
+
+        const safeExitDist = (myRadius + wtRadius + 24); // Safely outside detachment footprint
+        const safeExitDistSq = safeExitDist * safeExitDist;
+
+        if (dPlayerSq > safeExitDistSq && (this.attachments.length === 0 || minAttachmentDistSq > safeExitDistSq)) {
+          // Successfully exited the proximity zone; enable normal pickup upon return
+          wt.mustExitProximityFirst = false;
+        } else {
+          // Still inside detachment area, ignore pickup
+          continue;
+        }
+      }
       
       // Check collision with player core
       const dPlayerSq = (this.pos.x - wtPos.x)**2 + (this.pos.y - wtPos.y)**2;
       if (dPlayerSq < (myRadius + wtRadius)**2) {
-        this.dropWorldTurretAsLoot(wt);
-        continue;
+        if (this.attachWorldTurret(wt)) {
+          continue;
+        }
       }
       
       // Check collision with attachments
@@ -276,11 +320,82 @@ export class Player {
         const aRadius = a.size * 0.5;
         const dAttSq = (aPos.x - wtPos.x)**2 + (aPos.y - wtPos.y)**2;
         if (dAttSq < (aRadius + wtRadius)**2) {
-          this.dropWorldTurretAsLoot(wt);
-          break;
+          if (this.attachWorldTurret(wt)) {
+            break;
+          }
         }
       }
     }
+  }
+
+  attachWorldTurret(wt: any): boolean {
+    const config = turretTypes[wt.type];
+    if (!config) return false;
+
+    const doesCount = config.countTowardAttachedCapacity !== false && config.CountTowardAttachedCapacity !== false;
+    const maxCapacity = getPlayerUpgradeStat('turretAttachCapacity') || 6;
+    if (doesCount && this.getAttachedCount() >= maxCapacity) {
+      return false; // Player at max capacity, turret remains as a world turret
+    }
+
+    let bestSlot: { q: number, r: number } | null = null;
+    let minDist = Infinity;
+    const rangeLimit = 8;
+    const turretSize = config.size || 22;
+
+    for (let q = -rangeLimit; q <= rangeLimit; q++) {
+      for (let r = -rangeLimit; r <= rangeLimit; r++) {
+        if (Math.abs(q) + Math.abs(r) + Math.abs(-q - r) <= rangeLimit * 2) {
+          let occupied = (q === 0 && r === 0);
+          for (let a of this.attachments) if (a.hq === q && a.hr === r) occupied = true;
+
+          if (!occupied) {
+            const neighbors = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]];
+            let adj = false;
+            for (let [dq, dr] of neighbors) {
+              let nq = q + dq;
+              let nr = r + dr;
+              if (nq === 0 && nr === 0) { adj = true; break; }
+              if (this.attachments.some((a: any) => a.hq === nq && a.hr === nr)) { adj = true; break; }
+            }
+
+            if (adj) {
+              const offX = HEX_DIST * (1.5 * q);
+              const offY = HEX_DIST * (Math.sqrt(3) / 2 * q + Math.sqrt(3) * r);
+              const targetWorldX = this.pos.x + offX;
+              const targetWorldY = this.pos.y + offY;
+
+              const isClear = !state.world.checkCollision(targetWorldX, targetWorldY, turretSize * 0.55);
+
+              if (isClear) {
+                let d = dist(0, 0, q, r);
+                if (d < minDist) {
+                  minDist = d;
+                  bestSlot = { q, r };
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (bestSlot) {
+      const wtPos = wt.getWorldPos();
+      state.world.removeTurret(wt.gx, wt.gy);
+      const newTurret = createAttachedTurret(wt.type, this, bestSlot.q, bestSlot.r);
+      copyTurretState(wt, newTurret);
+      // Transfer active VFX
+      for (let v of state.vfx) {
+        if (v && v.target === wt) v.target = newTurret;
+      }
+      this.attachments.push(newTurret);
+      state.totalTurretsAcquired++;
+      state.vfx.push(new Explosion(wtPos.x, wtPos.y, 40, color(100, 255, 200)));
+      return true;
+    }
+
+    return false;
   }
 
   dropWorldTurretAsLoot(wt: any) {
@@ -341,7 +456,7 @@ export class Player {
     }
   }
 
-  addStrayTurret(type: string, hp?: number) {
+  addStrayTurret(type: string, hp?: number, turretData?: any) {
     const config = turretTypes[type];
     if (!config) return;
 
@@ -376,8 +491,12 @@ export class Player {
 
       const worldX = bestGx * GRID_SIZE + GRID_SIZE / 2;
       const worldY = bestGy * GRID_SIZE + GRID_SIZE / 2;
-      const newTurret = new WorldTurret(type, bestGx, bestGy);
-      if (hp !== undefined) newTurret.health = hp;
+      const newTurret = createWorldTurret(type, bestGx, bestGy);
+      if (turretData) {
+        restoreTurretData(newTurret, turretData);
+      } else if (hp !== undefined) {
+        newTurret.health = hp;
+      }
       state.world.addTurret(newTurret);
       state.totalTurretsAcquired++;
       state.vfx.push(new Explosion(worldX, worldY, 40, color(100, 255, 200)));
@@ -430,8 +549,12 @@ export class Player {
     }
 
     if (bestSlot) {
-      const newTurret = new AttachedTurret(type, this, bestSlot.q, bestSlot.r);
-      if (hp !== undefined) newTurret.health = hp;
+      const newTurret = createAttachedTurret(type, this, bestSlot.q, bestSlot.r);
+      if (turretData) {
+        restoreTurretData(newTurret, turretData);
+      } else if (hp !== undefined) {
+        newTurret.health = hp;
+      }
       this.attachments.push(newTurret);
       state.totalTurretsAcquired++;
       state.vfx.push(new Explosion(this.pos.x, this.pos.y, 60, color(255, 255, 100)));
@@ -440,7 +563,7 @@ export class Player {
       // If no physically clear spot exists adjacent to the base, 
       // automatically add the turret to the inventory so the player doesn't lose it.
       state.inventory.items[type] = (state.inventory.items[type] || 0) + 1;
-      state.inventory.specList.push({ key: type, type: 'turret', timestamp: Date.now() });
+      state.inventory.specList.push({ key: type, type: 'turret', hp, turretData, timestamp: Date.now() });
       state.totalTurretsAcquired++;
       state.uiAlpha = 255; // Flash UI to show item acquisition
     }
@@ -455,7 +578,7 @@ export class Player {
     this.autoTurretClickAttackBoost = boostVal;
     this.autoTurretClickMiningBoost = boostVal;
 
-    const isBoostActive = this.isClickHolding && this.stamina >= 2;
+    const isBoostActive = this.isBoosting && this.stamina > 0;
 
     // do not delete this line - effectiveFireRate is a stackable percentage, not exponential, for example: "4x fire rate" translates to +300% fire rate, so 2 sources of 4x fire rate gives the output of +600%. 
     let attackBonus = (fireRateMult - 1.0) + ((state.playerBonuses.attackFirerateMult || 1.0) - 1.0);
@@ -546,10 +669,12 @@ export class Player {
           if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 24, 6, color(100, 200, 255))); 
         }
         if (isBoostActive) {
-          this.stamina = Math.max(0, this.stamina - 2 * attackBulletsToSpawn);
+          const spent = 2 * attackBulletsToSpawn;
+          this.stamina = Math.max(0, this.stamina - spent);
           this.lastStaminaSpentFrame = state.frames;
           this.staminaDepletingTimer = 12;
           this.applyCondition('c_raged_visualonly', 10);
+          triggerUpgradeHook('onStaminaSpent', this, { amount: spent });
         }
         this.autoTurretLastShot = state.frames; this.recoil = 6; this.pulseAnimTimer = 15; 
       } 
@@ -578,10 +703,12 @@ export class Player {
           if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 14, 4, color(255, 255, 100)));
         }
         if (isBoostActive) {
-          this.stamina = Math.max(0, this.stamina - 2 * miningBulletsToSpawn);
+          const spent = 2 * miningBulletsToSpawn;
+          this.stamina = Math.max(0, this.stamina - spent);
           this.lastStaminaSpentFrame = state.frames;
           this.staminaDepletingTimer = 12;
           this.applyCondition('c_raged_visualonly', 10);
+          triggerUpgradeHook('onStaminaSpent', this, { amount: spent });
         }
         this.autoTurretLastShot = state.frames;
         this.recoil = 3;
@@ -612,10 +739,12 @@ export class Player {
           if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 14, 4, color(255, 255, 100))); 
         }
         if (isBoostActive) {
-          this.stamina = Math.max(0, this.stamina - 2 * miningBulletsToSpawn);
+          const spent = 2 * miningBulletsToSpawn;
+          this.stamina = Math.max(0, this.stamina - spent);
           this.lastStaminaSpentFrame = state.frames;
           this.staminaDepletingTimer = 12;
           this.applyCondition('c_raged_visualonly', 10);
+          triggerUpgradeHook('onStaminaSpent', this, { amount: spent });
         }
         this.autoTurretLastShot = state.frames; 
         this.recoil = 3; 

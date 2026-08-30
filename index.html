@@ -12,6 +12,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link old href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Viga&display=swap" rel="stylesheet">
+  <script>
+    // Enable willReadFrequently by default on 2D canvas contexts to optimize getImageData readbacks and eliminate browser warnings
+    (function() {
+      const originalGetContext = HTMLCanvasElement.prototype.getContext;
+      HTMLCanvasElement.prototype.getContext = function(type, options) {
+        if (type === '2d') {
+          options = options ? Object.assign({ willReadFrequently: true }, options) : { willReadFrequently: true };
+        }
+        return originalGetContext.call(this, type, options);
+      };
+    })();
+  </script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.min.js"></script>
 <script type="importmap">
 {

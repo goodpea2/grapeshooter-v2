@@ -58,9 +58,10 @@ export function handleTouchMoved(touches: any[]) {
     return;
   }
 
-  // Convert screen touch position to world coordinates
-  const touchWorldX = t.x - width / 2 + state.cameraPos.x;
-  const touchWorldY = t.y - height / 2 + state.cameraPos.y;
+  // Convert screen touch position to world coordinates taking camera zoom into account
+  const zoom = state.cameraZoom || 1.0;
+  const touchWorldX = (t.x - width / 2) / zoom + state.cameraPos.x;
+  const touchWorldY = (t.y - height / 2) / zoom + state.cameraPos.y;
 
   // Calculate direction vector from player to touch world position
   const dx = touchWorldX - state.player.pos.x;

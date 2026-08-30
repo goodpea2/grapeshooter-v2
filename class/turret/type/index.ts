@@ -35,6 +35,10 @@ import { t2_iceray } from './t2_iceray';
 import { t2_spike } from './t2_spike';
 import { t2_icebomb } from './t2_icebomb';
 import { t2_stun } from './t2_stun';
+import { t2_wallaser } from './t2_wallaser';
+import { t2_heallaser } from './t2_heallaser';
+import { t2_icewall } from './t2_icewall';
+import { t2_torchwood } from './t2_torchwood';
 import { t3_triplepea } from './t3_triplepea';
 import { t3_firepea2 } from './t3_firepea2';
 import { t3_spinnut } from './t3_spinnut';
@@ -60,6 +64,9 @@ import { t3_snowpeanut } from './t3_snowpeanut';
 import { t3_skymortar } from './t3_skymortar';
 import { t3_laser3 } from './t3_laser3';
 import { t3_puncher2 } from './t3_puncher2';
+import { t3_gatling } from './t3_gatling';
+import { t3_firecharge } from './t3_firecharge';
+import { t3_minecharge } from './t3_minecharge';
 import { tx_goldengrape } from './tx_goldengrape';
 
 export const turretTypeRegistry: any = {
@@ -100,6 +107,10 @@ export const turretTypeRegistry: any = {
   t2_spike,
   t2_icebomb,
   t2_stun,
+  t2_wallaser,
+  t2_heallaser,
+  t2_icewall,
+  t2_torchwood,
   t3_triplepea,
   t3_firepea2,
   t3_spinnut,
@@ -125,5 +136,8 @@ export const turretTypeRegistry: any = {
   t3_skymortar,
   t3_laser3,
   t3_puncher2,
+  t3_gatling,
+  t3_firecharge,
+  t3_minecharge,
   tx_goldengrape,
 };

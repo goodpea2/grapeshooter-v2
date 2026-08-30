@@ -198,7 +198,7 @@ export function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha
   pop();
 
   // --- Drag logic ---
-  if (hov && mouseIsPressed && state.isStationary && !state.isAlmanacOpen && !state.upgradeSelection) {
+  if (hov && mouseIsPressed && !state.isAlmanacOpen && !state.upgradeSelection) {
     if (!onCooldown && canAfford && !state.draggedTurretType) {
       state.draggedTurretType = key;
       state.dragOrigin = { x: mouseX, y: mouseY };

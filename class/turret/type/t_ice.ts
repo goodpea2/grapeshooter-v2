@@ -7,7 +7,7 @@ export const t_ice: TurretConfig = {
   actionType: ['pulse'],
   actionConfig: { 
     pulseBulletTypeKey: 'b_ice_explosion', 
-    pulseTriggerRadius: GRID_SIZE * 1.5, 
+    pulseTriggerRadius: GRID_SIZE * 2.5, 
     pulseTriggerBy: ['enemy'], 
     pulseCooldown: HOUR_FRAMES, 
     pulseCenteredAtTriggerSource: true, 

@@ -15,16 +15,16 @@ export const TURRET_RECIPES: TurretRecipe[] = [
   { id: 't2_snowpea', ingredients: ['t_pea', 't_ice'], duplicates: 0, totalCount: 2 },
   
   { id: 't2_laser2', ingredients: ['t_laser'], duplicates: 1, totalCount: 2 },
-  { id: 't2_puncher', ingredients: ['t_laser', 't_wall'], duplicates: 0, totalCount: 2 },
+  { id: 't2_wallaser', ingredients: ['t_laser', 't_wall'], duplicates: 0, totalCount: 2 },
   { id: 't2_laserexplode', ingredients: ['t_laser', 't_mine'], duplicates: 0, totalCount: 2 },
-  { id: 't2_iceray', ingredients: ['t_laser', 't_ice'], duplicates: 0, totalCount: 2 },
+  { id: 't2_heallaser', ingredients: ['t_laser', 't_ice'], duplicates: 0, totalCount: 2 },
   
   { id: 't2_tall', ingredients: ['t_wall'], duplicates: 1, totalCount: 2 },
   { id: 't2_pulse', ingredients: ['t_wall', 't_mine'], duplicates: 0, totalCount: 2 },
-  { id: 't2_spike', ingredients: ['t_wall', 't_ice'], duplicates: 0, totalCount: 2 },
+  { id: 't2_icewall', ingredients: ['t_wall', 't_ice'], duplicates: 0, totalCount: 2 },
   
   { id: 't2_minespawner', ingredients: ['t_mine'], duplicates: 1, totalCount: 2 },
-  { id: 't2_icebomb', ingredients: ['t_mine', 't_ice'], duplicates: 0, totalCount: 2 },
+  { id: 't2_torchwood', ingredients: ['t_mine', 't_ice'], duplicates: 0, totalCount: 2 },
   
   { id: 't2_stun', ingredients: ['t_ice'], duplicates: 1, totalCount: 2 },
 

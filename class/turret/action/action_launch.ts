@@ -4,10 +4,12 @@ import { TurretAction } from '../../turretAction';
 import { Bullet } from '../../bullet';
 import { MuzzleFlash } from '../../../vfx/index';
 import { triggerUpgradeHook } from '../../../src/upgrades';
+import { GRID_SIZE } from '../../../constants';
 
 declare const atan2: any;
 declare const random: any;
 declare const radians: any;
+declare const TWO_PI: any;
 
 export class ActionLaunch extends TurretAction {
   tags = ['attack', 'projectile', 'artillery'];
@@ -19,16 +21,21 @@ export class ActionLaunch extends TurretAction {
     const type = 'launch';
     const step = this.turret.actionSteps.get(type) || 0;
     
-    const frValue = config.shootFireRate || 60;
+    const isCharged = this.turret.isCharged ? this.turret.isCharged() : false;
+    let frValue = config.shootFireRate || 60;
+    if (isCharged && this.turret.config.whileCharged?.shootFireRate !== undefined) {
+      frValue = this.turret.config.whileCharged.shootFireRate;
+    }
     const baseFR = Array.isArray(frValue) ? frValue[step % frValue.length] : frValue;
     const frDivider = stats.firerateDivider || 1.0;
     
     let effectiveFireRate = baseFR / (frDivider * frMultiplier);
     let bulletsToSpawn = 1;
-    
-    if (effectiveFireRate < 2) {
-      bulletsToSpawn = Math.floor(2 / effectiveFireRate);
-      effectiveFireRate = 2;
+    if (effectiveFireRate > 0) {
+      while (effectiveFireRate < 4) {
+        effectiveFireRate *= 2;
+        bulletsToSpawn *= 2;
+      }
     }
 
     return { effectiveFireRate, bulletsToSpawn };
@@ -47,7 +54,12 @@ export class ActionLaunch extends TurretAction {
   }
 
   getRange(): number {
-    return (this.turret.config.actionConfig.shootRange || 300) * (this.turret.stats.rangeMult || 1);
+    const isCharged = this.turret.isCharged ? this.turret.isCharged() : false;
+    let baseRange = this.turret.config.actionConfig.shootRange || 300;
+    if (isCharged && this.turret.config.whileCharged?.shootRange !== undefined) {
+      baseRange = this.turret.config.whileCharged.shootRange;
+    }
+    return baseRange * (this.turret.stats.rangeMult || 1);
   }
 
   needsLOS(): boolean {
@@ -55,6 +67,10 @@ export class ActionLaunch extends TurretAction {
   }
 
   canExecute(): boolean {
+    const isCharged = this.turret.isCharged ? this.turret.isCharged() : false;
+    if (isCharged && this.turret.config.whileCharged?.shootRandomPosWhenNoTarget) {
+      return this.isReady();
+    }
     return this.isReady() && !!this.turret.target;
   }
 
@@ -63,9 +79,19 @@ export class ActionLaunch extends TurretAction {
     const config = this.turret.config.actionConfig;
     const type = 'launch';
     const step = this.turret.actionSteps.get(type) || 0;
+    const isCharged = this.turret.isCharged ? this.turret.isCharged() : false;
 
-    const tCenter = this.turret.getTargetCenter();
-    if (!tCenter) return;
+    let tCenter = this.turret.getTargetCenter();
+    if (!tCenter) {
+      if (isCharged && this.turret.config.whileCharged?.shootRandomPosWhenNoTarget) {
+        const randAngle = random(TWO_PI);
+        const maxR = this.getRange();
+        const randDist = random(GRID_SIZE * 1.5, maxR);
+        tCenter = { x: wPos.x + Math.cos(randAngle) * randDist, y: wPos.y + Math.sin(randAngle) * randDist };
+      } else {
+        return;
+      }
+    }
 
     this.turret.angle = atan2(tCenter.y - wPos.y, tCenter.x - wPos.x);
 
