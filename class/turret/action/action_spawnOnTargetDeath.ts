@@ -64,12 +64,12 @@ export class ActionSpawnOnTargetDeath extends TurretAction {
         const angle = i * angleStep;
         const tx = spawnAt.x + Math.cos(angle) * 100;
         const ty = spawnAt.y + Math.sin(angle) * 100;
-        state.bullets.push(new Bullet(spawnAt.x, spawnAt.y, tx, ty, bulletKey, 'enemy', this.turret));
+        state.bullets.push(Bullet.create(spawnAt.x, spawnAt.y, tx, ty, bulletKey, 'enemy', this.turret));
       }
     } else {
       for (let i = 0; i < count; i++) {
         // Default to spawning at target position if no pattern specified
-        state.bullets.push(new Bullet(spawnAt.x, spawnAt.y, spawnAt.x, spawnAt.y, bulletKey, 'none', this.turret));
+        state.bullets.push(Bullet.create(spawnAt.x, spawnAt.y, spawnAt.x, spawnAt.y, bulletKey, 'none', this.turret));
       }
     }
   }

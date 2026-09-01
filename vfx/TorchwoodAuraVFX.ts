@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const random: any;
 declare const TWO_PI: any;
@@ -15,23 +16,40 @@ declare const height: any;
 
 export class TorchwoodAuraVFX {
   target: any; 
-  radius: number;
+  radius: number = 60;
   embers: { x: number; y: number; s: number; vy: number; vx: number; phase: number; life: number; maxLife: number }[] = [];
 
-  constructor(target: any, radius: number) {
+  constructor(target: any = null, radius: number = 60) {
+    for (let i = 0; i < 18; i++) {
+      this.embers.push({
+        x: 0,
+        y: 0,
+        s: 3,
+        vy: -0.4,
+        vx: 0,
+        phase: 0,
+        life: 60,
+        maxLife: 90
+      });
+    }
+    this.reset(target, radius);
+  }
+
+  reset(target: any = null, radius: number = 60) {
     this.target = target;
     this.radius = radius;
     for (let i = 0; i < 18; i++) {
-      this.embers.push({
-        x: random(-radius * 0.8, radius * 0.8),
-        y: random(-radius * 0.8, radius * 0.8),
-        s: random(2.5, 4.5),
-        vy: random(-0.6, -0.2),
-        vx: random(-0.2, 0.2),
-        phase: random(TWO_PI),
-        life: random(30, 90),
-        maxLife: 90
-      });
+      const e = this.embers[i];
+      if (e) {
+        e.x = random(-radius * 0.8, radius * 0.8);
+        e.y = random(-radius * 0.8, radius * 0.8);
+        e.s = random(2.5, 4.5);
+        e.vy = random(-0.6, -0.2);
+        e.vx = random(-0.2, 0.2);
+        e.phase = random(TWO_PI);
+        e.life = random(30, 90);
+        e.maxLife = 90;
+      }
     }
   }
 
@@ -107,4 +125,17 @@ export class TorchwoodAuraVFX {
     }
     pop();
   }
+}
+
+export const torchwoodAuraPool = new ObjectPool<TorchwoodAuraVFX>(
+  'TorchwoodAura',
+  () => new TorchwoodAuraVFX(),
+  undefined,
+  100
+);
+
+export function spawnTorchwoodAuraVFX(target: any, radius: number): TorchwoodAuraVFX {
+  const vfx = torchwoodAuraPool.get();
+  vfx.reset(target, radius);
+  return vfx;
 }

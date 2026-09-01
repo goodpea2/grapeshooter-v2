@@ -2,6 +2,9 @@
 import { state } from '../../state';
 import { HOUR_FRAMES } from '../../constants';
 import { TYPE_MAP } from '../../assetTurret';
+import { soundEngine } from '../../src/audio/soundEngine';
+
+let lastNotEnoughSoundFrame = -999;
 
 declare const dist: any;
 declare const mouseX: any;
@@ -200,9 +203,15 @@ export function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha
   // --- Drag logic ---
   if (hov && mouseIsPressed && !state.isAlmanacOpen && !state.upgradeSelection) {
     if (!onCooldown && canAfford && !state.draggedTurretType) {
+      soundEngine.playSFX('inventory_click');
       state.draggedTurretType = key;
       state.dragOrigin = { x: mouseX, y: mouseY };
       state.isCurrentlyDragging = false;
+    } else if (!canAfford && !onCooldown && !state.draggedTurretType) {
+      if (state.frames - lastNotEnoughSoundFrame > 20) {
+        lastNotEnoughSoundFrame = state.frames;
+        soundEngine.playSFX('not_enough_resource');
+      }
     }
   }
 

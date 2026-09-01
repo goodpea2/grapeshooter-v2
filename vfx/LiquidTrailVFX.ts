@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const p5: any;
 declare const createVector: any;
@@ -48,18 +49,66 @@ declare const tint: any;
 declare const noTint: any;
 
 export class LiquidTrailVFX {
-  pos: any; type: string; life: number; maxLife: number; angle: number;
-  constructor(x: number, y: number, type: string, angle: number = 0) {
+  pos: any; type: string = 'water_trail'; life: number = 30; maxLife: number = 30; angle: number = 0;
+  constructor(x: number = 0, y: number = 0, type: string = 'water_trail', angle: number = 0) {
     this.pos = createVector(x, y); 
+    this.reset(x, y, type, angle);
+  }
+
+  reset(x: number = 0, y: number = 0, type: string = 'water_trail', angle: number = 0) {
+    if (this.pos) {
+      this.pos.set(x, y);
+    } else {
+      this.pos = createVector(x, y);
+    }
     this.type = type; 
     this.angle = angle;
     this.maxLife = type === 'water_trail' ? 30 : type === 'tar_trail' ? 120 : 60;
     this.life = this.maxLife;
   }
+
   update() { this.life--; }
   isDone() { return this.life <= 0; }
   display() {
-    let progress = 1 - (this.life / this.maxLife);
+    if (isNaN(this.pos.x) || isNaN(this.pos.y)) return;
+    const progress = 1 - (this.life / this.maxLife);
+    const alphaNorm = Math.max(0, Math.min(1, this.life / this.maxLife)) * 0.7;
+
+    const ctx = (window as any).drawingContext as CanvasRenderingContext2D;
+    if (ctx) {
+      if (this.type === 'water_trail') {
+        const radius = (progress * 20 + 20) * 0.5;
+        ctx.strokeStyle = `rgba(50, 120, 255, ${alphaNorm})`;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (this.type === 'ice_trail') {
+        const s = (1 - progress) * 10;
+        ctx.fillStyle = `rgba(220, 245, 255, ${alphaNorm})`;
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, Math.max(1, s), 0, Math.PI * 2);
+        ctx.fill();
+      } else if (this.type === 'tar_trail') {
+        const r = (progress * 50) * 0.5;
+        ctx.fillStyle = `rgba(40, 20, 60, ${alphaNorm * 0.8})`;
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, Math.max(1, r), 0, Math.PI * 2);
+        ctx.fill();
+      } else if (this.type === 'lava_trail') {
+        const r = (progress * 30) * 0.5;
+        ctx.fillStyle = `rgba(255, 60, 0, ${alphaNorm * 0.4})`;
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y, Math.max(1, r), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = `rgba(255, 200, 0, ${alphaNorm})`;
+        ctx.beginPath();
+        ctx.arc(this.pos.x, this.pos.y - progress * 10, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return;
+    }
+
     let alpha = map(this.life, 0, this.maxLife, 0, 180);
     push(); translate(this.pos.x, this.pos.y);
     noStroke();
@@ -90,4 +139,17 @@ export class LiquidTrailVFX {
     }
     pop();
   }
+}
+
+export const liquidTrailPool = new ObjectPool<LiquidTrailVFX>(
+  'LiquidTrail',
+  () => new LiquidTrailVFX(),
+  undefined,
+  500
+);
+
+export function spawnLiquidTrailVFX(x: number, y: number, type: string, angle: number = 0): LiquidTrailVFX {
+  const vfx = liquidTrailPool.get();
+  vfx.reset(x, y, type, angle);
+  return vfx;
 }

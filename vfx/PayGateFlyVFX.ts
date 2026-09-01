@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const createVector: any;
 declare const lerp: any;
@@ -24,16 +25,27 @@ export class PayGateFlyVFX {
   targetPos: any;
   progress: number = 0;
   speed: number = 0.08;
-  assetKey: string;
+  assetKey: string = '';
   size: number = 14;
   isDead: boolean = false;
-  arcHeight: number;
+  arcHeight: number = 0;
 
-  constructor(startX: number, startY: number, targetX: number, targetY: number, assetKey: string) {
+  constructor(startX: number = 0, startY: number = 0, targetX: number = 0, targetY: number = 0, assetKey: string = '') {
     this.pos = createVector(startX, startY);
     this.startPos = createVector(startX, startY);
     this.targetPos = createVector(targetX, targetY);
+    this.reset(startX, startY, targetX, targetY, assetKey);
+  }
+
+  reset(startX: number = 0, startY: number = 0, targetX: number = 0, targetY: number = 0, assetKey: string = '') {
+    if (this.pos) this.pos.set(startX, startY); else this.pos = createVector(startX, startY);
+    if (this.startPos) this.startPos.set(startX, startY); else this.startPos = createVector(startX, startY);
+    if (this.targetPos) this.targetPos.set(targetX, targetY); else this.targetPos = createVector(targetX, targetY);
     this.assetKey = assetKey;
+    this.progress = 0;
+    this.speed = 0.08;
+    this.size = 14;
+    this.isDead = false;
     this.arcHeight = (Math.random() - 0.5) * 20 - 15;
   }
 
@@ -79,4 +91,17 @@ export class PayGateFlyVFX {
     }
     pop();
   }
+}
+
+export const payGateFlyPool = new ObjectPool<PayGateFlyVFX>(
+  'PayGateFly',
+  () => new PayGateFlyVFX(),
+  undefined,
+  200
+);
+
+export function spawnPayGateFlyVFX(startX: number, startY: number, targetX: number, targetY: number, assetKey: string): PayGateFlyVFX {
+  const vfx = payGateFlyPool.get();
+  vfx.reset(startX, startY, targetX, targetY, assetKey);
+  return vfx;
 }

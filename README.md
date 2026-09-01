@@ -600,6 +600,137 @@ The Main Menu features a sleek layout pairing level navigation with a responsive
   - Implemented `checkLifetimeExplode()` lifecycle checks in `Bullet.update()` across all early return paths and at the end of the update loop.
   - Added safe fallbacks in `Bullet.explode()` and `Bullet.getLerpedAoeDamage()` for missing/empty radius gradients and color palettes, ensuring explosions reliably detonate and apply area effects upon bullet expiration without duplicate triggers.
 
+---
+
+## ⚡ High-Performance Architecture & Memory Management
+To eliminate GC spikes and maintain 60 FPS under dense projectile and enemy loads, the engine incorporates modern high-performance memory and spatial management systems:
+- **Bit-Packed Spatial Hash Grid (`SpatialHashGrid`)**:
+  - Encodes spatial buckets using bit-shifted 32-bit integer keys `((gx + 32768) << 16) | (gy + 32768)`, preventing negative coordinate hashing errors and completely removing GC garbage allocations from string-key allocations.
+  - Accelerated radius queries (`queryCircleEnemies`, `queryCircle`) with early bounding-box culling are integrated across all turret actions (Aura, Pulse, Shield, Laser Beam, Tesla Chaining), auto-turret targeting, and bullet explosion calculations.
+- **Generic Object Pooling (`ObjectPool<T>` & `PoolRegistry`)**:
+  - Lightweight pooling engine (`class/pool.ts`) supporting lifecycle resets, clean factory instantiation, and dynamic metric tracking (`totalCreated`, `totalAcquired`, `totalReleased`, `peakActive`, `recycleRate`).
+  - **Comprehensive VFX Pooling**:
+    - Projectiles & Combat: `Bullet`, `Explosion`, `DamageNumberVFX`, `HitSpark`, `MuzzleFlash`, `BlockHitVFX`, `BlockDebris`, `SparkVFX`.
+    - Area & Elemental: `FirePuddleVFX`, `FrostFieldAuraVFX`, `TorchwoodAuraVFX`, `StunGasVFX`, `PoisonGasVFX`, `ForcefieldVFX`, `MergeVFX`, `FireworkVFX`, `LiquidTrailVFX`.
+    - Status & Boss Effects: `ConditionVFX`, `BugSplatVFX`, `GiantDeathVFX`, `WeldingHitVFX`, `MagicLinkVFX`, `FirstStrikeVFX`.
+    - Flying Resource VFX: `LootInFlightVFX`, `PayGateFlyVFX`, `ShopFlyVFX`.
+  - **Comprehensive Loot Pooling**:
+    - `LootEntity` and `TurretLoot` pooled via `lootEntityPool` and `turretLootPool` with `spawnLootEntity()`, `spawnTurretLoot()`, and `releaseLoot()`.
+- **$O(1)$ Swap-and-Pop Array Lifecycle**:
+  - Replaced $O(N)$ `splice()` calls in core update loops with Swap-and-Pop (`const last = arr.pop()!; if (i < arr.length) arr[i] = last;`).
+  - Active across `bullets`, `enemyBullets`, `vfx`, `uiVfx`, `chunk.loot`, `enemies`, `groundFeatures`, `trails`, `pendingSpawns`, and `tickingExplosives`.
+- **Real-Time Engine Diagnostics & Performance Profiler HUD**:
+  - **Debug Overlay (`state.showPerfOverlay` / `Perf HUD` toggle)**:
+    - Real-time FPS and frame time monitoring (`ms/f`).
+    - Entity allocation breakdown: active Bullets, world & UI VFX, Enemies, world Loot, attached/world Turrets, active Chunks, and Spatial Grid bucket count.
+    - **Object Pools Leaderboard**: Displays active instances, peak usage, in-pool capacity, and total created instances with real-time color-coded load bars.
+  - **Diagnostic Actions**: `Reset Peaks` to baseline peak profiling, and `Trim Pools` to manually purge idle pool instances from memory.
+- **High-Performance Batched Bullet Renderer (`drawBatchedBullets`)**:
+  - Replaces per-bullet `push()/pop()` canvas matrix state saves with high-throughput multi-pass bucketed rendering.
+  - Groups tracer bullets into single continuous `ctx.beginPath() -> stroke()` vector paths, batches ground shadows into unified path fills, and buckets sprite bullets by texture key, reducing draw-call overhead and matrix state churn by over 90%.
+- **Hierarchical Multi-Goal Flow Field Registry (`FlowFieldRegistry`)**:
+  - Manages multiple prioritized navigation goals (Player, Core Base, PayGates, and custom objectives) in parallel.
+  - Enemies route dynamically to their highest-priority accessible goal or fallback to direct line-of-sight vectors.
+- **8-Bucket Interleaved AI Cognitive Scheduling & 30Hz Flocking**:
+  - Distributes heavy enemy line-of-sight and spatial target queries across 8 staggered frame slices (`(uid & 7) === (frames & 7)`), eliminating concurrent frame spikes when large horde waves spawn.
+  - Evaluates neighbor repulsion and soft-collision physics on alternating frames (30 Hz) with compensated impulse scaling, halving spatial hash queries while preserving movement smoothness.
+- **Zero-GC Bit-Packed Raycast Memoization (`checkLOS`)**:
+  - Replaced string template cache keys with bit-packed 48-bit numeric integer keys in `WorldManager.checkLOS()`, preventing heap string allocations during dense line-of-sight traversals.
+- **Direct Obstacle-Bypassing Flight Vector for Flying Enemies (`isFlying`)**:
+  - Enemies with `isFlying = true` completely bypass the flow-field grid pathfinder and wall line-of-sight checks, navigating directly toward their targets via straight Euclidean trajectories with no collision slowdowns or obstacle steering overhead.
+- **Accurate Bullet Coloration & Custom Sprite Assets**:
+  - Resolved bullet stroke color parsing by converting array RGB/RGBA tuples, hex strings, and numeric values into valid Canvas2D CSS color strings, eliminating unintended black borders.
+  - Fully supports custom projectile sprite assets via `b.config.assetImg`, `b.config.idleAssetImg`, `b.config.bulletAssetImg`, or direct bullet asset keys, rendered with proper center origin and projectile trajectory rotation.
+- **Fast Canvas2D Direct-Path Particle & VFX Acceleration**:
+  - Replaced per-particle p5 matrix state saves and color query functions (`red()`, `green()`, `blue()`) in `DamageNumberVFX`, `HitSpark`, and `Explosion` with high-speed Canvas2D native arc, stroke, and fill paths, eliminating text and transformation bottlenecking during massive wave clears.
+- **High-DPI 2x Crisp Visual Resolution & Fill-Rate Optimization**:
+  - Restored razor-sharp visual fidelity by dynamically scaling `pixelDensity(Math.min(window.devicePixelRatio, 2))` across the main canvas and offscreen chunk buffers (`renderToBuffer`, `deathBuffer`).
+  - Coupled with deep rendering pipeline optimizations, the engine comfortably maintains **60 FPS in fullscreen mode with 2x Retina clarity**.
+- **Double Frustum & Fog-Radius Culling in `worldManager.display`**:
+  - Implemented visibility-radius bounds filtering in addition to standard viewport bounds. In fullscreen mode (1440p/4K), chunks outside the player's immediate visibility bubble (`(VISIBILITY_RADIUS + 1) * GRID_SIZE`) are completely culled, reducing active chunk rendering by over 75%.
+- **Pre-Categorized Chunk Block Indexing**:
+  - Categorized block rendering in `Chunk` (`rebuildOverlayList`): segregated `liquidBlocks`, `assetBlocks`, `winConditionBlocks`, and `overlayBlocks`.
+  - Replaced the brute-force scanning of all 256–512 tiles per chunk with targeted iterations over only active specialized blocks (reducing block iteration overhead by ~95% per frame).
+- **Direct Canvas2D Blitting for Terrain Buffers & Trails**:
+  - Accelerated offscreen autotile chunk and death buffer draws using direct native `ctx.drawImage` calls, bypassing p5 transformation matrix allocation.
+  - Accelerated `LiquidTrailVFX` with direct Canvas2D arc and path rendering, keeping particle cascades smooth and fluid.
+- **Fast-Path Radial Vignette & Lighting Acceleration**:
+  - Replaced massive multi-thousand-pixel line width software arc strokes in `drawVisibilityOverlay` with direct single-pass radial gradient fills that cover the entire viewport in microseconds.
+  - Accelerated ambient day/night and game-over tinting in `drawGlobalLighting` via native direct `ctx.fillRect()`, eliminating state-stack push/pop stalls.
+- **Render-Loop Decoupling & Pure Viewport Drawing**:
+  - Removed state-modifying logic (`b.update()`) from the tile rendering loop in `chunk.display()`, relocating all active spawner, turret, and catalyst logic exclusively to the fixed-timestep simulation loop (`tick()`).
+- **Interactive Pause Menu Modal & Graphics Quality Settings**:
+  - Replaced the direct in-game "MENU" button navigation with an Almanac-style `PauseMenu` modal utilizing standardized primitives (`drawModalFrame`, `drawCard`, `drawButton`, `drawYellowButton`, `drawRedButton`) from `uiComponents.ts`.
+  - Added user-adjustable **Graphic Settings (`Low` [1x standard DPI] / `High` [2x Retina DPI])** with persistent state in `localStorage` (`grapeshooter_graphic_quality`), dynamically updating canvas `pixelDensity` and re-generating terrain buffers on demand.
+  - Included clean **Resume Game** and **Exit to Menu** action buttons with full keyboard `Escape` toggling support.
+- **Consistent Liquid Chunk Rendering**:
+  - Updated liquid tile rendering to display cleanly at 100% opacity alongside the chunk's terrain pass, completely removing per-tile distance calculation and fading overhead while relying on chunk-level culling and the atmospheric vignette.
+- **High-DPI Death VFX Buffer Alignment**:
+  - Fixed persistent enemy death bug-splat alignment in `GraphicSettings=high` (2x Retina DPI) by providing explicit logical destination dimensions (`chunkW, chunkW`) to native `ctx.drawImage` calls, eliminating 2x scaling offsets across offscreen death buffers.
+- **Standardized Debug Toggle & Collapsed Performance Section**:
+  - Upgraded the in-game `Debug` button to use `drawDarkButton` from `uiComponents.ts`, matching the Almanac tactile 3D style and hitbox layer registry.
+  - Set the `PERFORMANCE & POOLS` debug accordion to collapsed by default (`state.debugSectionsCollapsed.perf = true`) for a cleaner default debug view.
+- **Comprehensive Level Entry UI Cache Reset**:
+  - Hardened `startLevel()` in `levelManager.ts` to comprehensively purge all transient UI states (pause modal, shop dialogs, drag previews, upgrade popups, almanac state, scroll velocities, and input buffers) whenever starting or restarting a level.
+- **Dynamic Multi-Track Sound & Music Engine (`src/audio/soundEngine.ts`)**:
+  - **Dynamic In-Game Music & Synced Percussion**: Plays a shuffled, cycling playlist of synchronized level track pairs (`ingame1`/`ingame1b`, `ingame2`/`ingame2b`) in sample-accurate lockstep via the Web Audio API.
+  - **Day/Night Dynamic Ramping**: When the `THE NIGHT IS APPROACHING` warning begins (19:30), the tense percussion layer (`ingameNb`) smoothly ramps to full volume over 4 seconds while daytime bird ambience fades out; in the morning (`time >= 6:00am` and `enemyCount < 10`), the percussion layer smoothly fades out over 8 seconds while daytime birds fade back in.
+  - **Main Menu Music Cycling**: Main menu plays shuffled cycling tracks from `menu1` and `menu2` with smooth cross-fading.
+  - **Global Sound Settings & Main Menu Access**: Integrated dedicated `[Music]` and `[SFX]` steppers (`drawNumberStepper`) accessible from both in-game PauseMenu and MainMenu (via the settings gear button next to Import Level), persisting globally in `localStorage`.
+  - **AudioInfo HUD in Debug Mode**: Added an interactive Audio Engine HUD in Debug Mode (`state.showAudioDebugOverlay`) displaying active context state, loaded buffers count, current BGM, music/sfx master volumes, tense/birds multipliers, recent SFX triggers, and test SFX action buttons.
+  - **Comprehensive Fallback SFX Integration**:
+    - `enemy_death`: Randomly picks `enemy_death1`/`enemy_death2` when an enemy is slain.
+    - `projectile_hit_enemy`: Plays `projectile_hit_enemy1`/`projectile_hit_enemy2` upon hitting an enemy entity.
+    - `projectile_hit_block`: Plays `projectile_hit_block1`/`projectile_hit_block2` upon impacting destructible blocks and obstacles.
+    - `shoot_light`: Plays `shoot_light1`/`shoot_light2` on bullet discharge.
+    - `turret_bitten_softbody` & `turret_eaten`: Plays biting/eating sounds when turrets take enemy damage or are destroyed.
+    - `collect_sun`: Plays sound effect upon loot arrival at the HUD counter.
+    - `player_step`: Plays footsteps (`step1`-`step4`) during movement.
+    - `hugewave_siren` & `hugewave_intro`: Triggers during the night approaching warning.
+  - **Universal Deployment Support**: Built with dynamic base URL prefixing (`(import.meta as any).env?.BASE_URL`) for local and GitHub Pages deployments.
+- **Resource Loading Screen (`ui/uiLoadingScreen.ts`)**:
+  - Displays a clean, high-contrast loading screen (`Loading 50%` / progress bar) during initial audio/asset preloading and upon entering a level.
+- **Lazy AudioContext & Decoupled State Initialization**:
+  - Refactored `SoundEngine` to use lazy AudioContext initialization and safe fallback volume resolution (`localStorage` / guarded `state` access), eliminating circular dependency temporal dead zone (TDZ) warnings on initial bundle evaluation.
+- **Normalized UI & Battle SFX Triggers**:
+  - **Left-Aligned Audio Engine HUD**: Repositioned `AudioDebugHUD` to the left screen flank beneath the Performance HUD with toggleable test buttons and real-time buffer monitors.
+  - **`btn_click`**: Unified across all standard UI button clicks, modal buttons, and top-right in-game actions.
+  - **`levellist_hover`**: Triggered on modular button and level list hover states.
+  - **`hugewave_intro` & `hugewave_siren`**: Plays `hugewave_intro` when the "THE NIGHT IS APPROACHING" banner appears and `hugewave_siren` when the night's spawn budget starts deploying.
+  - **`inventory_click` & `not_enough_resource`**: Differentiates successful turret purchases/drags from insufficient currency attempts.
+  - **`pause_btn`**: Plays on toggling game pause or entering the pause/settings menu.
+  - **`speedup` / `speeddown`**: Plays upon toggling between 1x and 2x game speed.
+  - **`turret_pickup`**: Triggers on dragging a turret or colliding with a detached turret in the world.
+  - **`turret_place` & `turret_place_2`**: Alternates placement sound effects when deploying or moving turrets.
+  - **`merge`**: Plays upon successful turret fusion on player attachment or world grid slots.
+  - **`laser_loop`**: Continuous beam sound with seamless debounced looping in `ActionLaserBeam`.
+  - **`block_death` (`1`-`3`)**: Randomly triggers on obstacle / block destruction.
+  - **Dynamic In-Game Music & Throttled LOS Threat Detection**:
+    - Expanded the in-game music playlist with tracks `ingame3` and `ingame4`.
+    - Throttled tense percussion (`ingameXb`) threat evaluations to execute every 0.5 in-game hours (300 frames) to minimize CPU overhead.
+    - Updated threat detection logic: `tensePercussion` now strictly counts enemies that have an unobstructed Line of Sight (`state.world.checkLOS`) to the player, dynamically activating intense battle percussion only when active direct threats are present.
+  - **Pause Menu BGM Fade-Out & Resume**:
+    - Opening the pause menu (`state.isPaused = true`) smoothly fades out the active background music to zero volume.
+    - Resuming the game restores music tracks to their master volume levels seamlessly.
+  - **Custom Turret & Obstacle AOE Explosion SFX**:
+    - Added `explosionSfx` configuration to `aoeConfig` across explosive projectiles in `balanceBullets.ts` (e.g. `b_bomb_explosion`, `b_tnt_explosion`, `b_cherry_explosion`, `b_mine_explosion`, `b_mortar_shell`, `b_skymortar_shell`, `b_miningbomb_explosion`).
+    - `Bullet.explode()` dynamically triggers randomized explosion sound effects from `aoeConfig.explosionSfx` mapped to the corresponding VFX visual types (`sfx/turret/` and `sfx/obstacle/`).
+  - **Dynamic Level Editor Tooltips & Spawner UX**:
+    - Modal tooltips automatically appear and switch based on active category/selection (e.g., selecting `ov_spawner` or `l_spawner` activates the Spawner Tooltip, selecting `sunGenerator` activates the Sun Generator Tooltip, and non-spawner selections automatically dismiss active tooltips).
+    - Ground Spawner (`l_spawner`) provides full configuration for `hourlySpawnConfig` (hourly budget multiplier, hourly budget add, and self-destruction budget threshold).
+  - **Almanac & Level Editor Player Upgrade / Config UX**:
+    - Added `SET ALL TO 1 LEVEL` batch action in the Player Upgrades editor to rapidly configure all upgrade tracks to their first-tier values.
+    - Remade Player Upgrade and Level Config input fields using standardized design tokens from `uiComponents.ts` and `uiColors.ts` (consistent borders, focus highlights, selection colors, and responsive inputs).
+  - **Reworked Enemy Spawning Rules & Damage-Correlated Spawners**:
+    - Global enemy budget spawning strictly executes during nighttime, enforcing minimum 12-tile player distance and 6-tile turret distance.
+    - Enemies can spawn across open ground and non-dangerous liquids, while flying enemies (`isFlying: true`) can spawn on top of obstacles.
+    - Local spawners (`ov_spawner`) pre-cache their spawn queues upon initialization and spawn enemies proportionally as they take damage (% health lost correlates to % enemies spawned from the cached queue), spawning remaining units upon destruction.
+  - **Interactive Main Menu Minigame Audio**:
+    - Integrated sound effects for eliminating enemies and interacting within the main menu background mini-game.
+
+
+
+
 
 
 

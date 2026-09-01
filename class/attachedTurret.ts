@@ -5,9 +5,9 @@ import { turretTypes } from '../balanceTurrets';
 import { conditionTypes } from '../balanceConditions';
 import { liquidTypes } from '../balanceLiquids';
 import { overlayTypes } from '../balanceObstacles';
-import { MuzzleFlash, Explosion, SparkVFX, BlockDebris, ConditionVFX, MergeVFX, MagicLinkVFX, WeldingHitVFX, FirstStrikeVFX, FrostFieldAuraVFX, DamageNumberVFX } from '../vfx/index';
+import { MuzzleFlash, Explosion, SparkVFX, BlockDebris, ConditionVFX, MergeVFX, MagicLinkVFX, WeldingHitVFX, FirstStrikeVFX, FrostFieldAuraVFX, DamageNumberVFX, spawnMergeVFX } from '../vfx/index';
 import { Bullet } from './bullet';
-import { LootEntity, SunLoot } from './loot';
+import { LootEntity, SunLoot, spawnLootEntity } from './loot';
 import { Enemy } from './enemy';
 import { drawTurret, drawTurretUI } from '../visualTurrets';
 import { TURRET_RECIPES } from '../dictionaryTurretMerging';
@@ -385,7 +385,7 @@ export class AttachedTurret extends Turret {
           const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
           const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
           const chunk = state.world.getChunk(cx, cy);
-          if (chunk) chunk.loot.push(new LootEntity(px, py, res));
+          if (chunk) chunk.loot.push(spawnLootEntity(px, py, res));
         }
       }
       if (fCfg.lootOnHarvest.extra && random() < fCfg.lootOnHarvest.extra.chance) {
@@ -395,7 +395,7 @@ export class AttachedTurret extends Turret {
         const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
         const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
         const chunk = state.world.getChunk(cx, cy);
-        if (chunk) chunk.loot.push(new LootEntity(px, py, extraRes));
+        if (chunk) chunk.loot.push(spawnLootEntity(px, py, extraRes));
       }
     }
     
@@ -409,7 +409,7 @@ export class AttachedTurret extends Turret {
       this.onDeath();
     }
     
-    state.vfx.push(new MergeVFX(wPos.x, wPos.y, [255, 255, 255]));
+    state.vfx.push(spawnMergeVFX(wPos.x, wPos.y, [255, 255, 255]));
   }
 
   private applyObstacleRepulsion(wPos: any) {

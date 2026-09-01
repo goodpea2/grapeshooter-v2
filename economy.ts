@@ -1,7 +1,6 @@
-
 import { state } from './state';
 import { HOUR_FRAMES, GRID_SIZE, CHUNK_SIZE } from './constants';
-import { LootEntity, TurretLoot } from './entities';
+import { LootEntity, TurretLoot, spawnLootEntity, spawnTurretLoot } from './entities';
 import { lootTypes, lootTableTypes, lootConfigs, LootTableEntry, ExternalLootConfigEntry } from './balanceLootTable';
 import { turretTypes } from './balanceTurrets';
 
@@ -59,7 +58,7 @@ export function spawnLootAt(x: number, y: number, key: string, configSource: any
          const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
          const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
          const chunk = state.world.getChunk(cx, cy);
-         if (chunk) chunk.loot.push(new LootEntity(px, py, 'sun'));
+         if (chunk) chunk.loot.push(spawnLootEntity(px, py, 'sun'));
       }
       return;
     }
@@ -72,7 +71,7 @@ export function spawnLootAt(x: number, y: number, key: string, configSource: any
       const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
       const chunk = state.world.getChunk(cx, cy);
       const hp = (typeof configSource === 'number') ? configSource : (turretTypes[key]?.health || 100);
-      if (chunk) chunk.loot.push(new TurretLoot(px, py, key, hp));
+      if (chunk) chunk.loot.push(spawnTurretLoot(px, py, key, hp));
       return;
     }
 
@@ -83,7 +82,7 @@ export function spawnLootAt(x: number, y: number, key: string, configSource: any
       const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
       const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
       const chunk = state.world.getChunk(cx, cy);
-      if (chunk) chunk.loot.push(new LootEntity(px, py, key));
+      if (chunk) chunk.loot.push(spawnLootEntity(px, py, key));
       return;
     }
     return;
@@ -115,7 +114,7 @@ export function spawnLootAt(x: number, y: number, key: string, configSource: any
         const px = x + random(-15, 15);
         const py = y + random(-15, 15);
         
-        const loot = new LootEntity(px, py, typeKey);
+        const loot = spawnLootEntity(px, py, typeKey);
         const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
         const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
         const chunk = state.world.getChunk(cx, cy);

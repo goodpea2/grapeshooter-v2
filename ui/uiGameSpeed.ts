@@ -8,6 +8,7 @@ import { MergeVFX } from '../vfx/index';
 import { flowField } from '../pathfinding';
 import { GRID_SIZE } from '../constants';
 import { triggerUpgradeHook } from '../src/upgrades';
+import { soundEngine } from '../src/audio/soundEngine';
 
 export function detachAllTurrets() {
   if (!state.player || !state.player.attachments || state.player.attachments.length === 0 || !state.world) return;
@@ -261,9 +262,15 @@ export function drawGameSpeedButtons() {
     radius: 12,
     depth3D: 3,
     onClick: () => {
-      state.requestedGameSpeed = state.requestedGameSpeed === 2 ? 1 : 2;
+      const newSpeed = state.requestedGameSpeed === 2 ? 1 : 2;
+      state.requestedGameSpeed = newSpeed;
       state.isPaused = false;
       state.speedupFlashTimer = 30;
+      if (newSpeed === 2) {
+        soundEngine.playSFX('speedup');
+      } else {
+        soundEngine.playSFX('speeddown');
+      }
     }
   });
 
@@ -277,6 +284,7 @@ export function drawGameSpeedButtons() {
     onClick: () => {
       state.isPaused = !state.isPaused;
       state.speedupFlashTimer = 30;
+      soundEngine.playSFX('pause_btn');
     }
   });
 
@@ -308,7 +316,9 @@ export function drawGameSpeedButtons() {
       radius: 12,
       depth3D: 3,
       onClick: () => {
-        state.currentScreen = 'main_menu';
+        soundEngine.playSFX('pause_btn');
+        state.isPauseMenuOpen = true;
+        state.isPaused = true;
       }
     });
   }

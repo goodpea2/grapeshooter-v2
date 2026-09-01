@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const p5: any;
 declare const createVector: any;
@@ -47,22 +48,41 @@ declare const tint: any;
 declare const noTint: any;
 
 export class FirePuddleVFX {
-  pos: any; radius: number; life: number; duration: number;
+  pos: any; radius: number = 30; life: number = 60; duration: number = 60;
   embers: any[] = [];
   sparks: any[] = [];
 
-  constructor(x: number, y: number, radius: number, duration: number = 60) {
+  constructor(x: number = 0, y: number = 0, radius: number = 30, duration: number = 60) {
     this.pos = createVector(x, y); 
-    this.radius = radius;
-    this.life = duration; 
-    this.duration = duration;
     for(let i=0; i<6; i++) {
         this.embers.push({ 
-            p: createVector(random(-radius, radius), random(-radius, radius)), 
-            v: random(0.8, 1.5), 
-            s: random(3, 5),
-            off: random(TWO_PI)
+            p: createVector(0, 0), 
+            v: 1, 
+            s: 4,
+            off: 0
         });
+    }
+    this.reset(x, y, radius, duration);
+  }
+
+  reset(x: number = 0, y: number = 0, radius: number = 30, duration: number = 60) {
+    if (this.pos) {
+      this.pos.set(x, y);
+    } else {
+      this.pos = createVector(x, y);
+    }
+    this.radius = radius;
+    this.life = duration;
+    this.duration = duration;
+    this.sparks.length = 0;
+    for (let i = 0; i < 6; i++) {
+      const e = this.embers[i];
+      if (e) {
+        e.p.set(random(-radius, radius), random(-radius, radius));
+        e.v = random(0.8, 1.5);
+        e.s = random(3, 5);
+        e.off = random(TWO_PI);
+      }
     }
   }
 
@@ -74,7 +94,7 @@ export class FirePuddleVFX {
     }
 
     // Persistant spark spawning loop
-    if (this.life > 15 && random() < 0.25) {
+    if (this.life > 15 && random() < 0.25 && this.sparks.length < 20) {
         this.sparks.push({
             p: createVector(this.pos.x + random(-this.radius*0.7, this.radius*0.7), this.pos.y + random(-this.radius*0.3, this.radius*0.3)),
             v: createVector(random(-0.5, 0.5), random(-1.5, -3.5)),
@@ -86,7 +106,12 @@ export class FirePuddleVFX {
     for (let i = this.sparks.length - 1; i >= 0; i--) {
         this.sparks[i].p.add(this.sparks[i].v);
         this.sparks[i].l--;
-        if (this.sparks[i].l <= 0) this.sparks.splice(i, 1);
+        if (this.sparks[i].l <= 0) {
+          const last = this.sparks.pop()!;
+          if (i < this.sparks.length) {
+            this.sparks[i] = last;
+          }
+        }
     }
   }
 
@@ -130,4 +155,17 @@ export class FirePuddleVFX {
         ellipse(s.p.x, s.p.y, s.s);
     }
   }
+}
+
+export const firePuddlePool = new ObjectPool<FirePuddleVFX>(
+  'FirePuddle',
+  () => new FirePuddleVFX(),
+  undefined,
+  500
+);
+
+export function spawnFirePuddleVFX(x: number, y: number, radius: number = 30, duration: number = 60): FirePuddleVFX {
+  const vfx = firePuddlePool.get();
+  vfx.reset(x, y, radius, duration);
+  return vfx;
 }

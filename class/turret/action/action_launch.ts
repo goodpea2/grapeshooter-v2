@@ -106,7 +106,7 @@ export class ActionLaunch extends TurretAction {
       let targetX = tCenter.x + (config.spread ? random(-config.spread, config.spread) : 0);
       let targetY = tCenter.y + (config.spread ? random(-config.spread, config.spread) : 0);
 
-      const b = new Bullet(startX, startY, targetX, targetY, config.bulletTypeKey, 'enemy', this.turret);
+      const b = Bullet.create(startX, startY, targetX, targetY, config.bulletTypeKey, 'enemy', this.turret);
       (b as any).isArtillery = true;
       (b as any).arcHeight = (config.arcHeight || 100) * (1 + random(-0.2, 0.2));
       state.bullets.push(b);

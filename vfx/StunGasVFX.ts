@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const p5: any;
 declare const createVector: any;
@@ -47,20 +48,41 @@ declare const tint: any;
 declare const noTint: any;
 
 export class StunGasVFX {
-  pos: any; radius: number; life: number; duration: number;
-  clouds: any[] = [];
-  constructor(x: number, y: number, radius: number, duration: number) {
-    this.pos = createVector(x, y); this.radius = radius; this.life = duration; this.duration = duration;
+  pos: any; radius: number = 50; life: number = 60; duration: number = 60;
+  clouds: { off: any; s: number; phase: number; rotV: number; distMult: number }[] = [];
+
+  constructor(x: number = 0, y: number = 0, radius: number = 50, duration: number = 60) {
+    this.pos = createVector(x, y);
     for(let i=0; i<16; i++) {
-        this.clouds.push({ 
-            off: p5.Vector.random2D().mult(random(radius * 0.7)), 
-            s: random(radius * 0.5, radius * 1.0), 
-            phase: random(TWO_PI),
-            rotV: random(-0.02, 0.02),
-            distMult: random(0.8, 1.2)
-        });
+      this.clouds.push({ 
+        off: createVector(0, 0), 
+        s: 20, 
+        phase: 0,
+        rotV: 0,
+        distMult: 1
+      });
+    }
+    this.reset(x, y, radius, duration);
+  }
+
+  reset(x: number = 0, y: number = 0, radius: number = 50, duration: number = 60) {
+    if (this.pos) this.pos.set(x, y); else this.pos = createVector(x, y);
+    this.radius = radius;
+    this.life = duration;
+    this.duration = duration;
+    for(let i=0; i<16; i++) {
+      const c = this.clouds[i];
+      if (c) {
+        const rndV = p5.Vector.random2D().mult(random(radius * 0.7));
+        c.off.set(rndV.x, rndV.y);
+        c.s = random(radius * 0.5, radius * 1.0);
+        c.phase = random(TWO_PI);
+        c.rotV = random(-0.02, 0.02);
+        c.distMult = random(0.8, 1.2);
+      }
     }
   }
+
   update() { this.life--; }
   isDone() { return this.life <= 0; }
   display() {
@@ -82,4 +104,17 @@ export class StunGasVFX {
     }
     pop();
   }
+}
+
+export const stunGasPool = new ObjectPool<StunGasVFX>(
+  'StunGas',
+  () => new StunGasVFX(),
+  undefined,
+  200
+);
+
+export function spawnStunGasVFX(x: number, y: number, radius: number, duration: number): StunGasVFX {
+  const vfx = stunGasPool.get();
+  vfx.reset(x, y, radius, duration);
+  return vfx;
 }

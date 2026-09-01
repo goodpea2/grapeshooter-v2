@@ -12,6 +12,7 @@ import { drawOverlay } from '../visualObstacles';
 import { enemyTypes } from '../balanceEnemies';
 import { drawDecoration } from '../visualDecoration';
 import { flowField } from '../pathfinding';
+import { soundEngine } from '../src/audio/soundEngine';
 
 declare const createVector: any;
 declare const floor: any;
@@ -75,6 +76,9 @@ export class Block {
   isWinCondition: boolean = false;
   sunGeneratorConfig?: { damagePerSun: number; maxSun: number; accumulatedDamage: number; sunsDropped: number };
   catalystTimer?: number;
+  cachedSpawnList: string[] = [];
+  initialCachedSpawnCount: number = 0;
+  enemiesSpawnedFromDamage: number = 0;
 
   constructor(gx: number, gy: number, typeKey = 'o_dirt', overlay: string | null = null, biome: number = 0, liquidType: string | null = null) {
     this.gx = gx; this.gy = gy;
@@ -118,6 +122,7 @@ export class Block {
       if (oCfg.enemySpawnConfig) {
         this.spawnerBudget = oCfg.enemySpawnConfig.budget;
         this.lastSpawnTime = state.frames + floor(random(oCfg.enemySpawnConfig.spawnInterval));
+        this.initCachedSpawnList(oCfg.enemySpawnConfig);
       }
       if (oCfg.enemyTurretConfig) {
         const eCfg = oCfg.enemyTurretConfig;
@@ -167,6 +172,97 @@ export class Block {
     }
   }
 
+  /**
+   * Caches the list of enemies that will be spawned by ov_spawner upon taking damage.
+   */
+  initCachedSpawnList(sCfg: any) {
+    this.cachedSpawnList = [];
+    this.enemiesSpawnedFromDamage = 0;
+    let budget = sCfg.budget !== undefined ? sCfg.budget : (this.spawnerBudget || 60);
+    const eTypes = (sCfg.enemyTypeKey && sCfg.enemyTypeKey.length > 0) ? sCfg.enemyTypeKey : ['e_basic'];
+
+    let safety = 100;
+    while (budget > 0 && safety > 0) {
+      safety--;
+      const affordable = eTypes.filter((k: string) => enemyTypes[k] && enemyTypes[k].cost <= budget);
+      if (affordable.length === 0) break;
+      const eKey = affordable[floor(random(affordable.length))];
+      this.cachedSpawnList.push(eKey);
+      budget -= enemyTypes[eKey].cost;
+    }
+    this.initialCachedSpawnCount = this.cachedSpawnList.length;
+  }
+
+  /**
+   * Spawns an enemy for this spawner block.
+   * Rules:
+   * - If a spawnArea is declared within spawnRadius, spawns on that spawnArea tile.
+   * - If NO spawnArea is declared within spawnRadius, spawns normally within spawnRadius.
+   * - No proximity check (distance to player/turret).
+   * - Safe liquids or ground, flying enemies can spawn on top of obstacles.
+   */
+  spawnEnemyFromSpawner(eKey: string, sCfg: any): boolean {
+    const eCfg = enemyTypes[eKey];
+    if (!eCfg) return false;
+    const isFlying = !!eCfg.isFlying;
+    const spawnRadius = sCfg?.spawnRadius !== undefined ? sCfg.spawnRadius : 120;
+    const bcx = this.pos.x + GRID_SIZE / 2;
+    const bcy = this.pos.y + GRID_SIZE / 2;
+
+    // Check if any spawnArea tiles exist within spawnRadius
+    let hasLocalSpawnArea = false;
+    const localSpawnAreaTiles: { x: number; y: number }[] = [];
+    if (state.world.hasSpawnArea && state.world.hasSpawnArea()) {
+      const minGx = floor((bcx - spawnRadius) / GRID_SIZE);
+      const maxGx = floor((bcx + spawnRadius) / GRID_SIZE);
+      const minGy = floor((bcy - spawnRadius) / GRID_SIZE);
+      const maxGy = floor((bcy + spawnRadius) / GRID_SIZE);
+      for (let gx = minGx; gx <= maxGx; gx++) {
+        for (let gy = minGy; gy <= maxGy; gy++) {
+          const tx = gx * GRID_SIZE + GRID_SIZE / 2;
+          const ty = gy * GRID_SIZE + GRID_SIZE / 2;
+          const dSq = (tx - bcx) ** 2 + (ty - bcy) ** 2;
+          if (dSq <= spawnRadius * spawnRadius && state.world.isSpawnAreaAt(tx, ty)) {
+            localSpawnAreaTiles.push({ x: tx, y: ty });
+          }
+        }
+      }
+      if (localSpawnAreaTiles.length > 0) {
+        hasLocalSpawnArea = true;
+      }
+    }
+
+    let attempts = 15;
+    while (attempts > 0) {
+      attempts--;
+      let sx: number, sy: number;
+      if (hasLocalSpawnArea) {
+        const tile = localSpawnAreaTiles[floor(random(localSpawnAreaTiles.length))];
+        sx = tile.x + random(-GRID_SIZE * 0.3, GRID_SIZE * 0.3);
+        sy = tile.y + random(-GRID_SIZE * 0.3, GRID_SIZE * 0.3);
+      } else {
+        // Spawn normally in radius without proximity checks
+        const ang = random(TWO_PI);
+        const r = random(GRID_SIZE * 0.5, spawnRadius);
+        sx = bcx + cos(ang) * r;
+        sy = bcy + sin(ang) * r;
+      }
+
+      const isBlock = state.world.isBlockAt(sx, sy);
+      if (isBlock && !isFlying) continue;
+
+      const gx = floor(sx / GRID_SIZE);
+      const gy = floor(sy / GRID_SIZE);
+      const liqKey = state.world.getLiquidAt(gx, gy);
+      if (liqKey && liquidTypes[liqKey]?.isDanger) continue;
+
+      requestSpawn(sx, sy, eKey);
+      state.vfx.push(new MuzzleFlash(bcx, bcy, atan2(sy - bcy, sx - bcx), 24, 8, color(180, 50, 255)));
+      return true;
+    }
+    return false;
+  }
+
   update() {
     // 1. Overlay-based Logic (Only if not mined and has overlay)
     if (!this.isMined && this.overlay) {
@@ -208,9 +304,12 @@ export class Block {
           }
         }
 
+        // Periodic hourly spawning (if configured with hourlySpawnConfig)
         if (oCfg.enemySpawnConfig || (this.customSpawnerConfig && !this.liquidType)) {
           const sCfg = this.customSpawnerConfig ? { ...oCfg.enemySpawnConfig, ...this.customSpawnerConfig } : oCfg.enemySpawnConfig;
-          this.updateEnemySpawnerLogic(sCfg, false);
+          if (sCfg?.hourlySpawnConfig?.enabled) {
+            this.updateEnemySpawnerLogic(sCfg, false);
+          }
         }
 
         if (oCfg.enemyTurretConfig) {
@@ -316,7 +415,7 @@ export class Block {
               const sx = bcx + cos(fireAngle) * spawnOffset;
               const sy = bcy + sin(fireAngle) * spawnOffset;
 
-              const bullet = new Bullet(sx, sy, shotTx, shotTy, eCfg.bulletTypeKey, 'core', this);
+              const bullet = Bullet.create(sx, sy, shotTx, shotTy, eCfg.bulletTypeKey, 'core', this);
               state.enemyBullets.push(bullet);
 
               let flashCol = color(255, 50, 50);
@@ -396,40 +495,26 @@ export class Block {
             const eKey = affordable[floor(random(affordable.length))];
             const eCfg = enemyTypes[eKey];
             if (eCfg) {
-              let spawned = false;
-              let attempts = 10;
-              while (attempts > 0 && !spawned) {
-                attempts--;
-                const ang = random(TWO_PI);
-                const r = random(GRID_SIZE, sCfg.spawnRadius || 120);
-                const sx = this.pos.x + GRID_SIZE/2 + cos(ang) * r;
-                const sy = this.pos.y + GRID_SIZE/2 + sin(ang) * r;
-                
-                if (state.world.hasSpawnArea() && !state.world.isSpawnAreaAt(sx, sy)) {
-                  continue;
-                }
-                if (!state.world.checkCollision(sx, sy, eCfg.size/2.2)) {
-                  requestSpawn(sx, sy, eKey);
-                  this.hourlySpawnBudgetAccrued = Math.max(0, (this.hourlySpawnBudgetAccrued || 0) - eCfg.cost);
-                  this.totalBudgetSpawned = (this.totalBudgetSpawned || 0) + eCfg.cost;
-                  this.lastSpawnTime = state.frames;
-                  spawned = true;
+              const success = this.spawnEnemyFromSpawner(eKey, sCfg);
+              if (success) {
+                this.hourlySpawnBudgetAccrued = Math.max(0, (this.hourlySpawnBudgetAccrued || 0) - eCfg.cost);
+                this.totalBudgetSpawned = (this.totalBudgetSpawned || 0) + eCfg.cost;
+                this.lastSpawnTime = state.frames;
 
-                  // Check self-destruct threshold
-                  if (hCfg && hCfg.selfDestructAfterBudgetSpawned !== undefined && hCfg.selfDestructAfterBudgetSpawned > 0 && (this.totalBudgetSpawned || 0) >= hCfg.selfDestructAfterBudgetSpawned) {
-                    const cx = floor(this.gx / CHUNK_SIZE);
-                    const cy = floor(this.gy / CHUNK_SIZE);
-                    if (isLiquid) {
-                      this.liquidType = null;
-                    } else {
-                      this.overlay = null;
-                    }
-                    this.customSpawnerConfig = null;
-                    state.world.dirtyChunkAndNeighbors(cx, cy);
-                    state.vfx.push(new Explosion(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, 35));
-                    state.vfx.push(new BlockDebris(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, isLiquid ? [140, 30, 180] : [180, 50, 180]));
-                    return;
+                // Check self-destruct threshold
+                if (hCfg && hCfg.selfDestructAfterBudgetSpawned !== undefined && hCfg.selfDestructAfterBudgetSpawned > 0 && (this.totalBudgetSpawned || 0) >= hCfg.selfDestructAfterBudgetSpawned) {
+                  const cx = floor(this.gx / CHUNK_SIZE);
+                  const cy = floor(this.gy / CHUNK_SIZE);
+                  if (isLiquid) {
+                    this.liquidType = null;
+                  } else {
+                    this.overlay = null;
                   }
+                  this.customSpawnerConfig = null;
+                  state.world.dirtyChunkAndNeighbors(cx, cy);
+                  state.vfx.push(new Explosion(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, 35));
+                  state.vfx.push(new BlockDebris(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, isLiquid ? [140, 30, 180] : [180, 50, 180]));
+                  return;
                 }
               }
             }
@@ -451,23 +536,10 @@ export class Block {
           const eKey = eTypes[floor(random(eTypes.length))];
           const eCfg = enemyTypes[eKey];
           if (eCfg && (!sCfg.spawnIntervalConsumeBudget || this.spawnerBudget >= eCfg.cost)) {
-            let spawned = false;
-            let attempts = 10;
-            while (attempts > 0 && !spawned) {
-              attempts--;
-              const ang = random(TWO_PI);
-              const r = random(GRID_SIZE, sCfg.spawnRadius || 120);
-              const sx = this.pos.x + GRID_SIZE/2 + cos(ang) * r;
-              const sy = this.pos.y + GRID_SIZE/2 + sin(ang) * r;
-              if (state.world.hasSpawnArea() && !state.world.isSpawnAreaAt(sx, sy)) {
-                continue;
-              }
-              if (!state.world.checkCollision(sx, sy, eCfg.size/2.2)) {
-                requestSpawn(sx, sy, eKey);
-                if (sCfg.spawnIntervalConsumeBudget) this.spawnerBudget -= eCfg.cost;
-                this.lastSpawnTime = state.frames;
-                spawned = true;
-              }
+            const success = this.spawnEnemyFromSpawner(eKey, sCfg);
+            if (success) {
+              if (sCfg.spawnIntervalConsumeBudget) this.spawnerBudget -= eCfg.cost;
+              this.lastSpawnTime = state.frames;
             }
           }
         }
@@ -833,9 +905,30 @@ export class Block {
 
     this.health -= dmg; this.damageGlow = 180;
     state.vfx.push(new BlockHitVFX(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2));
+
+    // --- Damage-based Spawning for Overlay Spawners (ov_spawner) ---
+    if (this.overlay && (this.overlay.startsWith('ov_spawner') || oCfg?.enemySpawnConfig || this.customSpawnerConfig)) {
+      const sCfg = this.customSpawnerConfig ? { ...oCfg?.enemySpawnConfig, ...this.customSpawnerConfig } : oCfg?.enemySpawnConfig;
+      if (sCfg) {
+        if (this.initialCachedSpawnCount === 0 && (!this.cachedSpawnList || this.cachedSpawnList.length === 0)) {
+          this.initCachedSpawnList(sCfg);
+        }
+        if (this.initialCachedSpawnCount > 0 && this.cachedSpawnList && this.cachedSpawnList.length > 0) {
+          const dmgRatio = Math.min(1.0, Math.max(0.0, (this.maxHealth - this.health) / this.maxHealth));
+          const targetSpawnCount = Math.floor(dmgRatio * this.initialCachedSpawnCount);
+          while (this.enemiesSpawnedFromDamage < targetSpawnCount && this.cachedSpawnList.length > 0) {
+            const nextEnemy = this.cachedSpawnList.shift()!;
+            this.enemiesSpawnedFromDamage++;
+            this.spawnEnemyFromSpawner(nextEnemy, sCfg);
+          }
+        }
+      }
+    }
+
     if (this.health <= 0) {
       this.health = 0;
       this.isMined = true;
+      soundEngine.playSFXGroup('block_death');
       
       // Trigger Hooks
       if (source) {
@@ -862,30 +955,14 @@ export class Block {
             });
         }
 
-        // --- Death Rattle for Spawners ---
-        if ((oCfg.enemySpawnConfig || this.customSpawnerConfig) && this.spawnerBudget > 0) {
+        // --- Spawn all remaining cached enemies on death for Spawners ---
+        if ((oCfg.enemySpawnConfig || this.customSpawnerConfig) && this.cachedSpawnList) {
           const sCfg = this.customSpawnerConfig ? { ...oCfg.enemySpawnConfig, ...this.customSpawnerConfig } : oCfg.enemySpawnConfig;
-          let safety = 50; 
-          while (this.spawnerBudget > 0 && safety > 0) {
-            safety--;
-            const eTypes = (sCfg.enemyTypeKey && sCfg.enemyTypeKey.length > 0) ? sCfg.enemyTypeKey : ['e_basic'];
-            const affordable = eTypes.filter((k: string) => enemyTypes[k] && enemyTypes[k].cost <= this.spawnerBudget);
-            if (affordable.length === 0) break;
-            
-            const eKey = affordable[floor(random(affordable.length))];
-            const eCfg = enemyTypes[eKey];
-            const ang = random(TWO_PI);
-            const r = random(GRID_SIZE * 0.5, (sCfg.spawnRadius || 120) * 1.2);
-            const sx = this.pos.x + GRID_SIZE/2 + cos(ang) * r;
-            const sy = this.pos.y + GRID_SIZE/2 + sin(ang) * r;
-            
-            if (state.world.hasSpawnArea() && !state.world.isSpawnAreaAt(sx, sy)) {
-              continue;
-            }
-            if (!state.world.checkCollision(sx, sy, eCfg.size/2.2)) {
-              requestSpawn(sx, sy, eKey);
-              this.spawnerBudget -= eCfg.cost;
-              state.vfx.push(new MuzzleFlash(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, ang, 30, 10, color(180, 50, 255)));
+          if (sCfg) {
+            while (this.cachedSpawnList.length > 0) {
+              const nextEnemy = this.cachedSpawnList.shift()!;
+              this.enemiesSpawnedFromDamage++;
+              this.spawnEnemyFromSpawner(nextEnemy, sCfg);
             }
           }
         }
@@ -893,7 +970,7 @@ export class Block {
         if (oCfg.bulletToSpawnOnDeath) {
           const wPos = createVector(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2);
           for (const bKey of oCfg.bulletToSpawnOnDeath) {
-            let b = new Bullet(wPos.x, wPos.y, wPos.x, wPos.y, bKey, 'none');
+            let b = Bullet.create(wPos.x, wPos.y, wPos.x, wPos.y, bKey, 'none');
             b.life = 0; state.bullets.push(b);
           }
         }

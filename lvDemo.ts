@@ -8,6 +8,7 @@ import { getTime } from './ui/ui';
 import { SunLoot, Enemy } from './entities';
 import { ECONOMY_CONFIG, spawnLootAt } from './economy';
 import { Bullet } from './entities';
+import { soundEngine } from './src/audio/soundEngine';
 
 declare const random: any;
 declare const cos: any;
@@ -260,9 +261,6 @@ export function getWeightsForCurrentTime() {
 
 export function isLegibleSpot(x: number, y: number): boolean {
   if (state.world.isBlockAt(x, y)) return false;
-  if (state.world.hasSpawnArea && state.world.hasSpawnArea() && !state.world.isSpawnAreaAt(x, y)) {
-    return false;
-  }
   const gx = floor(x / GRID_SIZE);
   const gy = floor(y / GRID_SIZE); 
   const liqKey = state.world.getLiquidAt(gx, gy);
@@ -270,6 +268,81 @@ export function isLegibleSpot(x: number, y: number): boolean {
     const lCfg = liquidTypes[liqKey];
     if (lCfg && lCfg.isDanger) return false; // Don't spawn in Lava
   }
+  return true;
+}
+
+/**
+ * Validates whether an enemy of type enemyTypeKey can globally spawn at (x, y).
+ * Rules:
+ * - At least 12-tile distance from the player
+ * - At least 6-tile distance from all turrets (attachments and world turrets)
+ * - Safe liquid or empty ground (liquid without isDanger=true)
+ * - Enemies with isFlying=true can spawn on top of obstacles; non-flying cannot
+ * - No longer influenced by spawnArea
+ */
+export function canGlobalSpawnAt(x: number, y: number, enemyTypeKey: string): boolean {
+  const eCfg = enemyTypes[enemyTypeKey];
+  if (!eCfg) return false;
+  const isFlying = !!eCfg.isFlying;
+
+  // 1. Distance from player: at least 12 tiles
+  if (state.player) {
+    const minPlayerDist = 12 * GRID_SIZE;
+    const pDistSq = (x - state.player.pos.x) ** 2 + (y - state.player.pos.y) ** 2;
+    if (pDistSq < minPlayerDist * minPlayerDist) return false;
+
+    // 2. Distance from player attachments (turrets): at least 6 tiles
+    if (state.player.attachments) {
+      const minTurretDist = 6 * GRID_SIZE;
+      const minTurretDistSq = minTurretDist * minTurretDist;
+      for (const att of state.player.attachments) {
+        const apos = att.getWorldPos ? att.getWorldPos() : att.pos;
+        if (apos) {
+          const dSq = (x - apos.x) ** 2 + (y - apos.y) ** 2;
+          if (dSq < minTurretDistSq) return false;
+        }
+      }
+    }
+  }
+
+  // 3. Distance from world turrets: at least 6 tiles
+  if (state.world) {
+    const minTurretDist = 6 * GRID_SIZE;
+    const minTurretDistSq = minTurretDist * minTurretDist;
+    const worldTurrets = state.world.getAllTurrets();
+    for (const wt of worldTurrets) {
+      const wpos = wt.getWorldPos ? wt.getWorldPos() : wt.pos;
+      if (wpos) {
+        const dSq = (x - wpos.x) ** 2 + (y - wpos.y) ** 2;
+        if (dSq < minTurretDistSq) return false;
+      }
+    }
+  }
+
+  // 4. Obstacle check: flying enemies can spawn on top of obstacles; non-flying cannot
+  const isBlock = state.world.isBlockAt(x, y);
+  if (isBlock && !isFlying) return false;
+
+  // 5. Liquid check: all enemies can spawn on empty ground or liquid without isDanger=true
+  const gx = floor(x / GRID_SIZE);
+  const gy = floor(y / GRID_SIZE);
+  const liqKey = state.world.getLiquidAt(gx, gy);
+  if (liqKey) {
+    const lCfg = liquidTypes[liqKey];
+    if (lCfg && lCfg.isDanger) return false;
+  }
+
+  // 6. Ground features (like forcefields)
+  if (state.groundFeatures) {
+    for (const gf of state.groundFeatures) {
+      if (gf.typeKey === 'gf_forcefield') {
+        const dSq = (x - gf.pos.x) ** 2 + (y - gf.pos.y) ** 2;
+        const rSum = (eCfg.size || 20) * 0.5 + (gf.config?.radius || 40);
+        if (dSq < rSum * rSum) return false;
+      }
+    }
+  }
+
   return true;
 }
 
@@ -286,27 +359,32 @@ export function requestSpawn(x: number, y: number, typeKey: string) {
 
 /**
  * Spawns enemies until amount is reached or attempt limit hit.
+ * Global spawning ONLY happens at nighttime.
  * Returns the total cost spent.
  */
 export function spawnFromBudget(amount: number): number {
+  const t = getTime();
+  const isNight = getLightLevel(t.hour) === 0;
+  if (!isNight) return 0; // Global spawning now ONLY happens at nighttime
+
   let spent = 0;
   let limit = 40; 
   const weights = getWeightsForCurrentTime();
 
-  while(spent < amount && limit > 0) {
+  while (spent < amount && limit > 0) {
     limit--;
-    let pool = ENEMY_KEYS.filter((k, idx) => {
+    const pool = ENEMY_KEYS.filter((k, idx) => {
       const weight = weights[idx];
       return weight > 0 && enemyTypes[k].cost <= (amount - spent);
     });
 
     if (pool.length === 0) break;
 
-    let totalWeight = pool.reduce((acc, k) => acc + weights[ENEMY_KEYS.indexOf(k)], 0);
-    let r = random(totalWeight);
+    const totalWeight = pool.reduce((acc, k) => acc + weights[ENEMY_KEYS.indexOf(k)], 0);
+    const r = random(totalWeight);
     let sum = 0;
     let ek = pool[0];
-    for (let k of pool) {
+    for (const k of pool) {
       sum += weights[ENEMY_KEYS.indexOf(k)];
       if (r <= sum) {
         ek = k;
@@ -314,21 +392,16 @@ export function spawnFromBudget(amount: number): number {
       }
     }
 
-    let x: number, y: number;
-    if (state.world.hasSpawnArea && state.world.hasSpawnArea()) {
-      const sp = state.world.getRandomSpawnAreaPos();
-      if (!sp) break;
-      x = sp.x;
-      y = sp.y;
-    } else {
-      let ang = random(Math.PI * 2);
-      let distR = random(12, 18) * GRID_SIZE;
-      x = state.player.pos.x + cos(ang) * distR;
-      y = state.player.pos.y + sin(ang) * distR;
-    }
-    
-    // Check environmental legibility and collision
-    if (isLegibleSpot(x, y) && !state.world.checkCollision(x, y, enemyTypes[ek].size * 0.5)) {
+    // Pick candidate position around player between 12 and 22 tiles away
+    const ang = random(Math.PI * 2);
+    const distR = random(12, 22) * GRID_SIZE;
+    const px = state.player ? state.player.pos.x : 0;
+    const py = state.player ? state.player.pos.y : 0;
+    const x = px + cos(ang) * distR;
+    const y = py + sin(ang) * distR;
+
+    // Check candidate spawn spot using global rules (nighttime, distance, flying/obstacle, liquid)
+    if (canGlobalSpawnAt(x, y, ek)) {
       requestSpawn(x, y, ek);
       const cost = enemyTypes[ek].cost;
       spent += cost;
@@ -388,7 +461,8 @@ export function updateGameSystems() {
     s.timer--;
     if (s.timer <= 0) {
       state.enemies.push(new Enemy(s.x, s.y, s.type));
-      state.pendingSpawns.splice(i, 1);
+      const last = state.pendingSpawns.pop()!;
+      if (i < state.pendingSpawns.length) state.pendingSpawns[i] = last;
     }
   }
 
@@ -398,11 +472,12 @@ export function updateGameSystems() {
     tex.timer--;
     if (tex.timer <= 0) {
       // Explode
-      let b = new Bullet(tex.x, tex.y, tex.x, tex.y, 'b_tnt_explosion', 'none');
+      let b = Bullet.create(tex.x, tex.y, tex.x, tex.y, 'b_tnt_explosion', 'none');
       state.bullets.push(b);
       b.explode();
       b.life = 0;
-      state.tickingExplosives.splice(i, 1);
+      const last = state.tickingExplosives.pop()!;
+      if (i < state.tickingExplosives.length) state.tickingExplosives[i] = last;
     }
   }
 
@@ -427,6 +502,7 @@ export function updateGameSystems() {
   if (isNight && prevLightLevel !== 0 && state.lastNightTriggered !== t.day) {
     state.lastNightTriggered = t.day;
     // Trigger the big wave event
+    soundEngine.playSFX('hugewave_siren');
     spawnFromBudget(state.currentNightWaveBudget);
   }
 

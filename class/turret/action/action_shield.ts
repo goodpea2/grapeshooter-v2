@@ -36,18 +36,27 @@ export class ActionShield extends TurretAction {
     
     if (this.turret.specialActivityLevel > 0.1) {
         let sRadius = this.getRange();
-        const sRadiusSq = sRadius * sRadius;
-        for (let e of state.enemies) {
-            if (e.health <= 0 || e.isDying) continue;
+        const processEnemy = (e: any) => {
+            if (e.health <= 0 || e.isDying) return;
             const dx = e.pos.x - wPos.x;
             const dy = e.pos.y - wPos.y;
             const dSq = dx*dx + dy*dy;
             const rSum = (e.size / 2) + sRadius * this.turret.specialActivityLevel;
             if (dSq < rSum * rSum) {
                 const d = Math.sqrt(dSq);
-                const force = (rSum - d) * 0.15;
-                e.moveWithCollisions(createVector(dx/d * force, dy/d * force));
-                (this.turret as any).shieldImpactAngles.push(Math.atan2(dy, dx));
+                if (d > 0.001) {
+                    const force = (rSum - d) * 0.15;
+                    e.moveWithCollisions(createVector(dx/d * force, dy/d * force));
+                    (this.turret as any).shieldImpactAngles.push(Math.atan2(dy, dx));
+                }
+            }
+        };
+
+        if (state.spatialGrid) {
+            state.spatialGrid.queryCircleEnemies(wPos.x, wPos.y, sRadius, processEnemy);
+        } else {
+            for (let e of state.enemies) {
+                processEnemy(e);
             }
         }
     }

@@ -26,11 +26,14 @@ import { getTime, drawUI, drawTurretTooltip } from './ui/ui';
 import { drawAlmanac, handleAlmanacClick } from './ui/almanac/mainLayout';
 import { drawUnlockPopup, handleUnlockPopupClick, updateUnlockPopup } from './ui/almanac/turretUnlockPopup';
 import { drawGameOver, handleGameOverClick } from './ui/uiGameOver';
+import { drawPauseMenu } from './ui/uiPauseMenu';
+import { drawLoadingScreen } from './ui/uiLoadingScreen';
 import { drawWorldGenPreview, drawTurretPathDebug } from './ui/uiDebug';
 import { uiComponentsShowcase } from './ui/uiComponentsShowcase';
 import { handleNpcUiClick, handleNpcUiPress } from './ui/uiNpcShop';
 import { updateGameSystems, spawnFromBudget, getLightLevel, customDayLightConfig } from './lvDemo';
-import { MergeVFX, ShopFlyVFX, Explosion } from './vfx/index';
+import { MergeVFX, ShopFlyVFX, Explosion, explosionPool, DamageNumberVFX, damageNumberPool, HitSpark, hitSparkPool } from './vfx/index';
+import { bulletPool } from './class/bullet';
 import { overlayTypes } from './balanceObstacles';
 import { triggerUpgradeHook } from './src/upgrades';
 import { ASSETS } from './assets';
@@ -41,10 +44,12 @@ import { drawGameSpeedButtons, handleGameSpeedButtonClick } from './ui/uiGameSpe
 import { drawTurretSprite, TYPE_MAP } from './assetTurret';
 import { drawSelectionHighlight, drawMergeBubble } from './ui/overlay/TurretMergeOverlay';
 import { drawPendingSpawn } from './visualEnemies';
+import { drawBatchedBullets } from './visualBullets';
 import { drawTickingExplosive } from './visualObstacles';
 import { DisabledTurrets } from './debug/turretAvailability';
 import { drawMainMenu, handleMainMenuClick, handleMainMenuPress, handleMainMenuDrag, handleMainMenuRelease } from './ui/uiMainMenu';
 import { beginUIFrame, handleUIMousePress, handleUIMouseRelease } from './uiComponents';
+import { soundEngine } from './src/audio/soundEngine';
 import {
   drawLevelEditor,
   handleLevelEditorPress,
@@ -70,7 +75,7 @@ import {
   handlePlayerUpgradesScroll
 } from './ui/almanac/playerUpgradesPanel';
 import { handleLevelConfigKeyInput, handleLevelConfigScroll } from './ui/almanac/levelConfigPanel';
-import { flowField } from './pathfinding';
+import { flowField, flowFieldRegistry } from './pathfinding';
 import { spatialGrid } from './class/spatialGrid';
 
 declare const p5: any;
@@ -191,7 +196,15 @@ function drawGlobalLighting() {
     a = lerp(a, 220, p);
   }
 
-  if (a > 1) { push(); noStroke(); fill(r, g, b, a); rect(0, 0, width, height); pop(); }
+  if (a > 1) {
+    const ctx = (window as any).drawingContext as CanvasRenderingContext2D;
+    if (ctx) {
+      ctx.fillStyle = `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${(a / 255).toFixed(3)})`;
+      ctx.fillRect(0, 0, width, height);
+    } else {
+      push(); noStroke(); fill(r, g, b, a); rect(0, 0, width, height); pop();
+    }
+  }
 }
 
 function drawVisibilityOverlay() {
@@ -200,30 +213,31 @@ function drawVisibilityOverlay() {
   const innerRadius = (VISIBILITY_RADIUS - 2) * GRID_SIZE;
   const outerRadius = (VISIBILITY_RADIUS) * GRID_SIZE;
 
+  const ctx = (window as any).drawingContext as CanvasRenderingContext2D;
+  if (ctx) {
+    ctx.save();
+    // Use a radial gradient to create the cutout effect
+    const grad = ctx.createRadialGradient(px, py, 0, px, py, outerRadius);
+    grad.addColorStop(0, 'rgba(12,12,27,0)');
+    grad.addColorStop(Math.max(0, Math.min(1, innerRadius / outerRadius)), 'rgba(12,12,27,0)');
+    grad.addColorStop(1, 'rgba(12,12,27,1)');
+    
+    ctx.fillStyle = grad;
+    // Drawing a single rect across screen space is instantaneous and handles the entire canvas
+    ctx.fillRect(0, 0, width, height);
+    ctx.restore();
+    return;
+  }
+
   push();
   drawingContext.save();
-  // Use a radial gradient to create the cutout effect
   const grad = drawingContext.createRadialGradient(px, py, 0, px, py, outerRadius);
   grad.addColorStop(0, 'rgba(12,12,27,0)');
   grad.addColorStop(innerRadius / outerRadius, 'rgba(12,12,27,0)');
   grad.addColorStop(1, 'rgba(12,12,27,1)');
   
   drawingContext.fillStyle = grad;
-  // Draw a large enough rectangle to cover the screen even when zoomed/shaken
   drawingContext.fillRect(0, 0, width, height);
-  
-  // Also fill the rest of the screen outside the gradient radius if necessary
-  // But since we are drawing in screen space (not world space), width/height is enough
-  // unless the gradient is smaller than the screen.
-  // If the gradient is smaller than the screen, we need to fill the rest with black.
-  if (outerRadius < Math.max(width, height)) {
-    drawingContext.strokeStyle = 'rgba(12,12,27,1)';
-    drawingContext.lineWidth = Math.max(width, height) * 2;
-    drawingContext.beginPath();
-    drawingContext.arc(px, py, outerRadius + drawingContext.lineWidth / 2, 0, Math.PI * 2);
-    drawingContext.stroke();
-  }
-  
   drawingContext.restore();
   pop();
 }
@@ -335,6 +349,7 @@ function executePlacement() {
         
         state.totalTurretsAcquired++;
         state.vfx.push(new MergeVFX(wPos.x, wPos.y, [255, 255, 255]));
+        soundEngine.playSFX('merge');
         if (activePlacementType) state.turretLastUsed[activePlacementType] = state.frames;
         
         // Clear selected state after merge
@@ -380,6 +395,7 @@ function executePlacement() {
         state.world.addTurret(wt);
         state.totalTurretsAcquired++;
         state.turretLastUsed[activePlacementType] = state.frames;
+        soundEngine.playSFXGroup('turret_place');
         state.selectedTurretType = null; // Deselect after placement
       }
     } else if (state.draggedTurretInstance) {
@@ -453,6 +469,7 @@ function executePlacement() {
           state.player.attachments[indexToReplace] = newTurret;
           state.totalTurretsAcquired++;
           state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y, [255, 255, 255]));
+          soundEngine.playSFX('merge');
           state.turretLastUsed[activePlacementType] = state.frames;
         }
       }
@@ -490,6 +507,7 @@ function executePlacement() {
         state.player.attachments.push(nt);
         state.totalTurretsAcquired++;
         state.turretLastUsed[activePlacementType] = state.frames;
+        soundEngine.playSFXGroup('turret_place');
       }
     }
   }
@@ -514,6 +532,7 @@ function executePlacement() {
         state.player.attachments[indexToReplace] = newTurret;
         state.totalTurretsAcquired++;
         state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y, [255, 255, 255]));
+        soundEngine.playSFX('merge');
       }
     } else if (!state.mergeTargetPreview && state.previewSnapPos) {
       // Only move if NOT attempting a merge (or if merge was impossible/unaffordable, we don't snap to the target)
@@ -540,12 +559,14 @@ function executePlacement() {
              }
            }
            state.vfx.push(new MergeVFX(state.previewSnapPos.x, state.previewSnapPos.y, [255, 255, 255]));
+           soundEngine.playSFXGroup('turret_place');
          }
       } else {
          state.draggedTurretInstance.hq = snapAxial.q;
          state.draggedTurretInstance.hr = snapAxial.r;
          state.draggedTurretInstance.offset = axialToWorld(snapAxial.q, snapAxial.r);
          state.vfx.push(new MergeVFX(state.previewSnapPos.x, state.previewSnapPos.y, [255, 255, 255]));
+         soundEngine.playSFXGroup('turret_place');
       }
     }
   }
@@ -645,6 +666,7 @@ export function autoPlaceTurret(type: string) {
     state.player.attachments.push(nt);
     state.totalTurretsAcquired++;
     state.turretLastUsed[type] = state.frames;
+    soundEngine.playSFXGroup('turret_place');
 
     // VFX
     const wPos = nt.getWorldPos();
@@ -658,6 +680,9 @@ export function autoPlaceTurret(type: string) {
 (window as any).autoPlaceTurret = autoPlaceTurret;
 
 (window as any).preload = () => {
+  // Preload audio files with loading progress
+  soundEngine.preloadAllResources();
+
   state.assets = {};
   for (const [key, url] of Object.entries(ASSETS)) {
     try {
@@ -677,6 +702,9 @@ export function autoPlaceTurret(type: string) {
 };
 
 (window as any).setup = () => {
+  const isHighQuality = state.graphicQuality === 'high';
+  const dpr = isHighQuality && typeof window !== 'undefined' && window.devicePixelRatio && window.devicePixelRatio > 1 ? Math.min(window.devicePixelRatio, 2) : 1;
+  (window as any).pixelDensity(dpr);
   const canvas = createCanvas(windowWidth, windowHeight);
   canvas.elt.oncontextmenu = () => false; // Prevent right-click menu
   textFont('Viga');
@@ -721,17 +749,32 @@ function tick() {
   if (state.cameraShake < 0.1) state.cameraShake = 0;
 
   state.world.update(state.player.pos); 
-  for (let i = state.trails.length - 1; i >= 0; i--) { state.trails[i].update(); if (state.trails[i].isDone()) state.trails.splice(i, 1); }
-  for (let i = state.groundFeatures.length - 1; i >= 0; i--) { state.groundFeatures[i].update(); if (state.groundFeatures[i].life <= 0) state.groundFeatures.splice(i, 1); }
+  for (let i = state.trails.length - 1; i >= 0; i--) { 
+    state.trails[i].update(); 
+    if (state.trails[i].isDone()) {
+      const last = state.trails.pop()!;
+      if (i < state.trails.length) state.trails[i] = last;
+    }
+  }
+  for (let i = state.groundFeatures.length - 1; i >= 0; i--) { 
+    state.groundFeatures[i].update(); 
+    if (state.groundFeatures[i].life <= 0) {
+      const last = state.groundFeatures.pop()!;
+      if (i < state.groundFeatures.length) state.groundFeatures[i] = last;
+    }
+  }
   for (let npc of state.npcs) npc.update(state.player.pos);
   
   if (state.player) {
-    flowField.update(state.player.pos);
+    flowFieldRegistry.updateAll();
   }
 
   for (let i = state.enemies.length - 1; i >= 0; i--) { 
     state.enemies[i].update(state.player.pos); 
-    if (state.enemies[i].health <= 0 || state.enemies[i].markedForDespawn) state.enemies.splice(i, 1); 
+    if (state.enemies[i].health <= 0 || state.enemies[i].markedForDespawn) {
+      const last = state.enemies.pop()!;
+      if (i < state.enemies.length) state.enemies[i] = last;
+    }
   }
 
   // WinCondition check & Level Won Sequence
@@ -854,9 +897,39 @@ function tick() {
   }
 
   state.player.update();
-  for (let i = state.bullets.length - 1; i >= 0; i--) { state.bullets[i].update(); if (state.bullets[i].life <= 0) state.bullets.splice(i, 1); }
-  for (let i = state.enemyBullets.length - 1; i >= 0; i--) { state.enemyBullets[i].update(); if (state.enemyBullets[i].life <= 0) state.enemyBullets.splice(i, 1); }
-  for (let i = state.vfx.length - 1; i >= 0; i--) { state.vfx[i].update(); if (state.vfx[i].isDone()) state.vfx.splice(i, 1); }
+  for (let i = state.bullets.length - 1; i >= 0; i--) { 
+    const b = state.bullets[i];
+    b.update(); 
+    if (b.life <= 0) {
+      bulletPool.release(b);
+      const last = state.bullets.pop()!;
+      if (i < state.bullets.length) state.bullets[i] = last;
+    }
+  }
+  for (let i = state.enemyBullets.length - 1; i >= 0; i--) { 
+    const eb = state.enemyBullets[i];
+    eb.update(); 
+    if (eb.life <= 0) {
+      bulletPool.release(eb);
+      const last = state.enemyBullets.pop()!;
+      if (i < state.enemyBullets.length) state.enemyBullets[i] = last;
+    }
+  }
+  for (let i = state.vfx.length - 1; i >= 0; i--) { 
+    const v = state.vfx[i];
+    v.update(); 
+    if (v.isDone()) {
+      if (v instanceof Explosion) {
+        explosionPool.release(v);
+      } else if (v instanceof DamageNumberVFX) {
+        damageNumberPool.release(v);
+      } else if (v instanceof HitSpark) {
+        hitSparkPool.release(v);
+      }
+      const last = state.vfx.pop()!;
+      if (i < state.vfx.length) state.vfx[i] = last;
+    }
+  }
   
   // Update UI VFX in tick to be based on game tick rate
   // Moved to uiTick
@@ -904,19 +977,30 @@ export function getDynamicPlacementZoom(): number {
 (window as any).draw = () => {
   beginUIFrame();
 
-  if (state.currentScreen === 'main_menu') {
-    drawMainMenu();
-    return;
-  }
-  if (state.currentScreen === 'level_editor') {
-    drawLevelEditor();
-    return;
-  }
-
   const now = (window as any).performance.now();
   if (state.lastFrameTime === 0) state.lastFrameTime = now;
   const deltaTime = now - state.lastFrameTime;
   state.lastFrameTime = now;
+
+  // Global Audio Engine Update
+  soundEngine.update(deltaTime);
+
+  if (state.currentScreen === 'main_menu') {
+    drawMainMenu();
+    drawPauseMenu();
+    if (state.isLoadingResources) {
+      drawLoadingScreen();
+    }
+    return;
+  }
+  if (state.currentScreen === 'level_editor') {
+    drawLevelEditor();
+    drawPauseMenu();
+    if (state.isLoadingResources) {
+      drawLoadingScreen();
+    }
+    return;
+  }
   
   state.accumulator += deltaTime;
   const fixedStep = 1000 / 60;
@@ -973,6 +1057,7 @@ export function getDynamicPlacementZoom(): number {
     minY: state.cameraPos.y - halfViewH,
     maxY: state.cameraPos.y + halfViewH
   };
+  const vp = state.viewportBounds;
 
   push(); 
   translate(width/2 + shakeX, height/2 + shakeY);
@@ -1007,8 +1092,16 @@ export function getDynamicPlacementZoom(): number {
   
   for (let tex of state.tickingExplosives) drawTickingExplosive(tex);
   for (let s of state.pendingSpawns) drawPendingSpawn(s);
-  for (let i = state.trails.length - 1; i >= 0; i--) { state.trails[i].display(); }
-  for (let i = state.groundFeatures.length - 1; i >= 0; i--) { state.groundFeatures[i].display(); }
+  for (let i = state.trails.length - 1; i >= 0; i--) { 
+    const tr = state.trails[i];
+    if (tr.pos && vp && vp.maxX !== undefined && (tr.pos.x < vp.minX - 40 || tr.pos.x > vp.maxX + 40 || tr.pos.y < vp.minY - 40 || tr.pos.y > vp.maxY + 40)) continue;
+    tr.display(); 
+  }
+  for (let i = state.groundFeatures.length - 1; i >= 0; i--) { 
+    const gf = state.groundFeatures[i];
+    if (gf.pos && vp && vp.maxX !== undefined && (gf.pos.x < vp.minX - 50 || gf.pos.x > vp.maxX + 50 || gf.pos.y < vp.minY - 50 || gf.pos.y > vp.maxY + 50)) continue;
+    gf.display(); 
+  }
 
   const mWorld = createVector(
     (mouseX - width/2) / currentZoom + state.cameraPos.x,
@@ -1064,8 +1157,6 @@ export function getDynamicPlacementZoom(): number {
     return ay - by;
   });
 
-  const vp = state.viewportBounds;
-
   for (let e of ySorted) {
     if (e === state.player) {
       state.player.display();
@@ -1093,16 +1184,8 @@ export function getDynamicPlacementZoom(): number {
     pop();
   }
 
-  for (let i = state.bullets.length - 1; i >= 0; i--) { 
-    const b = state.bullets[i];
-    if (vp && vp.maxX !== undefined && (b.pos.x < vp.minX - 30 || b.pos.x > vp.maxX + 30 || b.pos.y < vp.minY - 30 || b.pos.y > vp.maxY + 30)) continue;
-    b.display(); 
-  }
-  for (let i = state.enemyBullets.length - 1; i >= 0; i--) { 
-    const eb = state.enemyBullets[i];
-    if (vp && vp.maxX !== undefined && (eb.pos.x < vp.minX - 30 || eb.pos.x > vp.maxX + 30 || eb.pos.y < vp.minY - 30 || eb.pos.y > vp.maxY + 30)) continue;
-    eb.display(); 
-  }
+  drawBatchedBullets(state.bullets, vp);
+  drawBatchedBullets(state.enemyBullets, vp);
   for (let i = state.vfx.length - 1; i >= 0; i--) { 
     const v = state.vfx[i];
     if (v.pos && vp && vp.maxX !== undefined && (v.pos.x < vp.minX - 100 || v.pos.x > vp.maxX + 100 || v.pos.y < vp.minY - 100 || v.pos.y > vp.maxY + 100)) continue;
@@ -1366,6 +1449,8 @@ export function getDynamicPlacementZoom(): number {
     drawGameOver();
   }
 
+  drawPauseMenu();
+
   drawAlmanac();
   drawUnlockPopup();
   uiComponentsShowcase.draw();
@@ -1380,9 +1465,14 @@ export function getDynamicPlacementZoom(): number {
   for (let i = state.uiVfx.length - 1; i >= 0; i--) { 
     state.uiVfx[i].display(); 
   }
+
+  if (state.isLoadingResources) {
+    drawLoadingScreen();
+  }
 };
 
 (window as any).mousePressed = () => {
+  soundEngine.unlock();
   state.isMouseDown = true;
   if (state.suppressGameplayMouseUntilRelease) {
     return;
@@ -1450,7 +1540,9 @@ export function getDynamicPlacementZoom(): number {
         if (!flowField.isTileAccessible(wt.getWorldPos().x, wt.getWorldPos().y)) {
           continue;
         }
-        state.draggedTurretInstance = wt; state.dragOrigin = { x: mouseX, y: mouseY }; state.isCurrentlyDragging = false; return;
+        state.draggedTurretInstance = wt; state.dragOrigin = { x: mouseX, y: mouseY }; state.isCurrentlyDragging = false;
+        soundEngine.playSFX('turret_pickup');
+        return;
       }
     }
 
@@ -1463,7 +1555,9 @@ export function getDynamicPlacementZoom(): number {
     for (let t of sortedForPicking) {
       if (!t.isFrosted && dist(mWorld.x, mWorld.y, t.getWorldPos().x, t.getWorldPos().y) < t.size/2 + 5) {
         if (t.config.turretLayer === 'ground') { const top = state.player.attachments.find((a: any) => a.hq === t.hq && a.hr === t.hr && (a.config.turretLayer || 'normal') === 'normal'); if (top) continue; }
-        state.draggedTurretInstance = t; state.dragOrigin = { x: mouseX, y: mouseY }; state.isCurrentlyDragging = false; break;
+        state.draggedTurretInstance = t; state.dragOrigin = { x: mouseX, y: mouseY }; state.isCurrentlyDragging = false;
+        soundEngine.playSFX('turret_pickup');
+        break;
       }
     }
   }
@@ -1657,8 +1751,10 @@ export function getDynamicPlacementZoom(): number {
 };
 
 (window as any).windowResized = () => { 
-  console.log("Window resized:", windowWidth, windowHeight);
   if (windowWidth > 0 && windowHeight > 0) {
+    const isHighQuality = state.graphicQuality === 'high';
+    const dpr = isHighQuality && typeof window !== 'undefined' && window.devicePixelRatio && window.devicePixelRatio > 1 ? Math.min(window.devicePixelRatio, 2) : 1;
+    (window as any).pixelDensity(dpr);
     (window as any).resizeCanvas(windowWidth, windowHeight); 
   }
 };
@@ -1681,6 +1777,21 @@ export function getDynamicPlacementZoom(): number {
 };
 
 (window as any).keyPressed = (event: any) => {
+  const k = event?.key || key;
+  const code = event?.keyCode || keyCode;
+
+  if (k === 'Escape' || code === 27) {
+    if (state.currentScreen === 'game') {
+      if (state.isPauseMenuOpen) {
+        state.isPauseMenuOpen = false;
+        state.isPaused = false;
+      } else if (!state.isAlmanacOpen && !state.showGameOverPopup) {
+        state.isPauseMenuOpen = true;
+        state.isPaused = true;
+      }
+      return false;
+    }
+  }
   if (state.isAlmanacOpen && state.almanacTab === 'LevelConfig' && state.activeLevelConfigInput) {
     const k = event?.key || key;
     const code = event?.keyCode || keyCode;

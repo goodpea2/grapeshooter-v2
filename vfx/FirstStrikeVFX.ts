@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const p5: any;
 declare const createVector: any;
@@ -48,11 +49,21 @@ declare const noTint: any;
 
 export class FirstStrikeVFX {
   target: any; life: number = 90;
-  constructor(target: any) { this.target = target; }
+  constructor(target: any = null) { 
+    this.reset(target); 
+  }
+
+  reset(target: any = null) {
+    this.target = target;
+    this.life = 90;
+  }
+
   update() { this.life--; }
   isDone() { return this.life <= 0 || !this.target || this.target.health <= 0; }
   display() {
-    const p = this.target.getWorldPos();
+    if (!this.target) return;
+    const p = this.target.getWorldPos ? this.target.getWorldPos() : this.target.pos;
+    if (!p) return;
     push(); translate(p.x, p.y);
     const pulse = 1.0 + 0.2 * sin(state.frames * 0.4);
     const alpha = map(this.life, 0, 90, 0, 180);
@@ -73,4 +84,17 @@ export class FirstStrikeVFX {
     }
     pop();
   }
+}
+
+export const firstStrikePool = new ObjectPool<FirstStrikeVFX>(
+  'FirstStrike',
+  () => new FirstStrikeVFX(),
+  undefined,
+  200
+);
+
+export function spawnFirstStrikeVFX(target: any): FirstStrikeVFX {
+  const vfx = firstStrikePool.get();
+  vfx.reset(target);
+  return vfx;
 }

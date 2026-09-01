@@ -5,16 +5,17 @@ import { liquidTypes } from '../balanceLiquids';
 import { conditionTypes } from '../balanceConditions';
 import { overlayTypes } from '../balanceObstacles';
 import { turretTypes } from '../balanceTurrets';
-import { Explosion, LiquidTrailVFX, MuzzleFlash, ConditionVFX } from '../vfx';
+import { Explosion, spawnExplosion, LiquidTrailVFX, MuzzleFlash, ConditionVFX } from '../vfx';
 import { AttachedTurret } from './attachedTurret';
 import { WorldTurret } from './worldTurret';
 import { createAttachedTurret, createWorldTurret, copyTurretState, restoreTurretData } from './turret/TurretRegistry';
 import { getPlayerUpgradeStat } from '../src/playerUpgrades';
 import { LootEntity, TurretLoot } from './loot';
 import { spawnLootAt } from '../economy';
-import { Bullet } from './bullet';
+import { Bullet, spawnBullet } from './bullet';
 import { drawPlayer } from '../visualPlayer';
 import { triggerUpgradeHook } from '../src/upgrades';
+import { soundEngine } from '../src/audio/soundEngine';
 
 declare const p5: any;
 declare const createVector: any;
@@ -235,6 +236,10 @@ export class Player {
       state.trailFadeTimer = 0;
     }
     
+    if (vel > 0.5) {
+      soundEngine.playSFXGroup('player_step');
+    }
+
     if (lData && lData.trailVfxInterval && state.frames % floor(lData.trailVfxInterval / 3) === 0 && vel > 0.5) {
       state.trails.push(new LiquidTrailVFX(this.pos.x, this.pos.y, lData.playerTrailVfx, atan2(this.pos.y - this.prevPos.y, this.pos.x - this.prevPos.x)));
     }
@@ -243,7 +248,7 @@ export class Player {
       const a = this.attachments[i]; 
       a.update(); 
       if (a.health <= 0) { 
-        state.vfx.push(new Explosion(a.getWorldPos().x, a.getWorldPos().y, a.size * 2, color(...a.config.color))); 
+        state.vfx.push(spawnExplosion(a.getWorldPos().x, a.getWorldPos().y, a.size * 2, color(...a.config.color))); 
         
         // Drop loot on death
         if (a.config.drops) {
@@ -392,6 +397,7 @@ export class Player {
       this.attachments.push(newTurret);
       state.totalTurretsAcquired++;
       state.vfx.push(new Explosion(wtPos.x, wtPos.y, 40, color(100, 255, 200)));
+      soundEngine.playSFX('turret_pickup');
       return true;
     }
 
@@ -557,7 +563,7 @@ export class Player {
       }
       this.attachments.push(newTurret);
       state.totalTurretsAcquired++;
-      state.vfx.push(new Explosion(this.pos.x, this.pos.y, 60, color(255, 255, 100)));
+      state.vfx.push(spawnExplosion(this.pos.x, this.pos.y, 60, color(255, 255, 100)));
     } else {
       // CRAMPED FALLBACK: 
       // If no physically clear spot exists adjacent to the base, 
@@ -633,7 +639,7 @@ export class Player {
             startX += offX; startY += offY;
             targetX += offX; targetY += offY;
           }
-          state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player', 'icecube', this)); 
+          state.bullets.push(spawnBullet(startX, startY, targetX, targetY, 'b_player', 'icecube', this)); 
           if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 24, 6, color(100, 200, 255))); 
         }
         if (isBoostActive) {
@@ -648,8 +654,26 @@ export class Player {
     }
 
     // 2. Enemies
-    let nearestE = null; let minDistE = this.autoTurretRange;
-    for (let e of state.enemies) if (e.health > 0 && !e.isDying) { let d = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y); if (d < minDistE && state.world.checkLOS(this.pos.x, this.pos.y, e.pos.x, e.pos.y)) { minDistE = d; nearestE = e; } }
+    let nearestE: any = null; let minDistE = this.autoTurretRange;
+    if (state.spatialGrid) {
+      state.spatialGrid.queryCircleEnemies(this.pos.x, this.pos.y, this.autoTurretRange, (e: any) => {
+        let d = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y);
+        if (d < minDistE && state.world.checkLOS(this.pos.x, this.pos.y, e.pos.x, e.pos.y)) {
+          minDistE = d;
+          nearestE = e;
+        }
+      });
+    } else {
+      for (let e of state.enemies) {
+        if (e.health > 0 && !e.isDying) {
+          let d = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y);
+          if (d < minDistE && state.world.checkLOS(this.pos.x, this.pos.y, e.pos.x, e.pos.y)) {
+            minDistE = d;
+            nearestE = e;
+          }
+        }
+      }
+    }
     if (nearestE) { 
       this.autoTurretAngle = atan2(nearestE.pos.y - this.pos.y, nearestE.pos.x - this.pos.x); 
       if (state.frames - this.autoTurretLastShot > effectiveAttackFireRate) { 
@@ -665,7 +689,7 @@ export class Player {
             startX += offX; startY += offY;
             targetX += offX; targetY += offY;
           }
-          state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player', 'enemy', this)); 
+          state.bullets.push(spawnBullet(startX, startY, targetX, targetY, 'b_player', 'enemy', this)); 
           if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 24, 6, color(100, 200, 255))); 
         }
         if (isBoostActive) {
@@ -699,7 +723,7 @@ export class Player {
             startX += offX; startY += offY;
             targetX += offX; targetY += offY;
           }
-          state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player_mining', 'none', this));
+          state.bullets.push(spawnBullet(startX, startY, targetX, targetY, 'b_player_mining', 'none', this));
           if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 14, 4, color(255, 255, 100)));
         }
         if (isBoostActive) {
@@ -735,7 +759,7 @@ export class Player {
             startX += offX; startY += offY;
             targetX += offX; targetY += offY;
           }
-          state.bullets.push(new Bullet(startX, startY, targetX, targetY, 'b_player_mining', 'none', this)); 
+          state.bullets.push(spawnBullet(startX, startY, targetX, targetY, 'b_player_mining', 'none', this)); 
           if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 14, 4, color(255, 255, 100))); 
         }
         if (isBoostActive) {

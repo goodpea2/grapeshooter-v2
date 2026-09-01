@@ -5,6 +5,7 @@ import { GRID_SIZE, HOUR_FRAMES } from '../constants';
 import { spawnLootAt } from '../economy';
 import { Bullet } from '../class/bullet';
 import { getPlayerUpgradeStat } from './playerUpgrades';
+import { eventBus } from './events/eventBus';
 
 export enum TurretClass {
   SHOOTER = 'shooter',
@@ -150,7 +151,7 @@ export const UPGRADES: Record<string, TurretUpgrade> = {
         if (!target) return;
         const pos = target.getWorldPos ? target.getWorldPos() : (target.pos ? target.pos : null);
         if (!pos) return;
-        const b = new Bullet(pos.x, pos.y, pos.x, pos.y, 'b_enemy_death_explode_50_small', 'none', ctx.source);
+        const b = Bullet.create(pos.x, pos.y, pos.x, pos.y, 'b_enemy_death_explode_50_small', 'none', ctx.source);
         b.life = 0;
         state.bullets.push(b);
       }
@@ -167,7 +168,7 @@ export const UPGRADES: Record<string, TurretUpgrade> = {
         
         const pos = target.getWorldPos ? target.getWorldPos() : (target.pos ? target.pos : null);
         if (!pos) return;
-        const b = new Bullet(pos.x, pos.y, pos.x, pos.y, 'b_death_explode_100_mid', 'none', ctx.source);
+        const b = Bullet.create(pos.x, pos.y, pos.x, pos.y, 'b_death_explode_100_mid', 'none', ctx.source);
         b.life = 0;
         state.bullets.push(b);
       }
@@ -232,7 +233,7 @@ export const UPGRADES: Record<string, TurretUpgrade> = {
         if (!target) return;
         const pos = target.getWorldPos ? target.getWorldPos() : (target.pos ? target.pos : null);
         if (!pos) return;
-        const b = new Bullet(pos.x, pos.y, pos.x, pos.y, 'b_death_explode_firepea', 'none', ctx.source);
+        const b = Bullet.create(pos.x, pos.y, pos.x, pos.y, 'b_death_explode_firepea', 'none', ctx.source);
         b.life = 0;
         state.bullets.push(b);
       }
@@ -270,7 +271,7 @@ export const UPGRADES: Record<string, TurretUpgrade> = {
            const finalAngle = angle + random(-spread, spread);
            const tx = pos.x + cos(finalAngle) * 100;
            const ty = pos.y + sin(finalAngle) * 100;
-           const b = new Bullet(pos.x, pos.y, tx, ty, 'b_giantpea', 'none', turret);
+           const b = Bullet.create(pos.x, pos.y, tx, ty, 'b_giantpea', 'none', turret);
            state.bullets.push(b);
         }
       }
@@ -486,6 +487,35 @@ export function triggerUpgradeHook(hookType: 'onKill' | 'onMine' | 'onDeath' | '
   if (source && source.type) {
     if (hookType === 'onShot') source.shotCount++;
     if (hookType === 'onKill') source.killCount++;
+  }
+
+  // Dispatch to EventBus for decoupled listeners
+  if (hookType === 'onKill') {
+    eventBus.emit('ENEMY_KILLED', {
+      enemy: context.enemy || context.target,
+      source: source,
+      pos: context.pos || context.enemy?.pos || (source?.pos ? { x: source.pos.x, y: source.pos.y } : { x: 0, y: 0 }),
+      isBoss: context.isBoss || context.enemy?.type?.includes('giant'),
+      typeKey: context.enemy?.type || 'unknown'
+    });
+  } else if (hookType === 'onMine') {
+    eventBus.emit('BLOCK_MINED', {
+      block: context.block,
+      pos: context.pos || { x: 0, y: 0 },
+      source: source
+    });
+  } else if (hookType === 'onShot') {
+    eventBus.emit('TURRET_FIRED', {
+      turret: source,
+      bullet: context.bullet,
+      targetPos: context.targetPos
+    });
+  } else if (hookType === 'onMerge') {
+    eventBus.emit('TURRET_MERGED', {
+      resultTurret: source,
+      ingredientTypes: context.ingredientTypes || [],
+      pos: source?.pos
+    });
   }
 
   // 1. Check source's own upgrades (if it's a turret)

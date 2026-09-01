@@ -44,8 +44,9 @@ export function isMouseOverSpawnerTooltip(topBarH: number, paletteH: number): bo
   const tip = state.levelEditor.toolbarSpawnerTooltip;
   if (!tip) return false;
 
+  const isLiquid = tip.isLiquid || tip.key === 'l_spawner' || tip.key.startsWith('l_spawner') || !!liquidTypes[tip.key];
   const tipW = 290;
-  const tipH = 410;
+  const tipH = isLiquid ? 490 : 410;
   const tipX = width - tipW - 15;
   const tipY = constrain(height - paletteH - tipH - 10, topBarH + 10, height - tipH - 10);
 
@@ -67,7 +68,13 @@ export function openToolbarSpawnerTooltip(key: string) {
       spawnTriggerRadius: spCfg.spawnTriggerRadius !== undefined ? spCfg.spawnTriggerRadius : 200,
       spawnInterval: spCfg.spawnInterval !== undefined ? spCfg.spawnInterval : 60,
       spawnIntervalConsumeBudget: spCfg.spawnIntervalConsumeBudget !== false,
-      health: oCfg.minHealth || 300
+      health: oCfg.minHealth || 300,
+      hourlySpawnConfig: spCfg.hourlySpawnConfig ? { ...spCfg.hourlySpawnConfig } : {
+        enabled: isLiquid,
+        hourlyBudgetMultiplier: 1.0,
+        hourlyBudgetAdd: 0,
+        selfDestructAfterBudgetSpawned: 0
+      }
     }
   };
 }
@@ -254,8 +261,9 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
   const tip = state.levelEditor.toolbarSpawnerTooltip;
   if (!tip) return;
 
+  const isLiquid = tip.isLiquid || tip.key === 'l_spawner' || tip.key.startsWith('l_spawner') || !!liquidTypes[tip.key];
   const tipW = 290;
-  const tipH = 410;
+  const tipH = isLiquid ? 490 : 410;
   const tipX = width - tipW - 15;
   const tipY = constrain(height - paletteH - tipH - 10, topBarH + 10, height - tipH - 10);
   const cfg = tip.config;
@@ -577,19 +585,70 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
     () => { cfg.spawnRadius = Math.min(600, (cfg.spawnRadius ?? 120) + 20); }
   );
 
-  // Health
-  renderEditableStepper(
-    'health',
-    'Health',
-    `${cfg.health ?? 300}`,
-    cfg.health ?? 300,
-    () => {
-      cfg.health = Math.max(50, (cfg.health ?? 300) - 50);
-    },
-    () => {
-      cfg.health = Math.min(5000, (cfg.health ?? 300) + 50);
+  // Health (for overlays) or Hourly Controls (for liquid ground spawner)
+  if (!isLiquid) {
+    renderEditableStepper(
+      'health',
+      'Health',
+      `${cfg.health ?? 300}`,
+      cfg.health ?? 300,
+      () => {
+        cfg.health = Math.max(50, (cfg.health ?? 300) - 50);
+      },
+      () => {
+        cfg.health = Math.min(5000, (cfg.health ?? 300) + 50);
+      }
+    );
+  } else {
+    if (!cfg.hourlySpawnConfig) {
+      cfg.hourlySpawnConfig = {
+        enabled: true,
+        hourlyBudgetMultiplier: 1.0,
+        hourlyBudgetAdd: 0,
+        selfDestructAfterBudgetSpawned: 0
+      };
     }
-  );
+    const hCfg = cfg.hourlySpawnConfig;
+
+    renderEditableStepper(
+      'hourlyBudgetMultiplier',
+      'Hourly Mult',
+      `x${(hCfg.hourlyBudgetMultiplier ?? 1.0).toFixed(1)}`,
+      hCfg.hourlyBudgetMultiplier ?? 1.0,
+      () => {
+        hCfg.hourlyBudgetMultiplier = Math.max(0.1, Number(((hCfg.hourlyBudgetMultiplier ?? 1.0) - 0.2).toFixed(1)));
+      },
+      () => {
+        hCfg.hourlyBudgetMultiplier = Math.min(10.0, Number(((hCfg.hourlyBudgetMultiplier ?? 1.0) + 0.2).toFixed(1)));
+      }
+    );
+
+    renderEditableStepper(
+      'hourlyBudgetAdd',
+      'Hourly Add',
+      `+${hCfg.hourlyBudgetAdd ?? 0}`,
+      hCfg.hourlyBudgetAdd ?? 0,
+      () => {
+        hCfg.hourlyBudgetAdd = Math.max(0, (hCfg.hourlyBudgetAdd ?? 0) - 20);
+      },
+      () => {
+        hCfg.hourlyBudgetAdd = Math.min(2000, (hCfg.hourlyBudgetAdd ?? 0) + 20);
+      }
+    );
+
+    renderEditableStepper(
+      'selfDestructAfterBudgetSpawned',
+      'Self Destruct',
+      hCfg.selfDestructAfterBudgetSpawned > 0 ? `${hCfg.selfDestructAfterBudgetSpawned} bg` : 'Never',
+      hCfg.selfDestructAfterBudgetSpawned ?? 0,
+      () => {
+        hCfg.selfDestructAfterBudgetSpawned = Math.max(0, (hCfg.selfDestructAfterBudgetSpawned ?? 0) - 50);
+      },
+      () => {
+        hCfg.selfDestructAfterBudgetSpawned = Math.min(5000, (hCfg.selfDestructAfterBudgetSpawned ?? 0) + 50);
+      }
+    );
+  }
 
   // 4. Enemy Type Chips Selection
   curY += 2;
@@ -692,7 +751,7 @@ function applySpawnerInputBuffer(tip: any, activeInput: { field: string; textBuf
   if (activeInput.field === 'name') {
     tip.name = activeInput.textBuffer;
   } else {
-    const num = parseInt(activeInput.textBuffer, 10);
+    const num = parseFloat(activeInput.textBuffer);
     if (!isNaN(num)) {
       if (activeInput.field === 'budget') {
         tip.config.budget = num;
@@ -704,6 +763,15 @@ function applySpawnerInputBuffer(tip: any, activeInput: { field: string; textBuf
         tip.config.spawnRadius = num;
       } else if (activeInput.field === 'health') {
         tip.config.health = num;
+      } else if (activeInput.field === 'hourlyBudgetMultiplier') {
+        if (!tip.config.hourlySpawnConfig) tip.config.hourlySpawnConfig = { enabled: true };
+        tip.config.hourlySpawnConfig.hourlyBudgetMultiplier = num;
+      } else if (activeInput.field === 'hourlyBudgetAdd') {
+        if (!tip.config.hourlySpawnConfig) tip.config.hourlySpawnConfig = { enabled: true };
+        tip.config.hourlySpawnConfig.hourlyBudgetAdd = num;
+      } else if (activeInput.field === 'selfDestructAfterBudgetSpawned') {
+        if (!tip.config.hourlySpawnConfig) tip.config.hourlySpawnConfig = { enabled: true };
+        tip.config.hourlySpawnConfig.selfDestructAfterBudgetSpawned = num;
       }
     }
   }
@@ -714,8 +782,9 @@ export function handleToolbarSpawnerTooltipClick(topBarH: number, paletteH: numb
   const tip = state.levelEditor.toolbarSpawnerTooltip;
   if (!tip) return false;
 
+  const isLiquid = tip.isLiquid || tip.key === 'l_spawner' || tip.key.startsWith('l_spawner') || !!liquidTypes[tip.key];
   const tipW = 290;
-  const tipH = 410;
+  const tipH = isLiquid ? 490 : 410;
   const tipX = width - tipW - 15;
   const tipY = constrain(height - paletteH - tipH - 10, topBarH + 10, height - tipH - 10);
 

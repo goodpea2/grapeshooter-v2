@@ -10,6 +10,8 @@ import { drawTurretIcon } from './inventory/turretIcon';
 import { drawNewTurretTooltip } from './UITurretTooltip';
 import { restoreLevelFromCache } from '../levelEditor';
 import { getPlayerUpgradeStat } from '../src/playerUpgrades';
+import { drawDarkButton } from '../uiComponents';
+import { soundEngine } from '../src/audio/soundEngine';
 
 declare const floor: any;
 declare const nf: any;
@@ -498,17 +500,24 @@ export function drawUI(spawnFromBudget: Function) {
   pop();
 
   if (!isPlacing) {
-    push();
-    let dbgX = width - 110;
-    let dbgY = 65; // Moved down by 50px
-    let dbgW = 100;
-    let dbgH = 30;
-    let dbgHov = mouseX > dbgX && mouseX < dbgX + dbgW && mouseY > dbgY && mouseY < dbgY + dbgH;
-    fill(state.showDebug ? 80 : 30); if (dbgHov) fill(state.showDebug ? 100 : 50);
-    stroke(255, 100); rect(dbgX, dbgY, dbgW, dbgH, 5);
-    fill(255); textAlign(CENTER, CENTER); textSize(12); text("Debug", dbgX + dbgW/2, dbgY + dbgH/2);
-    if (dbgHov && mouseIsPressed && !state.isAlmanacOpen && !state.showUnlockPopup) { state.showDebug = !state.showDebug; (window as any).mouseIsPressed = false; }
-    pop();
+    const dbgX = width - 110;
+    const dbgY = 65; // Moved down by 50px
+    const dbgW = 100;
+    const dbgH = 30;
+
+    drawDarkButton(dbgX, dbgY, dbgW, dbgH, 'Debug', {
+      id: 'btn_toggle_debug',
+      isSelected: state.showDebug,
+      fontSize: 12,
+      radius: 8,
+      depth3D: 2,
+      layer: 100,
+      onClick: () => {
+        if (!state.isAlmanacOpen && !state.showUnlockPopup && !state.isPauseMenuOpen) {
+          state.showDebug = !state.showDebug;
+        }
+      }
+    });
 
     drawDebugPanel(spawnFromBudget);
     drawNPCPanel();
@@ -522,6 +531,9 @@ export function drawUI(spawnFromBudget: Function) {
     
     if (currentDayFrames >= nightWarningStartFrame && currentDayFrames < nightWarningStartFrame + 300) {
       const elapsed = currentDayFrames - nightWarningStartFrame;
+      if (elapsed === 0) {
+        soundEngine.playSFX('hugewave_intro');
+      }
       let alpha = 0;
       let yOffset = 0;
       
@@ -675,8 +687,8 @@ export function drawUI(spawnFromBudget: Function) {
 }
 
 export function isMouseOverUI() {
-  // Almanac UI blocks everything
-  if (state.isAlmanacOpen || state.showUnlockPopup) return true;
+  // Pause Menu & Almanac UI block everything
+  if (state.isPauseMenuOpen || state.isAlmanacOpen || state.showUnlockPopup) return true;
 
   const isPlacing = !!(state.selectedTurretType || state.draggedTurretInstance || state.draggedTurretType);
   if (isPlacing) {

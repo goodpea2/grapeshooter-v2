@@ -3,8 +3,8 @@ import { state } from '../../../state';
 import { TurretAction } from '../../turretAction';
 import { GRID_SIZE, CHUNK_SIZE } from '../../../constants';
 import { Enemy } from '../../enemy';
-import { MergeVFX } from '../../../vfx/index';
-import { LootEntity } from '../../loot';
+import { spawnMergeVFX } from '../../../vfx/index';
+import { spawnLootEntity } from '../../loot';
 import { triggerUpgradeHook } from '../../../src/upgrades';
 
 declare const floor: any;
@@ -159,7 +159,7 @@ export class ActionFarm extends TurretAction {
           const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
           const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
           const chunk = state.world.getChunk(cx, cy);
-          if (chunk) chunk.loot.push(new LootEntity(px, py, res));
+          if (chunk) chunk.loot.push(spawnLootEntity(px, py, res));
         }
       }
       if (fCfg.lootOnHarvest.extra && random() < fCfg.lootOnHarvest.extra.chance) {
@@ -169,7 +169,7 @@ export class ActionFarm extends TurretAction {
         const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
         const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
         const chunk = state.world.getChunk(cx, cy);
-        if (chunk) chunk.loot.push(new LootEntity(px, py, extraRes));
+        if (chunk) chunk.loot.push(spawnLootEntity(px, py, extraRes));
       }
     }
     
@@ -183,7 +183,7 @@ export class ActionFarm extends TurretAction {
       (this.turret as any).onDeath();
     }
     
-    state.vfx.push(new MergeVFX(wPos.x, wPos.y, [255, 255, 255]));
+    state.vfx.push(spawnMergeVFX(wPos.x, wPos.y, [255, 255, 255]));
   }
 
   private spawnMobFarmEnemy() {
@@ -201,7 +201,7 @@ export class ActionFarm extends TurretAction {
         const sx = wPos.x + cos(spawnAngle) * spawnDist;
         const sy = wPos.y + sin(spawnAngle) * spawnDist;
         state.enemies.push(new Enemy(sx, sy, enemyType));
-        state.vfx.push(new MergeVFX(sx, sy, [255, 255, 255]));
+        state.vfx.push(spawnMergeVFX(sx, sy, [255, 255, 255]));
     }
   }
 

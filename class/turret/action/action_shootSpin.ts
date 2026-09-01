@@ -105,7 +105,7 @@ export class ActionShootSpin extends TurretAction {
         targetY += offY;
       }
       
-      const b = new Bullet(startX, startY, targetX, targetY, config.bulletTypeKey, 'enemy', this.turret);
+      const b = Bullet.create(startX, startY, targetX, targetY, config.bulletTypeKey, 'enemy', this.turret);
       state.bullets.push(b);
       
       if (i === 0) {

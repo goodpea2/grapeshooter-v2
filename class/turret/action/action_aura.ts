@@ -54,12 +54,18 @@ export class ActionAura extends TurretAction {
 
       // 1. Condition Aura on Enemies
       if (cfg.appliedCondition) {
-        for (let e of state.enemies) {
-          if (e.health <= 0 || e.isDying) continue;
-          const dx = e.pos.x - wPos.x;
-          const dy = e.pos.y - wPos.y;
-          if (dx * dx + dy * dy < auraRadiusSq) {
+        if (state.spatialGrid) {
+          state.spatialGrid.queryCircleEnemies(wPos.x, wPos.y, effectiveRadius, (e: any) => {
             e.applyCondition(cfg.appliedCondition, cfg.duration || 60);
+          });
+        } else {
+          for (let e of state.enemies) {
+            if (e.health <= 0 || e.isDying) continue;
+            const dx = e.pos.x - wPos.x;
+            const dy = e.pos.y - wPos.y;
+            if (dx * dx + dy * dy < auraRadiusSq) {
+              e.applyCondition(cfg.appliedCondition, cfg.duration || 60);
+            }
           }
         }
       }

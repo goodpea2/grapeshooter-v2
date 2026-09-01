@@ -66,13 +66,21 @@ export class ActionPulse extends TurretAction {
     // Proximity fallback check: scan nearby enemies/obstacles if target was lost or null
     if (!triggered && !config.pulseTriggerAlways) {
       if (triggerBy.includes('enemy')) {
-        for (const e of state.enemies) {
-          if (e.health > 0 && !e.isDying) {
-            const edSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
-            if (edSq <= triggerRadiusSq) {
-              triggered = true;
-              if (!tCenter) tCenter = e.pos.copy ? e.pos.copy() : createVector(e.pos.x, e.pos.y);
-              break;
+        if (state.spatialGrid) {
+          state.spatialGrid.queryCircleEnemies(wPos.x, wPos.y, triggerRadius, (e: any) => {
+            triggered = true;
+            if (!tCenter) tCenter = e.pos.copy ? e.pos.copy() : createVector(e.pos.x, e.pos.y);
+            return true;
+          });
+        } else {
+          for (const e of state.enemies) {
+            if (e.health > 0 && !e.isDying) {
+              const edSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
+              if (edSq <= triggerRadiusSq) {
+                triggered = true;
+                if (!tCenter) tCenter = e.pos.copy ? e.pos.copy() : createVector(e.pos.x, e.pos.y);
+                break;
+              }
             }
           }
         }
@@ -114,7 +122,7 @@ export class ActionPulse extends TurretAction {
         if (config.pulseBulletTypeKey) {
           const sx = config.pulseCenteredAtTriggerSource && tCenter ? tCenter.x : wPos.x;
           const sy = config.pulseCenteredAtTriggerSource && tCenter ? tCenter.y : wPos.y;
-          let b = new Bullet(sx, sy, sx, sy, config.pulseBulletTypeKey, 'none', this.turret); 
+          let b = Bullet.create(sx, sy, sx, sy, config.pulseBulletTypeKey, 'none', this.turret); 
           (b as any).life = 0; 
           state.bullets.push(b);
           triggerUpgradeHook('onShot', this.turret, { actionType: 'pulse', bulletTypeKey: config.pulseBulletTypeKey });
@@ -186,7 +194,7 @@ export class ActionPulse extends TurretAction {
         if (config.pulseBulletTypeKey) {
           const sx = targetPos.x;
           const sy = targetPos.y;
-          let b = new Bullet(sx, sy, sx, sy, config.pulseBulletTypeKey, 'none', this.turret);
+          let b = Bullet.create(sx, sy, sx, sy, config.pulseBulletTypeKey, 'none', this.turret);
           (b as any).life = 0;
           state.bullets.push(b);
           triggerUpgradeHook('onShot', this.turret, { actionType: 'pulse', bulletTypeKey: config.pulseBulletTypeKey });

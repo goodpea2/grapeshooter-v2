@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const p5: any;
 declare const createVector: any;
@@ -15,20 +16,41 @@ declare const translate: any;
 declare const frameCount: any;
 
 export class PoisonGasVFX {
-  pos: any; radius: number; life: number; duration: number;
-  clouds: any[] = [];
-  constructor(x: number, y: number, radius: number, duration: number) {
-    this.pos = createVector(x, y); this.radius = radius; this.life = duration; this.duration = duration;
+  pos: any; radius: number = 50; life: number = 60; duration: number = 60;
+  clouds: { off: any; s: number; phase: number; rotV: number; distMult: number }[] = [];
+
+  constructor(x: number = 0, y: number = 0, radius: number = 50, duration: number = 60) {
+    this.pos = createVector(x, y);
     for(let i=0; i<12; i++) {
-        this.clouds.push({ 
-            off: p5.Vector.random2D().mult(random(radius * 0.6)), 
-            s: random(radius * 0.4, radius * 0.8), 
-            phase: random(TWO_PI),
-            rotV: random(-0.03, 0.03),
-            distMult: random(0.7, 1.3)
-        });
+      this.clouds.push({ 
+        off: createVector(0, 0), 
+        s: 20, 
+        phase: 0,
+        rotV: 0,
+        distMult: 1
+      });
+    }
+    this.reset(x, y, radius, duration);
+  }
+
+  reset(x: number = 0, y: number = 0, radius: number = 50, duration: number = 60) {
+    if (this.pos) this.pos.set(x, y); else this.pos = createVector(x, y);
+    this.radius = radius;
+    this.life = duration;
+    this.duration = duration;
+    for(let i=0; i<12; i++) {
+      const c = this.clouds[i];
+      if (c) {
+        const rndV = p5.Vector.random2D().mult(random(radius * 0.6));
+        c.off.set(rndV.x, rndV.y);
+        c.s = random(radius * 0.4, radius * 0.8);
+        c.phase = random(TWO_PI);
+        c.rotV = random(-0.03, 0.03);
+        c.distMult = random(0.7, 1.3);
+      }
     }
   }
+
   update() { this.life--; }
   isDone() { return this.life <= 0; }
   display() {
@@ -51,4 +73,17 @@ export class PoisonGasVFX {
     }
     pop();
   }
+}
+
+export const poisonGasPool = new ObjectPool<PoisonGasVFX>(
+  'PoisonGas',
+  () => new PoisonGasVFX(),
+  undefined,
+  200
+);
+
+export function spawnPoisonGasVFX(x: number, y: number, radius: number, duration: number): PoisonGasVFX {
+  const vfx = poisonGasPool.get();
+  vfx.reset(x, y, radius, duration);
+  return vfx;
 }

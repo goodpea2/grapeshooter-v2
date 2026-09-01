@@ -1,5 +1,6 @@
 import { state } from './state';
 import { color, ColorRGBA } from './uiColors';
+import { soundEngine } from './src/audio/soundEngine';
 
 declare const mouseX: any;
 declare const mouseY: any;
@@ -49,6 +50,7 @@ export interface UIHitbox {
 let activeHitboxes: UIHitbox[] = [];
 let currentLayer: number = 0;
 let pressedHitboxId: string | null = null;
+let lastHoveredHitboxId: string | null = null;
 
 export function beginUIFrame() {
   activeHitboxes = [];
@@ -105,6 +107,9 @@ export function handleUIMouseRelease(mx: number = mouseX, my: number = mouseY): 
   const wasPressedId = pressedHitboxId;
   pressedHitboxId = null;
   if (hit && !hit.disabled && hit.id === wasPressedId && hit.onClick) {
+    if (hit.id !== 'btn_pause' && hit.id !== 'btn_menu' && hit.id !== 'btn_speedup') {
+      soundEngine.playSFX('btn_click');
+    }
     hit.onClick();
     return true;
   }
@@ -272,6 +277,11 @@ export function drawButton(
   const isUnderMouse = !disabled && mouseX >= hitX && mouseX <= hitX + w && mouseY >= hitY && mouseY <= hitY + h;
   const isHovered = isHoveredForce || isUnderMouse;
   const isPressed = !disabled && (isPressedForce || (pressedHitboxId === id && isUnderMouse && mouseIsDown()));
+
+  if (isUnderMouse && lastHoveredHitboxId !== id) {
+    lastHoveredHitboxId = id;
+    soundEngine.playSFX('levellist_hover');
+  }
 
   registerUIHitbox({
     id,

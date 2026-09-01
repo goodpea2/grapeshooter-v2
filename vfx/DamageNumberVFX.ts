@@ -1,90 +1,112 @@
-import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const p5: any;
 declare const createVector: any;
-declare const color: any;
-declare const red: any;
-declare const green: any;
-declare const blue: any;
-declare const map: any;
-declare const lerp: any;
-declare const lerpColor: any;
 declare const random: any;
-declare const TWO_PI: any;
-declare const cos: any;
-declare const sin: any;
 declare const pow: any;
-declare const noStroke: any;
-declare const noFill: any;
-declare const fill: any;
-declare const beginShape: any;
-declare const endShape: any;
-declare const vertex: any;
-declare const ellipse: any;
+declare const lerp: any;
+declare const map: any;
 declare const push: any;
 declare const pop: any;
 declare const translate: any;
-declare const rotate: any;
-declare const scale: any;
-declare const CLOSE: any;
-declare const width: any;
-declare const height: any;
-declare const rect: any;
-declare const distSq: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const triangle: any;
-declare const frameCount: any;
-declare const max: any;
-declare const floor: any;
-declare const HALF_PI: any;
-declare const line: any;
-declare const arc: any;
-declare const image: any;
-declare const imageMode: any;
-declare const CENTER: any;
-declare const tint: any;
-declare const noTint: any;
-declare const text: any;
-declare const textSize: any;
 declare const textAlign: any;
-declare const HCENTER: any;
-declare const VCENTER: any;
+declare const textSize: any;
+declare const noStroke: any;
+declare const fill: any;
+declare const text: any;
+declare const CENTER: any;
 
 export class DamageNumberVFX {
-    pos: any; damage: number; life: number; maxLife: number;
-    color: any; startY: number; xOffset: number;
+  pos: any;
+  damage: number = 0;
+  life: number = 45;
+  maxLife: number = 45;
+  r: number = 255;
+  g: number = 255;
+  b: number = 255;
+  startY: number = 0;
+  xOffset: number = 0;
 
-    constructor(x: number, y: number, damage: number, col: any = [255, 255, 255]) {
-        this.xOffset = random(-10, 10);
-        this.pos = createVector(x, y);
-        this.startY = y;
-        this.damage = damage;
-        this.life = 45; // Duration of the VFX
-        this.maxLife = 45;
-        this.color = col;
+  constructor(x: number = 0, y: number = 0, damage: number = 0, col: any = [255, 255, 255]) {
+    this.pos = createVector(x, y);
+    this.reset(x, y, damage, col);
+  }
+
+  reset(x: number, y: number, damage: number, col: any = [255, 255, 255]) {
+    this.xOffset = (Math.random() - 0.5) * 20;
+    if (this.pos) {
+      this.pos.set(x, y);
+    } else {
+      this.pos = createVector(x, y);
+    }
+    this.startY = y;
+    this.damage = damage;
+    this.life = 45;
+    this.maxLife = 45;
+
+    if (Array.isArray(col)) {
+      this.r = col[0] ?? 255;
+      this.g = col[1] ?? 255;
+      this.b = col[2] ?? 255;
+    } else if (col && Array.isArray(col.levels)) {
+      this.r = col.levels[0];
+      this.g = col.levels[1];
+      this.b = col.levels[2];
+    } else {
+      this.r = 255;
+      this.g = 255;
+      this.b = 255;
+    }
+  }
+
+  update() {
+    this.life--;
+    const t = 1 - (this.life / this.maxLife);
+    const eased = 1 - Math.pow(1 - t, 4);
+    this.pos.y = this.startY - 30 * eased;
+  }
+
+  isDone() {
+    return this.life <= 0;
+  }
+
+  display() {
+    const alphaNorm = Math.max(0, Math.min(1, this.life / this.maxLife));
+    const currentSize = Math.round(10 + (this.life / this.maxLife) * 4);
+    const textVal = `${Math.round(Math.abs(this.damage))}`;
+    const drawX = this.pos.x + this.xOffset;
+    const drawY = this.pos.y;
+
+    const ctx = (window as any).drawingContext as CanvasRenderingContext2D;
+    if (ctx) {
+      ctx.font = `bold ${currentSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = `rgba(${this.r}, ${this.g}, ${this.b}, ${alphaNorm})`;
+      ctx.fillText(textVal, drawX, drawY);
+      return;
     }
 
-    update() {
-        this.life--;
-      let t = 1 - (this.life / this.maxLife);
-      let eased = 1 - pow(1 - t, 4);
-      this.pos.y = lerp(this.startY, this.startY - 30, eased);
-    }
+    push();
+    translate(drawX, drawY);
+    textAlign(CENTER, CENTER);
+    textSize(currentSize);
+    noStroke();
+    fill(this.r, this.g, this.b, alphaNorm * 255);
+    text(textVal, 0, 0);
+    pop();
+  }
+}
 
-    isDone() { return this.life <= 0; }
+export const damageNumberPool = new ObjectPool<DamageNumberVFX>(
+  'DamageNumber',
+  () => new DamageNumberVFX(),
+  undefined,
+  500
+);
 
-    display() {
-        let alpha = map(this.life, 0, this.maxLife, 0, 255);
-        let currentSize = map(this.life, 0, this.maxLife, 10, 14);
-
-        push();
-        translate(this.pos.x + this.xOffset, this.pos.y);
-        textAlign(CENTER, CENTER);
-        textSize(currentSize);
-        noStroke();
-        fill(this.color[0], this.color[1], this.color[2], alpha);
-        text(Math.round(Math.abs(this.damage)), 0, 0);
-        pop();
-    }
+export function spawnDamageNumber(x: number, y: number, damage: number, col: any = [255, 255, 255]): DamageNumberVFX {
+  const vfx = damageNumberPool.get();
+  vfx.reset(x, y, damage, col);
+  return vfx;
 }

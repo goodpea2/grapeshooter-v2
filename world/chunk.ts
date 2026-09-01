@@ -49,6 +49,9 @@ export const BLOCK_KEYS = ['o_dirt', 'o_clay', 'o_stone', 'o_slate', 'o_black'];
 export class Chunk {
   cx: number; cy: number; blocks: Block[] = []; blockMap: Map<string, Block> = new Map();
   overlayBlocks: Block[] = []; // OPTIMIZATION: Keep track of blocks with overlays
+  liquidBlocks: Block[] = [];  // OPTIMIZATION: Cache blocks with liquids
+  assetBlocks: Block[] = [];   // OPTIMIZATION: Cache blocks with asset images
+  winConditionBlocks: Block[] = []; // OPTIMIZATION: Cache win condition blocks
   turrets: any[] = []; // Store world turrets in chunks
   loot: any[] = []; // Store loot in chunks
   localChunkLevel: number = 0;
@@ -86,9 +89,12 @@ export class Chunk {
     this.rebuildOverlayList();
   }
 
-  // OPTIMIZATION: Cache blocks that need overlay rendering
+  // OPTIMIZATION: Cache blocks by render requirement
   rebuildOverlayList() {
     this.overlayBlocks = this.blocks.filter(b => !!b.overlay || b.health < b.maxHealth);
+    this.liquidBlocks = this.blocks.filter(b => !!b.liquidType);
+    this.assetBlocks = this.blocks.filter(b => !!b.config?.assetImgConfig);
+    this.winConditionBlocks = this.blocks.filter(b => b.isWinCondition);
     this.needsRedraw = true;
   }
 
@@ -421,9 +427,10 @@ export class Chunk {
 
   renderToBuffer() {
     const chunkW = CHUNK_SIZE * GRID_SIZE;
+    const isHighQuality = state.graphicQuality === 'high';
+    const dpr = isHighQuality && typeof window !== 'undefined' && window.devicePixelRatio && window.devicePixelRatio > 1 ? Math.min(window.devicePixelRatio, 2) : 1;
     if (!this.buffer) {
       this.buffer = createGraphics(chunkW, chunkW);
-      const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
       this.buffer.pixelDensity(dpr);
     }
     const pg = this.buffer;
@@ -457,9 +464,11 @@ export class Chunk {
   }
 
   ensureDeathBuffer() {
+    const isHighQuality = state.graphicQuality === 'high';
+    const dpr = isHighQuality && typeof window !== 'undefined' && window.devicePixelRatio && window.devicePixelRatio > 1 ? Math.min(window.devicePixelRatio, 2) : 1;
     if (!this.deathBuffer) {
       this.deathBuffer = createGraphics(CHUNK_SIZE * GRID_SIZE, CHUNK_SIZE * GRID_SIZE);
-      this.deathBuffer.pixelDensity(1);
+      this.deathBuffer.pixelDensity(dpr);
     }
     return this.deathBuffer;
   }
@@ -478,115 +487,107 @@ export class Chunk {
     // SQUARED DISTANCE OPTIMIZATION
     const px = playerPos.x;
     const py = playerPos.y;
-    const visRadSq = (VISIBILITY_RADIUS * GRID_SIZE)**2;
-    const fadeStartSq = ((VISIBILITY_RADIUS - 1) * GRID_SIZE)**2;
+    const visRad = VISIBILITY_RADIUS * GRID_SIZE;
+    const visRadSq = visRad * visRad;
+    const fadeStart = (VISIBILITY_RADIUS - 1) * GRID_SIZE;
+    const fadeStartSq = fadeStart * fadeStart;
+
+    const ctx = (window as any).drawingContext as CanvasRenderingContext2D;
 
     if (this.deathBuffer) {
+      const source = this.deathBuffer.canvas || this.deathBuffer.elt || this.deathBuffer;
+      if (ctx && source) {
+        ctx.drawImage(source, chunkX, chunkY, chunkW, chunkW);
+      } else {
         push();
         imageMode(CORNER);
-        image(this.deathBuffer, chunkX, chunkY);
+        image(this.deathBuffer, chunkX, chunkY, chunkW, chunkW);
         pop();
+      }
     }
 
-    // Pass 0: Liquids (UNDER blocks)
-    for (let b of this.blocks) {
-        const dx = b.pos.x + GRID_SIZE/2 - px;
-        const dy = b.pos.y + GRID_SIZE/2 - py;
-        const dSq = dx*dx + dy*dy;
-        
-        if (dSq > visRadSq) continue;
-        if (b.liquidType) {
-          let opacity = 255;
-          if (dSq > fadeStartSq) {
-            const d = Math.sqrt(dSq);
-            opacity = constrain(map(d, (VISIBILITY_RADIUS - 1) * GRID_SIZE, VISIBILITY_RADIUS * GRID_SIZE, 255, 0), 0, 255);
-          }
-          b.renderBase(opacity);
-        }
+    // Pass 0: Liquids (UNDER blocks) - renders directly along with chunk
+    for (let i = 0; i < this.liquidBlocks.length; i++) {
+      this.liquidBlocks[i].renderBase(255);
     }
 
     if (this.needsRedraw) {
       this.renderToBuffer();
     }
     if (this.buffer) {
+      const source = this.buffer.canvas || this.buffer.elt || this.buffer;
+      if (ctx && source) {
+        ctx.drawImage(source, chunkX, chunkY, chunkW + 0.5, chunkW + 0.5);
+      } else {
+        push();
+        imageMode(CORNER);
+        image(this.buffer, chunkX, chunkY, chunkW + 0.5, chunkW + 0.5);
+        pop();
+      }
+    }
+
+    // Pass 1: Renders custom asset blocks (only blocks with assetImgConfig)
+    for (let i = 0; i < this.assetBlocks.length; i++) { 
+      const b = this.assetBlocks[i];
+      const dx = b.pos.x + GRID_SIZE/2 - px;
+      const dy = b.pos.y + GRID_SIZE/2 - py;
+      const dSq = dx*dx + dy*dy;
+      if (dSq > visRadSq) continue;
+      let opacity = 255;
+      if (dSq > fadeStartSq) {
+        const d = Math.sqrt(dSq);
+        opacity = constrain(map(d, fadeStart, visRad, 255, 0), 0, 255);
+      }
+      b.renderBase(opacity);
+    }
+
+    // Render win condition markers
+    for (let i = 0; i < this.winConditionBlocks.length; i++) {
+      const b = this.winConditionBlocks[i];
+      if (b.isMined) continue;
+      const dx = b.pos.x + GRID_SIZE / 2 - px;
+      const dy = b.pos.y + GRID_SIZE / 2 - py;
+      const dSq = dx*dx + dy*dy;
+      if (dSq > visRadSq) continue;
+      let opacity = 255;
+      if (dSq > fadeStartSq) {
+        const d = Math.sqrt(dSq);
+        opacity = constrain(map(d, fadeStart, visRad, 255, 0), 0, 255);
+      }
       push();
-      imageMode(CORNER);
-      image(this.buffer, chunkX, chunkY, chunkW + 0.5, chunkW + 0.5);
+      translate(b.pos.x + GRID_SIZE / 2, b.pos.y + GRID_SIZE / 2);
+      noFill();
+      stroke(255, 215, 0, (180 + 40 * sin(state.frames * 0.08)) * (opacity / 255));
+      strokeWeight(2.5);
+      ellipse(0, 0, GRID_SIZE * 0.85 + 2 * sin(state.frames * 0.08));
+      fill(255, 215, 0, 230 * (opacity / 255));
+      noStroke();
+      triangle(-3, -6, 6, -2, -3, 2);
+      stroke(255, 215, 0, 250 * (opacity / 255));
+      strokeWeight(1.5);
+      line(-3, -6, -3, 7);
       pop();
     }
-
-    // Pass 1: Renders bases (Ground/Liquids/Borders)
-    for (let b of this.blocks) { 
-        const dx = b.pos.x + GRID_SIZE/2 - px;
-        const dy = b.pos.y + GRID_SIZE/2 - py;
-        const dSq = dx*dx + dy*dy;
-        
-        if (dSq > visRadSq) continue;
-        b.update(); // Block logic only runs when near visible
-
-        let opacity = 255;
-        if (dSq > fadeStartSq) {
-          const d = Math.sqrt(dSq);
-          opacity = constrain(map(d, (VISIBILITY_RADIUS - 1) * GRID_SIZE, VISIBILITY_RADIUS * GRID_SIZE, 255, 0), 0, 255);
-        }
-        if (b.config.assetImgConfig) b.renderBase(opacity);
-        b.renderSparkles(opacity);
-
-        if (b.isWinCondition && !b.isMined) {
-          push();
-          translate(b.pos.x + GRID_SIZE / 2, b.pos.y + GRID_SIZE / 2);
-          noFill();
-          stroke(255, 215, 0, (180 + 40 * sin(state.frames * 0.08)) * (opacity / 255));
-          strokeWeight(2.5);
-          ellipse(0, 0, GRID_SIZE * 0.85 + 2 * sin(state.frames * 0.08));
-          fill(255, 215, 0, 230 * (opacity / 255));
-          noStroke();
-          triangle(-3, -6, 6, -2, -3, 2);
-          stroke(255, 215, 0, 250 * (opacity / 255));
-          strokeWeight(1.5);
-          line(-3, -6, -3, 7);
-          pop();
-        }
-
-        if (state.showDebug && state.showObstacleOutline && !b.isMined) {
-          push();
-          noFill();
-          stroke(255, 0, 0, opacity * 0.5);
-          strokeWeight(1);
-          rect(b.pos.x, b.pos.y, GRID_SIZE, GRID_SIZE);
-          
-          // Debug: Show block coordinates
-          if (opacity > 200) {
-            fill(255, 0, 0, opacity);
-            noStroke();
-            textSize(8);
-            textAlign(CENTER, CENTER);
-            text(`${b.gx},${b.gy}`, b.pos.x + GRID_SIZE/2, b.pos.y + GRID_SIZE/2);
-          }
-          pop();
-        }
-    }
     
-    // Pass 2: Renders overlays (Assets/Pulsing effects)
-    for (let b of this.overlayBlocks) {
-        const dx = b.pos.x + GRID_SIZE/2 - px;
-        const dy = b.pos.y + GRID_SIZE/2 - py;
-        const dSq = dx*dx + dy*dy;
-        
-        if (dSq > visRadSq) continue;
-
-        let opacity = 255;
-        if (dSq > fadeStartSq) {
-          const d = Math.sqrt(dSq);
-          opacity = constrain(map(d, (VISIBILITY_RADIUS - 1) * GRID_SIZE, VISIBILITY_RADIUS * GRID_SIZE, 255, 0), 0, 255);
-        }
-        b.renderOverlay(opacity);
-        b.renderSparkles(opacity);
+    // Pass 2: Renders overlays (Assets/Pulsing effects/Spawners)
+    for (let i = 0; i < this.overlayBlocks.length; i++) {
+      const b = this.overlayBlocks[i];
+      const dx = b.pos.x + GRID_SIZE/2 - px;
+      const dy = b.pos.y + GRID_SIZE/2 - py;
+      const dSq = dx*dx + dy*dy;
+      if (dSq > visRadSq) continue;
+      let opacity = 255;
+      if (dSq > fadeStartSq) {
+        const d = Math.sqrt(dSq);
+        opacity = constrain(map(d, fadeStart, visRad, 255, 0), 0, 255);
+      }
+      b.renderOverlay(opacity);
+      b.renderSparkles(opacity);
     }
 
     // Pass 3: Render Loot
-    for (let l of this.loot) {
-      l.display();
+    for (let i = 0; i < this.loot.length; i++) {
+      this.loot[i].display();
     }
   }
 }

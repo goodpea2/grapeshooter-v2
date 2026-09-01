@@ -58,7 +58,7 @@ export class ActionFirstStrike extends TurretAction {
             const minRange = (sbc.distRange ? sbc.distRange[0] : 0) * (this.turret.stats.rangeMult || 1);
             const ang = random(Math.PI * 2); const r = random(minRange, range);
             const tx = wPos.x + Math.cos(ang) * r; const ty = wPos.y + Math.sin(ang) * r;
-            let b = new Bullet(wPos.x, wPos.y, tx, ty, sbc.bulletKey, 'none', this.turret); 
+            let b = Bullet.create(wPos.x, wPos.y, tx, ty, sbc.bulletKey, 'none', this.turret); 
             (b as any).targetPos = createVector(tx, ty);
             state.bullets.push(b); 
             this.turret.recoil = 8;
@@ -66,7 +66,7 @@ export class ActionFirstStrike extends TurretAction {
       }
       if (fsc.actionToTrigger === 'pulse') {
         if (config.pulseBulletTypeKey) {
-          let b = new Bullet(wPos.x, wPos.y, wPos.x, wPos.y, config.pulseBulletTypeKey, 'none', this.turret); 
+          let b = Bullet.create(wPos.x, wPos.y, wPos.x, wPos.y, config.pulseBulletTypeKey, 'none', this.turret); 
           (b as any).life = 0; 
           state.bullets.push(b);
         }

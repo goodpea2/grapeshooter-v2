@@ -17,7 +17,17 @@ const FIELD_RADIUS = 36; // 36 tiles in each direction (73x73 = 5,329 tiles, ~23
 const FIELD_DIM = FIELD_RADIUS * 2 + 1;
 const SQRT2 = 1.41421356;
 
+export interface FlowFieldGoal {
+  id: string;
+  pos: { x: number; y: number };
+  priority: number; // Higher number = higher priority
+  field: FlowFieldManager;
+  active: boolean;
+  type?: string;
+}
+
 export class FlowFieldManager {
+  goalId: string = 'player';
   originGx: number = 0;
   originGy: number = 0;
   targetGx: number = 0;
@@ -43,6 +53,10 @@ export class FlowFieldManager {
 
   private queueX: Int16Array = new Int16Array(FIELD_DIM * FIELD_DIM);
   private queueY: Int16Array = new Int16Array(FIELD_DIM * FIELD_DIM);
+
+  constructor(goalId: string = 'player') {
+    this.goalId = goalId;
+  }
 
   markDirty() {
     this.needsUpdate = true;
@@ -215,7 +229,6 @@ export class FlowFieldManager {
     }
 
     // Perimeter Siege Fallback: For disconnected pockets of open tiles (dist = 1e9)
-    // Find open tiles that are disconnected and propagate from the tile closest to the center
     let hasUnreachable = false;
     for (let i = 0; i < totalCells; i++) {
       if (this.clearance[i] >= minClearance && distField[i] >= 1e8) {
@@ -304,7 +317,6 @@ export class FlowFieldManager {
         let bestDirX = 0;
         let bestDirY = 0;
 
-        // Avoid diagonal vectors when adjacent to obstacles
         const hasNearbyObstacle = (
           (lx > 0 && this.clearance[idx - 1] < minClearance) ||
           (lx + 1 < FIELD_DIM && this.clearance[idx + 1] < minClearance) ||
@@ -398,8 +410,6 @@ export class FlowFieldManager {
       const isSiege = (isGiant ? this.isSiegeGiant[idx] : this.isSiegeNormal[idx]) === 1;
 
       if (Math.abs(vx) > 0.01 || Math.abs(vy) > 0.01) {
-        // Tile Centering prior to steering:
-        // Compute offset from current tile center and steer towards tile center
         const tileCenterX = (egx + 0.5) * GRID_SIZE;
         const tileCenterY = (egy + 0.5) * GRID_SIZE;
         const offX = tileCenterX - enemyPos.x;
@@ -443,7 +453,6 @@ export class FlowFieldManager {
     const top = state.cameraPos.y - (window as any).height / 2 - margin;
     const bottom = state.cameraPos.y + (window as any).height / 2 + margin;
 
-    // Draw flow field arrows on visible tiles
     for (let ly = 0; ly < FIELD_DIM; ly += 2) {
       const gy = this.originGy + ly;
       const wy = gy * GRID_SIZE + GRID_SIZE * 0.5;
@@ -476,4 +485,101 @@ export class FlowFieldManager {
   }
 }
 
-export const flowField = new FlowFieldManager();
+/**
+ * Hierarchical Multi-Goal Flow Field Registry
+ * Manages multiple prioritized targets (Player, Core Base, PayGates, High Priority Objectives)
+ */
+export class FlowFieldRegistry {
+  private goals: Map<string, FlowFieldGoal> = new Map();
+  playerField: FlowFieldManager;
+
+  constructor() {
+    this.playerField = new FlowFieldManager('player');
+    this.registerGoal('player', { x: 0, y: 0 }, 100, this.playerField);
+  }
+
+  registerGoal(id: string, pos: { x: number; y: number }, priority: number = 10, existingField?: FlowFieldManager, type?: string): FlowFieldGoal {
+    let field = existingField || this.goals.get(id)?.field;
+    if (!field) {
+      field = new FlowFieldManager(id);
+    }
+    const goal: FlowFieldGoal = {
+      id,
+      pos,
+      priority,
+      field,
+      active: true,
+      type
+    };
+    this.goals.set(id, goal);
+    return goal;
+  }
+
+  unregisterGoal(id: string): void {
+    if (id === 'player') return; // Cannot remove player field
+    this.goals.delete(id);
+  }
+
+  getGoal(id: string): FlowFieldGoal | undefined {
+    return this.goals.get(id);
+  }
+
+  getActiveGoalsSorted(): FlowFieldGoal[] {
+    const list: FlowFieldGoal[] = [];
+    for (const g of this.goals.values()) {
+      if (g.active) list.push(g);
+    }
+    return list.sort((a, b) => b.priority - a.priority);
+  }
+
+  markDirty(): void {
+    for (const g of this.goals.values()) {
+      g.field.markDirty();
+    }
+  }
+
+  updateAll(): void {
+    if (state.player) {
+      const pGoal = this.goals.get('player');
+      if (pGoal) {
+        pGoal.pos = state.player.pos;
+        pGoal.field.update(state.player.pos);
+      }
+    }
+
+    for (const g of this.goals.values()) {
+      if (g.id !== 'player' && g.active) {
+        g.field.update(g.pos);
+      }
+    }
+  }
+
+  getEnemyMoveVector(
+    enemyPos: { x: number; y: number },
+    enemySize: number,
+    targetPos: { x: number; y: number },
+    goalId?: string
+  ): { vx: number; vy: number; mode: 'los' | 'flow' | 'siege' | 'direct' } {
+    if (goalId && this.goals.has(goalId)) {
+      const goal = this.goals.get(goalId)!;
+      if (goal.active) {
+        return goal.field.getEnemyMoveVector(enemyPos, enemySize, targetPos);
+      }
+    }
+
+    // Default to player flow field
+    return this.playerField.getEnemyMoveVector(enemyPos, enemySize, targetPos);
+  }
+
+  drawDebug(): void {
+    for (const g of this.goals.values()) {
+      if (g.active) {
+        g.field.drawDebug();
+      }
+    }
+  }
+}
+
+export const flowFieldRegistry = new FlowFieldRegistry();
+export const flowField = flowFieldRegistry.playerField;
+

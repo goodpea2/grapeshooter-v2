@@ -1,6 +1,8 @@
 
 import { state } from '../state';
 import { getPlayerUpgradeStat } from '../src/playerUpgrades';
+import { ObjectPool } from '../class/pool';
+import { soundEngine } from '../src/audio/soundEngine';
 
 declare const p5: any;
 declare const createVector: any;
@@ -13,26 +15,48 @@ declare const noTint: any;
 declare const width: any;
 declare const height: any;
 declare const sin: any;
+declare const push: any;
+declare const pop: any;
 
 export class LootInFlightVFX {
   pos: any;
   targetPos: any;
   progress: number = 0;
   speed: number = 0.05;
-  assetKey: string;
-  size: number;
-  value: number;
-  itemKey: string;
-  type: string;
+  assetKey: string = '';
+  size: number = 20;
+  value: number = 1;
+  itemKey: string = '';
+  type: string = '';
   turretHP?: number;
   turretData?: any;
-
   startPos: any;
 
-  constructor(startX: number, startY: number, targetX: number, targetY: number, assetKey: string, size: number, value: number, itemKey: string, type: string, turretHP?: number, turretData?: any) {
+  constructor(startX: number = 0, startY: number = 0, targetX: number = 0, targetY: number = 0, assetKey: string = '', size: number = 20, value: number = 1, itemKey: string = '', type: string = '', turretHP?: number, turretData?: any) {
     this.pos = createVector(startX, startY);
     this.startPos = createVector(startX, startY);
     this.targetPos = createVector(targetX, targetY);
+    this.reset(startX, startY, targetX, targetY, assetKey, size, value, itemKey, type, turretHP, turretData);
+  }
+
+  reset(startX: number = 0, startY: number = 0, targetX: number = 0, targetY: number = 0, assetKey: string = '', size: number = 20, value: number = 1, itemKey: string = '', type: string = '', turretHP?: number, turretData?: any) {
+    if (this.pos) {
+      this.pos.set(startX, startY);
+    } else {
+      this.pos = createVector(startX, startY);
+    }
+    if (this.startPos) {
+      this.startPos.set(startX, startY);
+    } else {
+      this.startPos = createVector(startX, startY);
+    }
+    if (this.targetPos) {
+      this.targetPos.set(targetX, targetY);
+    } else {
+      this.targetPos = createVector(targetX, targetY);
+    }
+    this.progress = 0;
+    this.speed = 0.05;
     this.assetKey = assetKey;
     this.size = size;
     this.value = value;
@@ -52,6 +76,7 @@ export class LootInFlightVFX {
     this.pos.y = lerp(this.startPos.y, this.targetPos.y, t);
 
     if (this.progress >= 1) {
+      soundEngine.playSFX('collect_sun', 0.9, 0.08);
       // Apply the value to state
       if (this.type === 'currency') {
         if (this.itemKey === 'sun') {
@@ -98,5 +123,15 @@ export class LootInFlightVFX {
   }
 }
 
-declare const push: any;
-declare const pop: any;
+export const lootInFlightPool = new ObjectPool<LootInFlightVFX>(
+  'LootInFlight',
+  () => new LootInFlightVFX(),
+  undefined,
+  500
+);
+
+export function spawnLootInFlightVFX(startX: number, startY: number, targetX: number, targetY: number, assetKey: string, size: number, value: number, itemKey: string, type: string, turretHP?: number, turretData?: any): LootInFlightVFX {
+  const vfx = lootInFlightPool.get();
+  vfx.reset(startX, startY, targetX, targetY, assetKey, size, value, itemKey, type, turretHP, turretData);
+  return vfx;
+}

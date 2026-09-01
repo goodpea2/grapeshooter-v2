@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const p5: any;
 declare const createVector: any;
@@ -47,21 +48,37 @@ declare const tint: any;
 declare const noTint: any;
 
 export class FrostFieldAuraVFX {
-  target: any; radius: number;
+  target: any; radius: number = 60;
   flakes: {x: number, y: number, s: number, v: number, phase: number}[] = [];
-  constructor(target: any, radius: number) {
+
+  constructor(target: any = null, radius: number = 60) {
+    for(let i=0; i<16; i++) {
+      this.flakes.push({
+        x: 0,
+        y: 0,
+        s: 2,
+        v: 0.2,
+        phase: 0
+      });
+    }
+    this.reset(target, radius);
+  }
+
+  reset(target: any = null, radius: number = 60) {
     this.target = target;
     this.radius = radius;
     for(let i=0; i<16; i++) {
-      this.flakes.push({
-        x: random(-radius, radius),
-        y: random(-radius, radius),
-        s: random(2, 4),
-        v: random(0.15, 0.5),
-        phase: random(TWO_PI)
-      });
+      const f = this.flakes[i];
+      if (f) {
+        f.x = random(-radius, radius);
+        f.y = random(-radius, radius);
+        f.s = random(2, 4);
+        f.v = random(0.15, 0.5);
+        f.phase = random(TWO_PI);
+      }
     }
   }
+
   update() {
     for(let f of this.flakes) {
       f.y += f.v;
@@ -71,7 +88,9 @@ export class FrostFieldAuraVFX {
       if (f.x < -this.radius) f.x = this.radius;
     }
   }
+
   isDone() { return !this.target || this.target.health <= 0 || (this.target.isMined === true); }
+
   display() {
     if (!this.target) return;
     const p = this.target.getWorldPos ? this.target.getWorldPos() : this.target.pos;
@@ -116,4 +135,17 @@ export class FrostFieldAuraVFX {
     }
     pop();
   }
+}
+
+export const frostFieldAuraPool = new ObjectPool<FrostFieldAuraVFX>(
+  'FrostFieldAura',
+  () => new FrostFieldAuraVFX(),
+  undefined,
+  100
+);
+
+export function spawnFrostFieldAuraVFX(target: any, radius: number): FrostFieldAuraVFX {
+  const vfx = frostFieldAuraPool.get();
+  vfx.reset(target, radius);
+  return vfx;
 }

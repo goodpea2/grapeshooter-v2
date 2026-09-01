@@ -3,13 +3,15 @@ import { state } from '../state';
 import { GRID_SIZE, CHUNK_SIZE } from '../constants';
 import { bulletTypes } from '../balanceBullets';
 import { overlayTypes } from '../balanceObstacles';
-import { Explosion, MuzzleFlash, HitSpark, FireworkVFX } from '../vfx';
+import { Explosion, MuzzleFlash, HitSpark, FireworkVFX, spawnHitSpark, spawnExplosion, spawnFireworkVFX } from '../vfx';
 import { GroundFeature } from './groundFeature';
 import { Player } from './player';
 import { Enemy } from './enemy';
 import { drawBullet } from '../visualBullets';
 import { conditionTypes } from '../balanceConditions';
 import { getPlayerUpgradeStat } from '../src/playerUpgrades';
+import { ObjectPool } from './pool';
+import { soundEngine } from '../src/audio/soundEngine';
 
 declare const p5: any;
 declare const createVector: any;
@@ -25,7 +27,15 @@ declare const width: any;
 declare const height: any;
 
 export class Bullet {
-  pos: any; prevPos: any; vel: any; col: any; dmg: number; targetType: string; life: number; config: any; typeKey: string;
+  pos: any;
+  prevPos: any;
+  vel: any;
+  col: any;
+  dmg: number = 0;
+  targetType: string = 'none';
+  life: number = 0;
+  config: any;
+  typeKey: string = '';
   damageTargets: string[] = [];
   targetPos: any | null = null;
   currentPierceChance: number = 0;
@@ -39,13 +49,39 @@ export class Bullet {
   // Track unique turrets that buffed/boosted this projectile (e.g. Torchwood)
   boostedByTurrets: Set<string> = new Set();
 
-  constructor(x: number, y: number, tx: number, ty: number, typeKey: string, targetType: string, source?: any) {
-    this.source = source;
-    this.typeKey = typeKey; this.config = bulletTypes[typeKey] || bulletTypes.b_player;
+  static create(x: number, y: number, tx: number, ty: number, typeKey: string, targetType: string, source?: any): Bullet {
+    const b = bulletPool.get();
+    b.init(x, y, tx, ty, typeKey, targetType, source);
+    return b;
+  }
+
+  constructor(x?: number, y?: number, tx?: number, ty?: number, typeKey?: string, targetType?: string, source?: any) {
+    this.pos = createVector(0, 0);
+    this.prevPos = createVector(0, 0);
+    this.vel = createVector(0, 0);
+    if (x !== undefined && y !== undefined && tx !== undefined && ty !== undefined && typeKey !== undefined && targetType !== undefined) {
+      this.init(x, y, tx, ty, typeKey, targetType, source);
+    }
+  }
+
+  init(x: number, y: number, tx: number, ty: number, typeKey: string, targetType: string, source?: any) {
+    this.source = source || null;
+    this.typeKey = typeKey;
+    this.config = bulletTypes[typeKey] || bulletTypes.b_player;
     this.damageTargets = this.config.damageTargets || [];
-    this.pos = createVector(x, y); this.prevPos = this.pos.copy();
-    
-    this.col = this.config.bulletColor; this.dmg = this.config.bulletDamage; this.targetType = targetType; this.life = this.config.bulletLifeTime;
+    this.pos.set(x, y);
+    this.prevPos.set(x, y);
+    this.targetPos = null;
+    this.rotation = 0;
+    this.hasExploded = false;
+    this.seeThroughObstacles = false;
+    this.hitTargets.clear();
+    this.boostedByTurrets.clear();
+
+    this.col = this.config.bulletColor;
+    this.dmg = this.config.bulletDamage;
+    this.targetType = targetType;
+    this.life = this.config.bulletLifeTime;
     
     // Check if bullet or source overlay grants seeThroughObstacles
     if (this.config.seeThroughObstacles) {
@@ -91,10 +127,14 @@ export class Bullet {
        this.targetPos = createVector(tx, ty);
        // Calculate required velocity to reach target in exactly arcTravelTime frames
        let dx = tx - x; let dy = ty - y;
-       this.vel = createVector(dx / this.life, dy / this.life);
+       this.vel.set(dx / this.life, dy / this.life);
     } else {
        let dx = tx - x; let dy = ty - y; let mag = Math.sqrt(dx * dx + dy * dy);
-       this.vel = mag < 0.1 ? createVector(0,0) : createVector(dx / mag * this.config.bulletSpeed, dy / mag * this.config.bulletSpeed);
+       if (mag < 0.1) {
+         this.vel.set(0, 0);
+       } else {
+         this.vel.set(dx / mag * this.config.bulletSpeed, dy / mag * this.config.bulletSpeed);
+       }
     }
   }
 
@@ -173,6 +213,7 @@ export class Bullet {
           this.hitTargets.add(blockKey);
           if (!this.seeThroughObstacles) {
             block.takeDamage(this.dmg * (this.config.obstacleDamageMultiplier || 1), this.source);
+            soundEngine.playSFXGroup('projectile_hit_block');
             
             // Trigger sparking Hit VFX on obstacle impact
             const hitVfx = this.config.bulletHitVfx || 'v_hit_spark';
@@ -228,10 +269,11 @@ export class Bullet {
           // Satisfying Hit VFX
           const hitVfx = this.config.bulletHitVfx || 'v_hit_spark';
           if (hitVfx === 'v_hit_spark') {
-             state.vfx.push(new HitSpark(this.pos.x, this.pos.y, this.col));
+             state.vfx.push(spawnHitSpark(this.pos.x, this.pos.y, this.col));
           }
 
           const killed = e.takeDamage(this.dmg, this.source); 
+          soundEngine.playSFXGroup('projectile_hit_enemy');
           if (killed && this.source && this.source.onTargetKilled) {
             this.source.onTargetKilled(e);
           }
@@ -378,34 +420,69 @@ export class Bullet {
     const maxR = radii[radii.length - 1] || 10;
     
     if (this.config.bulletDeathVfx === 'v_goldengrape_firework') {
-      state.vfx.push(new FireworkVFX(this.pos.x, this.pos.y));
+      state.vfx.push(spawnFireworkVFX(this.pos.x, this.pos.y));
     } else {
       const bulletColor = this.col ? color(this.col) : color(255, 200, 50);
-      state.vfx.push(new Explosion(this.pos.x, this.pos.y, maxR*2, bulletColor));
+      state.vfx.push(spawnExplosion(this.pos.x, this.pos.y, maxR*2, bulletColor));
+    }
+
+    // Play custom explosion SFX from aoeConfig if defined
+    if (aoe && aoe.explosionSfx) {
+      const sfxList = Array.isArray(aoe.explosionSfx) ? aoe.explosionSfx : [aoe.explosionSfx];
+      if (sfxList.length > 0) {
+        const sfxChoice = sfxList[floor(random(sfxList.length))];
+        soundEngine.playSFX(sfxChoice, 1.0, 0.05);
+      }
     }
     
     if (!aoe) return;
     
     if (this.damageTargets.includes('enemy')) {
-      for (let e of state.enemies) {
-        let dSq = (this.pos.x - e.pos.x)**2 + (this.pos.y - e.pos.y)**2;
-        if (dSq < maxR*maxR) {
-          const d = Math.sqrt(dSq);
-          
-          // AOE Knockback
-          if (aoe.aoeKnockbackStrength) {
-             const dir = p5.Vector.sub(e.pos, this.pos).normalize();
-             const strength = (aoe.aoeKnockbackStrength * (1 - d/maxR)) / Math.max(0.2, (e.size / 30));
-             e.kbVel.add(dir.mult(strength));
-             if (this.config.knockBackDuration) {
-                e.kbTimer = Math.max(e.kbTimer || 0, this.config.knockBackDuration);
-             }
-          }
+      const grid = state.spatialGrid;
+      if (grid) {
+        grid.queryCircleEnemies(this.pos.x, this.pos.y, maxR, (e: any) => {
+          let dSq = (this.pos.x - e.pos.x)**2 + (this.pos.y - e.pos.y)**2;
+          if (dSq < maxR * maxR) {
+            const d = Math.sqrt(dSq);
+            
+            // AOE Knockback
+            if (aoe.aoeKnockbackStrength) {
+               const dir = p5.Vector.sub(e.pos, this.pos).normalize();
+               const strength = (aoe.aoeKnockbackStrength * (1 - d/maxR)) / Math.max(0.2, (e.size / 30));
+               e.kbVel.add(dir.mult(strength));
+               if (this.config.knockBackDuration) {
+                  e.kbTimer = Math.max(e.kbTimer || 0, this.config.knockBackDuration);
+               }
+            }
 
-          const lerpDmg = this.getLerpedAoeDamage(d, aoe);
-          this.applyBulletConditions(e);
-          if (lerpDmg !== 0) {
-            e.takeDamage(lerpDmg);
+            const lerpDmg = this.getLerpedAoeDamage(d, aoe);
+            this.applyBulletConditions(e);
+            if (lerpDmg !== 0) {
+              e.takeDamage(lerpDmg, this.source);
+            }
+          }
+        });
+      } else {
+        for (let e of state.enemies) {
+          let dSq = (this.pos.x - e.pos.x)**2 + (this.pos.y - e.pos.y)**2;
+          if (dSq < maxR*maxR) {
+            const d = Math.sqrt(dSq);
+            
+            // AOE Knockback
+            if (aoe.aoeKnockbackStrength) {
+               const dir = p5.Vector.sub(e.pos, this.pos).normalize();
+               const strength = (aoe.aoeKnockbackStrength * (1 - d/maxR)) / Math.max(0.2, (e.size / 30));
+               e.kbVel.add(dir.mult(strength));
+               if (this.config.knockBackDuration) {
+                  e.kbTimer = Math.max(e.kbTimer || 0, this.config.knockBackDuration);
+               }
+            }
+
+            const lerpDmg = this.getLerpedAoeDamage(d, aoe);
+            this.applyBulletConditions(e);
+            if (lerpDmg !== 0) {
+              e.takeDamage(lerpDmg, this.source);
+            }
           }
         }
       }
@@ -485,4 +562,20 @@ export class Bullet {
     if (screenX < -margin || screenX > width + margin || screenY < -margin || screenY > height + margin) return;
     drawBullet(this);
   }
+}
+
+export const bulletPool = new ObjectPool<Bullet>(
+  'Bullet',
+  () => new Bullet(),
+  (b) => {
+    b.hitTargets.clear();
+    b.boostedByTurrets.clear();
+    b.source = null;
+    b.targetPos = null;
+  },
+  1000
+);
+
+export function spawnBullet(x: number, y: number, tx: number, ty: number, typeKey: string, targetType: string, source?: any): Bullet {
+  return Bullet.create(x, y, tx, ty, typeKey, targetType, source);
 }

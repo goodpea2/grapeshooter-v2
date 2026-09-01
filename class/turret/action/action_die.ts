@@ -40,7 +40,7 @@ export class ActionDie extends TurretAction {
     const config = this.turret.config.actionConfig;
     
     if (config.pulseBulletTypeKey) {
-      let b = new Bullet(wPos.x, wPos.y, wPos.x, wPos.y, config.pulseBulletTypeKey, 'none', this.turret); 
+      let b = Bullet.create(wPos.x, wPos.y, wPos.x, wPos.y, config.pulseBulletTypeKey, 'none', this.turret); 
       (b as any).life = 0; 
       state.bullets.push(b);
     }

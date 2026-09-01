@@ -5,7 +5,8 @@ import { enemyTypes } from '../balanceEnemies';
 import { bulletTypes } from '../balanceBullets';
 import { GRID_SIZE } from '../constants';
 import { BugSplatVFX, GiantDeathVFX, Explosion, FireworkVFX, DamageNumberVFX, drawPersistentDeathVisual } from '../vfx/index';
-import { drawYellowButton, drawCyanButton, drawPurpleButton } from '../uiComponents';
+import { drawYellowButton, drawCyanButton, drawPurpleButton, drawDarkButton } from '../uiComponents';
+import { soundEngine } from '../src/audio/soundEngine';
 
 declare const push: any;
 declare const pop: any;
@@ -228,8 +229,10 @@ function killMenuEnemy(e: MenuEnemy, index?: number) {
   // In-game Enemy Death VFX (GiantDeathVFX for giants, BugSplatVFX for standard)
   if (e.type === 'e_giant' || e.type.includes('giant')) {
     menuVfx.push(new GiantDeathVFX(e.x, e.y, e.size, e.col));
+    soundEngine.playSFX('enemy_death_strong');
   } else {
     menuVfx.push(new BugSplatVFX(e.x, e.y, e.size, color(e.col[0], e.col[1], e.col[2])));
+    soundEngine.playSFXGroup('enemy_death');
   }
 
   // Trigger on-death actions (e.g. e_bomb_mainmenu spawns b_bomb_mainmenu)
@@ -438,10 +441,12 @@ export function drawMainMenu() {
   const cardH = 88;
   const cardGap = 14;
 
-  // Bottom action buttons (LEVEL EDITOR, IMPORT LEVEL)
+  // Bottom action buttons (LEVEL EDITOR, IMPORT LEVEL, SETTINGS)
   const bottomBtnH = 42;
-  const bottomBtnGap = 10;
-  const singleBtnW = (cardW - bottomBtnGap) / 2;
+  const bottomBtnGap = 8;
+  const settingsBtnW = 44;
+  const twoBtnsW = cardW - settingsBtnW - bottomBtnGap * 2;
+  const singleBtnW = twoBtnsW / 2;
   const bottomY = height - Math.max(28, height * 0.04) - bottomBtnH;
 
   // Scrollable container bounds
@@ -619,16 +624,18 @@ export function drawMainMenu() {
     rect(sbX, handleY, sbW, handleH, 2);
   }
 
-  // 5. Bottom Action Buttons: LEVEL EDITOR & IMPORT LEVEL
+  // 5. Bottom Action Buttons: LEVEL EDITOR, IMPORT LEVEL & SETTINGS
   // Button 1: LEVEL EDITOR
   const btn1X = leftMargin;
   const btn1Y = bottomY;
 
   drawCyanButton(btn1X, btn1Y, singleBtnW, bottomBtnH, "LEVEL EDITOR", {
-    fontSize: 13,
+    id: "btn_menu_level_editor",
+    fontSize: 12.5,
     radius: 10,
     depth3D: 4,
     onClick: () => {
+      soundEngine.playSFX('btn_click');
       startLevelEditor();
     }
   });
@@ -638,11 +645,28 @@ export function drawMainMenu() {
   const btn2Y = bottomY;
 
   drawPurpleButton(btn2X, btn2Y, singleBtnW, bottomBtnH, "IMPORT LEVEL", {
-    fontSize: 13,
+    id: "btn_menu_import_level",
+    fontSize: 12.5,
     radius: 10,
     depth3D: 4,
     onClick: () => {
+      soundEngine.playSFX('btn_click');
       triggerImportLevelJson();
+    }
+  });
+
+  // Button 3: SETTINGS (PauseMenu settings modal in Main Menu)
+  const btn3X = btn2X + singleBtnW + bottomBtnGap;
+  const btn3Y = bottomY;
+
+  drawDarkButton(btn3X, btn3Y, settingsBtnW, bottomBtnH, "⚙️", {
+    id: "btn_menu_settings",
+    fontSize: 18,
+    radius: 10,
+    depth3D: 4,
+    onClick: () => {
+      soundEngine.playSFX('pausemenu_btn');
+      state.isPauseMenuOpen = true;
     }
   });
 

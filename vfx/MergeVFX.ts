@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const p5: any;
 declare const createVector: any;
@@ -48,10 +49,22 @@ declare const noTint: any;
 
 export class MergeVFX {
   pos: any; life: number = 30; duration: number = 30; color: any;
-  constructor(x: number, y: number, col: any) {
+  constructor(x: number = 0, y: number = 0, col: any = color(255, 255, 255)) {
     this.pos = createVector(x, y);
-    this.color = col;
+    this.reset(x, y, col);
   }
+
+  reset(x: number = 0, y: number = 0, col?: any) {
+    if (this.pos) {
+      this.pos.set(x, y);
+    } else {
+      this.pos = createVector(x, y);
+    }
+    this.color = col || color(255, 255, 255);
+    this.life = 30;
+    this.duration = 30;
+  }
+
   update() { this.life--; }
   isDone() { return this.life <= 0; }
   display() {
@@ -67,4 +80,17 @@ export class MergeVFX {
     triangle(-currentSize, currentSize, 0, -currentSize, currentSize, currentSize);
     pop();
   }
+}
+
+export const mergePool = new ObjectPool<MergeVFX>(
+  'MergeVFX',
+  () => new MergeVFX(),
+  undefined,
+  200
+);
+
+export function spawnMergeVFX(x: number, y: number, col: any): MergeVFX {
+  const vfx = mergePool.get();
+  vfx.reset(x, y, col);
+  return vfx;
 }

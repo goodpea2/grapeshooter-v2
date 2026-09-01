@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const p5: any;
 declare const createVector: any;
@@ -50,15 +51,22 @@ declare const noTint: any;
 export class ShopFlyVFX {
   pos: any; 
   target: any; 
-  life: number; 
-  maxLife: number; 
-  assetKey: string;
+  life: number = 40; 
+  maxLife: number = 40; 
+  assetKey: string = '';
   startPos: any;
 
-  constructor(sx: number, sy: number, tx: number, ty: number, assetKey: string) {
+  constructor(sx: number = 0, sy: number = 0, tx: number = 0, ty: number = 0, assetKey: string = '') {
     this.pos = createVector(sx, sy);
     this.startPos = createVector(sx, sy);
     this.target = createVector(tx, ty);
+    this.reset(sx, sy, tx, ty, assetKey);
+  }
+
+  reset(sx: number = 0, sy: number = 0, tx: number = 0, ty: number = 0, assetKey: string = '') {
+    if (this.pos) this.pos.set(sx, sy); else this.pos = createVector(sx, sy);
+    if (this.startPos) this.startPos.set(sx, sy); else this.startPos = createVector(sx, sy);
+    if (this.target) this.target.set(tx, ty); else this.target = createVector(tx, ty);
     this.life = 40;
     this.maxLife = 40;
     this.assetKey = assetKey;
@@ -67,7 +75,6 @@ export class ShopFlyVFX {
   update() {
     this.life--;
     let t = 1 - (this.life / this.maxLife);
-    // Exponential ease in for a "snappy" landing
     let easedT = pow(t, 2);
     this.pos.x = lerp(this.startPos.x, this.target.x, easedT);
     this.pos.y = lerp(this.startPos.y, this.target.y, easedT);
@@ -97,4 +104,17 @@ export class ShopFlyVFX {
     }
     pop();
   }
+}
+
+export const shopFlyPool = new ObjectPool<ShopFlyVFX>(
+  'ShopFly',
+  () => new ShopFlyVFX(),
+  undefined,
+  200
+);
+
+export function spawnShopFlyVFX(sx: number, sy: number, tx: number, ty: number, assetKey: string): ShopFlyVFX {
+  const vfx = shopFlyPool.get();
+  vfx.reset(sx, sy, tx, ty, assetKey);
+  return vfx;
 }

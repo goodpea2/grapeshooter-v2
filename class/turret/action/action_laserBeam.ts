@@ -4,6 +4,7 @@ import { TurretAction } from '../../turretAction';
 import { WeldingHitVFX } from '../../../vfx/index';
 import { Bullet } from '../../bullet';
 import { GRID_SIZE } from '../../../constants';
+import { soundEngine } from '../../../src/audio/soundEngine';
 
 declare const createVector: any;
 declare const random: any;
@@ -36,6 +37,7 @@ export class ActionLaserBeam extends TurretAction {
     
     const target = this.turret.target;
     if (target) {
+      soundEngine.triggerLaser();
       const targetId = target.uid || `${target.gx},${target.gy}`;
       if (targetId === (this.turret as any).lastTargetUid) (this.turret as any).uninterruptedFrames++;
       else { (this.turret as any).lastTargetUid = targetId; (this.turret as any).uninterruptedFrames = 0; }
@@ -85,20 +87,33 @@ export class ActionLaserBeam extends TurretAction {
         }
 
         if (config.beamBulletTypeKey && targetPosBackup) {
-          state.bullets.push(new Bullet(targetPosBackup.x, targetPosBackup.y, targetPosBackup.x, targetPosBackup.y, config.beamBulletTypeKey, 'none', this.turret));
+          state.bullets.push(Bullet.create(targetPosBackup.x, targetPosBackup.y, targetPosBackup.x, targetPosBackup.y, config.beamBulletTypeKey, 'none', this.turret));
         }
 
         if (config.beamDamageWidth > 0) {
           const widthSq = config.beamDamageWidth * config.beamDamageWidth;
-          for (let e of state.enemies) {
-              if (e === target || e.health <= 0 || e.isDying) continue;
-              const dSegSq = (this.turret as any).distToSegmentSq(e.pos, wPos, tCenter);
-              if (dSegSq < (widthSq + e.size**2 * 0.25)) {
-                  e.takeDamage(currentDamage, this.turret);
-                  if (config.appliedConditions && e.applyCondition) {
-                      for (const cond of config.appliedConditions) e.applyCondition(cond.type, cond.duration, cond);
-                  }
+          const beamMidX = (wPos.x + tCenter.x) * 0.5;
+          const beamMidY = (wPos.y + tCenter.y) * 0.5;
+          const beamLen = Math.sqrt((wPos.x - tCenter.x)**2 + (wPos.y - tCenter.y)**2);
+          const searchRadius = beamLen * 0.5 + config.beamDamageWidth + 20;
+
+          const checkEnemy = (e: any) => {
+            if (e === target || e.health <= 0 || e.isDying) return;
+            const dSegSq = (this.turret as any).distToSegmentSq(e.pos, wPos, tCenter);
+            if (dSegSq < (widthSq + e.size**2 * 0.25)) {
+              e.takeDamage(currentDamage, this.turret);
+              if (config.appliedConditions && e.applyCondition) {
+                for (const cond of config.appliedConditions) e.applyCondition(cond.type, cond.duration, cond);
               }
+            }
+          };
+
+          if (state.spatialGrid) {
+            state.spatialGrid.queryCircleEnemies(beamMidX, beamMidY, searchRadius, checkEnemy);
+          } else {
+            for (let e of state.enemies) {
+              checkEnemy(e);
+            }
           }
         }
       }
@@ -113,7 +128,7 @@ export class ActionLaserBeam extends TurretAction {
     if (config.spawnBulletOnTargetDeath && target) {
       const tc = target.getWorldPos ? target.getWorldPos() : (target.pos ? target.pos.copy() : null);
       if (tc) {
-        state.bullets.push(new Bullet(tc.x, tc.y, tc.x, tc.y, config.spawnBulletOnTargetDeath, 'none', this.turret));
+        state.bullets.push(Bullet.create(tc.x, tc.y, tc.x, tc.y, config.spawnBulletOnTargetDeath, 'none', this.turret));
       }
     }
   }
@@ -128,7 +143,7 @@ export class ActionLaserBeam extends TurretAction {
         ? createVector(target.gx * GRID_SIZE + GRID_SIZE / 2, target.gy * GRID_SIZE + GRID_SIZE / 2)
         : (target.getWorldPos ? target.getWorldPos() : (target.pos ? createVector(target.pos.x + GRID_SIZE / 2, target.pos.y + GRID_SIZE / 2) : null));
       if (tc) {
-        state.bullets.push(new Bullet(tc.x, tc.y, tc.x, tc.y, config.spawnBulletOnTargetDeath, 'none', this.turret));
+        state.bullets.push(Bullet.create(tc.x, tc.y, tc.x, tc.y, config.spawnBulletOnTargetDeath, 'none', this.turret));
       }
     }
   }

@@ -1,7 +1,8 @@
 import { state } from '../state';
-import { BugSplatVFX } from './BugSplatVFX';
-import { Explosion } from './Explosion';
+import { spawnBugSplatVFX } from './BugSplatVFX';
+import { spawnExplosion } from './Explosion';
 import { drawPersistentDeathVisual } from './Utils';
+import { ObjectPool } from '../class/pool';
 
 declare const p5: any;
 declare const createVector: any;
@@ -50,24 +51,34 @@ declare const tint: any;
 declare const noTint: any;
 
 export class GiantDeathVFX {
-  pos: any; life: number = 90; duration: number = 90; color: any; size: number;
-  constructor(x: number, y: number, size: number, col: any) {
+  pos: any; life: number = 90; duration: number = 90; color: any; size: number = 40;
+  constructor(x: number = 0, y: number = 0, size: number = 40, col: any = color(255, 100, 100)) {
     this.pos = createVector(x, y);
-    this.color = col;
-    this.size = size;
+    this.reset(x, y, size, col);
   }
+
+  reset(x: number = 0, y: number = 0, size: number = 40, col?: any) {
+    if (this.pos) this.pos.set(x, y); else this.pos = createVector(x, y);
+    this.color = col || color(255, 100, 100);
+    this.size = size;
+    this.life = 90;
+    this.duration = 90;
+  }
+
   update() {
     this.life--;
     if (this.life > 20 && state.frames % 3 === 0) {
       this.pos.add(random(-4, 4), random(-4, 4));
-      state.vfx.push(new BugSplatVFX(this.pos.x + random(-30, 30), this.pos.y + random(-30, 30), 20, this.color));
+      state.vfx.push(spawnBugSplatVFX(this.pos.x + random(-30, 30), this.pos.y + random(-30, 30), 20, this.color));
     }
     if (this.life === 20) {
-      state.vfx.push(new Explosion(this.pos.x, this.pos.y, this.size * 2.5, color(this.color)));
+      state.vfx.push(spawnExplosion(this.pos.x, this.pos.y, this.size * 2.5, color(this.color)));
       drawPersistentDeathVisual(this.pos.x, this.pos.y, this.size * 1.5, [red(this.color), green(this.color), blue(this.color)]);
     }
   }
+
   isDone() { return this.life <= 0; }
+
   display() {
     let alpha = map(this.life, 20, this.duration, 255, 0);
     if (this.life <= 20) return;
@@ -77,4 +88,17 @@ export class GiantDeathVFX {
     ellipse(0, 0, this.size * (1 + sin(this.life * 0.5) * 0.1));
     pop();
   }
+}
+
+export const giantDeathPool = new ObjectPool<GiantDeathVFX>(
+  'GiantDeath',
+  () => new GiantDeathVFX(),
+  undefined,
+  100
+);
+
+export function spawnGiantDeathVFX(x: number, y: number, size: number, col: any): GiantDeathVFX {
+  const vfx = giantDeathPool.get();
+  vfx.reset(x, y, size, col);
+  return vfx;
 }

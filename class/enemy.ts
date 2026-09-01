@@ -4,10 +4,10 @@ import { GRID_SIZE, CHUNK_SIZE, EnemyCollideRadiusCheck } from '../constants';
 import { enemyTypes } from '../balanceEnemies';
 import { conditionTypes } from '../balanceConditions';
 import { liquidTypes } from '../balanceLiquids';
-import { BugSplatVFX, GiantDeathVFX, HitSpark, LiquidTrailVFX, MuzzleFlash, ConditionVFX, drawPersistentDeathVisual, Explosion, DamageNumberVFX } from '../vfx/index';
+import { BugSplatVFX, GiantDeathVFX, HitSpark, spawnHitSpark, LiquidTrailVFX, MuzzleFlash, ConditionVFX, drawPersistentDeathVisual, Explosion, spawnExplosion, DamageNumberVFX, spawnDamageNumber } from '../vfx/index';
 import { AttachedTurret } from './attachedTurret';
 import { WorldTurret } from './worldTurret';
-import { Bullet } from './bullet';
+import { Bullet, spawnBullet } from './bullet';
 import { GroundFeature } from './groundFeature';
 import { lerpAngle } from './utils';
 import { checkCircleRectCollision } from '../utils/collisions';
@@ -16,7 +16,8 @@ import { drawEnemy } from '../visualEnemies';
 import { isLegibleSpot } from '../lvDemo';
 import { spawnLootAt } from '../economy';
 import { triggerUpgradeHook } from '../src/upgrades';
-import { flowField } from '../pathfinding';
+import { flowField, flowFieldRegistry } from '../pathfinding';
+import { soundEngine } from '../src/audio/soundEngine';
 
 declare const p5: any;
 declare const createVector: any;
@@ -210,8 +211,13 @@ export class Enemy {
     const checkLimitSq = EnemyCollideRadiusCheck * EnemyCollideRadiusCheck;
     let shouldMove = true;
     
-    // TARGETING THROTTLE
-    if (state.frames - this.lastTargetScanFrame >= 30 || state.needsTargetReScan || !this.target) {
+    // TARGETING THROTTLE (8-Bucket Interleaved Frame Staggering)
+    const enemyBucket = ((this as any).uid || 0) & 7;
+    const isInterleavedScanFrame = (state.frames & 7) === enemyBucket;
+    const scanIntervalElapsed = state.frames - this.lastTargetScanFrame >= 24;
+    const isTargetInvalid = !this.target || this.target.isDying || (this.target.life !== undefined && this.target.life <= 0);
+
+    if ((isInterleavedScanFrame && scanIntervalElapsed) || state.needsTargetReScan || isTargetInvalid) {
       this.lastTargetScanFrame = state.frames;
       let nearestT = null; 
       let minDistTSq = 450*450;
@@ -241,7 +247,7 @@ export class Enemy {
 
             const twPos = ent.getWorldPos ? ent.getWorldPos() : ent.pos;
             const dSq = (this.pos.x - twPos.x)**2 + (this.pos.y - twPos.y)**2;
-            if (dSq < minDistTSq && state.world.checkLOS(this.pos.x, this.pos.y, twPos.x, twPos.y)) { 
+            if (dSq < minDistTSq && (this.isFlying || state.world.checkLOS(this.pos.x, this.pos.y, twPos.x, twPos.y))) { 
                 nearestT = ent; minDistTSq = dSq; 
             }
           }
@@ -309,46 +315,66 @@ export class Enemy {
     const d = Math.sqrt(dSq);
     const dirHeading = atan2(dy, dx);
 
-    const flow = flowField.getEnemyMoveVector(this.pos, this.size, tp);
-    (this as any).pathfindingMode = flow.mode;
-    (this as any).moveVector = { x: flow.vx, y: flow.vy };
+    let flowVx = 0;
+    let flowVy = 0;
+    let flowMode: string = 'direct';
 
-    const moveHeading = (Math.abs(flow.vx) > 0.01 || Math.abs(flow.vy) > 0.01) ? atan2(flow.vy, flow.vx) : dirHeading;
-    this.rot = lerpAngle(this.rot, flow.mode === 'los' ? dirHeading : moveHeading, 0.12);
+    if (this.isFlying) {
+      flowVx = d > 0 ? dx / d : 0;
+      flowVy = d > 0 ? dy / d : 0;
+      flowMode = 'fly';
+      (this as any).pathfindingMode = 'fly';
+      (this as any).moveVector = { x: flowVx, y: flowVy };
+      this.rot = lerpAngle(this.rot, dirHeading, 0.15);
+    } else {
+      const goalId = (this.target as any)?.flowGoalId || (this.target === state.player ? 'player' : undefined);
+      const flow = flowFieldRegistry.getEnemyMoveVector(this.pos, this.size, tp, goalId);
+      flowVx = flow.vx;
+      flowVy = flow.vy;
+      flowMode = flow.mode;
+      (this as any).pathfindingMode = flow.mode;
+      (this as any).moveVector = { x: flow.vx, y: flow.vy };
 
-    // Enemy-Enemy collision avoidance
-    const grid = state.spatialGrid;
-    if (grid) {
-      grid.forEachNeighborCell(this.pos.x, this.pos.y, 1, (neighbors: any[]) => {
-        for (const other of neighbors) {
-          if (other === this || other.isDying || !(other instanceof Enemy)) continue;
-          const odx = this.pos.x - other.pos.x;
-          const ody = this.pos.y - other.pos.y;
-          const distSq = odx*odx + ody*ody;
-          
-          if (distSq > checkLimitSq) continue;
-          
-          const md = (this.size + other.size)*0.55;
-          if (distSq < md*md && distSq > 0) {
-            const od = Math.sqrt(distSq);
-            this.moveWithCollisions(createVector(odx/od * 0.2, ody/od * 0.2));
+      const moveHeading = (Math.abs(flow.vx) > 0.01 || Math.abs(flow.vy) > 0.01) ? atan2(flow.vy, flow.vx) : dirHeading;
+      this.rot = lerpAngle(this.rot, flow.mode === 'los' ? dirHeading : moveHeading, 0.12);
+    }
+
+    // Enemy-Enemy collision avoidance (Interleaved 30Hz evaluation)
+    const isRepulsionFrame = (((this as any).uid || 0) & 1) === (state.frames & 1);
+    if (isRepulsionFrame) {
+      const grid = state.spatialGrid;
+      if (grid) {
+        grid.forEachNeighborCell(this.pos.x, this.pos.y, 1, (neighbors: any[]) => {
+          for (const other of neighbors) {
+            if (other === this || other.isDying || !(other instanceof Enemy)) continue;
+            const odx = this.pos.x - other.pos.x;
+            const ody = this.pos.y - other.pos.y;
+            const distSq = odx*odx + ody*ody;
+            
+            if (distSq > checkLimitSq) continue;
+            
+            const md = (this.size + other.size)*0.55;
+            if (distSq < md*md && distSq > 0) {
+              const od = Math.sqrt(distSq);
+              this.moveWithCollisions(createVector(odx/od * 0.4, ody/od * 0.4));
+            }
           }
-        }
-      });
+        });
+      }
     }
 
     let targetRadius = (this.target.size || 32) * 0.5;
     
     const inMeleeRange = d < (this.size * 0.5 + targetRadius + 15);
     const isShooter = this.type === 'e_shooting' || this.type === 'e_shooting_giant';
-    const canShootInRange = this.actionType.includes('shoot') && d < this.actionConfig.shootRange && (isShooter || state.world.checkLOS(this.pos.x, this.pos.y, tp.x, tp.y));
+    const canShootInRange = this.actionType.includes('shoot') && d < this.actionConfig.shootRange && (isShooter || this.isFlying || state.world.checkLOS(this.pos.x, this.pos.y, tp.x, tp.y));
 
     if (canShootInRange) shouldMove = false;
 
     if (shouldMove && this.actionType.includes('moveDefault')) {
       let rThresh = this.actionType.includes('shoot') ? this.actionConfig.shootRange * 0.75 : this.size * 0.6;
       if (d > rThresh) {
-        targetMoveVec = createVector(flow.vx, flow.vy).mult(this.speed * speedMult);
+        targetMoveVec = createVector(flowVx, flowVy).mult(this.speed * speedMult);
         this.moveWithCollisions(targetMoveVec);
       }
     }
@@ -363,7 +389,7 @@ export class Enemy {
     if (this.actionType.includes('shoot') && canShootInRange && this.shootCooldown <= 0) { 
         const bType = this.actionConfig.bulletTypeKey || 'b_enemy_basic';
         let sa = dirHeading + (this.actionConfig.inaccuracy ? random(-radians(this.actionConfig.inaccuracy), radians(this.actionConfig.inaccuracy)) : 0);
-        state.enemyBullets.push(new Bullet(this.pos.x, this.pos.y, this.pos.x + cos(sa)*500, this.pos.y + sin(sa)*500, bType, 'core')); 
+        state.enemyBullets.push(spawnBullet(this.pos.x, this.pos.y, this.pos.x + cos(sa)*500, this.pos.y + sin(sa)*500, bType, 'core')); 
         state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 22, 6, color(200, 100, 255))); 
         
         if (Array.isArray(this.actionConfig.shootFireRate)) {
@@ -416,12 +442,12 @@ export class Enemy {
 
     if (distToStrike < strikeRange) {
         this.target.takeDamage(this.actionConfig.damage);
-        if (state.frames % 5 === 0) state.vfx.push(new HitSpark(strikePos.x, strikePos.y, [255, 50, 50]));
+        if (state.frames % 5 === 0) state.vfx.push(spawnHitSpark(strikePos.x, strikePos.y, [255, 50, 50]));
         
         if (this.type === 'e_giant' || this.type === 'e_shooting_giant' || this.type === 'e_snowthrower_giant') {
             state.cameraShake = Math.max(state.cameraShake, 10);
             state.cameraShakeFalloff = 0.9;
-            state.vfx.push(new Explosion(strikePos.x, strikePos.y, this.size * 2, color(255, 100, 0)));
+            state.vfx.push(spawnExplosion(strikePos.x, strikePos.y, this.size * 2, color(255, 100, 0)));
         }
     }
   }
@@ -527,7 +553,7 @@ export class Enemy {
 
   performSpawnBullet() {
     const bType = this.actionConfig.bulletTypeToSpawn;
-    const b = new Bullet(this.pos.x, this.pos.y, this.pos.x, this.pos.y, bType, 'core');
+    const b = spawnBullet(this.pos.x, this.pos.y, this.pos.x, this.pos.y, bType, 'core');
     b.life = 0;
     state.enemyBullets.push(b);
   }
@@ -617,13 +643,16 @@ export class Enemy {
     const pending = state.pendingDamage.get(this.uid) || 0;
 
     const numColor = dmg < 0 ? [80, 255, 120] : [255, 255, 255];
-    state.vfx.push(new DamageNumberVFX(this.pos.x, this.pos.y - this.size * 0.5, Math.abs(dmg), numColor));
+    state.vfx.push(spawnDamageNumber(this.pos.x, this.pos.y - this.size * 0.5, Math.abs(dmg), numColor));
 
     if (this.health <= 0) { 
       this.health = 0;
       this.isDying = true;
       state.totalEnemiesDead++;
       state.killsByType[this.type] = (state.killsByType[this.type] || 0) + 1;
+
+      // Play Enemy Death SFX
+      soundEngine.playSFXGroup('enemy_death');
 
       // Trigger Hooks
       if (source) {

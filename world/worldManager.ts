@@ -1,10 +1,11 @@
 import { state } from '../state';
 import { 
-  GRID_SIZE, CHUNK_SIZE, LEVEL_THRESHOLDS, LEVEL_BUDGET, WORLD_GEN_STATS, CHUNK_GEN_RADIUS
+  GRID_SIZE, CHUNK_SIZE, LEVEL_THRESHOLDS, LEVEL_BUDGET, WORLD_GEN_STATS, CHUNK_GEN_RADIUS, VISIBILITY_RADIUS
 } from '../constants';
 import { obstacleTypes, overlayTypes } from '../balanceObstacles';
 import { liquidTypes } from '../balanceLiquids';
-import { LootInFlightVFX } from '../vfx/index';
+import { spawnLootInFlightVFX } from '../vfx/index';
+import { releaseLoot } from '../class/loot';
 import { spawnFromBudget, getCurrentLevelHourlyBudget } from '../lvDemo';
 import { generateRoomDirectorData } from '../debug/roomDirectorGenerator';
 import { flowField } from '../pathfinding';
@@ -42,7 +43,7 @@ declare const height: any;
 export class WorldManager {
   chunks: Map<string, Chunk> = new Map();
   obstacleVersion: number = 0;
-  private losCache: Map<string, boolean> = new Map();
+  private losCache: Map<number, boolean> = new Map();
   private losCacheVersion: number = -1;
 
   constructor() {
@@ -182,6 +183,13 @@ export class WorldManager {
   display(playerPos: any) {
     const vp = state.viewportBounds;
     const chunkW = CHUNK_SIZE * GRID_SIZE;
+    const isLevelEditor = state.currentScreen === 'level_editor';
+    const visLimit = (VISIBILITY_RADIUS + 1) * GRID_SIZE;
+
+    const minVisX = (!isLevelEditor && playerPos) ? playerPos.x - visLimit : -Infinity;
+    const maxVisX = (!isLevelEditor && playerPos) ? playerPos.x + visLimit : Infinity;
+    const minVisY = (!isLevelEditor && playerPos) ? playerPos.y - visLimit : -Infinity;
+    const maxVisY = (!isLevelEditor && playerPos) ? playerPos.y + visLimit : Infinity;
 
     this.chunks.forEach(chunk => {
       const cMinX = chunk.cx * chunkW;
@@ -194,6 +202,11 @@ export class WorldManager {
         if (cMaxX < vp.minX || cMinX > vp.maxX || cMaxY < vp.minY || cMinY > vp.maxY) {
           return;
         }
+      }
+
+      // Visibility fog radius culling check (anything outside fog is completely black)
+      if (cMaxX < minVisX || cMinX > maxVisX || cMaxY < minVisY || cMinY > maxVisY) {
+        return;
       }
 
       state.activeChunkKeys.add(`${chunk.cx},${chunk.cy}`);
@@ -289,8 +302,8 @@ export class WorldManager {
           chunk.turrets[i].update();
         }
 
-        // If offscreen, actively tick overlay blocks (e.g. sun generators, spawners, catalysts)
-        if (!isNearPlayer && chunk.overlayBlocks) {
+        // Actively tick overlay blocks (e.g. sun generators, spawners, catalysts) in active chunks
+        if (chunk.overlayBlocks) {
           for (let b of chunk.overlayBlocks) {
             if (!b.isMined) {
               b.update();
@@ -299,10 +312,15 @@ export class WorldManager {
         }
 
         // Update loot (for player collection when near, while off-screen loots remain persistently in memory)
-        for (let i = chunk.loot.length - 1; i >= 0; i--) {
-          const res = chunk.loot[i].update(playerPos);
+        const lootArr = chunk.loot;
+        for (let i = lootArr.length - 1; i >= 0; i--) {
+          const l = lootArr[i];
+          const res = l.update(playerPos);
           if (res === 'collected') {
-            const l = chunk.loot.splice(i, 1)[0];
+            const last = lootArr.pop()!;
+            if (i < lootArr.length) {
+              lootArr[i] = last;
+            }
             const screenPos = {
               x: l.pos.x - (state.cameraPos.x - width/2),
               y: l.pos.y - (state.cameraPos.y - height/2)
@@ -323,7 +341,7 @@ export class WorldManager {
               tx = width - 50; ty = height - 50;
             }
 
-            state.uiVfx.push(new LootInFlightVFX(
+            state.uiVfx.push(spawnLootInFlightVFX(
               screenPos.x, screenPos.y, 
               tx, ty, 
               l.config.idleAssetImg, 
@@ -334,11 +352,17 @@ export class WorldManager {
               (l as any).turretHP, // Pass HP if it's a TurretLoot
               (l as any).turretData // Pass preserved turret state/arming progress
             ));
+
+            releaseLoot(l);
           } else if (res === 'missed' || res === 'consumed') {
-            const l = chunk.loot.splice(i, 1)[0];
+            const last = lootArr.pop()!;
+            if (i < lootArr.length) {
+              lootArr[i] = last;
+            }
             if (res === 'missed' && l.config.item === 'sun') {
               state.sunMissedTotal += l.config.itemValue || 1;
             }
+            releaseLoot(l);
           }
         }
       }
@@ -407,7 +431,9 @@ export class WorldManager {
       this.losCacheVersion = this.obstacleVersion;
     }
 
-    const cacheKey = `${gx},${gy}_${targetGx},${targetGy}`;
+    const k1 = ((gx + 2048) & 4095) | (((gy + 2048) & 4095) << 12);
+    const k2 = ((targetGx + 2048) & 4095) | (((targetGy + 2048) & 4095) << 12);
+    const cacheKey = k1 * 16777216 + k2;
     const cached = this.losCache.get(cacheKey);
     if (cached !== undefined) {
       return cached;

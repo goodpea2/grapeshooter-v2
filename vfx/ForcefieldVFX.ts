@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const p5: any;
 declare const createVector: any;
@@ -47,10 +48,19 @@ declare const tint: any;
 declare const noTint: any;
 
 export class ForcefieldVFX {
-  pos: any; radius: number; life: number; duration: number;
-  constructor(x: number, y: number, radius: number, duration: number) {
-    this.pos = createVector(x, y); this.radius = radius; this.life = duration; this.duration = duration;
+  pos: any; radius: number = 40; life: number = 60; duration: number = 60;
+  constructor(x: number = 0, y: number = 0, radius: number = 40, duration: number = 60) {
+    this.pos = createVector(x, y); 
+    this.reset(x, y, radius, duration);
   }
+
+  reset(x: number = 0, y: number = 0, radius: number = 40, duration: number = 60) {
+    if (this.pos) this.pos.set(x, y); else this.pos = createVector(x, y);
+    this.radius = radius;
+    this.life = duration;
+    this.duration = duration;
+  }
+
   update() { this.life--; }
   isDone() { return this.life <= 0; }
   display() {
@@ -70,4 +80,17 @@ export class ForcefieldVFX {
     
     pop();
   }
+}
+
+export const forcefieldPool = new ObjectPool<ForcefieldVFX>(
+  'Forcefield',
+  () => new ForcefieldVFX(),
+  undefined,
+  100
+);
+
+export function spawnForcefieldVFX(x: number, y: number, radius: number, duration: number): ForcefieldVFX {
+  const vfx = forcefieldPool.get();
+  vfx.reset(x, y, radius, duration);
+  return vfx;
 }

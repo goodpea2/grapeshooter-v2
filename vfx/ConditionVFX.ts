@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const p5: any;
 declare const createVector: any;
@@ -47,10 +48,18 @@ declare const tint: any;
 declare const noTint: any;
 
 export class ConditionVFX {
-  target: any; type: string; 
-  constructor(target: any, type: string) { this.target = target; this.type = type; }
+  target: any; type: string = ''; 
+  constructor(target: any = null, type: string = '') { 
+    this.reset(target, type);
+  }
+
+  reset(target: any = null, type: string = '') {
+    this.target = target; 
+    this.type = type;
+  }
+
   update() {}
-  isDone() { return !this.target || this.target.health <= 0 || !this.target.conditions.has(this.type); }
+  isDone() { return !this.target || this.target.health <= 0 || !this.target.conditions || !this.target.conditions.has(this.type); }
   display() {
     const p = this.target.pos || (this.target.getWorldPos ? this.target.getWorldPos() : null);
     if (!p) return;
@@ -94,4 +103,17 @@ export class ConditionVFX {
     }
     pop();
   }
+}
+
+export const conditionPool = new ObjectPool<ConditionVFX>(
+  'ConditionVFX',
+  () => new ConditionVFX(),
+  undefined,
+  500
+);
+
+export function spawnConditionVFX(target: any, type: string): ConditionVFX {
+  const vfx = conditionPool.get();
+  vfx.reset(target, type);
+  return vfx;
 }

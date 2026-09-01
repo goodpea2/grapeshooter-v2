@@ -462,20 +462,48 @@ function drawEditorUpgradesPanel(w: number, h: number, globalPanelX: number, glo
   textSize(12);
   text("PLAYER UPGRADE CONFIG: Edit Stats and Costs (leave blank for default)", bannerX + 14, bannerY + bannerH / 2);
 
-  // "RESET ALL DEFAULTS" button in header
+  // "SET ALL TO 1 LEVEL" button in header
+  const set1LevelW = 140;
+  const set1LevelH = 24;
   const resetAllW = 145;
   const resetAllH = 24;
   const resetAllX = bannerW - resetAllW - 6;
-  const resetAllY = (bannerH - resetAllH) / 2;
+  const set1LevelX = resetAllX - set1LevelW - 8;
+  const btnY = (bannerH - 24) / 2;
 
-  drawButton(bannerX + resetAllX, bannerY + resetAllY, resetAllW, resetAllH, "RESET ALL TO DEFAULT", {
+  drawButton(bannerX + set1LevelX, bannerY + btnY, set1LevelW, set1LevelH, "SET ALL TO 1 LEVEL", {
+    id: 'btn_set_all_1level_upgrades',
+    variant: 'yellow',
+    fontSize: 10,
+    radius: 6,
+    depth3D: 2,
+    hitboxX: globalPanelX + bannerX + set1LevelX,
+    hitboxY: globalPanelY + bannerY + btnY,
+    onClick: () => {
+      for (const key of UPGRADE_KEYS) {
+        const defaultCfg = DEFAULT_PLAYER_UPGRADE_CONFIGS[key];
+        if (defaultCfg && state.levelEditorPlayerUpgrades[key]) {
+          const firstVal = defaultCfg.values?.[0] !== undefined ? defaultCfg.values[0] : 0;
+          const firstCost = defaultCfg.costs?.[0] !== undefined ? defaultCfg.costs[0] : 0;
+          state.levelEditorPlayerUpgrades[key].statStr = String(firstVal);
+          state.levelEditorPlayerUpgrades[key].costStr = String(firstCost);
+          state.levelEditorPlayerUpgrades[key].values = [firstVal];
+          state.levelEditorPlayerUpgrades[key].costs = [firstCost];
+        }
+      }
+      state.activePlayerUpgradeInput = null;
+    }
+  });
+
+  // "RESET ALL DEFAULTS" button in header
+  drawButton(bannerX + resetAllX, bannerY + btnY, resetAllW, resetAllH, "RESET ALL TO DEFAULT", {
     id: 'btn_reset_all_upgrades',
     variant: 'purple',
     fontSize: 10,
     radius: 6,
     depth3D: 2,
     hitboxX: globalPanelX + bannerX + resetAllX,
-    hitboxY: globalPanelY + bannerY + resetAllY,
+    hitboxY: globalPanelY + bannerY + btnY,
     onClick: () => {
       for (const key of UPGRADE_KEYS) {
         if (state.levelEditorPlayerUpgrades[key]) {

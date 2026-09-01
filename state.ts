@@ -185,6 +185,7 @@ export const state: any = {
   debugScrollVelocity: 0,
   debugSectionsCollapsed: {
     core: false,
+    perf: true,
     chunks: true,
     prefabs: true,
     turrets: true,
@@ -193,6 +194,7 @@ export const state: any = {
     overlays: true,
     entities: true
   },
+  showPerfOverlay: false,
   showWorldGenPreview: false,
   worldPreviewBuffer: null, // Buffer to store the noise map to prevent lag
   worldPreviewNeedsUpdate: true,
@@ -229,12 +231,17 @@ export const state: any = {
   turretLastUsed: {}, 
   uiAlpha: 255,
 
+  // Loading & Preloader
+  isLoadingResources: true,
+  loadingProgress: 0,
+
   // Development / Debug Toggles
   makeAllTurretsAvailable: false,
   instantRechargeTurrets: false,
   simulateTouchScreen: true,
   showTouchGizmo: false,
   showPlayerGizmos: false,
+  showAudioDebugOverlay: false,
 
   // Time Warp
   timeWarpRemaining: 0,
@@ -256,6 +263,34 @@ export const state: any = {
   gameSpeed: 1, // 0 = paused, 1 = normal, 2 = speedup
   requestedGameSpeed: 1, // What the user wants (1x or 2x)
   isPaused: false,
+  isPauseMenuOpen: false,
+  graphicQuality: (() => {
+    try {
+      const saved = localStorage.getItem('grapeshooter_graphic_quality');
+      if (saved === 'high' || saved === 'low') return saved;
+    } catch {}
+    return 'low';
+  })(),
+  musicVolume: (() => {
+    try {
+      const saved = localStorage.getItem('grapeshooter_music_volume');
+      if (saved !== null) {
+        const val = parseInt(saved, 10);
+        if (!isNaN(val) && val >= 0 && val <= 100) return val;
+      }
+    } catch {}
+    return 50;
+  })(),
+  sfxVolume: (() => {
+    try {
+      const saved = localStorage.getItem('grapeshooter_sfx_volume');
+      if (saved !== null) {
+        const val = parseInt(saved, 10);
+        if (!isNaN(val) && val >= 0 && val <= 100) return val;
+      }
+    } catch {}
+    return 50;
+  })(),
   speedupFlashTimer: 0,
   isPlayerMoving: false,
   playerSpeedMultiplier: 0, // 0-1.0 multiplier based on drag distance

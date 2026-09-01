@@ -1,4 +1,3 @@
-
 import { state } from '../state';
 import { ECONOMY_CONFIG } from '../economy';
 import { GRID_SIZE } from '../constants';
@@ -6,7 +5,8 @@ import { lootTypes, LootType } from '../balanceLootTable';
 import { getPlayerUpgradeStat } from '../src/playerUpgrades';
 import { turretTypes } from '../balanceTurrets';
 import { createWorldTurret, restoreTurretData } from './turret/TurretRegistry';
-import { Explosion } from '../vfx';
+import { spawnExplosion } from '../vfx';
+import { ObjectPool } from './pool';
 
 declare const p5: any;
 declare const createVector: any;
@@ -42,25 +42,47 @@ declare const abs: any;
 export class LootEntity {
   pos: any; 
   vel: any; 
-  life: number; 
-  spawnFrame: number; 
-  typeKey: string;
-  config: LootType;
-  renderSize: number;
+  life: number = 0; 
+  spawnFrame: number = 0; 
+  typeKey: string = 'sun';
+  config!: LootType;
+  renderSize: number = 16;
   neverDespawn: boolean = true;
   isBeingAttractedByFarm: boolean = false;
   farmAttractor: any = null;
 
-  constructor(x: number, y: number, typeKey: string) {
+  constructor(x: number = 0, y: number = 0, typeKey: string = 'sun') {
+    this.pos = createVector(x, y);
+    this.vel = createVector(0, 0);
+    this.reset(x, y, typeKey);
+  }
+
+  reset(x: number = 0, y: number = 0, typeKey: string = 'sun') {
     this.typeKey = typeKey;
-    this.config = lootTypes[typeKey];
-    this.pos = createVector(x, y); 
-    this.vel = p5.Vector.random2D().mult(random(0.5, 1.2)); 
+    this.config = lootTypes[typeKey] || lootTypes['sun'];
+    if (this.pos) {
+      this.pos.set(x, y);
+    } else {
+      this.pos = createVector(x, y);
+    }
+    const angle = random(0, Math.PI * 2);
+    const speed = random(0.5, 1.2);
+    if (this.vel) {
+      this.vel.set(Math.cos(angle) * speed, Math.sin(angle) * speed);
+    } else {
+      this.vel = createVector(Math.cos(angle) * speed, Math.sin(angle) * speed);
+    }
     this.life = ECONOMY_CONFIG.sunLootLifetime;
     this.spawnFrame = state.frames;
+    this.neverDespawn = true;
+    this.isBeingAttractedByFarm = false;
+    this.farmAttractor = null;
     
-    // Pick random size from range
-    this.renderSize = random(this.config.idleAssetImgSize[0], this.config.idleAssetImgSize[1]);
+    if (this.config?.idleAssetImgSize) {
+      this.renderSize = random(this.config.idleAssetImgSize[0], this.config.idleAssetImgSize[1]);
+    } else {
+      this.renderSize = 16;
+    }
   }
 
   update(playerPos: any): 'none' | 'collected' | 'missed' | 'consumed' {
@@ -126,6 +148,7 @@ export class LootEntity {
     const dy = abs(this.pos.y - state.cameraPos.y);
     if (dx > width * 0.6 || dy > height * 0.6) return;
 
+    if (!this.config) return;
     const sprite = state.assets[this.config.idleAssetImg];
     if (!sprite) return; // Skip if asset hasn't loaded
 
@@ -134,47 +157,52 @@ export class LootEntity {
     translate(this.pos.x, this.pos.y);
     
     // ALPHA OPTIMIZATION: Use native globalAlpha instead of p5 tint()
-    // tint() is very slow because it creates offscreen buffers for pixel manipulation
     let alpha = 1.0;
     if (!this.neverDespawn && this.life < 100) alpha = this.life / 100;
     ctx.globalAlpha = alpha;
 
-    // MATH SIMPLIFICATION: Combined pulse and state logic
     const pulse = 1.0 + 0.1 * sin(state.frames * 0.15);
     if (this.config.type === 'currency') rotate(state.frames * 0.02);
     
     imageMode(CENTER);
     image(sprite, 0, 0, this.renderSize * pulse, this.renderSize * pulse);
     
-    // Reset native state
     ctx.globalAlpha = 1.0;
     pop();
   }
 }
 
 export class SunLoot extends LootEntity {
-  constructor(x: number, y: number, amount: number = 1) {
+  constructor(x: number = 0, y: number = 0, amount: number = 1) {
     super(x, y, 'sun');
     if (this.config) {
       this.config = { ...this.config, itemValue: amount };
     }
   }
+
+  reset(x: number = 0, y: number = 0, typeKey: string = 'sun') {
+    super.reset(x, y, typeKey);
+  }
 }
 
 export class TurretLoot extends LootEntity {
-  turretType: string;
-  turretHP: number;
+  turretType: string = '';
+  turretHP: number = 100;
   turretData?: any;
 
-  constructor(x: number, y: number, turretType: string, hp: number, turretData?: any) {
-    // Attempt to use the specific turret type key if it exists in lootTypes, otherwise fallback to 'turret'
+  constructor(x: number = 0, y: number = 0, turretType: string = 'turret', hp: number = 100, turretData?: any) {
     const typeKey = lootTypes[turretType] ? turretType : 'turret';
     super(x, y, typeKey); 
+    this.resetTurret(x, y, turretType, hp, turretData);
+  }
+
+  resetTurret(x: number = 0, y: number = 0, turretType: string = 'turret', hp: number = 100, turretData?: any) {
+    const typeKey = lootTypes[turretType] ? turretType : 'turret';
+    super.reset(x, y, typeKey);
     this.turretType = turretType;
     this.turretHP = hp;
     this.turretData = turretData;
     
-    // Ensure the config reflects the specific turret type for collection logic
     if (this.config) {
       this.config = { ...this.config, item: turretType, itemValue: turretType };
     }
@@ -222,7 +250,7 @@ export class TurretLoot extends LootEntity {
       }
       state.world.addTurret(newTurret);
       state.totalTurretsAcquired++;
-      state.vfx.push(new Explosion(worldX, worldY, 40, color(100, 255, 200)));
+      state.vfx.push(spawnExplosion(worldX, worldY, 40, color(100, 255, 200)));
       return true;
     }
     return false;
@@ -233,5 +261,39 @@ export class TurretLoot extends LootEntity {
       return 'consumed';
     }
     return super.update(playerPos);
+  }
+}
+
+export const lootEntityPool = new ObjectPool<LootEntity>(
+  'LootEntity',
+  () => new LootEntity(),
+  undefined,
+  600
+);
+
+export const turretLootPool = new ObjectPool<TurretLoot>(
+  'TurretLoot',
+  () => new TurretLoot(),
+  undefined,
+  150
+);
+
+export function spawnLootEntity(x: number, y: number, typeKey: string): LootEntity {
+  const entity = lootEntityPool.get();
+  entity.reset(x, y, typeKey);
+  return entity;
+}
+
+export function spawnTurretLoot(x: number, y: number, turretType: string, hp: number = 100, turretData?: any): TurretLoot {
+  const entity = turretLootPool.get();
+  entity.resetTurret(x, y, turretType, hp, turretData);
+  return entity;
+}
+
+export function releaseLoot(loot: LootEntity) {
+  if (loot instanceof TurretLoot) {
+    turretLootPool.release(loot);
+  } else {
+    lootEntityPool.release(loot);
   }
 }

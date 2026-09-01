@@ -5,6 +5,7 @@ import { Bullet } from '../../bullet';
 import { MuzzleFlash } from '../../../vfx/index';
 import { triggerUpgradeHook } from '../../../src/upgrades';
 import { conditionTypes } from '../../../balanceConditions';
+import { soundEngine } from '../../../src/audio/soundEngine';
 
 declare const createVector: any;
 declare const random: any;
@@ -126,11 +127,12 @@ export class ActionShoot extends TurretAction {
         targetY += offY;
       }
       
-      const b = new Bullet(startX, startY, targetX, targetY, config.bulletTypeKey, 'enemy', this.turret);
+      const b = Bullet.create(startX, startY, targetX, targetY, config.bulletTypeKey, 'enemy', this.turret);
       state.bullets.push(b);
       
       if (i === 0) {
         state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, sa));
+        soundEngine.playSFXGroup('shoot_light');
       }
     }
 

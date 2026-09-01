@@ -1,6 +1,8 @@
 import { state } from '../../state';
 import { enemyTypes } from '../../balanceEnemies';
 import { AlmanacProgression } from '../../lvDemo';
+import { color } from '../../uiColors';
+import { drawButton, drawCard } from '../../uiComponents';
 
 declare const push: any;
 declare const pop: any;
@@ -911,25 +913,26 @@ function renderTextInput(
   const isHov = mouseX >= gX && mouseX <= gX + w && mouseY >= gY && mouseY <= gY + h;
 
   push();
-  fill(160, 180, 215);
+  fill(...color.lightBlue(220));
   textAlign(LEFT, BOTTOM);
   textSize(8.5);
   text(label, x, y - 2);
 
-  fill(isFocused ? [14, 25, 52] : (isHov ? [20, 28, 50] : [12, 16, 32]));
+  fill(...(isFocused ? color.veryDarkBlue(250) : (isHov ? [20, 28, 50, 240] : [12, 16, 32, 230])));
   if (isFocused) {
-    stroke(0, 220, 255);
+    stroke(...color.cyan());
     strokeWeight(1.5);
   } else if (isHov) {
-    stroke(80, 120, 190);
+    stroke(...color.lightBlue());
     strokeWeight(1);
   } else {
-    noStroke();
+    stroke(45, 55, 95);
+    strokeWeight(1);
   }
-  rect(x, y, w, h, 4);
+  rect(x, y, w, h, 6);
 
   const displayVal = isFocused ? state.activeLevelConfigInput!.textBuffer : (value || '');
-  fill(isFocused ? [255, 255, 255] : [240, 235, 180]);
+  fill(...(isFocused ? color.white() : [240, 235, 180]));
   noStroke();
   textAlign(LEFT, CENTER);
   textSize(9.5);

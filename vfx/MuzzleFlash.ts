@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const p5: any;
 declare const createVector: any;
@@ -47,10 +48,25 @@ declare const tint: any;
 declare const noTint: any;
 
 export class MuzzleFlash {
-  pos: any; angle: number; size: number; duration: number; life: number; color: any;
-  constructor(x: number, y: number, angle: number, size = random(18, 28), duration = 6, col = color(255, 255, 200)) {
-    this.pos = createVector(x, y); this.angle = angle; this.size = size; this.duration = duration; this.life = this.duration; this.color = col;
+  pos: any; angle: number = 0; size: number = 20; duration: number = 6; life: number = 6; color: any;
+  constructor(x: number = 0, y: number = 0, angle: number = 0, size?: number, duration: number = 6, col?: any) {
+    this.pos = createVector(x, y);
+    this.reset(x, y, angle, size, duration, col);
   }
+
+  reset(x: number = 0, y: number = 0, angle: number = 0, size?: number, duration: number = 6, col?: any) {
+    if (this.pos) {
+      this.pos.set(x, y);
+    } else {
+      this.pos = createVector(x, y);
+    }
+    this.angle = angle;
+    this.size = size !== undefined ? size : random(18, 28);
+    this.duration = duration;
+    this.life = duration;
+    this.color = col || color(255, 255, 200);
+  }
+
   update() { this.life--; }
   isDone() { return this.life <= 0; }
   display() {
@@ -72,4 +88,17 @@ export class MuzzleFlash {
     ellipse(0, 0, currentSize * 0.6, currentSize * 0.3);
     pop();
   }
+}
+
+export const muzzleFlashPool = new ObjectPool<MuzzleFlash>(
+  'MuzzleFlash',
+  () => new MuzzleFlash(),
+  undefined,
+  500
+);
+
+export function spawnMuzzleFlash(x: number, y: number, angle: number, size?: number, duration: number = 6, col?: any): MuzzleFlash {
+  const mf = muzzleFlashPool.get();
+  mf.reset(x, y, angle, size, duration, col);
+  return mf;
 }

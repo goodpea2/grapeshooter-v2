@@ -1,6 +1,6 @@
 import { state } from './state';
 import { WorldManager, Block } from './world';
-import { Player, GroundFeature, NPCEntity, Enemy, LootEntity, TurretLoot } from './entities';
+import { Player, GroundFeature, NPCEntity, Enemy, LootEntity, TurretLoot, spawnLootEntity } from './entities';
 import { GRID_SIZE, CHUNK_SIZE, HOUR_FRAMES } from './constants';
 import { customStartingHour, AlmanacProgression, getActiveAlmanacProgression } from './lvDemo';
 import { createWorldTurret } from './class/turret/TurretRegistry';
@@ -11,6 +11,7 @@ import { serializeLevelEditorPlayerUpgrades } from './ui/almanac/playerUpgradesP
 declare const floor: any;
 
 import { serializeLevelEditorLevelConfig } from './ui/almanac/levelConfigPanel';
+import { soundEngine } from './src/audio/soundEngine';
 
 export interface LevelConfig {
   id: string;
@@ -188,14 +189,59 @@ export function startLevel(levelId: string, customLayoutData?: any) {
   state.showGameOverPopup = false;
   state.gameOverProgress = 0;
   state.isPaused = false;
+  state.isPauseMenuOpen = false;
   state.activeNPC = null;
+  state.npcUiPanelPos = 0;
+  state.activeNpcDialogueIdx = 0;
+  state.npcDialogueJump = 0;
+  state.npcStock = {};
+  state.pressedTradeId = null;
+  state.npcShopScrollY = 0;
+  state.npcShopScrollVelocity = 0;
+  state.npcShopPressPos = null;
   state.selectedTurretType = null;
   state.draggedTurretType = null;
   state.draggedTurretInstance = null;
   state.isCurrentlyDragging = false;
+  state.hoveredTurretInstance = null;
+  state.hoveredTurretSlot = null;
+  state.tooltipTurret = null;
   state.isAlmanacOpen = false;
+  state.isAlmanacEditorMode = false;
+  state.almanacTab = 'Turrets';
+  state.almanacScrollY = 0;
+  state.almanacScrollVelocity = 0;
+  state.almanacIsDragging = false;
+  state.almanacInfoScrollY = 0;
+  state.almanacInfoScrollVelocity = 0;
+  state.activeUpgradeSelection = null;
+  state.upgradeSelection = null;
   state.showUnlockPopup = false;
+  state.lastUnlockedTurret = null;
+  state.unlockPopupTimer = 0;
   state.showWorldGenPreview = false;
+  state.previewSnapPos = null;
+  state.previewWorldSnap = null;
+  state.turretOverlayAnimation = null;
+  state.turretMergeOverlay = null;
+  state.activePlayerUpgradeInput = null;
+  state.activeLevelConfigInput = null;
+  state.touchInputVec = { x: 0, y: 0 };
+  state.touchStartPos = null;
+  state.isTouchingUI = false;
+  state.isMouseDown = false;
+  state.uiSunScale = 1.0;
+  state.uiElixirScale = 1.0;
+  state.uiSoilScale = 1.0;
+  state.cameraShake = 0;
+  state.timeWarpRemaining = 0;
+  state.nightWarningTimer = 0;
+  state.uiVfx = [];
+  state.speedupFlashTimer = 0;
+  state.gameSpeed = 1;
+  state.requestedGameSpeed = 1;
+  state.debugScrollY = 0;
+  state.debugScrollVelocity = 0;
 
   // Reset currencies from startingResource config or defaults
   if (layout?.startingResource) {
@@ -311,6 +357,9 @@ export function startLevel(levelId: string, customLayoutData?: any) {
   if (state.world) {
     state.world.rebuildPayGateGroups();
   }
+
+  // Initialize synchronized background music & dynamic layers
+  soundEngine.startLevelMusic();
 }
 
 export function serializeSpawnAreaTiles(spawnAreaSet: Set<string> | undefined | null): [number, number, number][] {
@@ -697,7 +746,7 @@ export function deserializeLevelLoots(world: any, lootsData: any[] | undefined |
             const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
             const chunk = world.getChunk(cx, cy);
             if (chunk) {
-              const loot = new LootEntity(px, py, type);
+              const loot = spawnLootEntity(px, py, type);
               loot.neverDespawn = true;
               chunk.loot.push(loot);
             }
@@ -710,7 +759,7 @@ export function deserializeLevelLoots(world: any, lootsData: any[] | undefined |
         const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
         const chunk = world.getChunk(cx, cy);
         if (chunk) {
-          const loot = new LootEntity(px, py, type);
+          const loot = spawnLootEntity(px, py, type);
           loot.neverDespawn = true;
           chunk.loot.push(loot);
         }
@@ -722,7 +771,7 @@ export function deserializeLevelLoots(world: any, lootsData: any[] | undefined |
       const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
       const chunk = world.getChunk(cx, cy);
       if (chunk) {
-        const loot = new LootEntity(px, py, type);
+        const loot = spawnLootEntity(px, py, type);
         loot.neverDespawn = true;
         chunk.loot.push(loot);
       }

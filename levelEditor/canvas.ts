@@ -745,6 +745,19 @@ export function drawPalettePanel(panelH: number) {
           const first = allItems.find(i => i.category === tab.key);
           if (first) {
             state.levelEditor.selectedItemKey = first.key;
+            if ((first.category === 'overlays' && first.key.startsWith('ov_spawner')) || (first.category === 'liquids' && (first.key === 'l_spawner' || first.key.startsWith('l_spawner'))) || first.key === 'l_spawner' || first.key.startsWith('l_spawner')) {
+              openToolbarSpawnerTooltip(first.key);
+              state.levelEditor.toolbarSunGeneratorTooltip = null;
+            } else if (first.category === 'overlays' && first.key === 'sunGenerator') {
+              openToolbarSunGeneratorTooltip();
+              state.levelEditor.toolbarSpawnerTooltip = null;
+            } else {
+              state.levelEditor.toolbarSpawnerTooltip = null;
+              state.levelEditor.toolbarSunGeneratorTooltip = null;
+            }
+          } else {
+            state.levelEditor.toolbarSpawnerTooltip = null;
+            state.levelEditor.toolbarSunGeneratorTooltip = null;
           }
           state.levelEditor.paletteScrollX = 0;
           state.levelEditor.paletteScrollVel = 0;
@@ -842,8 +855,13 @@ export function drawPalettePanel(panelH: number) {
         state.levelEditor.selectedItemKey = item.key;
         if ((item.category === 'overlays' && item.key.startsWith('ov_spawner')) || (item.category === 'liquids' && (item.key === 'l_spawner' || item.key.startsWith('l_spawner'))) || item.key === 'l_spawner' || item.key.startsWith('l_spawner')) {
           openToolbarSpawnerTooltip(item.key);
+          state.levelEditor.toolbarSunGeneratorTooltip = null;
         } else if (item.category === 'overlays' && item.key === 'sunGenerator') {
           openToolbarSunGeneratorTooltip();
+          state.levelEditor.toolbarSpawnerTooltip = null;
+        } else {
+          state.levelEditor.toolbarSpawnerTooltip = null;
+          state.levelEditor.toolbarSunGeneratorTooltip = null;
         }
       }
     });

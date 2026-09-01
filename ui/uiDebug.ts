@@ -19,9 +19,12 @@ import { generateRoomDirectorData } from '../debug/roomDirectorGenerator';
 import { saveLevelLayout } from '../levelManager';
 import { uiComponentsShowcase } from './uiComponentsShowcase';
 import { drawButton, drawDarkButton, drawGreenButton, drawCyanButton, drawRedButton, registerUIHitbox } from '../uiComponents';
+import { poolRegistry } from '../class/pool';
+import { soundEngine } from '../src/audio/soundEngine';
 
 // p5.js global variable declarations
 declare const floor: any;
+declare const frameRate: any;
 declare const push: any;
 declare const pop: any;
 declare const fill: any;
@@ -84,6 +87,7 @@ function updateWorldPreviewBuffer() {
 
   if (!state.worldPreviewBuffer) {
     state.worldPreviewBuffer = createGraphics(bufferSize, bufferSize);
+    state.worldPreviewBuffer.pixelDensity(1);
   }
 
   const pg = state.worldPreviewBuffer;
@@ -398,19 +402,66 @@ export function drawDebugPanel(spawnFromBudget: Function) {
       { l: "WARP 12H", a: () => state.timeWarpRemaining = 60, grid: true },
       { l: "SPEED 0.1", a: () => { state.requestedGameSpeed = 0.1; state.gameSpeed = 0.1; }, grid: true },
       { l: "CLEAR BLOCK", a: () => {
-        const b = new Bullet(state.player.pos.x, state.player.pos.y, state.player.pos.x, state.player.pos.y, 'b_cheat_blocks', 'none');
+        const b = Bullet.create(state.player.pos.x, state.player.pos.y, state.player.pos.x, state.player.pos.y, 'b_cheat_blocks', 'none');
         b.life = 0; 
         state.bullets.push(b);
       }, grid: true},
       { l: "CLEAR ENEMY", a: () => {
-        const b = new Bullet(state.player.pos.x, state.player.pos.y, state.player.pos.x, state.player.pos.y, 'b_cheat_enemies', 'none');
+        const b = Bullet.create(state.player.pos.x, state.player.pos.y, state.player.pos.x, state.player.pos.y, 'b_cheat_enemies', 'none');
         b.life = 0; 
         state.bullets.push(b);
       }, grid: true},
       { l: "SPAWN WAVE", a: () => spawnFromBudget(state.currentNightWaveBudget), grid: true },
       { l: "SaveLevelLayout", a: () => saveLevelLayout(), grid: true },
+      { l: "Perf HUD", v: state.showPerfOverlay, a: () => state.showPerfOverlay = !state.showPerfOverlay, type: 'toggle', grid: true },
+      { l: "Audio Info", v: state.showAudioDebugOverlay, a: () => state.showAudioDebugOverlay = !state.showAudioDebugOverlay, type: 'toggle', grid: true },
       { l: "SHOW UI COMPONENTS", a: () => uiComponentsShowcase.open(), grid: false }
     );
+  }
+
+  // Audio System Header
+  allItems.push({ l: "AUDIO SYSTEM", type: 'header', section: 'audio' });
+  if (!state.debugSectionsCollapsed.audio) {
+    const audioInfo = soundEngine.getDebugInfo();
+    allItems.push(
+      { l: "Audio Info HUD", v: state.showAudioDebugOverlay, a: () => state.showAudioDebugOverlay = !state.showAudioDebugOverlay, type: 'toggle', grid: true },
+      { l: `State: ${audioInfo.ctxState} (${audioInfo.buffersLoaded})`, type: 'infoText' },
+      { l: `Playing: ${audioInfo.musicPlaying}`, type: 'infoText' },
+      { l: `Vol: Music=${audioInfo.musicVolume}% | SFX=${audioInfo.sfxVolume}%`, type: 'infoText' },
+      { l: `Tense Layer: ${(audioInfo.tenseVolume * 100).toFixed(0)}% | Birds: ${(audioInfo.birdsVolume * 100).toFixed(0)}%`, type: 'infoText' },
+      { l: "TEST SFX TRIGGERS", type: 'subheader' },
+      { l: "Hit Enemy", a: () => soundEngine.playSFXGroup('projectile_hit_enemy'), grid: true },
+      { l: "Hit Block", a: () => soundEngine.playSFXGroup('projectile_hit_block'), grid: true },
+      { l: "Enemy Death", a: () => soundEngine.playSFXGroup('enemy_death'), grid: true },
+      { l: "Shoot Light", a: () => soundEngine.playSFXGroup('shoot_light'), grid: true },
+      { l: "Collect Sun", a: () => soundEngine.playSFX('collect_sun'), grid: true },
+      { l: "Turret Bite", a: () => soundEngine.playSFXGroup('turret_bitten_softbody'), grid: true }
+    );
+  }
+
+  // Performance & Pools Header
+  allItems.push({ l: "PERFORMANCE & POOLS", type: 'header', section: 'perf' });
+  if (!state.debugSectionsCollapsed.perf) {
+    allItems.push(
+      { l: "Perf HUD", v: state.showPerfOverlay, a: () => state.showPerfOverlay = !state.showPerfOverlay, type: 'toggle', grid: true },
+      { l: "Reset Peaks", a: () => poolRegistry.resetAllPeaks(), grid: true },
+      { l: "Trim Pools", a: () => poolRegistry.trimAll(), grid: false }
+    );
+
+    allItems.push({ l: "OBJECT POOLS METRICS", type: 'subheader' });
+    const allPools = poolRegistry.getAll().slice().sort((a, b) => (b.activeCount + b.peakActive) - (a.activeCount + a.peakActive));
+    for (const p of allPools) {
+      const stats = p.getStats();
+      allItems.push({
+        l: `${p.name}: Act ${stats.active} / Peak ${stats.peakActive} (Pool: ${stats.inPool})`,
+        type: 'infoText',
+        highlight: stats.active > 0,
+        active: stats.active,
+        peak: stats.peakActive,
+        inPool: stats.inPool,
+        total: stats.totalCreated
+      });
+    }
   }
 
   // Turret Actions Header
@@ -434,7 +485,7 @@ export function drawDebugPanel(spawnFromBudget: Function) {
       { l: "Turret Gizmo", v: state.debugGizmosTurrets, a: () => state.debugGizmosTurrets = !state.debugGizmosTurrets, type: 'toggle', grid: true },
       { l: "DrawTurretPath", v: state.debugDrawTurretPath, a: () => state.debugDrawTurretPath = !state.debugDrawTurretPath, type: 'toggle', grid: true },
       { l: "CLEAR TURRET", a: () => {
-        const b = new Bullet(state.player.pos.x, state.player.pos.y, state.player.pos.x, state.player.pos.y, 'b_cheat_destroyTurret', 'none');
+        const b = Bullet.create(state.player.pos.x, state.player.pos.y, state.player.pos.x, state.player.pos.y, 'b_cheat_destroyTurret', 'none');
         b.life = 0; 
         state.bullets.push(b);
       }, grid: true},
@@ -579,10 +630,14 @@ export function drawDebugPanel(spawnFromBudget: Function) {
       let group = 1;
       while(i_cnt + group < allItems.length && allItems[i_cnt + group].grid) { group++; if(group >= 2) break; }
       i_cnt += group;
+      calculatedH += btnSpacing;
+    } else if (it.type === 'infoText') {
+      i_cnt++;
+      calculatedH += 18;
     } else {
       i_cnt++;
+      calculatedH += btnSpacing;
     }
-    calculatedH += btnSpacing;
   }
   calculatedH += 40; // bottom padding
 
@@ -638,6 +693,19 @@ export function drawDebugPanel(spawnFromBudget: Function) {
         pop();
       }
       curY += btnSpacing;
+    }
+    else if (item.type === 'infoText') {
+      if (inBounds) {
+        push();
+        noStroke();
+        fill(item.highlight ? color(100, 255, 200) : color(160, 175, 190));
+        textAlign(LEFT, CENTER);
+        textSize(8.5);
+        textStyle(NORMAL);
+        text(item.l, debugX + 15, curY);
+        pop();
+      }
+      curY += 18;
     }
     else if (item.grid) {
       let gridGroup = [item];
@@ -705,6 +773,204 @@ export function drawDebugPanel(spawnFromBudget: Function) {
       fill(0, 255, 150, 150);
       rect(sbX, handleY, sbW, handleH, 3);
   }
+  pop();
+
+  if (state.showPerfOverlay) {
+    drawPerfOverlay();
+  }
+
+  if (state.showAudioDebugOverlay) {
+    drawAudioDebugOverlay();
+  }
+}
+
+export function drawAudioDebugOverlay() {
+  if (!state.showAudioDebugOverlay) return;
+
+  push();
+  const info = soundEngine.getDebugInfo();
+  const ox = 10;
+  const perfH = state.showPerfOverlay ? (150 + Math.min(7, poolRegistry.getAll().length) * 20 + 15) : 0;
+  const oy = state.showPerfOverlay ? (110 + perfH + 10) : 110;
+  const ow = 285;
+  const sfxCount = info.recentSFX ? info.recentSFX.length : 0;
+  const cardH = 175 + (sfxCount > 0 ? sfxCount * 17 : 20);
+
+  // Background Card
+  fill(14, 18, 32, 235);
+  stroke(70, 140, 255, 180);
+  strokeWeight(1.5);
+  rect(ox, oy, ow, cardH, 8);
+
+  // Header Title
+  textAlign(LEFT, TOP);
+  textSize(12);
+  textStyle(NORMAL);
+  noStroke();
+  fill(80, 220, 255);
+  text("🎵 AUDIO ENGINE HUD", ox + 10, oy + 10);
+
+  let py = oy + 30;
+  textSize(10.5);
+  fill(210, 225, 255);
+
+  // Audio Context & Buffers
+  text(`Context: ${info.ctxState.toUpperCase()} | Loaded: ${info.buffersLoaded}`, ox + 10, py); py += 16;
+  
+  // BGM
+  fill(120, 255, 160);
+  text(`BGM: ${info.musicPlaying}`, ox + 10, py); py += 16;
+
+  // Master & Multipliers
+  fill(240, 245, 255);
+  text(`Music: ${info.musicVolume}%  |  SFX: ${info.sfxVolume}%`, ox + 10, py); py += 16;
+  text(`Tense Multiplier: ${(info.tenseVolume * 100).toFixed(0)}%  |  Birds: ${(info.birdsVolume * 100).toFixed(0)}%`, ox + 10, py); py += 18;
+
+  // Divider
+  stroke(255, 255, 255, 30);
+  line(ox + 8, py, ox + ow - 8, py);
+  noStroke();
+  py += 6;
+
+  // Recent SFX
+  fill(255, 215, 90);
+  text("RECENT SFX TRIGGERED:", ox + 10, py); py += 16;
+
+  if (sfxCount === 0) {
+    fill(140, 155, 180);
+    text("No SFX triggered yet", ox + 10, py);
+  } else {
+    const now = Date.now();
+    for (const sfx of info.recentSFX) {
+      const ageSec = Math.max(0, (now - sfx.time) / 1000).toFixed(1);
+      fill(255, 255, 255, 220);
+      text(`• ${sfx.name} (${ageSec}s ago, vol: ${(sfx.volume * 100).toFixed(0)}%)`, ox + 10, py);
+      py += 17;
+    }
+  }
+
+  pop();
+}
+
+export function drawPerfOverlay() {
+  if (!state.showPerfOverlay) return;
+
+  push();
+  const ox = 10;
+  const oy = 110;
+  const ow = 265;
+
+  // Gather system metrics
+  const fps = typeof frameRate === 'function' ? frameRate() : 60;
+  const frameTimeMs = fps > 0 ? (1000 / fps).toFixed(1) : '16.6';
+
+  const enemyCount = state.enemies ? state.enemies.length : 0;
+  const bulletCount = state.bullets ? state.bullets.length : 0;
+  const vfxCount = state.vfx ? state.vfx.length : 0;
+  const uiVfxCount = state.uiVfx ? state.uiVfx.length : 0;
+  const attachedTurretsCount = state.turrets ? state.turrets.length : 0;
+  let worldTurretsCount = 0;
+  let worldLootCount = 0;
+  let activeChunksCount = 0;
+
+  if (state.world && state.world.chunks) {
+    state.world.chunks.forEach((chunk: any) => {
+      activeChunksCount++;
+      if (chunk.turrets) worldTurretsCount += chunk.turrets.length;
+      if (chunk.loot) worldLootCount += chunk.loot.length;
+    });
+  }
+
+  const spatialBucketsCount = state.spatialGrid ? state.spatialGrid.activeCellCount || 0 : 0;
+
+  // Pools sorted by highest activity/peak load
+  const pools = poolRegistry.getAll().slice().sort((a, b) => (b.activeCount + b.peakActive) - (a.activeCount + a.peakActive));
+  const topPools = pools.slice(0, 7);
+
+  const totalPoolsActive = pools.reduce((sum, p) => sum + p.activeCount, 0);
+  const totalPoolsIdle = pools.reduce((sum, p) => sum + p.size, 0);
+  const totalPoolsCreated = pools.reduce((sum, p) => sum + p.totalCreated, 0);
+
+  const cardH = 150 + topPools.length * 20;
+
+  // Background card
+  fill(12, 16, 26, 230);
+  stroke(40, 70, 110, 180);
+  strokeWeight(1.5);
+  rect(ox, oy, ow, cardH, 8);
+
+  // Header Title
+  noStroke();
+  fill(0, 255, 200);
+  textAlign(LEFT, TOP);
+  textSize(12);
+  textStyle(NORMAL);
+  text("ENGINE DIAGNOSTICS & PROFILER", ox + 10, oy + 8);
+
+  // FPS & Frame Time
+  let fpsColor = color(100, 255, 120);
+  if (fps < 45) fpsColor = color(255, 200, 50);
+  if (fps < 30) fpsColor = color(255, 80, 80);
+
+  fill(fpsColor);
+  textSize(13);
+  text(`${Math.round(fps)} FPS`, ox + 10, oy + 26);
+  fill(160, 180, 200);
+  textSize(10);
+  text(`(${frameTimeMs} ms/f)`, ox + 70, oy + 28);
+
+  // Active Entities Grid
+  let ey = oy + 46;
+  fill(255, 255, 255, 220);
+  textSize(9.5);
+  text(`Bullets: ${bulletCount} | VFX: ${vfxCount + uiVfxCount} | Enemies: ${enemyCount}`, ox + 10, ey); ey += 14;
+  text(`Loot: ${worldLootCount} | Turrets: ${attachedTurretsCount + worldTurretsCount} | Chunks: ${activeChunksCount}`, ox + 10, ey); ey += 14;
+  text(`Spatial Grid Buckets: ${spatialBucketsCount}`, ox + 10, ey); ey += 18;
+
+  // Divider
+  stroke(255, 255, 255, 30);
+  line(ox + 8, ey, ox + ow - 8, ey);
+  noStroke();
+  ey += 6;
+
+  // Pools Header
+  fill(255, 220, 100);
+  textSize(10);
+  text(`POOLS (Active: ${totalPoolsActive} | Idle: ${totalPoolsIdle} | Inst: ${totalPoolsCreated})`, ox + 10, ey);
+  ey += 16;
+
+  // Top Pools Render
+  for (const p of topPools) {
+    const stats = p.getStats();
+    const isUnderLoad = stats.active > 0;
+    
+    // Label
+    fill(isUnderLoad ? color(255, 255, 255) : color(150, 160, 170));
+    textSize(9);
+    textAlign(LEFT, CENTER);
+    text(p.name, ox + 10, ey);
+
+    // Active / Peak / InPool text
+    textAlign(RIGHT, CENTER);
+    fill(isUnderLoad ? color(100, 255, 200) : color(120, 130, 140));
+    text(`Act:${stats.active} Pk:${stats.peakActive} [${stats.inPool}]`, ox + ow - 10, ey);
+
+    // Mini Gauge bar
+    const barX = ox + 105;
+    const barY = ey - 3;
+    const barW = 50;
+    const barH = 6;
+    fill(255, 255, 255, 20);
+    rect(barX, barY, barW, barH, 2);
+    
+    const peakMax = Math.max(1, stats.peakActive, stats.totalCreated);
+    const activeFillW = constrain((stats.active / peakMax) * barW, 0, barW);
+    fill(isUnderLoad ? color(0, 230, 180) : color(60, 100, 120));
+    rect(barX, barY, activeFillW, barH, 2);
+
+    ey += 18;
+  }
+
   pop();
 }
 

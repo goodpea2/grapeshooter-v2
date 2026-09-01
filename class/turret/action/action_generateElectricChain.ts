@@ -59,8 +59,8 @@ export class ActionGenerateElectricChain extends TurretAction {
             const widthSq = (config.electricChainDamageWidth || 32)**2;
             const maxTotalDmg = config.electricChainMaxDamage || 15;
 
-            for (let e of state.enemies) {
-                if (e.health <= 0 || e.isDying) continue;
+            const checkEnemy = (e: any) => {
+                if (e.health <= 0 || e.isDying) return;
                 const dSegSq = (this.turret as any).distToSegmentSq(e.pos, p1, p2);
                 if (dSegSq < (widthSq + e.size**2 * 0.25)) {
                     if ((e as any).elecFrame !== state.frames) { (e as any).elecFrame = state.frames; (e as any).elecDmg = 0; }
@@ -68,6 +68,17 @@ export class ActionGenerateElectricChain extends TurretAction {
                         e.takeDamage(dmg, this.turret);
                         (e as any).elecDmg += dmg;
                     }
+                }
+            };
+
+            if (state.spatialGrid) {
+                const mx = (p1.x + p2.x) * 0.5;
+                const my = (p1.y + p2.y) * 0.5;
+                const r = Math.sqrt(dSq) * 0.5 + 40;
+                state.spatialGrid.queryCircleEnemies(mx, my, r, checkEnemy);
+            } else {
+                for (let e of state.enemies) {
+                    checkEnemy(e);
                 }
             }
             this.turret.actionTimers.set(type, state.frames);

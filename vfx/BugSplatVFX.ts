@@ -1,4 +1,5 @@
 import { state } from '../state';
+import { ObjectPool } from '../class/pool';
 
 declare const p5: any;
 declare const createVector: any;
@@ -48,21 +49,41 @@ declare const noTint: any;
 
 export class BugSplatVFX {
   pos: any; blobs: any[] = []; life: number = 30; duration: number = 30; color: any;
-  constructor(x: number, y: number, size: number, col: any) {
+  constructor(x: number = 0, y: number = 0, size: number = 30, col: any = color(100, 255, 100)) {
     this.pos = createVector(x, y);
-    this.color = col;
-    for(let i=0; i<15; i++){
+    for (let i = 0; i < 15; i++) {
+      this.blobs.push({
+        off: createVector(0, 0),
+        v: createVector(0, 0),
+        s: 5
+      });
+    }
+    this.reset(x, y, size, col);
+  }
+
+  reset(x: number = 0, y: number = 0, size: number = 30, col?: any) {
+    if (this.pos) {
+      this.pos.set(x, y);
+    } else {
+      this.pos = createVector(x, y);
+    }
+    this.color = col || color(100, 255, 100);
+    this.life = 30;
+    this.duration = 30;
+    for (let i = 0; i < 15; i++) {
       const ang1 = random(TWO_PI);
       const dist1 = random(size * 0.1, size * 0.5);
       const ang2 = random(TWO_PI);
       const speed2 = random(2, 6);
-      this.blobs.push({
-        off: createVector(cos(ang1) * dist1, sin(ang1) * dist1),
-        v: createVector(cos(ang2) * speed2, sin(ang2) * speed2),
-        s: random(size * 0.2, size * 0.5)
-      });
+      const b = this.blobs[i];
+      if (b) {
+        b.off.set(cos(ang1) * dist1, sin(ang1) * dist1);
+        b.v.set(cos(ang2) * speed2, sin(ang2) * speed2);
+        b.s = random(size * 0.2, size * 0.5);
+      }
     }
   }
+
   update() { this.life--; for(let b of this.blobs) { b.off.add(b.v); b.v.mult(0.9); b.s *= 0.96; } }
   isDone() { return this.life <= 0; }
   display() {
@@ -75,4 +96,17 @@ export class BugSplatVFX {
     ellipse(0, 0, (1 - this.life/this.duration) * 80);
     pop();
   }
+}
+
+export const bugSplatPool = new ObjectPool<BugSplatVFX>(
+  'BugSplat',
+  () => new BugSplatVFX(),
+  undefined,
+  500
+);
+
+export function spawnBugSplatVFX(x: number, y: number, size: number = 30, col?: any): BugSplatVFX {
+  const vfx = bugSplatPool.get();
+  vfx.reset(x, y, size, col);
+  return vfx;
 }

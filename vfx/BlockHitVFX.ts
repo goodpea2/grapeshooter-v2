@@ -1,6 +1,7 @@
 
 import { state } from '../state';
 import { GRID_SIZE } from '../constants';
+import { ObjectPool } from '../class/pool';
 
 declare const createVector: any;
 declare const push: any;
@@ -15,9 +16,21 @@ declare const rectMode: any;
 
 export class BlockHitVFX {
   pos: any; life: number = 10; maxLife: number = 10;
-  constructor(x: number, y: number) {
+  constructor(x: number = 0, y: number = 0) {
     this.pos = createVector(x, y);
+    this.reset(x, y);
   }
+
+  reset(x: number = 0, y: number = 0) {
+    if (this.pos) {
+      this.pos.set(x, y);
+    } else {
+      this.pos = createVector(x, y);
+    }
+    this.life = 10;
+    this.maxLife = 10;
+  }
+
   update() {
     this.life--;
   }
@@ -32,4 +45,17 @@ export class BlockHitVFX {
     rect(0, 0, GRID_SIZE, GRID_SIZE, 12);
     pop();
   }
+}
+
+export const blockHitPool = new ObjectPool<BlockHitVFX>(
+  'BlockHit',
+  () => new BlockHitVFX(),
+  undefined,
+  500
+);
+
+export function spawnBlockHitVFX(x: number, y: number): BlockHitVFX {
+  const vfx = blockHitPool.get();
+  vfx.reset(x, y);
+  return vfx;
 }

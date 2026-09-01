@@ -5,7 +5,7 @@ import { turretTypes } from '../balanceTurrets';
 import { conditionTypes } from '../balanceConditions';
 import { liquidTypes } from '../balanceLiquids';
 import { overlayTypes } from '../balanceObstacles';
-import { MuzzleFlash, BlockDebris, ConditionVFX, FirstStrikeVFX, DamageNumberVFX, MagicLinkVFX, WeldingHitVFX, SparkVFX, MergeVFX } from '../vfx/index';
+import { MuzzleFlash, BlockDebris, ConditionVFX, FirstStrikeVFX, DamageNumberVFX, spawnDamageNumber, MagicLinkVFX, WeldingHitVFX, SparkVFX, MergeVFX } from '../vfx/index';
 import { Bullet } from './bullet';
 import { SunLoot } from './loot';
 import { spawnLootAt } from '../economy';
@@ -14,6 +14,7 @@ import { Enemy } from './enemy';
 import { drawTurret, drawTurretUI } from '../visualTurrets';
 import { TurretAction } from './turretAction';
 import { TurretHub } from './turret/hub';
+import { soundEngine } from '../src/audio/soundEngine';
 
 declare const p5: any;
 declare const createVector: any;
@@ -207,7 +208,7 @@ export abstract class Turret {
 
     if (amount > 0) {
       const wPos = this.getWorldPos();
-      state.vfx.push(new DamageNumberVFX(wPos.x, wPos.y, amount, [80, 255, 120]));
+      state.vfx.push(spawnDamageNumber(wPos.x, wPos.y, amount, [80, 255, 120]));
     }
   }
 
@@ -469,9 +470,11 @@ export abstract class Turret {
     this.flashType = 'damage';
     this.hurtAnimTimer = 10;
     const wPos = this.getWorldPos();
-    state.vfx.push(new DamageNumberVFX(wPos.x, wPos.y, dmg, [255, 100, 100]));
+    state.vfx.push(spawnDamageNumber(wPos.x, wPos.y, dmg, [255, 100, 100]));
+    soundEngine.playSFXGroup('turret_bitten_softbody');
 
     if (this.health <= 0) {
+      soundEngine.playSFX('turret_eaten');
       // Trigger Hooks
       if (source) {
         triggerUpgradeHook('onKill', source, { target: this, targetType: 'turret', typeName: this.type });

@@ -102,7 +102,7 @@ export class ActionLaunchMultiTarget extends TurretAction {
                 startX += random(-10, 10);
                 startY += random(-10, 10);
               }
-              let b = new Bullet(startX, startY, tc.x, tc.y, config.bulletTypeKey, 'enemy', this.turret);
+              let b = Bullet.create(startX, startY, tc.x, tc.y, config.bulletTypeKey, 'enemy', this.turret);
               (b as any).isArtillery = true;
               (b as any).arcHeight = (config.arcHeight || 100) * (1 + random(-0.2, 0.2));
               state.bullets.push(b);

@@ -98,7 +98,7 @@ export class ActionShootMultiTarget extends TurretAction {
                 startX += random(-10, 10);
                 startY += random(-10, 10);
               }
-              state.bullets.push(new Bullet(startX, startY, tc.x, tc.y, config.bulletTypeKey, 'enemy', this.turret));
+              state.bullets.push(Bullet.create(startX, startY, tc.x, tc.y, config.bulletTypeKey, 'enemy', this.turret));
             }
             state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, sa));
             this.turret.recoil = 6;
