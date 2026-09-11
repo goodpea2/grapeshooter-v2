@@ -6,6 +6,7 @@ import { liquidTypes } from './balanceLiquids';
 import { turretTypes } from './balanceTurrets';
 import { getTime } from './ui/ui';
 import { SunLoot, Enemy } from './entities';
+import { createEnemy } from './class/enemy/EnemyRegistry';
 import { ECONOMY_CONFIG, spawnLootAt } from './economy';
 import { Bullet } from './entities';
 import { soundEngine } from './src/audio/soundEngine';
@@ -46,7 +47,11 @@ export const AlmanacProgression: AlmanacProgressionConfig = {
   ],
   LockedTurret: [
     { type: 't2_firepea', weight: 10 }, { type: 't2_peanut', weight: 10 }, { type: 't2_mortar', weight: 10 }, { type: 't2_snowpea', weight: 10 }, { type: 't2_wallaser', weight: 10 }, { type: 't2_laserexplode', weight: 10 }, { type: 't2_heallaser', weight: 10 }, { type: 't2_pulse', weight: 10 }, { type: 't2_icewall', weight: 10 }, { type: 't2_torchwood', weight: 10 },
-    { type: 't3_triplepea', weight: 3 }, { type: 't3_firepea2', weight: 3 }, { type: 't3_spinnut', weight: 3 }, { type: 't3_mortar2', weight: 3 }, { type: 't3_snowpea2', weight: 3 }, { type: 't3_inferno', weight: 3 }, { type: 't3_flamethrower', weight: 3 }, { type: 't3_bowling', weight: 3 }, { type: 't3_repulser', weight: 3 }, { type: 't3_snowpeanut', weight: 3 }, { type: 't3_skymortar', weight: 3 }, { type: 't3_laser3', weight: 3 }, { type: 't3_puncher2', weight: 3 }, { type: 't3_aoelaser', weight: 3 }, { type: 't3_iceray2', weight: 3 }, { type: 't3_miningbomb', weight: 3 }, { type: 't3_tesla', weight: 3 }, { type: 't3_icepuncher', weight: 3 }, { type: 't3_densnut', weight: 3 }, { type: 't3_durian', weight: 3 }, { type: 't3_spike2', weight: 3 }, { type: 't3_holonut', weight: 3 }, { type: 't3_minefield', weight: 3 }, { type: 't3_frostfield', weight: 3 }, { type: 't3_triberg', weight: 3 }
+    { type: 't3_triplepea', weight: 3 }, { type: 't3_firepea2', weight: 3 }, { type: 't3_bowling', weight: 3 }, { type: 't3_mortar2', weight: 3 }, { type: 't3_snowpea2', weight: 3 }, { type: 't3_witch', weight: 3 }, { type: 't3_flamethrower', weight: 3 }, { type: 't3_firecharge', weight: 3 }, { type: 't3_repulser', weight: 3 }, { type: 't3_gatling', weight: 3 }, { type: 't3_skymortar', weight: 3 },
+    { type: 't3_laser3', weight: 3 }, { type: 't3_puncher', weight: 3 }, { type: 't3_aoelaser', weight: 3 }, { type: 't3_heallaser2', weight: 3 }, { type: 't3_hypno', weight: 3 }, { type: 't3_magnet', weight: 3 }, { type: 't3_powerbank', weight: 3 },
+    { type: 't3_densnut', weight: 3 }, { type: 't3_durian', weight: 3 }, { type: 't3_frostfield', weight: 3 }, { type: 't3_holonut', weight: 3 },
+    { type: 't3_minecharge', weight: 3 }, { type: 't3_speeder', weight: 3 },
+    { type: 't3_icecharge', weight: 3 }
   ],
   BannedTurrets: [],
   UnlockCost: [
@@ -320,8 +325,11 @@ export function canGlobalSpawnAt(x: number, y: number, enemyTypeKey: string): bo
   }
 
   // 4. Obstacle check: flying enemies can spawn on top of obstacles; non-flying cannot
-  const isBlock = state.world.isBlockAt(x, y);
-  if (isBlock && !isFlying) return false;
+  const enemyRad = ((eCfg.size || 20) * 0.5) + 2;
+  if (!isFlying) {
+    if (state.world.isBlockAt(x, y)) return false;
+    if (state.world.checkCollision && state.world.checkCollision(x, y, enemyRad)) return false;
+  }
 
   // 5. Liquid check: all enemies can spawn on empty ground or liquid without isDanger=true
   const gx = floor(x / GRID_SIZE);
@@ -349,11 +357,23 @@ export function canGlobalSpawnAt(x: number, y: number, enemyTypeKey: string): bo
 /**
  * Global helper to request a spawn with a portal VFX
  */
-export function requestSpawn(x: number, y: number, typeKey: string) {
+export function requestSpawn(x: number, y: number, typeKey: string, timer: number = 60) {
   state.pendingSpawns.push({
     x, y, 
     type: typeKey,
-    timer: 60
+    timer: timer,
+    initialTimer: timer
+  });
+}
+
+/**
+ * Helper to launch a flung spawn pod from a spawner to target destination
+ */
+export function requestFlungSpawn(fromX: number, fromY: number, targetX: number, targetY: number, typeKey: string, portalFrames: number = 20) {
+  import('./vfx/FlungSpawnPodVFX').then(({ FlungSpawnPodVFX }) => {
+    state.vfx.push(new FlungSpawnPodVFX(fromX, fromY, targetX, targetY, typeKey, portalFrames));
+  }).catch(() => {
+    requestSpawn(targetX, targetY, typeKey, portalFrames);
   });
 }
 
@@ -460,7 +480,7 @@ export function updateGameSystems() {
     const s = state.pendingSpawns[i];
     s.timer--;
     if (s.timer <= 0) {
-      state.enemies.push(new Enemy(s.x, s.y, s.type));
+      state.enemies.push(createEnemy(s.x, s.y, s.type));
       const last = state.pendingSpawns.pop()!;
       if (i < state.pendingSpawns.length) state.pendingSpawns[i] = last;
     }

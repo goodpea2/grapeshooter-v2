@@ -2,87 +2,108 @@
 import { HOUR_FRAMES } from './constants';
 
 export const groundFeatureTypes: any = {
-  gf_fire_puddle: {
+  gf_fire_firepea: {
     name: 'Fire Puddle',
     life: 60,
     radius: 16,
-    damage: 3, // firepea's fire puddle also damages obstacles
+    damageConfig: {
+      enemy: 0,
+      turret: 0,
+      player: 0,
+      obstacle: 5
+    },
     tickRate: 15,
     vfxType: 'fire_puddle',
     color: [255, 100, 50],
-    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 2 }], // this damage is its own source
-    conditionDuration: 60
+    appliedCondition: [{ type: 'c_burning', duration: 60, damageConfig: { enemy: 5, turret: 1, player: 1 } }]
   },
-  gf_fire_puddle_t3: {
+  gf_fire_firepeat3: {
     name: 'T3 Fire Puddle',
-    life: 240, // 4 seconds
+    life: 360, // 6 seconds
     radius: 20,
-    damage: 3,
+    damageConfig: {
+      enemy: 0,
+      turret: 0,
+      player: 0,
+      obstacle: 5
+    },
     tickRate: 15,
     vfxType: 'fire_puddle',
     color: [255, 120, 0],
-    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 2 }],
-    conditionDuration: 60
+    appliedCondition: [{ type: 'c_burning', duration: 60, damageConfig: { enemy: 5, turret: 1, player: 1 } }]
   },
-  gf_fire_puddle_flamethrower: {
-    name: 'Flamethrower fire',
+  gf_fire_flamethrower: {
+    name: 'Flamethrower Fire',
     life: 60,
     radius: 20,
-    damage: 2, // lower dmg to obstacles but stackable
+    damageConfig: {
+      enemy: 0,
+      turret: 0,
+      player: 0,
+      obstacle: 3
+    },
     tickRate: 15,
     vfxType: 'fire_puddle',
-    color: [255, 120, 0],
-    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 5 }], // mainly burn dmg to enemies
-    conditionDuration: 60
+    color: [255, 100, 50],
+    appliedCondition: [{ type: 'c_burning', duration: 60, damageConfig: { enemy: 5, turret: 0, player: 0 } }]
   },
-  gf_fire_puddle_firecharge: {
-    name: 'Firecharge fire',
+  gf_fire_firecharge: {
+    name: 'Firecharge Fire',
     life: 180,
     radius: 24,
-    damage: 5, // same dmg to both enemies and obstacles
+    damageConfig: {
+      enemy: 0,
+      turret: 0,
+      player: 0,
+      obstacle: 5
+    },
     tickRate: 15,
     vfxType: 'fire_puddle',
     color: [255, 120, 0],
-    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 0 }], // mainly burn dmg to enemies
-    conditionDuration: 60
+    appliedCondition: [{ type: 'c_burning', duration: 60, damageConfig: { enemy: 5, turret: 0, player: 0 } }]
   },
-  gf_firecherry_puddle: {
+  gf_fire_firecherry: {
     name: 'Cherry Fire',
     life: HOUR_FRAMES * 2,
     radius: 20,
-    damage: 1,
-    tickRate: 6,
+    damageConfig: {
+      enemy: 0,
+      turret: 0,
+      player: 0,
+      obstacle: 10
+    },
+    tickRate: 15,
     vfxType: 'fire_puddle',
     color: [255, 50, 0],
-    appliedCondition: [{ type: 'c_burning', duration: 60, damage: 1 }],
-    conditionDuration: 60
+    appliedCondition: [{ type: 'c_burning', duration: 60, damageConfig: { enemy: 5, turret: 0, player: 0 } }]
   },
   gf_stun_gas: {
     name: 'Stun Gas',
     life: HOUR_FRAMES * 2,
     radius: 32,
+    damageConfig: { enemy: 0, turret: 0, player: 0, obstacle: 0 },
     damage: 0,
     tickRate: 10,
     vfxType: 'stun_gas',
     color: [200, 200, 255],
-    appliedCondition: 'c_stun',
-    conditionDuration: 120
+    appliedCondition: [{ type: 'c_stun', duration: 120 }]
   },
   gf_stun_gas_t3: {
     name: 'Stun Gas T3',
     life: HOUR_FRAMES * 3,
     radius: 34,
+    damageConfig: { enemy: 0, turret: 0, player: 0, obstacle: 0 },
     damage: 0,
     tickRate: 10,
     vfxType: 'stun_gas',
     color: [200, 200, 255],
-    appliedCondition: 'c_stun',
-    conditionDuration: 180
+    appliedCondition: [{ type: 'c_stun', duration: 180 }]
   },
   gf_poison_gas: {
     name: 'Poison Gas',
     life: HOUR_FRAMES,
     radius: 34,
+    damageConfig: { enemy: 0, turret: 2.5, player: 2.5, obstacle: 0 },
     damage: 2.5,
     tickRate: 30,
     vfxType: 'poison_gas',
@@ -93,6 +114,7 @@ export const groundFeatureTypes: any = {
     name: 'Forcefield',
     life: 180,
     radius: 51, // ~1.5 tiles (34 * 1.5)
+    damageConfig: { enemy: 0, turret: 0, player: 0, obstacle: 0 },
     damage: 0,
     tickRate: 1,
     vfxType: 'forcefield',
@@ -118,3 +140,10 @@ export const groundFeatureTypes: any = {
     }
   }
 };
+
+// Backward-compatibility aliases for existing saves/maps
+groundFeatureTypes.gf_fire_puddle = groundFeatureTypes.gf_fire_firepea;
+groundFeatureTypes.gf_fire_puddle_t3 = groundFeatureTypes.gf_fire_firepeat3;
+groundFeatureTypes.gf_fire_puddle_flamethrower = groundFeatureTypes.gf_fire_flamethrower;
+groundFeatureTypes.gf_fire_puddle_firecharge = groundFeatureTypes.gf_fire_firecharge;
+groundFeatureTypes.gf_firecherry_puddle = groundFeatureTypes.gf_fire_firecherry;

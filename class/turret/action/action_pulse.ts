@@ -9,26 +9,39 @@ declare const p5: any;
 declare const sin: any;
 declare const createVector: any;
 
+function isIndestructibleEntity(ent: any): boolean {
+  if (!ent) return false;
+  return ent.isIndestructible === true ||
+         ent.config?.isIndestructible === true ||
+         ent.type === 'o_barrier' ||
+         ent.health === Infinity ||
+         ent.isValidTarget === false ||
+         ent.config?.isValidTarget === false;
+}
+
 export class ActionPulse extends TurretAction {
   tags = ['attack', 'aoe'];
 
   isReady(): boolean {
     if (this.isLocked()) return false;
     if (this.turret.jumpPhase !== null || this.turret.jumpFrames > 0) return false;
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const type = 'pulse';
     let lastFire = this.turret.actionTimers.get(type) || 0;
     const fireRate = config.pulseCooldown || 60;
-    return state.frames - lastFire >= fireRate;
+    const applyFR = config.pulseAppliedFireRateMultiplier ?? false;
+    const frMultiplier = applyFR ? (this.turret.getFireRateMultiplier ? this.turret.getFireRateMultiplier() : (this.turret.fireRateMultiplier || 1.0)) : 1.0;
+    const effectiveCooldown = fireRate / frMultiplier;
+    return state.frames - lastFire >= effectiveCooldown;
   }
 
   needsTarget(): boolean {
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     return !config.pulseTriggerAlways;
   }
 
   getRange(): number {
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     return (config.pulseTriggerRadius || 0) * (this.turret.stats?.rangeMult || 1);
   }
 
@@ -42,7 +55,7 @@ export class ActionPulse extends TurretAction {
 
   performExecute() {
     const wPos = this.turret.getWorldPos();
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const type = 'pulse';
     const triggerRadius = this.getRange();
     const triggerRadiusSq = Math.max(1, triggerRadius * triggerRadius);
@@ -53,11 +66,14 @@ export class ActionPulse extends TurretAction {
     if (tCenter) {
       const dSq = (wPos.x - tCenter.x)**2 + (wPos.y - tCenter.y)**2;
       if (dSq <= triggerRadiusSq) {
-        // Check if target is in pulseTriggerBy
+        // Check if target is in pulseTriggerBy and not indestructible
         let validTarget = false;
-        if (triggerBy.includes('enemy') && (this.turret.target.health !== undefined && !this.turret.target.isMined)) validTarget = true;
-        if (triggerBy.includes('obstacle') && (this.turret.target.isMined !== undefined || this.turret.target.type?.startsWith('o_') || this.turret.target.overlay !== undefined)) validTarget = true;
-        if (triggerBy.includes('turret') && this.turret.target.actions !== undefined) validTarget = true;
+        const target = this.turret.target;
+        if (!isIndestructibleEntity(target)) {
+          if (triggerBy.includes('enemy') && (target.health !== undefined && !target.isMined)) validTarget = true;
+          if (triggerBy.includes('obstacle') && (target.isMined !== undefined || target.type?.startsWith('o_') || target.overlay !== undefined)) validTarget = true;
+          if (triggerBy.includes('turret') && target.actions !== undefined) validTarget = true;
+        }
         
         if (validTarget) triggered = true;
       }
@@ -68,13 +84,16 @@ export class ActionPulse extends TurretAction {
       if (triggerBy.includes('enemy')) {
         if (state.spatialGrid) {
           state.spatialGrid.queryCircleEnemies(wPos.x, wPos.y, triggerRadius, (e: any) => {
+            if (e.conditions?.has('c_hypnotized')) return;
+            if (isIndestructibleEntity(e)) return;
             triggered = true;
             if (!tCenter) tCenter = e.pos.copy ? e.pos.copy() : createVector(e.pos.x, e.pos.y);
             return true;
           });
         } else {
           for (const e of state.enemies) {
-            if (e.health > 0 && !e.isDying) {
+            if (e.health > 0 && !e.isDying && !e.conditions?.has('c_hypnotized')) {
+              if (isIndestructibleEntity(e)) continue;
               const edSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
               if (edSq <= triggerRadiusSq) {
                 triggered = true;
@@ -91,13 +110,18 @@ export class ActionPulse extends TurretAction {
         const tileR = Math.ceil(triggerRadius / GRID_SIZE);
         for (let dx = -tileR; dx <= tileR; dx++) {
           for (let dy = -tileR; dy <= tileR; dy++) {
-            const bx = (baseGx + dx) * GRID_SIZE + GRID_SIZE / 2;
-            const by = (baseGy + dy) * GRID_SIZE + GRID_SIZE / 2;
-            const bdSq = (wPos.x - bx)**2 + (wPos.y - by)**2;
-            if (bdSq <= triggerRadiusSq && state.world.isBlockAt(bx, by)) {
-              triggered = true;
-              if (!tCenter) tCenter = createVector(bx, by);
-              break;
+            const gx = baseGx + dx;
+            const gy = baseGy + dy;
+            const block = state.world.getBlock ? state.world.getBlock(gx, gy) : null;
+            if (block && !block.isMined && !isIndestructibleEntity(block)) {
+              const bx = gx * GRID_SIZE + GRID_SIZE / 2;
+              const by = gy * GRID_SIZE + GRID_SIZE / 2;
+              const bdSq = (wPos.x - bx)**2 + (wPos.y - by)**2;
+              if (bdSq <= triggerRadiusSq) {
+                triggered = true;
+                if (!tCenter) tCenter = createVector(bx, by);
+                break;
+              }
             }
           }
           if (triggered) break;
@@ -125,6 +149,12 @@ export class ActionPulse extends TurretAction {
           let b = Bullet.create(sx, sy, sx, sy, config.pulseBulletTypeKey, 'none', this.turret); 
           (b as any).life = 0; 
           state.bullets.push(b);
+          if (this.turret.isCharged && this.turret.isCharged()) {
+            const stamCost = config.staminaCostPerBulletSpawned || config.StaminaCostPerBulletSpawned || 0;
+            if (stamCost > 0 && state.player) {
+              state.player.spendStamina(stamCost, this.turret);
+            }
+          }
           triggerUpgradeHook('onShot', this.turret, { actionType: 'pulse', bulletTypeKey: config.pulseBulletTypeKey });
           (this.turret as any).pulseAnimTimer = 15;
         }
@@ -135,7 +165,7 @@ export class ActionPulse extends TurretAction {
 
   update() {
     if (!this.turret.jumpPhase) return;
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const wPos = this.turret.getWorldPos();
     const type = 'pulse';
     const baseRunSpeed = 5.0; // Fast chase speed
@@ -197,6 +227,12 @@ export class ActionPulse extends TurretAction {
           let b = Bullet.create(sx, sy, sx, sy, config.pulseBulletTypeKey, 'none', this.turret);
           (b as any).life = 0;
           state.bullets.push(b);
+          if (this.turret.isCharged && this.turret.isCharged()) {
+            const stamCost = config.staminaCostPerBulletSpawned || config.StaminaCostPerBulletSpawned || 0;
+            if (stamCost > 0 && state.player) {
+              state.player.spendStamina(stamCost, this.turret);
+            }
+          }
           triggerUpgradeHook('onShot', this.turret, { actionType: 'pulse', bulletTypeKey: config.pulseBulletTypeKey });
           (this.turret as any).pulseAnimTimer = 15;
         }

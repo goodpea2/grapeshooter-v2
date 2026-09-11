@@ -79,7 +79,7 @@ export class DamageNumberVFX {
 
     const ctx = (window as any).drawingContext as CanvasRenderingContext2D;
     if (ctx) {
-      ctx.font = `bold ${currentSize}px sans-serif`;
+      ctx.font = `bold ${currentSize}px`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = `rgba(${this.r}, ${this.g}, ${this.b}, ${alphaNorm})`;

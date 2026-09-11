@@ -472,9 +472,10 @@ export function recalculateTurretStats(turret: any) {
   turret.refreshActions();
 
   // Update max health if changed
-  const newMax = (turret.config.health * stats.healthMult) + stats.healthAdd;
+  const baseMax = turret.config?.maxHealth !== undefined ? turret.config.maxHealth : (turret.config?.health ?? 50);
+  const newMax = (baseMax * stats.healthMult) + stats.healthAdd;
   if (newMax !== turret.maxHealth) {
-    const ratio = turret.health / turret.maxHealth;
+    const ratio = turret.maxHealth > 0 ? (turret.health / turret.maxHealth) : 1;
     turret.maxHealth = newMax;
     turret.health = turret.maxHealth * ratio;
   }

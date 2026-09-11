@@ -12,18 +12,31 @@ export const state: any = {
     selectedItemKey: 'o_dirt',
     paletteScrollX: 0,
     paletteScrollVel: 0,
-    toolMode: 'brush', // 'brush' | 'bucket' | 'spawn_area'
+    toolMode: 'brush' as 'brush' | 'bucket' | 'spawn_area' | 'lasso',
+    leftPanelWidth: 186,
+    isResizingLeftPanel: false,
+    paletteScrollY: 0,
+    undoStack: [] as any[],
+    redoStack: [] as any[],
+    copiedSpawnerConfig: null as any,
+    copiedSunGenConfig: null as any,
+    copiedBreakCost: undefined as number | undefined,
+    copiedTextSign: null as any,
+    copiedWinCondition: false,
+    editorToastMessage: '',
+    editorToastTimer: 0,
     selectedCustomSpawner: null, // { gx, gy, block }
-    toolbarSpawnerTooltip: null, // { key: string, name: string, config: any }
+    toolbarSpawnerTooltip: null as any, // { key: string, name: string, config: any, targetBlock?: any }
     toolbarSunGeneratorTooltip: null, // { key: string, name: string, config: { damagePerSun: number, maxSun: number } }
     toolbarPaygateTooltip: null, // { gx?: number, gy?: number, resource: string, amount: number }
     toolbarTextSignTooltip: null, // { gx?: number, gy?: number, text: string }
     customSpawnerPrefabs: [], // array of { id, name, config }
-    activeSpawnerInput: null, // { field: string, textBuffer: string }
+    activeSpawnerInput: null as { field: string; textBuffer: string; cursor?: number; selectionStart?: number; selectionEnd?: number; isDragging?: boolean } | null,
     activeSunGeneratorInput: null, // { field: string, textBuffer: string }
     activePaygateInput: null, // { field: string, textBuffer: string }
     activeTextSignInput: null, // { textBuffer: string }
-    spawnAreaLassoPoints: [], // { x, y }[]
+    spawnAreaLassoPoints: [] as { x: number; y: number }[] | null, // { x, y }[]
+    obstacleLassoPoints: [] as { x: number; y: number }[] | null,
     spawnAreaLassoIsRightClick: false,
     flagDragMode: null, // 'add' | 'remove' | null
     isFlagDragActive: false,
@@ -71,8 +84,10 @@ export const state: any = {
   levelEditorAlmanacProgression: null,
   levelEditorPlayerUpgrades: null as any,
   activePlayerUpgradeInput: null as { key: string; field: 'stat' | 'cost' } | null,
+  editorPlayerUpgradesScrollY: 0,
+  editorPlayerUpgradesScrollVelocity: 0,
   levelEditorLevelConfig: null as any,
-  activeLevelConfigInput: null as { field: string; subKey?: string; textBuffer: string; isDragging?: boolean } | null,
+  activeLevelConfigInput: null as { field: string; subKey?: string; textBuffer: string; cursor?: number; selectionStart?: number; selectionEnd?: number; isDragging?: boolean } | null,
   levelConfigScrollY: 0,
   levelConfigScrollVelocity: 0,
   almanacSelectedTurret: 't_pea', // should be dynamic with previous user selection

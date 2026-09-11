@@ -13,17 +13,16 @@ export class ActionLaunchMultiTarget extends TurretAction {
   tags = ['attack', 'projectile', 'artillery', 'multiTarget'];
 
   getFireRateInfo() {
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const stats = this.turret.stats;
-    const frMultiplier = this.turret.fireRateMultiplier || 1;
+    const frMultiplier = this.turret.getFireRateMultiplier ? this.turret.getFireRateMultiplier() : (this.turret.fireRateMultiplier || 1);
     const type = 'launchMultiTarget';
     const step = this.turret.actionSteps.get(type) || 0;
     
     const frValue = config.shootFireRate || 60;
     const baseFR = Array.isArray(frValue) ? frValue[step % frValue.length] : frValue;
-    const frDivider = stats.firerateDivider || 1.0;
     
-    let effectiveFireRate = baseFR / (frDivider * frMultiplier);
+    let effectiveFireRate = baseFR / frMultiplier;
     let bulletsToSpawn = 1;
     if (effectiveFireRate > 0) {
       while (effectiveFireRate < 4) {
@@ -51,7 +50,8 @@ export class ActionLaunchMultiTarget extends TurretAction {
   }
 
   getRange(): number {
-    return (this.turret.config.actionConfig.shootRange || 300) * (this.turret.stats.rangeMult || 1);
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
+    return (config.shootRange || 300) * (this.turret.stats.rangeMult || 1);
   }
 
   needsLOS(): boolean {
@@ -64,7 +64,7 @@ export class ActionLaunchMultiTarget extends TurretAction {
 
   performExecute() {
     const wPos = this.turret.getWorldPos();
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const stats = this.turret.stats;
     const type = 'launchMultiTarget';
     const step = this.turret.actionSteps.get(type) || 0;
@@ -106,6 +106,12 @@ export class ActionLaunchMultiTarget extends TurretAction {
               (b as any).isArtillery = true;
               (b as any).arcHeight = (config.arcHeight || 100) * (1 + random(-0.2, 0.2));
               state.bullets.push(b);
+              if (this.turret.isCharged && this.turret.isCharged()) {
+                const stamCost = config.staminaCostPerBulletSpawned || config.StaminaCostPerBulletSpawned || 0;
+                if (stamCost > 0 && state.player) {
+                  state.player.spendStamina(stamCost, this.turret);
+                }
+              }
             }
             state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, this.turret.angle));
             this.turret.recoil = 10;

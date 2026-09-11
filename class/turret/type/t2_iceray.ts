@@ -2,7 +2,7 @@ import { TurretConfig } from '../turretConfig';
 import { GRID_SIZE } from '../../../constants';
 
 export const t2_iceray: TurretConfig = {
-  name: 'Ice Laser', costs: { sun: 20 }, costAlmanac: { shard: 2, ice: 5 }, drops: { shard: 1, ice: 1 }, health: 50, color: [150, 255, 255], size: 22, tier: 2,
+  name: 'Ice Laser', costs: { sun: 20 }, costAlmanac: { shard: 2, ice: 5 }, drops: { shard: 1, ice: 1 }, health: 100, color: [150, 255, 255], size: 22, tier: 2,
   tooltip: "Slows down enemies contacting the laser beam", animationBodyType: 'tough',
   actionType: ['laserBeam', 'spawnOnTargetDeath'],
   actionConfig: { 

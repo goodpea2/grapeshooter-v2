@@ -2,7 +2,7 @@ import { TurretConfig } from '../turretConfig';
 import { GRID_SIZE } from '../../../constants';
 
 export const tx_goldengrape: TurretConfig = { 
-  name: 'Golden Grape', costs: { elixir: 500 }, costAlmanac: { leaf: 100, shard: 100, shell: 100 }, drops: { leaf: 10, shard: 10, shell: 10 }, health: 400, color: [255, 215, 0], size: 24, isSpecial: true, tier: 0,
+  name: 'Golden Grape', costs: { elixir: 500 }, costAlmanac: { leaf: 100, shard: 100, shell: 100 }, drops: { leaf: 10, shard: 10, shell: 10 }, health: 600, color: [255, 215, 0], size: 24, isSpecial: true, tier: 0,
   tooltip: "Buy the Golden Grape and win the game", animationBodyType: 'soft',
   actionType: ['launchMultiTarget'],
   actionConfig: { 

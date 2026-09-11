@@ -34,6 +34,7 @@ declare const textAlign: any;
 declare const textSize: any;
 declare const textWidth: any;
 declare const textStyle: any;
+declare const textFont: any;
 declare const text: any;
 declare const rect: any;
 declare const line: any;
@@ -331,6 +332,7 @@ function renderSunInputRow(
   const numCenterX = inputAreaX + inputAreaW / 2;
   const numCenterY = y + h / 2;
 
+  if (typeof textFont === 'function') textFont('Consolas, monospace');
   const rawText = stateObj.text;
   textSize(14);
   textStyle(BOLD);
@@ -363,6 +365,7 @@ function renderSunInputRow(
     line(cursorX, numCenterY - 8, cursorX, numCenterY + 8);
     noStroke();
   }
+  if (typeof textFont === 'function') textFont('sans-serif');
 
   // Clickable hitbox for the editable number area
   registerUIHitbox({

@@ -5,7 +5,7 @@ import { liquidTypes } from '../balanceLiquids';
 import { conditionTypes } from '../balanceConditions';
 import { overlayTypes } from '../balanceObstacles';
 import { turretTypes } from '../balanceTurrets';
-import { Explosion, spawnExplosion, LiquidTrailVFX, MuzzleFlash, ConditionVFX } from '../vfx';
+import { Explosion, spawnExplosion, LiquidTrailVFX, MuzzleFlash, ConditionVFX, spawnConditionVFX, spawnStaminaFlyToTurretVFX, spawnStaminaFlyOutVFX, spawnStaminaAbsorbVFX } from '../vfx';
 import { AttachedTurret } from './attachedTurret';
 import { WorldTurret } from './worldTurret';
 import { createAttachedTurret, createWorldTurret, copyTurretState, restoreTurretData } from './turret/TurretRegistry';
@@ -16,6 +16,7 @@ import { Bullet, spawnBullet } from './bullet';
 import { drawPlayer } from '../visualPlayer';
 import { triggerUpgradeHook } from '../src/upgrades';
 import { soundEngine } from '../src/audio/soundEngine';
+import { eventBus } from '../src/events/eventBus';
 
 declare const p5: any;
 declare const createVector: any;
@@ -35,6 +36,7 @@ export class Player {
   pos: any; prevPos: any; size = 30; attachments: AttachedTurret[] = []; health = 100; maxHealth = 100; speed = 3.0; flash = 0; autoTurretAngle = 0; autoTurretLastShot = 0; autoTurretRange = GRID_SIZE * 6; autoTurretFireRate = 22; recoil = 0; target: any = null;
   stamina = 100;
   maxStamina = 100;
+  totalStaminaSpent = 0;
   lastStaminaSpentFrame = -1000;
   staminaDepletingTimer = 0;
   hurtAnimTimer = 0;
@@ -44,6 +46,7 @@ export class Player {
   autoTurretClickAttackBoost = 2; // +200% attack speed
   pulseAnimTimer = 0;
   conditions: Map<string, number> = new Map();
+  conditionData: Map<string, any> = new Map();
   
   // Input tracking for orientation and state locking
   moveInputVec: any;
@@ -65,10 +68,125 @@ export class Player {
     this.stamina = configuredMaxStam;
   }
   
-  applyCondition(cKey: string, duration: number) {
+  applyCondition(cKey: string, duration: number, data?: any) {
     const cfg = conditionTypes[cKey]; if (!cfg) return;
-    this.conditions.set(cKey, Math.max(this.conditions.get(cKey) || 0, duration));
-    if (!state.vfx.some((v: any) => v instanceof ConditionVFX && v.target === this && v.type === cKey)) state.vfx.push(new ConditionVFX(this, cKey));
+    if (cfg.conditionClashesConfig?.override) {
+      for (let ov of cfg.conditionClashesConfig.override) {
+        for (let k of Array.from(this.conditions.keys())) {
+          if (k === ov || (ov.startsWith('c_burning') && k.startsWith('c_burning'))) {
+            this.conditions.delete(k);
+          }
+        }
+        this.conditionData.delete(ov + '_dmg');
+        if (ov.startsWith('c_burning')) this.conditionData.delete('c_burning_dmg');
+      }
+    }
+
+    // Non-stacking burning conditions: burn hierarchy (only apply the stronger burn, no damage fallback)
+    if (cKey.startsWith('c_burning')) {
+      const incomingDmg = (data?.damageConfig?.player !== undefined)
+        ? data.damageConfig.player
+        : ((data?.damage !== undefined) ? data.damage : (cfg.damage || 0));
+      if (incomingDmg <= 0) return;
+      const currentBurnDmg = this.conditionData.get('c_burning_dmg') ?? 0;
+      const hasBurn = Array.from(this.conditions.keys()).some(k => k.startsWith('c_burning'));
+
+      if (!hasBurn || incomingDmg > currentBurnDmg) {
+        for (let k of Array.from(this.conditions.keys())) {
+          if (k.startsWith('c_burning')) this.conditions.delete(k);
+        }
+        this.conditions.set(cKey, duration);
+        this.conditionData.set('c_burning_dmg', incomingDmg);
+      } else if (incomingDmg === currentBurnDmg) {
+        this.conditions.set(cKey, Math.max(this.conditions.get(cKey) || 0, duration));
+      }
+      // If incomingDmg < currentBurnDmg, ignore weaker burn
+    } else {
+      this.conditions.set(cKey, Math.max(this.conditions.get(cKey) || 0, duration));
+    }
+
+    if (!state.vfx.some((v: any) => v instanceof ConditionVFX && v.target === this && v.type === cKey)) {
+      state.vfx.push(spawnConditionVFX(this, cKey));
+    }
+  }
+
+  auraFirerateBoosts: Map<string, { amount: number; expiresAt: number }> = new Map();
+
+  applyAuraFirerateBoost(emitterUid: string, amount: number, duration: number = 4) {
+    if (!this.auraFirerateBoosts) this.auraFirerateBoosts = new Map();
+    this.auraFirerateBoosts.set(emitterUid, {
+      amount,
+      expiresAt: state.frames + duration
+    });
+  }
+
+  getAttachedPowerbankStamina(): number {
+    let total = 0;
+    for (const a of this.attachments) {
+      if (a.type === 't3_powerbank') {
+        total += (a as any).stamina || 0;
+      }
+    }
+    return total;
+  }
+
+  getTotalAvailableStamina(): number {
+    return this.stamina + this.getAttachedPowerbankStamina();
+  }
+
+  spendStamina(amount: number, turret?: any) {
+    if (amount <= 0) return;
+    let remainingToSpend = amount;
+
+    // First spend from player's own stamina
+    if (this.stamina > 0) {
+      const spendFromPlayer = Math.min(this.stamina, remainingToSpend);
+      this.stamina = Math.max(0, this.stamina - spendFromPlayer);
+      remainingToSpend -= spendFromPlayer;
+    }
+
+    // If still need to spend, consume from attached powerbanks
+    if (remainingToSpend > 0) {
+      for (const a of this.attachments) {
+        if (a.type === 't3_powerbank' && (a as any).stamina > 0) {
+          const pb = a as any;
+          if (pb.spendStamina) {
+            const spent = pb.spendStamina(remainingToSpend);
+            remainingToSpend -= spent;
+          } else {
+            const spendFromPb = Math.min(pb.stamina, remainingToSpend);
+            pb.stamina = Math.max(0, pb.stamina - spendFromPb);
+            pb.growthProgress = pb.stamina;
+            remainingToSpend -= spendFromPb;
+            if (state.frames % 4 === 0) {
+              const wPos = a.getWorldPos();
+              spawnStaminaFlyOutVFX(wPos.x, wPos.y);
+            }
+          }
+          if (remainingToSpend <= 0) break;
+        }
+      }
+    }
+
+    const actualSpent = amount - remainingToSpend;
+    if (actualSpent > 0) {
+      this.totalStaminaSpent = (this.totalStaminaSpent || 0) + actualSpent;
+      this.lastStaminaSpentFrame = state.frames;
+      this.staminaDepletingTimer = 12;
+      this.applyCondition('c_raged_visualonly', 10);
+    }
+
+    if (this.getTotalAvailableStamina() <= 0) {
+      this.isBoosting = false;
+    }
+
+    triggerUpgradeHook('onStaminaSpent', this, { amount: actualSpent, turret });
+
+    if (turret) {
+      spawnStaminaFlyToTurretVFX(this.pos.x, this.pos.y, turret);
+    } else {
+      spawnStaminaFlyOutVFX(this.pos.x, this.pos.y);
+    }
   }
 
   update() {
@@ -79,14 +197,15 @@ export class Player {
     if (this.pulseAnimTimer > 0) this.pulseAnimTimer--;
     if (this.staminaDepletingTimer > 0) this.staminaDepletingTimer--;
 
-    // Update Boosting state: requires >= 25 stamina to start, stops when stamina runs out (<= 0)
+    // Update Boosting state: requires >= 25 total stamina to start, stops when total stamina runs out (<= 0)
+    const totalAvailStam = this.getTotalAvailableStamina();
     if (this.isClickHolding) {
       if (!this.isBoosting) {
-        if (this.stamina >= 25) {
+        if (totalAvailStam >= 25) {
           this.isBoosting = true;
         }
       } else {
-        if (this.stamina <= 0) {
+        if (totalAvailStam <= 0) {
           this.isBoosting = false;
         }
       }
@@ -112,6 +231,9 @@ export class Player {
     const timeSinceLastSpent = state.frames - this.lastStaminaSpentFrame;
     if (!isMoving && timeSinceLastSpent >= 60 && this.stamina < this.maxStamina) {
       this.stamina = Math.min(this.maxStamina, this.stamina + (2 / 6));
+      if (state.frames % 8 === 0) {
+        spawnStaminaAbsorbVFX(this.pos.x, this.pos.y);
+      }
     }
 
     // Game Over check
@@ -128,10 +250,40 @@ export class Player {
     let fireRateBonus = 0;
     for (let [cKey, life] of this.conditions) {
       const cfg = conditionTypes[cKey];
-      if (cfg.playerCombatBoost) fireRateBonus += (cfg.playerCombatBoost - 1);
-      if (cfg.firerateBoost) fireRateBonus += cfg.firerateBoost;
+      if (cfg) {
+        if (cfg.playerCombatBoost) fireRateBonus += (cfg.playerCombatBoost - 1);
+        if (cKey === 'fireRateUp' && this.auraFirerateBoosts && this.auraFirerateBoosts.size > 0) {
+          // Handled via auraFirerateBoosts per emitter
+        } else if (cfg.firerateBoost) {
+          fireRateBonus += cfg.firerateBoost;
+        }
+
+        if (cKey.startsWith('c_burning')) {
+          const dmg = this.conditionData.get('c_burning_dmg') ?? cfg.damage ?? 0;
+          if (dmg > 0 && state.frames % (cfg.damageInterval || 15) === 0) {
+            this.takeDamage(dmg, { type: 'condition', key: cKey });
+          }
+        } else if (cfg.damage && state.frames % cfg.damageInterval === 0) {
+          this.takeDamage(cfg.damage, { type: 'condition', key: cKey });
+        }
+      }
       this.conditions.set(cKey, life - 1);
-      if (life <= 0) this.conditions.delete(cKey);
+      if (life <= 0) {
+        this.conditions.delete(cKey);
+        if (cKey.startsWith('c_burning')) {
+          const hasMoreBurning = Array.from(this.conditions.keys()).some(k => k.startsWith('c_burning'));
+          if (!hasMoreBurning) this.conditionData.delete('c_burning_dmg');
+        }
+      }
+    }
+    if (this.auraFirerateBoosts) {
+      for (const [uid, boost] of this.auraFirerateBoosts) {
+        if (state.frames <= boost.expiresAt) {
+          fireRateBonus += boost.amount;
+        } else {
+          this.auraFirerateBoosts.delete(uid);
+        }
+      }
     }
     let fireRateMult = 1.0 + fireRateBonus;
 
@@ -584,7 +736,7 @@ export class Player {
     this.autoTurretClickAttackBoost = boostVal;
     this.autoTurretClickMiningBoost = boostVal;
 
-    const isBoostActive = this.isBoosting && this.stamina > 0;
+    const isBoostActive = this.isBoosting && this.getTotalAvailableStamina() > 0;
 
     // do not delete this line - effectiveFireRate is a stackable percentage, not exponential, for example: "4x fire rate" translates to +300% fire rate, so 2 sources of 4x fire rate gives the output of +600%. 
     let attackBonus = (fireRateMult - 1.0) + ((state.playerBonuses.attackFirerateMult || 1.0) - 1.0);
@@ -643,10 +795,7 @@ export class Player {
           if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 24, 6, color(100, 200, 255))); 
         }
         if (isBoostActive) {
-          this.stamina = Math.max(0, this.stamina - 2 * attackBulletsToSpawn);
-          this.lastStaminaSpentFrame = state.frames;
-          this.staminaDepletingTimer = 12;
-          this.applyCondition('c_raged_visualonly', 10);
+          this.spendStamina(2 * attackBulletsToSpawn);
         }
         this.autoTurretLastShot = state.frames; this.recoil = 6; this.pulseAnimTimer = 15; 
       } 
@@ -657,6 +806,7 @@ export class Player {
     let nearestE: any = null; let minDistE = this.autoTurretRange;
     if (state.spatialGrid) {
       state.spatialGrid.queryCircleEnemies(this.pos.x, this.pos.y, this.autoTurretRange, (e: any) => {
+        if (e.health <= 0 || e.isDying || e.isAirborne || e.conditions?.has('c_hypnotized')) return;
         let d = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y);
         if (d < minDistE && state.world.checkLOS(this.pos.x, this.pos.y, e.pos.x, e.pos.y)) {
           minDistE = d;
@@ -665,7 +815,7 @@ export class Player {
       });
     } else {
       for (let e of state.enemies) {
-        if (e.health > 0 && !e.isDying) {
+        if (e.health > 0 && !e.isDying && !e.isAirborne && !e.conditions?.has('c_hypnotized')) {
           let d = dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y);
           if (d < minDistE && state.world.checkLOS(this.pos.x, this.pos.y, e.pos.x, e.pos.y)) {
             minDistE = d;
@@ -675,6 +825,7 @@ export class Player {
       }
     }
     if (nearestE) { 
+      this.target = nearestE;
       this.autoTurretAngle = atan2(nearestE.pos.y - this.pos.y, nearestE.pos.x - this.pos.x); 
       if (state.frames - this.autoTurretLastShot > effectiveAttackFireRate) { 
         for (let i = 0; i < attackBulletsToSpawn; i++) {
@@ -693,12 +844,7 @@ export class Player {
           if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 24, 6, color(100, 200, 255))); 
         }
         if (isBoostActive) {
-          const spent = 2 * attackBulletsToSpawn;
-          this.stamina = Math.max(0, this.stamina - spent);
-          this.lastStaminaSpentFrame = state.frames;
-          this.staminaDepletingTimer = 12;
-          this.applyCondition('c_raged_visualonly', 10);
-          triggerUpgradeHook('onStaminaSpent', this, { amount: spent });
+          this.spendStamina(2 * attackBulletsToSpawn);
         }
         this.autoTurretLastShot = state.frames; this.recoil = 6; this.pulseAnimTimer = 15; 
       } 
@@ -727,12 +873,7 @@ export class Player {
           if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 14, 4, color(255, 255, 100)));
         }
         if (isBoostActive) {
-          const spent = 2 * miningBulletsToSpawn;
-          this.stamina = Math.max(0, this.stamina - spent);
-          this.lastStaminaSpentFrame = state.frames;
-          this.staminaDepletingTimer = 12;
-          this.applyCondition('c_raged_visualonly', 10);
-          triggerUpgradeHook('onStaminaSpent', this, { amount: spent });
+          this.spendStamina(2 * miningBulletsToSpawn);
         }
         this.autoTurretLastShot = state.frames;
         this.recoil = 3;
@@ -763,12 +904,7 @@ export class Player {
           if (i === 0) state.vfx.push(new MuzzleFlash(this.pos.x, this.pos.y, sa, 14, 4, color(255, 255, 100))); 
         }
         if (isBoostActive) {
-          const spent = 2 * miningBulletsToSpawn;
-          this.stamina = Math.max(0, this.stamina - spent);
-          this.lastStaminaSpentFrame = state.frames;
-          this.staminaDepletingTimer = 12;
-          this.applyCondition('c_raged_visualonly', 10);
-          triggerUpgradeHook('onStaminaSpent', this, { amount: spent });
+          this.spendStamina(2 * miningBulletsToSpawn);
         }
         this.autoTurretLastShot = state.frames; 
         this.recoil = 3; 
@@ -843,7 +979,13 @@ export class Player {
     
     if (!cy) this.pos.y = ty;
   }
-  takeDamage(dmg: number) { this.health -= dmg; this.flash = 6; this.hurtAnimTimer = 10; if (this.health <= 0) this.health = 0; }
+  takeDamage(dmg: number, source?: any) {
+    this.health -= dmg;
+    this.flash = 6;
+    this.hurtAnimTimer = 10;
+    if (this.health <= 0) this.health = 0;
+    eventBus.emit('PLAYER_DAMAGED', { player: this, source, amount: dmg });
+  }
   
   displayAttachments(behind: boolean) { 
     const filtered = this.attachments.filter(a => {

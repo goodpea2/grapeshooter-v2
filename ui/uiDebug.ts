@@ -868,7 +868,7 @@ export function drawPerfOverlay() {
   const bulletCount = state.bullets ? state.bullets.length : 0;
   const vfxCount = state.vfx ? state.vfx.length : 0;
   const uiVfxCount = state.uiVfx ? state.uiVfx.length : 0;
-  const attachedTurretsCount = state.turrets ? state.turrets.length : 0;
+  const attachedTurretsCount = state.player?.attachments ? state.player.attachments.length : 0;
   let worldTurretsCount = 0;
   let worldLootCount = 0;
   let activeChunksCount = 0;

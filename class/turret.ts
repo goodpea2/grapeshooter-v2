@@ -2,10 +2,11 @@
 import { state } from '../state';
 import { GRID_SIZE, TurretMinScanRate, WORLD_TURRET_ACTIVE_RANGE, CHUNK_SIZE } from '../constants';
 import { turretTypes } from '../balanceTurrets';
+import { TURRET_RECIPES } from '../dictionaryTurretMerging';
 import { conditionTypes } from '../balanceConditions';
 import { liquidTypes } from '../balanceLiquids';
 import { overlayTypes } from '../balanceObstacles';
-import { MuzzleFlash, BlockDebris, ConditionVFX, FirstStrikeVFX, DamageNumberVFX, spawnDamageNumber, MagicLinkVFX, WeldingHitVFX, SparkVFX, MergeVFX } from '../vfx/index';
+import { MuzzleFlash, BlockDebris, ConditionVFX, spawnConditionVFX, FirstStrikeVFX, DamageNumberVFX, spawnDamageNumber, MagicLinkVFX, WeldingHitVFX, SparkVFX, MergeVFX } from '../vfx/index';
 import { Bullet } from './bullet';
 import { SunLoot } from './loot';
 import { spawnLootAt } from '../economy';
@@ -15,6 +16,7 @@ import { drawTurret, drawTurretUI } from '../visualTurrets';
 import { TurretAction } from './turretAction';
 import { TurretHub } from './turret/hub';
 import { soundEngine } from '../src/audio/soundEngine';
+import { eventBus } from '../src/events/eventBus';
 
 declare const p5: any;
 declare const createVector: any;
@@ -45,6 +47,8 @@ export abstract class Turret {
   actionTimers: Map<string, number> = new Map();
   actionSteps: Map<string, number> = new Map();
   actions: TurretAction[] = [];
+  actionsNormal: TurretAction[] = [];
+  actionsCharged: TurretAction[] = [];
   actionLocks: Set<string> = new Set();
   target: any = null;
   isWaterlogged: boolean = false;
@@ -96,6 +100,7 @@ export abstract class Turret {
 
   // Shield tracking
   shieldImpactAngles: number[] = [];
+  hasEmittedDestroyedEvent: boolean = false;
   activeStats: any = {
     damageMult: 1.0,
     firerateMult: 1.0,
@@ -125,9 +130,17 @@ export abstract class Turret {
     this.health = this.config.initialHealth !== undefined ? this.config.initialHealth : this.config.health;
     this.targetScanTimer = floor(random(TurretMinScanRate));
     
-    // Initialize base ingredients for T1 turrets
+    // Initialize base ingredients for T1, T2, and T3 turrets
     if (this.config.tier === 1) {
       this.baseIngredients = [type];
+    } else if (this.config.tier === 2 || this.config.tier === 3) {
+      const recipe = TURRET_RECIPES.find(r => r.id === type);
+      if (recipe) {
+        this.baseIngredients = [...recipe.ingredients];
+        while (this.baseIngredients.length < recipe.totalCount) {
+          this.baseIngredients.push(recipe.ingredients[0]);
+        }
+      }
     }
 
     if (this.config.actionType.includes('firstStrike')) {
@@ -155,7 +168,16 @@ export abstract class Turret {
   }
 
   initActions() {
-    this.actions = TurretHub.getActions(this);
+    this.actionsNormal = TurretHub.getActions(this, false);
+    this.actionsCharged = TurretHub.getActions(this, true);
+    this.actions = this.isCharged() ? this.actionsCharged : this.actionsNormal;
+  }
+
+  getActiveActionConfig(): any {
+    if (this.isCharged() && this.config.actionConfigWhileCharged) {
+      return { ...this.config.actionConfig, ...this.config.actionConfigWhileCharged };
+    }
+    return this.config.actionConfig || {};
   }
 
   refreshActions() {
@@ -269,7 +291,40 @@ export abstract class Turret {
 
   isCharged(): boolean {
     if (!this.isAttachedToPlayer()) return false;
-    return !!(state.player && state.player.isBoosting && state.player.stamina > 0);
+    return !!(state.player && state.player.isBoosting && (state.player.stamina > 0 || state.player.getAttachedPowerbankStamina() > 0));
+  }
+
+  isArmed(): boolean {
+    const config = this.config;
+    const actionConfig = config.actionConfig;
+    if (this.jumpPhase === 'toTarget') return true;
+    if (this.jumpPhase !== null && this.jumpPhase !== undefined) return false;
+
+    // Check if primary actions are on cooldown
+    const primaryActions = ['pulse', 'shoot', 'shootMultiTarget', 'launch', 'spawnBulletAtRandom'];
+    const applyTo = config.unarmedAssetApplyToAction || primaryActions;
+
+    for (const act of primaryActions) {
+      if (config.actionType && config.actionType.includes(act) && applyTo.includes(act)) {
+        const timer = this.actionTimers.get(act) || -999999;
+        let cooldown = 0;
+        let applyFR = true;
+        if (act === 'spawnBulletAtRandom') cooldown = actionConfig?.spawnBulletAtRandom?.cooldown || 0;
+        else if (act === 'pulse') {
+          cooldown = actionConfig?.pulseCooldown || 0;
+          applyFR = actionConfig?.pulseAppliedFireRateMultiplier ?? false;
+        } else {
+          const fr = Array.isArray(actionConfig?.shootFireRate) ? actionConfig?.shootFireRate[0] : actionConfig?.shootFireRate;
+          cooldown = fr || 0;
+        }
+
+        const frMult = applyFR ? (this.getFireRateMultiplier ? this.getFireRateMultiplier() : (this.fireRateMultiplier || 1.0)) : 1.0;
+        if (cooldown > 0 && (state.frames - timer) < (cooldown / frMult)) {
+          return false;
+        }
+      }
+    }
+    return true;
   }
 
   update() {
@@ -293,16 +348,27 @@ export abstract class Turret {
     if (this.pulseAnimTimer > 0) this.pulseAnimTimer--;
     this.shieldImpactAngles = [];
 
-    if (this.isCharged() && this.config.whileCharged && Object.keys(this.config.whileCharged).length > 0) {
+    const isChargedNow = this.isCharged();
+    const hasWhileChargedDeclared = !!(
+      (this.config.actionTypeWhileCharged && this.config.actionTypeWhileCharged.length > 0) ||
+      this.config.actionConfigWhileCharged
+    );
+
+    if (isChargedNow && hasWhileChargedDeclared) {
       this.applyCondition('c_raged_visualonly', 4);
+    } else {
+      this.conditions.delete('c_raged_visualonly');
     }
+
+    this.actions = isChargedNow ? this.actionsCharged : this.actionsNormal;
 
     const wPos = this.getWorldPos();
     const gx = floor(wPos.x / GRID_SIZE);
     const gy = floor(wPos.y / GRID_SIZE);
     const liquidType = state.world.getLiquidAt(gx, gy);
     const lData = liquidType ? liquidTypes[liquidType] : null;
-    this.fireRateMultiplier = lData?.liquidConfig?.turretFireRateMultiplier ?? 1.0;
+    this.liquidFireRateMultiplier = lData?.liquidConfig?.turretFireRateMultiplier ?? 1.0;
+    this.fireRateMultiplier = this.getFireRateMultiplier();
 
     // Waterlogged logic might differ between attached and world turrets
     // For now, let's keep it simple or override in subclasses
@@ -326,16 +392,21 @@ export abstract class Turret {
   protected updateConditions() {
     for (let [cKey, life] of this.conditions) {
       const cfg = conditionTypes[cKey];
-      if (cKey === 'c_burning') {
-        const dmg = this.conditionData.get('c_burning_dmg') || cfg.damage || 0;
-        if (dmg > 0 && state.frames % (cfg.damageInterval || 6) === 0) this.takeDamage(dmg);
-      } else if (cfg.damage && state.frames % cfg.damageInterval === 0) {
-        this.takeDamage(cfg.damage);
+      if (cKey.startsWith('c_burning')) {
+        const dmg = this.conditionData.get('c_burning_dmg') ?? cfg?.damage ?? 0;
+        if (dmg > 0 && state.frames % (cfg?.damageInterval || 15) === 0) {
+          this.takeDamage(dmg, { type: 'condition', key: cKey });
+        }
+      } else if (cfg?.damage && state.frames % cfg.damageInterval === 0) {
+        this.takeDamage(cfg.damage, { type: 'condition', key: cKey });
       }
       this.conditions.set(cKey, life - 1);
       if (life <= 0) {
         this.conditions.delete(cKey);
-        if (cKey === 'c_burning') this.conditionData.delete('c_burning_dmg');
+        if (cKey.startsWith('c_burning')) {
+          const hasMoreBurning = Array.from(this.conditions.keys()).some(k => k.startsWith('c_burning'));
+          if (!hasMoreBurning) this.conditionData.delete('c_burning_dmg');
+        }
       }
     }
   }
@@ -512,6 +583,11 @@ export abstract class Turret {
     const wPos = this.getWorldPos();
     state.vfx.push(new BlockDebris(wPos.x, wPos.y, [100, 100, 100]));
     
+    if (!this.hasEmittedDestroyedEvent) {
+      this.hasEmittedDestroyedEvent = true;
+      eventBus.emit('TURRET_DESTROYED', { turret: this, pos: wPos });
+    }
+    
     // Drop loot based on config
     if (this.config.lootConfigOnDeath) {
       spawnLootAt(wPos.x, wPos.y, this.type, this.config.lootConfigOnDeath);
@@ -530,18 +606,98 @@ export abstract class Turret {
     if (!cfg) return;
     if (cfg.conditionClashesConfig?.override) {
       for (let ov of cfg.conditionClashesConfig.override) {
-        this.conditions.delete(ov);
+        for (let k of Array.from(this.conditions.keys())) {
+          if (k === ov || (ov.startsWith('c_burning') && k.startsWith('c_burning'))) {
+            this.conditions.delete(k);
+          }
+        }
         this.conditionData.delete(ov + '_dmg');
+        if (ov.startsWith('c_burning')) this.conditionData.delete('c_burning_dmg');
       }
     }
-    this.conditions.set(cKey, Math.max(this.conditions.get(cKey) || 0, duration));
-    if (cKey === 'c_burning' && data?.damage !== undefined) {
-      const currentMax = this.conditionData.get('c_burning_dmg') || 0;
-      this.conditionData.set('c_burning_dmg', Math.max(currentMax, data.damage));
+
+    // Non-stacking burning conditions: burn hierarchy (only apply the stronger burn, no damage fallback)
+    if (cKey.startsWith('c_burning')) {
+      const incomingDmg = (data?.damageConfig?.turret !== undefined)
+        ? data.damageConfig.turret
+        : ((data?.damage !== undefined) ? data.damage : (cfg.damage || 0));
+      if (incomingDmg <= 0) return;
+      const currentBurnDmg = this.conditionData.get('c_burning_dmg') ?? 0;
+      const hasBurn = Array.from(this.conditions.keys()).some(k => k.startsWith('c_burning'));
+
+      if (!hasBurn || incomingDmg > currentBurnDmg) {
+        for (let k of Array.from(this.conditions.keys())) {
+          if (k.startsWith('c_burning')) this.conditions.delete(k);
+        }
+        this.conditions.set(cKey, duration);
+        this.conditionData.set('c_burning_dmg', incomingDmg);
+      } else if (incomingDmg === currentBurnDmg) {
+        this.conditions.set(cKey, Math.max(this.conditions.get(cKey) || 0, duration));
+      }
+      // If incomingDmg < currentBurnDmg, ignore weaker burn
+    } else {
+      this.conditions.set(cKey, Math.max(this.conditions.get(cKey) || 0, duration));
     }
+
     if (!state.vfx.some((v: any) => v instanceof ConditionVFX && v.target === this && v.type === cKey)) {
-      state.vfx.push(new ConditionVFX(this, cKey));
+      state.vfx.push(spawnConditionVFX(this, cKey));
     }
+  }
+
+  auraFirerateBoosts: Map<string, { amount: number; expiresAt: number }> = new Map();
+
+  applyAuraFirerateBoost(emitterUid: string, amount: number, duration: number = 4) {
+    if (!this.auraFirerateBoosts) this.auraFirerateBoosts = new Map();
+    this.auraFirerateBoosts.set(emitterUid, {
+      amount,
+      expiresAt: state.frames + duration
+    });
+  }
+
+  /**
+   * =========================================================================
+   * UNIFIED FIRE RATE EVALUATION GETTER
+   * =========================================================================
+   * REMINDER FOR FUTURE DEVELOPERS & GENERATIONS:
+   * DO NOT invent separate ad-hoc multipliers or isolated calculation paths for
+   * turret fire rates! All fire rate calculations across all systems (including
+   * ActionShoot, ActionLaunch, ActionPulse, ActionShootSpin, TurretGizmos, etc.)
+   * MUST query or synchronize with this exact method: `turret.getFireRateMultiplier()`.
+   *
+   * Formula:
+   *   Total Multiplier = (baseFirerateDivider + conditionBoosts + auraFirerateBoosts) * liquidFireRateMultiplier
+   *
+   * An increased multiplier means FASTER fire rate (i.e. lower frame cooldown):
+   *   effectiveCooldown = baseCooldown / getFireRateMultiplier()
+   * =========================================================================
+   */
+  liquidFireRateMultiplier: number = 1.0;
+
+  getFireRateMultiplier(): number {
+    let frDivider = this.activeStats?.firerateDivider || 1.0;
+    for (const [cKey] of this.conditions) {
+      if (cKey === 'fireRateUp' && this.auraFirerateBoosts && this.auraFirerateBoosts.size > 0) {
+        // Boost is already counted per-emitter via auraFirerateBoosts
+        continue;
+      }
+      const cfg = conditionTypes[cKey];
+      if (cfg?.firerateBoost) frDivider += cfg.firerateBoost;
+    }
+    if (this.auraFirerateBoosts) {
+      for (const [uid, boost] of this.auraFirerateBoosts) {
+        if (state.frames <= boost.expiresAt) {
+          frDivider += boost.amount;
+        } else {
+          this.auraFirerateBoosts.delete(uid);
+        }
+      }
+    }
+    const liquidMult = this.liquidFireRateMultiplier ?? 1.0;
+    return frDivider * liquidMult;
+  }
+
+  getFireRateDivider(): number {
+    return this.getFireRateMultiplier();
   }
 
   public findTarget() {
@@ -621,7 +777,7 @@ export abstract class Turret {
       const grid = state.spatialGrid;
       if (grid) {
         grid.queryCircleEnemies(wPos.x, wPos.y, range, (e: any) => {
-          if (e.conditions.has('c_hypnotized')) return;
+          if (e.conditions.has('c_hypnotized') || e.isAirborne || e.isDying || e.health <= 0) return;
           const dSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
           if (dSq <= rangeSq) candidates.push({ e, dSq });
         });
@@ -670,7 +826,7 @@ export abstract class Turret {
         const cw = CHUNK_SIZE * GRID_SIZE; const dx = (chunk.cx * cw + cw/2) - wPos.x; const dy = (chunk.cy * cw + cw/2) - wPos.y;
         if (dx*dx + dy*dy > (range + cw)**2) return;
         chunk.blocks.forEach((b: any) => {
-          if (b.isMined || b.type === 'o_barrier' || b.config?.isValidTarget === false || b.isValidTarget === false) return;
+          if (b.isMined || b.type === 'o_barrier' || b.isIndestructible || b.config?.isIndestructible || b.health === Infinity || b.config?.isValidTarget === false || b.isValidTarget === false) return;
           const oCfg = b.overlay ? overlayTypes[b.overlay] : null;
           if (oCfg?.isValidTarget === false) return;
           const bcx = b.pos.x + GRID_SIZE/2; const bcy = b.pos.y + GRID_SIZE/2;
@@ -695,7 +851,8 @@ export abstract class Turret {
     }
 
     // While charged, if there's no target within own range, follow player's current target
-    if (!this.target && this.isCharged() && this.config.whileCharged?.followPlayerTarget && state.player?.target) {
+    const activeCfg = this.getActiveActionConfig();
+    if (!this.target && this.isCharged() && (activeCfg?.followPlayerTarget || this.config.whileCharged?.followPlayerTarget) && state.player?.target) {
       const pTarget = state.player.target;
       let valid = pTarget.isFrosted !== undefined 
         ? (pTarget.isFrosted && pTarget.iceCubeHealth > 0) 
@@ -713,7 +870,7 @@ export abstract class Turret {
   protected findAllTargetsWithin(range: number) {
     const wPos = this.getWorldPos();
     return state.enemies.filter((e: any) => {
-      if (e.health <= 0 || e.isDying) return false;
+      if (e.health <= 0 || e.isDying || e.isAirborne) return false;
       const dSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
       return dSq < (range + 10)**2 && state.world.checkLOS(wPos.x, wPos.y, e.pos.x, e.pos.y);
     });

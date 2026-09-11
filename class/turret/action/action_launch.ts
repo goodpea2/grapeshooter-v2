@@ -15,21 +15,16 @@ export class ActionLaunch extends TurretAction {
   tags = ['attack', 'projectile', 'artillery'];
 
   getFireRateInfo() {
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const stats = this.turret.stats;
-    const frMultiplier = this.turret.fireRateMultiplier || 1;
+    const frMultiplier = this.turret.getFireRateMultiplier ? this.turret.getFireRateMultiplier() : (this.turret.fireRateMultiplier || 1);
     const type = 'launch';
     const step = this.turret.actionSteps.get(type) || 0;
     
-    const isCharged = this.turret.isCharged ? this.turret.isCharged() : false;
     let frValue = config.shootFireRate || 60;
-    if (isCharged && this.turret.config.whileCharged?.shootFireRate !== undefined) {
-      frValue = this.turret.config.whileCharged.shootFireRate;
-    }
     const baseFR = Array.isArray(frValue) ? frValue[step % frValue.length] : frValue;
-    const frDivider = stats.firerateDivider || 1.0;
     
-    let effectiveFireRate = baseFR / (frDivider * frMultiplier);
+    let effectiveFireRate = baseFR / frMultiplier;
     let bulletsToSpawn = 1;
     if (effectiveFireRate > 0) {
       while (effectiveFireRate < 4) {
@@ -54,11 +49,8 @@ export class ActionLaunch extends TurretAction {
   }
 
   getRange(): number {
-    const isCharged = this.turret.isCharged ? this.turret.isCharged() : false;
-    let baseRange = this.turret.config.actionConfig.shootRange || 300;
-    if (isCharged && this.turret.config.whileCharged?.shootRange !== undefined) {
-      baseRange = this.turret.config.whileCharged.shootRange;
-    }
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
+    let baseRange = config.shootRange || 300;
     return baseRange * (this.turret.stats.rangeMult || 1);
   }
 
@@ -67,8 +59,9 @@ export class ActionLaunch extends TurretAction {
   }
 
   canExecute(): boolean {
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const isCharged = this.turret.isCharged ? this.turret.isCharged() : false;
-    if (isCharged && this.turret.config.whileCharged?.shootRandomPosWhenNoTarget) {
+    if (isCharged && config.shootRandomPosWhenNoTarget) {
       return this.isReady();
     }
     return this.isReady() && !!this.turret.target;
@@ -76,14 +69,14 @@ export class ActionLaunch extends TurretAction {
 
   performExecute() {
     const wPos = this.turret.getWorldPos();
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const type = 'launch';
     const step = this.turret.actionSteps.get(type) || 0;
     const isCharged = this.turret.isCharged ? this.turret.isCharged() : false;
 
     let tCenter = this.turret.getTargetCenter();
     if (!tCenter) {
-      if (isCharged && this.turret.config.whileCharged?.shootRandomPosWhenNoTarget) {
+      if (isCharged && config.shootRandomPosWhenNoTarget) {
         const randAngle = random(TWO_PI);
         const maxR = this.getRange();
         const randDist = random(GRID_SIZE * 1.5, maxR);
@@ -113,6 +106,13 @@ export class ActionLaunch extends TurretAction {
 
       if (i === 0) {
         state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, sa));
+      }
+    }
+
+    if (this.turret.isCharged && this.turret.isCharged()) {
+      const stamCost = config.staminaCostPerBulletSpawned || config.StaminaCostPerBulletSpawned || 0;
+      if (stamCost > 0 && state.player) {
+        state.player.spendStamina(stamCost * totalBullets, this.turret);
       }
     }
 

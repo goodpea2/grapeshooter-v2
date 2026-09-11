@@ -63,10 +63,18 @@ import { t3_repulser } from './t3_repulser';
 import { t3_snowpeanut } from './t3_snowpeanut';
 import { t3_skymortar } from './t3_skymortar';
 import { t3_laser3 } from './t3_laser3';
+import { t3_puncher } from './t3_puncher';
 import { t3_puncher2 } from './t3_puncher2';
 import { t3_gatling } from './t3_gatling';
 import { t3_firecharge } from './t3_firecharge';
 import { t3_minecharge } from './t3_minecharge';
+import { t3_witch } from './t3_witch';
+import { t3_hypno } from './t3_hypno';
+import { t3_magnet } from './t3_magnet';
+import { t3_heallaser2 } from './t3_heallaser2';
+import { t3_icecharge } from './t3_icecharge';
+import { t3_powerbank } from './t3_powerbank';
+import { t3_speeder } from './t3_speeder';
 import { tx_goldengrape } from './tx_goldengrape';
 
 export const turretTypeRegistry: any = {
@@ -92,52 +100,64 @@ export const turretTypeRegistry: any = {
   t_farm_bush,
   t_farm_crystal,
   t_farm_mob,
+  // Tier 2 Active
   t2_repeater,
   t2_firepea,
-  t2_laser2,
   t2_peanut,
-  t2_puncher,
-  t2_tall,
   t2_mortar,
-  t2_pulse,
-  t2_laserexplode,
-  t2_minespawner,
   t2_snowpea,
+  t2_laser2,
+  t2_wallaser,
+  t2_laserexplode,
+  t2_heallaser,
+  t2_tall,
+  t2_pulse,
+  t2_icewall,
+  t2_minespawner,
+  t2_torchwood,
+  t2_stun,
+  // Tier 3 Active
+  t3_triplepea,
+  t3_firepea2,
+  t3_bowling,
+  t3_mortar2,
+  t3_snowpea2,
+  t3_witch,
+  t3_flamethrower,
+  t3_firecharge,
+  t3_repulser,
+  t3_gatling,
+  t3_skymortar,
+  t3_laser3,
+  t3_puncher,
+  t3_aoelaser,
+  t3_heallaser2,
+  t3_hypno,
+  t3_magnet,
+  t3_powerbank,
+  t3_densnut,
+  t3_durian,
+  t3_frostfield,
+  t3_holonut,
+  t3_minecharge,
+  t3_speeder,
+  t3_icecharge,
+  // Special
+  tx_goldengrape,
+  // Legacy Turrets (unused, kept for compatibility)
+  t2_puncher,
   t2_iceray,
   t2_spike,
   t2_icebomb,
-  t2_stun,
-  t2_wallaser,
-  t2_heallaser,
-  t2_icewall,
-  t2_torchwood,
-  t3_triplepea,
-  t3_firepea2,
   t3_spinnut,
-  t3_mortar2,
-  t3_snowpea2,
   t3_inferno,
-  t3_aoelaser,
+  t3_snowpeanut,
+  t3_puncher2,
   t3_iceray2,
   t3_miningbomb,
   t3_tesla,
   t3_icepuncher,
-  t3_densnut,
-  t3_durian,
   t3_spike2,
-  t3_holonut,
   t3_minefield,
-  t3_frostfield,
   t3_triberg,
-  t3_flamethrower,
-  t3_bowling,
-  t3_repulser,
-  t3_snowpeanut,
-  t3_skymortar,
-  t3_laser3,
-  t3_puncher2,
-  t3_gatling,
-  t3_firecharge,
-  t3_minecharge,
-  tx_goldengrape,
 };

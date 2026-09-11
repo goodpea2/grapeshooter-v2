@@ -7,7 +7,8 @@ import { MuzzleFlash, BlockDebris, BlockHitVFX, Explosion } from '../vfx/index';
 import { Bullet } from '../entities';
 import { spawnLootAt } from '../economy';
 import { triggerUpgradeHook } from '../src/upgrades';
-import { worldGenConfig, requestSpawn, getCurrentLevelHourlyBudget } from '../lvDemo';
+import { worldGenConfig, requestSpawn, requestFlungSpawn, getCurrentLevelHourlyBudget, getLightLevel } from '../lvDemo';
+import { getTime } from '../ui/ui';
 import { drawOverlay } from '../visualObstacles';
 import { enemyTypes } from '../balanceEnemies';
 import { drawDecoration } from '../visualDecoration';
@@ -79,6 +80,7 @@ export class Block {
   cachedSpawnList: string[] = [];
   initialCachedSpawnCount: number = 0;
   enemiesSpawnedFromDamage: number = 0;
+  lastHourlyProcessedHour?: number;
 
   constructor(gx: number, gy: number, typeKey = 'o_dirt', overlay: string | null = null, biome: number = 0, liquidType: string | null = null) {
     this.gx = gx; this.gy = gy;
@@ -208,6 +210,7 @@ export class Block {
     const spawnRadius = sCfg?.spawnRadius !== undefined ? sCfg.spawnRadius : 120;
     const bcx = this.pos.x + GRID_SIZE / 2;
     const bcy = this.pos.y + GRID_SIZE / 2;
+    const enemyRad = ((eCfg.size || 20) * 0.5) + 2;
 
     // Check if any spawnArea tiles exist within spawnRadius
     let hasLocalSpawnArea = false;
@@ -248,16 +251,21 @@ export class Block {
         sy = bcy + sin(ang) * r;
       }
 
-      const isBlock = state.world.isBlockAt(sx, sy);
-      if (isBlock && !isFlying) continue;
+      // 1. Obstacle & collision clearance
+      if (!isFlying) {
+        if (state.world.isBlockAt(sx, sy)) continue;
+        if (state.world.checkCollision && state.world.checkCollision(sx, sy, enemyRad)) continue;
+      }
 
+      // 2. Liquid check
       const gx = floor(sx / GRID_SIZE);
       const gy = floor(sy / GRID_SIZE);
       const liqKey = state.world.getLiquidAt(gx, gy);
       if (liqKey && liquidTypes[liqKey]?.isDanger) continue;
 
-      requestSpawn(sx, sy, eKey);
-      state.vfx.push(new MuzzleFlash(bcx, bcy, atan2(sy - bcy, sx - bcx), 24, 8, color(180, 50, 255)));
+      // Physically flung spawn pod from center of spawner to target
+      requestFlungSpawn(bcx, bcy, sx, sy, eKey);
+      state.vfx.push(new MuzzleFlash(bcx, bcy, atan2(sy - bcy, sx - bcx), 20, 6, color(180, 50, 255)));
       return true;
     }
     return false;
@@ -304,13 +312,7 @@ export class Block {
           }
         }
 
-        // Periodic hourly spawning (if configured with hourlySpawnConfig)
-        if (oCfg.enemySpawnConfig || (this.customSpawnerConfig && !this.liquidType)) {
-          const sCfg = this.customSpawnerConfig ? { ...oCfg.enemySpawnConfig, ...this.customSpawnerConfig } : oCfg.enemySpawnConfig;
-          if (sCfg?.hourlySpawnConfig?.enabled) {
-            this.updateEnemySpawnerLogic(sCfg, false);
-          }
-        }
+        // (ov_spawner only spawns upon taking damage/death - no periodic interval or proximity ticking)
 
         if (oCfg.enemyTurretConfig) {
           const eCfg = oCfg.enemyTurretConfig;
@@ -462,42 +464,118 @@ export class Block {
     const isHourly = !!sCfg.hourlySpawnConfig?.enabled;
 
     if (isHourly) {
-      const hCfg = sCfg.hourlySpawnConfig;
-      const currentHourly = getCurrentLevelHourlyBudget();
-      const mult = hCfg.hourlyBudgetMultiplier !== undefined ? hCfg.hourlyBudgetMultiplier : 1.0;
-      const add = hCfg.hourlyBudgetAdd || 0;
-      const hourlyRate = Math.max(0, currentHourly * mult + add);
-      const budgetPerFrame = hourlyRate / HOUR_FRAMES;
+      const hCfg = sCfg.hourlySpawnConfig || {};
+      const t = getTime();
+      const lightLevel = getLightLevel(t.hour);
+      const isNight = lightLevel === 0;
 
-      if (this.lastHourlyBudgetFrame === undefined) {
-        this.lastHourlyBudgetFrame = state.frames;
+      // 1. Calculate budget from configured daytime/nighttime arrays + multiplier for subsequent days
+      const dayIdx = Math.max(0, (t.day || 1) - 1);
+      const mult = hCfg.hourlyBudgetMultiplierForFollowingDay !== undefined ? hCfg.hourlyBudgetMultiplierForFollowingDay : 1.25;
+
+      const dayArr: number[] = Array.isArray(hCfg.hourlyDaytimeBudget) && hCfg.hourlyDaytimeBudget.length > 0
+        ? hCfg.hourlyDaytimeBudget
+        : (typeof hCfg.hourlyDaytimeBudget === 'number' ? [hCfg.hourlyDaytimeBudget] : [10, 20, 30]);
+
+      const nightArr: number[] = Array.isArray(hCfg.hourlyNighttimeBudget) && hCfg.hourlyNighttimeBudget.length > 0
+        ? hCfg.hourlyNighttimeBudget
+        : (typeof hCfg.hourlyNighttimeBudget === 'number' ? [hCfg.hourlyNighttimeBudget] : [30, 50, 80]);
+
+      const activeArr = isNight ? nightArr : dayArr;
+      let calculatedHourlyRate: number;
+      if (dayIdx < activeArr.length) {
+        calculatedHourlyRate = activeArr[dayIdx] ?? 10;
+      } else {
+        const lastVal = activeArr[activeArr.length - 1] ?? 10;
+        calculatedHourlyRate = Math.round(lastVal * Math.pow(mult, dayIdx - (activeArr.length - 1)));
       }
-      const lastFrame = this.lastHourlyBudgetFrame ?? state.frames;
-      const elapsed = Math.max(0, state.frames - lastFrame);
-      this.lastHourlyBudgetFrame = state.frames;
-      this.hourlySpawnBudgetAccrued = (this.hourlySpawnBudgetAccrued || 0) + budgetPerFrame * elapsed;
+
+      // 2. Hour change trigger: REFRESH cached enemies-that-will-be-spawned list
+      const currentFloorHour = Math.floor(t.totalHours || 0);
+      if (this.lastHourlyProcessedHour === undefined) {
+        // First initialization: process current hour immediately
+        this.lastHourlyProcessedHour = currentFloorHour - 1;
+      }
+
+      if (currentFloorHour > this.lastHourlyProcessedHour) {
+        const hoursPassed = Math.max(1, currentFloorHour - this.lastHourlyProcessedHour);
+        this.lastHourlyProcessedHour = currentFloorHour;
+
+        // 1. Reset entire cached enemy pool and self-refund unspawned units' costs
+        if (this.cachedSpawnList && this.cachedSpawnList.length > 0) {
+          for (const k of this.cachedSpawnList) {
+            if (enemyTypes[k]) {
+              this.hourlySpawnBudgetAccrued = (this.hourlySpawnBudgetAccrued || 0) + enemyTypes[k].cost;
+            }
+          }
+          this.cachedSpawnList = [];
+        }
+
+        // 2. Add newly accrued hourly budget for the hours passed
+        this.hourlySpawnBudgetAccrued = (this.hourlySpawnBudgetAccrued || 0) + (calculatedHourlyRate * hoursPassed);
+
+        // 3. Generate a brand new pool using total accumulated budget
+        this.cachedSpawnList = [];
+        const eTypes = (sCfg.enemyTypeKey && sCfg.enemyTypeKey.length > 0) ? sCfg.enemyTypeKey : ['e_basic'];
+        let budgetLeft = this.hourlySpawnBudgetAccrued || 0;
+        let safety = 200;
+        while (budgetLeft > 0 && safety > 0) {
+          safety--;
+          const affordable = eTypes.filter((k: string) => enemyTypes[k] && enemyTypes[k].cost <= budgetLeft);
+          if (affordable.length === 0) break;
+          const chosenKey = affordable[floor(random(affordable.length))];
+          this.cachedSpawnList.push(chosenKey);
+          budgetLeft -= enemyTypes[chosenKey].cost;
+        }
+        this.hourlySpawnBudgetAccrued = Math.max(0, budgetLeft);
+      }
 
       if (this.totalBudgetSpawned === undefined) {
         this.totalBudgetSpawned = 0;
       }
 
-      const dx = this.pos.x + GRID_SIZE/2 - state.player.pos.x;
-      const dy = this.pos.y + GRID_SIZE/2 - state.player.pos.y;
-      const dSq = dx*dx + dy*dy;
-      const trigRad = sCfg.spawnTriggerRadius > 0 ? sCfg.spawnTriggerRadius : 200;
+      // 3. Proximity trigger & spawn execution from cached list
+      const rawTrig = sCfg.spawnTriggerRadius !== undefined ? sCfg.spawnTriggerRadius : 200;
+      const trigRad = rawTrig < 0 ? -1 : Math.max(100, rawTrig);
+      const bcx = this.pos.x + GRID_SIZE/2;
+      const bcy = this.pos.y + GRID_SIZE/2;
 
-      if (sCfg.spawnTriggerRadius < 0 || dSq < trigRad * trigRad) {
+      let isTriggered = false;
+      if (trigRad < 0) {
+        isTriggered = true;
+      } else {
+        const trigRadSq = trigRad * trigRad;
+        if (state.player) {
+          const pdx = bcx - state.player.pos.x;
+          const pdy = bcy - state.player.pos.y;
+          if (pdx * pdx + pdy * pdy <= trigRadSq) {
+            isTriggered = true;
+          }
+        }
+        if (!isTriggered && state.world) {
+          for (const t of state.world.getAllTurrets()) {
+            if (t && t.health > 0) {
+              const tdx = bcx - t.pos.x;
+              const tdy = bcy - t.pos.y;
+              if (tdx * tdx + tdy * tdy <= trigRadSq) {
+                isTriggered = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (isTriggered) {
         const minInterval = sCfg.spawnInterval > 0 ? sCfg.spawnInterval : 60;
         if (state.frames - this.lastSpawnTime >= minInterval) {
-          const eTypes = (sCfg.enemyTypeKey && sCfg.enemyTypeKey.length > 0) ? sCfg.enemyTypeKey : ['e_basic'];
-          const affordable = eTypes.filter((k: string) => enemyTypes[k] && enemyTypes[k].cost <= (this.hourlySpawnBudgetAccrued || 0));
-          if (affordable.length > 0) {
-            const eKey = affordable[floor(random(affordable.length))];
-            const eCfg = enemyTypes[eKey];
+          if (this.cachedSpawnList && this.cachedSpawnList.length > 0) {
+            const nextEnemy = this.cachedSpawnList[0];
+            const eCfg = enemyTypes[nextEnemy];
             if (eCfg) {
-              const success = this.spawnEnemyFromSpawner(eKey, sCfg);
+              const success = this.spawnEnemyFromSpawner(nextEnemy, sCfg);
               if (success) {
-                this.hourlySpawnBudgetAccrued = Math.max(0, (this.hourlySpawnBudgetAccrued || 0) - eCfg.cost);
+                this.cachedSpawnList.shift();
                 this.totalBudgetSpawned = (this.totalBudgetSpawned || 0) + eCfg.cost;
                 this.lastSpawnTime = state.frames;
 
@@ -511,6 +589,7 @@ export class Block {
                     this.overlay = null;
                   }
                   this.customSpawnerConfig = null;
+                  this.cachedSpawnList = [];
                   state.world.dirtyChunkAndNeighbors(cx, cy);
                   state.vfx.push(new Explosion(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, 35));
                   state.vfx.push(new BlockDebris(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, isLiquid ? [140, 30, 180] : [180, 50, 180]));

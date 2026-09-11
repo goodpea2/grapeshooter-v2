@@ -6,6 +6,7 @@ import { Enemy } from '../../enemy';
 import { spawnMergeVFX } from '../../../vfx/index';
 import { spawnLootEntity } from '../../loot';
 import { triggerUpgradeHook } from '../../../src/upgrades';
+import { requestFlungSpawn } from '../../../lvDemo';
 
 declare const floor: any;
 declare const random: any;
@@ -200,7 +201,7 @@ export class ActionFarm extends TurretAction {
         const spawnDist = mCfg.spawnDist || GRID_SIZE * 2;
         const sx = wPos.x + cos(spawnAngle) * spawnDist;
         const sy = wPos.y + sin(spawnAngle) * spawnDist;
-        state.enemies.push(new Enemy(sx, sy, enemyType));
+        requestFlungSpawn(wPos.x, wPos.y, sx, sy, enemyType, 15);
         state.vfx.push(spawnMergeVFX(sx, sy, [255, 255, 255]));
     }
   }

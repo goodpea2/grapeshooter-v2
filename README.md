@@ -57,10 +57,24 @@ Base expansion is built on a **Hex-Axial Coordinate System** (q, r).
     - **First Strike**: The `t3_minefield` performs a rapid-fire sequence of 8 mine launches immediately upon placement, accompanied by a power-up visual effect.
     - **Aura**: The `t3_frostfield` emits a continuous chilling field that slows all enemies within a 2.8 tile radius, providing constant crowd control regardless of arming state.
     - **Gas Barrage**: The `t3_triberg` has been upgraded from a trap to a multi-target ranged lobber, capable of dropping 3 high-duration stun gas puddles on different enemies simultaneously.
+    - **Witch Hazel (`t3_witch`)**: Features a primary shooting action matching `t2_firepea` with a focused 5-tile range firing `b_firepea` piercing projectiles. When an ally turret is destroyed, a green essence projectile (`GreenEssenceVFX`) flies from the death spot into the Witch Hazel turret itself; upon arrival, the Witch summons exactly ONE friendly armored enemy (`e_friendly_armor2`) 1 tile away from the Witch. If multiple Witch Hazels are present in the field, each active Witch receives an essence projectile and summons one friendly ally per turret death.
+    - **Hypnotized Combat System (`t3_hypno` / `c_hypnotized`)**: Hypnotized enemies turn against hostile enemies. Hypnotized units actively seek out and pursue other hostile enemies across the active field rather than remaining stationary. If no hostile enemies or spawners remain, they execute reverse pathfinding by default, moving away from the player along the flowfield distance gradient (`getEnemyReverseMoveVector`). The player auto-turret, laser beams, pulses, and aura effects cleanly filter out `c_hypnotized` allies, preventing accidental friendly-fire or targeting lock. Hypnotized shooting enemies spawn friendly-aligned projectiles directed toward enemy targets, preserving their visual appearance without bullet tinting while allowing hostile enemy projectiles to hit and engage hypnotized allies.
+    - **Condition Visual System (`ConditionVFX`)**: Refactored status effect visual system with dedicated hypnotic rings and swirling orbs for `c_hypnotized`, cleaned declaration footprint, and pooled lifecycle management via `conditionPool`.
     - **Gatling Pea (`t3_gatling`)**: Rapid burst shooter with `whileCharged` mechanics. When the player is boosted via click-hold, it overrides fire rate down to 3 frames and locks onto the player's current target if no enemies are within its standard radius.
-    - **Fire Launcher (`t3_firecharge`)**: High-arc lobber targeting random enemies with lingering fire puddles (`gf_fire_puddle_firecharge`). While charged, increases range to 8 tiles, increases fire rate, and barrages random ground positions when no target is present.
-    - **Mine Charger (`t3_minecharge`)**: Channeling explosive trap that consumes player stamina while holding click to grow in size and explosive radius (up to 500 growth points). At high charges, triggers screen-clearing explosions (`b_mine_explosion2` / `b_mine_explosion3`).
-    - **Dynamic Charge Integration (`whileCharged` / `c_raged_visualonly`)**: Centralized `isCharged()` state hook across attached and world turrets, synchronizing burst fire rate, rage visual aura, and stacked bullet mechanics when fire rate drops below 4 frames.
+    - **Fire Launcher (`t3_firecharge`)**: High-arc lobber targeting random enemies with lingering fire puddles (`gf_fire_firecharge`). While charged, increases range to 8 tiles, increases fire rate, and barrages random ground positions when no target is present.
+    - **Mine Charger (`t3_minecharge`) & Ice Charger (`t3_icecharge`)**: Channeling explosive traps that passively track stamina spent by the player during boost mode (up to 500 growth points). Multiple instances charge up simultaneously without individual stamina drainage penalties. They dynamically cycle custom sprites: unarmed (`_unarmed`), stage 1 (`_charge1`), stage 2 (`_charge2` at 200 stamina), and stage 3 (`_charge3` at 500 stamina), using `charge3` as their main shop icon. Unarmed instances cleanly suppress the charged aura (`c_raged_visualonly`).
+    - **Powerbank (`t3_powerbank`)**: Stamina reserve unit holding up to 100 stamina that automatically recharges 1 stamina per 30 frames. Automatically transitions sprites based on current charge: stage 1 (1-24 charge), stage 2 (25-99 charge), and stage 3 (100 / full charge), utilizing stage 3 as its main icon. When attached to the player, boosting draws from the powerbank's stamina reserve once player stamina is exhausted, properly emitting `StaminaFlyOutVFX` burst particles upon spending. When gaining stamina (passive auto-recharge or transferred from world powerbanks), it triggers `StaminaAbsorbVFX` particles converging inward. World powerbanks transfer energy to attached powerbanks within a 2-tile radius at 10 stamina per 15 frames via `StaminaFlyToTurretVFX` and `StaminaFlyOutVFX`. Reuses the standardized Growth Bar design for its stamina capacity UI, rendering a glowing cyan stamina meter above the unit.
+    - **Wallaser (`t2_wallaser`)**: Laser unit with dynamic health-based visuals, starting at 150 initial health up to 1200 max health. Transitions between stage 1 (150-299 HP), stage 2 (300-600 HP), and stage 3 (601+ HP) seamlessly as it mines obstacles and restores its health (heals 50 HP per mined block). Upgrades system (`recalculateTurretStats`) calculates health modifiers from `turret.config.maxHealth` to preserve its 1200 max HP pool upon placement and upgrade refreshes.
+    - **Speeder (`t3_speeder`)**: Rebuilt from scratch using the standardized `ActionAura` architecture (modeled directly on `t2_torchwood`). Emits a continuous haste aura within a 2-tile radius (`radius: GRID_SIZE * 2.0`, `auraVfx: 'aura_speeder'`). In strict accordance with the established fire rate formula, it avoids raw compounding multipliers and applies `firerateBoost: 0.25` via `boostsTurretConfig`. Multiple Speeders cleanly stack additively to the turret's `firerateDivider` (`effectiveFireRate = baseFR / (frDivider * fireRateMultiplier)`). Features dedicated `SpeederAuraVFX` rendering pulsing golden haste rings and orbiting speed motes, along with `fireRateUp` condition status visuals.
+    - **Dynamic Charge Integration (`actionTypeWhileCharged` / `actionConfigWhileCharged`)**: Dual Action Set architecture across attached and world turrets. While charged, turrets dynamically switch to `actionTypeWhileCharged` and `actionConfigWhileCharged` (with seamless fallback to default actions). Includes stamina consumption hooks (`staminaCostPerBulletSpawned`, `staminaCostPerLaserBeamExecuted`), reactive stamina fly VFX (`StaminaFlyToTurretVFX`), and instantaneous auto-revert upon player stamina depletion.
+    - **Fire Ground Features & Burning Condition Damage System**:
+        - **Standardized Naming**: All fire ground features use the `gf_fire_` prefix: `gf_fire_firepea`, `gf_fire_firepeat3`, `gf_fire_flamethrower`, `gf_fire_firecharge`, and `gf_fire_firecherry`.
+        - **Target-Specific Damage Configuration**: Ground features utilize `damageConfig: { enemy: N, turret: N, player: N, obstacle: N }` allowing precise balancing and supporting friendly fire where configured.
+        - **Condition Target Damage (`appliedCondition.damageConfig`)**: Conditions applied by ground features define target-specific damage rates via `damageConfig: { enemy: N, turret: N, player: N }` (e.g. `appliedCondition: [{ type: 'c_burning', duration: 60, damageConfig: { enemy: 2, turret: 1, player: 1 } }]`), removing redundant top-level `conditionDuration` declarations in favor of explicit per-condition `duration` and target-differentiated tick damage.
+        - **Unified 15-Frame Tick Rate**: All fire ground features and `c_burning` condition ticks operate on a synchronized tick rate of 15 frames (`state.frames % 15 === 0`).
+        - **Anti-Stacking Damage Resolution**: Standing in overlapping fire puddles does not cause multiplied damage. `GroundFeature.resolveFireGroundFeatures` batches all active fire puddles every 15 frames, applying only the highest ground damage value and highest target-appropriate condition damage among overlapping puddles to entities (enemies, player, turrets, and obstacles).
+        - **Burn Hierarchy (Highest Damage Priority)**: Entities affected by burning conditions (`c_burning*`) only retain the burn with the highest damage per tick. Stronger incoming burns immediately replace weaker burns; weaker burns do not overwrite or reset the duration of stronger burns; burns with equal damage refresh the duration. If a target's damage is 0 (e.g. friendly fire disabled for player/turret), burning is cleanly ignored.
+        - **Event Bus Dispatch**: Direct entity damage from ground features and conditions emits `ENEMY_DAMAGED` and `PLAYER_DAMAGED` events with payload `{ enemy/player, source: { type: 'groundFeature' | 'condition', key }, amount }`.
 
 ---
 
@@ -84,10 +98,21 @@ The Almanac (v4.0) serves as the central hub for discovery, purchasing, and reci
 - **Dynamic UI**: The Almanac features a left-aligned navigation system, real-time resource monitors, and a specialized **Player Upgrades** display centering the animated player sprite with a 2-column scrollable grid of upgrade cards styled using the `uiComponents.ts` design tokens (deep forest green cards `[16, 44, 34]`, gold titles and pips, light-green stat progression arrows, and tactile 3D yellow upgrade buttons).
 - **Level-Specific Player Upgrades**: When loading a level from the Level List, the game strictly loads the level's own `playerUpgrades` configuration (with fallback to default if not defined), cleanly isolating gameplay from any modifications made during recent Level Editor sessions.
 - **Interactive Upgrade Editing & Text Navigation**: In the Level Editor's Upgrade Config, text inputs for `StatLevel:` and `UpgradeCost:` support seamless cursor navigation (arrow keys, Home/End), text selection (drag-to-highlight, Shift+Arrows, Ctrl+A), and instant reactive parsing across imported and newly created custom maps without getting stuck at stale cache states.
-- **Ground Spawner (Liquid) Prefab Pipeline**:
-  - `l_spawner` (Ground Spawner) operates as a liquid-layer entity that triggers enemy spawns independently of block mining status.
-  - Rendered with its custom ground asset at 50% opacity and no liquid-base texture.
-  - Adding or duplicating prefabs while editing a Ground Spawner now correctly stores the new prefab under the `Liquids` tab (`liquidTypes`), preserving full customization of budget, intervals, spawn trigger radius, and enemy lists.
+- **Ground Spawner (`l_spawner`) & Overlay Spawner (`ov_spawner`) Mechanics**:
+  - `l_spawner` operates as a liquid-layer entity that triggers enemy spawns independently of block mining status, rendered with its custom ground asset at 50% opacity.
+  - **Independent Hourly Budget Architecture**: `l_spawner` instances use an autonomous `hourlySpawnConfig` decoupling them from global level budget pools:
+    - `hourlyDaytimeBudget`: Array of day-by-day daytime budget allowances (e.g. `[10, 20, 30]`).
+    - `hourlyNighttimeBudget`: Array of day-by-day nighttime budget allowances (e.g. `[30, 50, 80]`).
+    - `hourlyBudgetMultiplierForFollowingDay`: Multiplier applied per day for subsequent days beyond the explicit array definitions (default `1.25`).
+    - **Hourly Cache Refreshing**: On every in-game hour transition, the spawner refreshes its cached list of enemies to be spawned based on the accumulated budget. When conditions are met (trigger radius & spawn interval), it spawns enemies sequentially from this cache.
+  - **Flung Spawn Pod VFX (`FlungSpawnPodVFX`)**:
+    - When a spawner (`ov_spawner` or `l_spawner`) produces an enemy, an energy pod is physically flung along a subtle parabolic arc from the spawner's center to the target landing coordinate.
+    - Upon landing, the target coordinates activate the swirling portal VFX and spawn the enemy entity smoothly into play.
+  - **Obstacle Clearance & 1Hz Enemy Repulsion**:
+    - Spawner positioning performs circular clearance tests against obstacles to prevent spawning enemies inside or colliding with solid blocks.
+    - Ground enemies execute an interleaved 1Hz radial repulsion sweep (`unstuckFromObstacles`) that smoothly nudges trapped entities into adjacent open space.
+  - **Level Editor Spawner Range Gizmos**:
+    - In the Level Editor, hovering the cursor over any placed `ov_spawner` or `l_spawner` dynamically projects its **Trigger Range** (amber ring with label) and **Spawn Range** (magenta ring with label). Hovering off returns the canvas to a clean view.
 
 ---
 
@@ -348,25 +373,6 @@ The Main Menu features a sleek layout pairing level navigation with a responsive
 - **Directory Structure (`/ui/`)**:
   - All dedicated UI modules (`uiMainMenu.ts`, `uiGameOver.ts`, `uiGameSpeed.ts`, `uiNpcShop.ts`, `uiDebug.ts`, `uiComponentsShowcase.ts`, `almanac/`, `overlay/`) reside cleanly within the `/ui/` directory, while root `uiColors.ts` and `uiComponents.ts` serve as the universal foundation across the entire game and editor.
 
----
-
-## 🌿 Interactive Overlays & World Mechanics
-- **`catalyst_clay` (Clay Catalyst Overlay)**:
-  - An indestructible, non-targetable overlay (`isValidTarget: false`) placed on terrain blocks that generates adjacent `o_clay` blocks over time.
-  - **CatalystConfig Structure**: Configured via `catalystConfig: { neighborMatrix: [[-1,-1], [0,-1], [1,-1], [-1,0], [1,0], [-1,1], [0,1], [1,1]], spawnInterval: HOUR_FRAMES * 0.5, obstacleToSpawn: 'o_clay' }` in `overlayTypes`.
-  - **Instant Placement Spawning**: Placing a Clay Catalyst in the Level Editor immediately populates all empty adjacent neighbor tiles in its matrix with the target obstacle.
-  - **Dynamic Spawn & Halt**: In active gameplay, every interval it randomly chooses one empty neighboring tile (`!block || block.isMined`) to turn into Clay with dust debris VFX. If all 8 adjacent tiles are occupied, its spawn cycle halts until an adjacent block is mined.
-  - **Debug & Editor Gizmos**: When `debugHP` or Level Editor mode is active, renders visual bounding box gizmos around all 8 matrix neighbor positions (green outline for empty/valid spawn spots, red outline for occupied spots).
-- **`gf_spawner` (Ground Spawner Budget & Death Visual)**:
-  - Ground-layer enemy spawner feature that spends its localized spawner budget when producing enemies.
-  - When its budget is fully depleted (`spawnerBudget <= 0`), the spawner automatically expires (`life = 0`) and triggers the purple `BugSplatVFX` death explosion at its location.
-- **`sunGenerator` (Sun Generator Overlay)**:
-  - Specialized resource node overlay requiring damage to harvest Sun currency.
-  - Spawns physical `sun` loot entities upon reaching cumulative damage milestones, pairing with the in-game hover speech bubble (`[Icon] X left`) and lowest target priority for auto-aiming turrets.
-  - **Level Editor Customization**: Interactive customization tooltip (`Sun Generator Config`) accessible directly by clicking the Sun Generator card in the Overlays palette or selecting a placed Sun Generator on the world canvas, allowing on-the-fly adjustment of `damagePerSun` and `maxSun`.
-
----
-
 ## ⚡ Player Stamina, ClickHolding Boost & Upgrades
 - **Stamina System**:
   - **Base Stamina & HUD Display**: Base 100 stamina displayed as a dedicated `StaminaBar` directly adjacent to the `HealthBar`, with an icon badge and dynamic length scaling based on `maxStamina`.
@@ -464,29 +470,6 @@ The Main Menu features a sleek layout pairing level navigation with a responsive
   - `WorldManager.update()` decouples visual viewport culling from world simulation. Chunks containing active world buildings (player turrets, sun generators, active spawners, catalyst nodes) are registered into the simulation tick.
   - Placed world turrets continue auto-firing and mining sun generators offscreen, accumulating loot in chunk arrays with zero render CPU/GPU overhead until the player returns.
 
----
-
-## 🧪 Modular Test Turrets & Action Expansions
-- **`t2_wallaser` (Wallaser)**:
-  - *Tooltip*: "For every blocks mined on its own, this turret heals 50 HP, bypassing's own MaxHP".
-  - *Base & Stats*: 300 HP, `beamMaxLength: GRID_SIZE * 4`, reuses `t2_puncher`'s asset sprites.
-  - *Mechanic*: Modular `onMineHealSelf: 50` and `onMineHealBypassMaxHP: true` configured on `ActionLaserBeam`. Automatically triggers when mining blocks or extracting Sun from Sun Generators.
-- **`t2_heallaser` (Heallaser)**:
-  - *Tooltip*: "For every blocks mined on its own, release a 10-hp heal pulse to nearby turrets".
-  - *Base & Stats*: 50 HP, base laser range (`GRID_SIZE * 8`), reuses `t2_iceray`'s asset sprites.
-  - *Mechanic*: Extends `ActionSpawnOnTargetDeath` with `triggerOnMine: true`, spawning `b_healing_pulse_10` at the turret to emit an AoE heal pulse to nearby friendly turrets.
-  - *Costs*: 25 Sun (Almanac: 3 Shards, 5 Ice).
-- **`t2_icewall` (Ice Wallnut)**:
-  - *Tooltip*: "Emits a small chilling field".
-  - *Base & Stats*: 300 HP wall defensive unit with `ActionAura` chilling aura (`radius: GRID_SIZE * 1.5`, `c_chilled` condition, `aura_frostfield` VFX).
-  - *Costs*: 15 Sun (Almanac: 3 Shells, 2 Ice).
-- **`t2_torchwood` (Torchwood)**:
-  - *Tooltip*: "Emits a field that boost bullet's damage".
-  - *Base & Stats*: 200 HP support unit, reuses `t3_flamethrower`'s asset sprites with custom animated ember particle `TorchwoodAuraVFX`.
-  - *Mechanic*: Emits a 1.5-tile damage-boost field (`radius: GRID_SIZE * 1.5`). Projectiles passing through unique Torchwood fields receive `+3` stacked damage (`boostsBulletFromEmitter: ['turret', 'player']`) with visual fiery color tinting.
-  - *Costs*: 30 Sun (Almanac: 5 Fuel, 5 Ice).
-
----
 
 ## ✨ Aura VFX Lifecycle, Grid Aura Persistence & Healing Visuals
 - **Aura VFX Optimization & Stacking Prevention**:
@@ -501,22 +484,6 @@ The Main Menu features a sleek layout pairing level navigation with a responsive
   - Moving turrets between world grid tiles and the mobile attached squad now carries over the starting world position, allowing turrets to smoothly leap and glide to their new positions across all placement modes.
 - **Green Healing Feedback Numbers**:
   - Reused `DamageNumberVFX` to render dynamic green text indicators (`[80, 255, 120]`) upon any turret, enemy, or player healing event without adding redundant UI elements.
-
----
-
-## ⚡ Turret Movement, Chill Attack Slowdown & Balance Updates
-- **Single-Trigger `t2_heallaser` Mining Fix**:
-  - Block destruction now invokes `onTargetMined` exclusively without redundant firing from generic `onTargetKilled` hooks, ensuring `t2_heallaser` only heals once per block mined.
-- **Physical Grid Movement & Aura VFX Retargeting**:
-  - Picking up and moving turrets between world grid coordinates now physically repositions the turret instance, immediately updating its coordinate vectors (`gx`, `gy`, `pos`) and automatically carrying over active aura VFX (`FrostFieldAuraVFX`, `TorchwoodAuraVFX`), conditions, and stats.
-  - Moving turrets between attached squad slots and the world grid seamlessly transfers health, max health, stat modifiers, and reparents existing VFX bindings.
-- **Chill Condition Attack Slowdown (`c_chilled`)**:
-  - Added `enemyAttackSpeedMultiplier: 2` to `c_chilled` in `conditionTypes`.
-  - Enemies afflicted with `c_chilled` now experience a 2x slowdown on melee attack animation windups, melee cooldowns, and projectile firing rates.
-- **`t2_wallaser` Balancing & Health Scaling**:
-  - Updated `t2_wallaser` to feature a `maxHealth` of 1200 while starting at 150 HP upon placement.
-  - Self-healing from mining blocks now strictly caps at `maxHealth` (1200 HP) without bypassing the maximum health ceiling.
-
 ---
 
 ## ⚡ Performance Optimizations: Spatial Grid, LOS Caching & Enemy Sprite Pipeline
@@ -675,64 +642,75 @@ To eliminate GC spikes and maintain 60 FPS under dense projectile and enemy load
 - **Dynamic Multi-Track Sound & Music Engine (`src/audio/soundEngine.ts`)**:
   - **Dynamic In-Game Music & Synced Percussion**: Plays a shuffled, cycling playlist of synchronized level track pairs (`ingame1`/`ingame1b`, `ingame2`/`ingame2b`) in sample-accurate lockstep via the Web Audio API.
   - **Day/Night Dynamic Ramping**: When the `THE NIGHT IS APPROACHING` warning begins (19:30), the tense percussion layer (`ingameNb`) smoothly ramps to full volume over 4 seconds while daytime bird ambience fades out; in the morning (`time >= 6:00am` and `enemyCount < 10`), the percussion layer smoothly fades out over 8 seconds while daytime birds fade back in.
-  - **Main Menu Music Cycling**: Main menu plays shuffled cycling tracks from `menu1` and `menu2` with smooth cross-fading.
-  - **Global Sound Settings & Main Menu Access**: Integrated dedicated `[Music]` and `[SFX]` steppers (`drawNumberStepper`) accessible from both in-game PauseMenu and MainMenu (via the settings gear button next to Import Level), persisting globally in `localStorage`.
-  - **AudioInfo HUD in Debug Mode**: Added an interactive Audio Engine HUD in Debug Mode (`state.showAudioDebugOverlay`) displaying active context state, loaded buffers count, current BGM, music/sfx master volumes, tense/birds multipliers, recent SFX triggers, and test SFX action buttons.
-  - **Comprehensive Fallback SFX Integration**:
-    - `enemy_death`: Randomly picks `enemy_death1`/`enemy_death2` when an enemy is slain.
-    - `projectile_hit_enemy`: Plays `projectile_hit_enemy1`/`projectile_hit_enemy2` upon hitting an enemy entity.
-    - `projectile_hit_block`: Plays `projectile_hit_block1`/`projectile_hit_block2` upon impacting destructible blocks and obstacles.
-    - `shoot_light`: Plays `shoot_light1`/`shoot_light2` on bullet discharge.
-    - `turret_bitten_softbody` & `turret_eaten`: Plays biting/eating sounds when turrets take enemy damage or are destroyed.
-    - `collect_sun`: Plays sound effect upon loot arrival at the HUD counter.
-    - `player_step`: Plays footsteps (`step1`-`step4`) during movement.
-    - `hugewave_siren` & `hugewave_intro`: Triggers during the night approaching warning.
-  - **Universal Deployment Support**: Built with dynamic base URL prefixing (`(import.meta as any).env?.BASE_URL`) for local and GitHub Pages deployments.
-- **Resource Loading Screen (`ui/uiLoadingScreen.ts`)**:
-  - Displays a clean, high-contrast loading screen (`Loading 50%` / progress bar) during initial audio/asset preloading and upon entering a level.
-- **Lazy AudioContext & Decoupled State Initialization**:
-  - Refactored `SoundEngine` to use lazy AudioContext initialization and safe fallback volume resolution (`localStorage` / guarded `state` access), eliminating circular dependency temporal dead zone (TDZ) warnings on initial bundle evaluation.
-- **Normalized UI & Battle SFX Triggers**:
-  - **Left-Aligned Audio Engine HUD**: Repositioned `AudioDebugHUD` to the left screen flank beneath the Performance HUD with toggleable test buttons and real-time buffer monitors.
-  - **`btn_click`**: Unified across all standard UI button clicks, modal buttons, and top-right in-game actions.
-  - **`levellist_hover`**: Triggered on modular button and level list hover states.
-  - **`hugewave_intro` & `hugewave_siren`**: Plays `hugewave_intro` when the "THE NIGHT IS APPROACHING" banner appears and `hugewave_siren` when the night's spawn budget starts deploying.
-  - **`inventory_click` & `not_enough_resource`**: Differentiates successful turret purchases/drags from insufficient currency attempts.
-  - **`pause_btn`**: Plays on toggling game pause or entering the pause/settings menu.
-  - **`speedup` / `speeddown`**: Plays upon toggling between 1x and 2x game speed.
-  - **`turret_pickup`**: Triggers on dragging a turret or colliding with a detached turret in the world.
-  - **`turret_place` & `turret_place_2`**: Alternates placement sound effects when deploying or moving turrets.
-  - **`merge`**: Plays upon successful turret fusion on player attachment or world grid slots.
-  - **`laser_loop`**: Continuous beam sound with seamless debounced looping in `ActionLaserBeam`.
-  - **`block_death` (`1`-`3`)**: Randomly triggers on obstacle / block destruction.
-  - **Dynamic In-Game Music & Throttled LOS Threat Detection**:
-    - Expanded the in-game music playlist with tracks `ingame3` and `ingame4`.
-    - Throttled tense percussion (`ingameXb`) threat evaluations to execute every 0.5 in-game hours (300 frames) to minimize CPU overhead.
-    - Updated threat detection logic: `tensePercussion` now strictly counts enemies that have an unobstructed Line of Sight (`state.world.checkLOS`) to the player, dynamically activating intense battle percussion only when active direct threats are present.
-  - **Pause Menu BGM Fade-Out & Resume**:
-    - Opening the pause menu (`state.isPaused = true`) smoothly fades out the active background music to zero volume.
-    - Resuming the game restores music tracks to their master volume levels seamlessly.
-  - **Custom Turret & Obstacle AOE Explosion SFX**:
-    - Added `explosionSfx` configuration to `aoeConfig` across explosive projectiles in `balanceBullets.ts` (e.g. `b_bomb_explosion`, `b_tnt_explosion`, `b_cherry_explosion`, `b_mine_explosion`, `b_mortar_shell`, `b_skymortar_shell`, `b_miningbomb_explosion`).
-    - `Bullet.explode()` dynamically triggers randomized explosion sound effects from `aoeConfig.explosionSfx` mapped to the corresponding VFX visual types (`sfx/turret/` and `sfx/obstacle/`).
-  - **Dynamic Level Editor Tooltips & Spawner UX**:
-    - Modal tooltips automatically appear and switch based on active category/selection (e.g., selecting `ov_spawner` or `l_spawner` activates the Spawner Tooltip, selecting `sunGenerator` activates the Sun Generator Tooltip, and non-spawner selections automatically dismiss active tooltips).
-    - Ground Spawner (`l_spawner`) provides full configuration for `hourlySpawnConfig` (hourly budget multiplier, hourly budget add, and self-destruction budget threshold).
-  - **Almanac & Level Editor Player Upgrade / Config UX**:
-    - Added `SET ALL TO 1 LEVEL` batch action in the Player Upgrades editor to rapidly configure all upgrade tracks to their first-tier values.
-    - Remade Player Upgrade and Level Config input fields using standardized design tokens from `uiComponents.ts` and `uiColors.ts` (consistent borders, focus highlights, selection colors, and responsive inputs).
-  - **Reworked Enemy Spawning Rules & Damage-Correlated Spawners**:
-    - Global enemy budget spawning strictly executes during nighttime, enforcing minimum 12-tile player distance and 6-tile turret distance.
-    - Enemies can spawn across open ground and non-dangerous liquids, while flying enemies (`isFlying: true`) can spawn on top of obstacles.
-    - Local spawners (`ov_spawner`) pre-cache their spawn queues upon initialization and spawn enemies proportionally as they take damage (% health lost correlates to % enemies spawned from the cached queue), spawning remaining units upon destruction.
-  - **Interactive Main Menu Minigame Audio**:
-    - Integrated sound effects for eliminating enemies and interacting within the main menu background mini-game.
+- **LevelEditor Canvas UI Refinements (`levelEditor/canvas.ts`)**:
+  - **Compact Floating LevelInfo HUD**: Positioned an unobtrusive, floating readout (140×85px) on the editor canvas displaying real-time level metrics (`WinCondition enemies/obstacles`, `Sun ores/loots/generators`, `Overlay/Ground spawner budgets`) with compact monospace green readout and input isolation.
+  - **Optimized Palette Grid**: Adjusted item card dimensions (40px card height with 25px preview icons) and centered multiline wrappable internal identifier keys to maximize vertical density within the category tabs.
 
+---
 
+## 👾 Modular Enemy Action Pipeline & Advanced Enemy Archetypes
+The enemy architecture has been refactored into a modular, extensible component-based system modeled directly on the turret architecture:
+- **`EnemyAction` & Action Tag Pipeline**:
+  - Encapsulates discrete enemy behaviors into modular actions (`ActionMoveDefault`, `ActionMeleeAttack`, `ActionShoot`, `ActionLaunchAlly`, `ActionLeadFormation`, `ActionFrontShield`).
+  - Supports capability tagging (`movement`, `attack`, `support`, `collab`, `defense`) and state locking (`lockActions(['movement'])`), allowing complex coordination without hardcoded state machines.
+  - Lifecycle hooks (`initActions`, `update`, `onDamage`, `onDeath`, `customUpdate`, `customDisplay`) provide seamless extension points for custom enemy classes.
+- **`EnemyRegistry` Factory Pattern**:
+  - `createEnemy(x, y, typeKey)` instantiates specialized subclasses (`LauncherEnemy`, `LeaderEnemy`, `FrontShieldEnemy`) via `EnemyLogicMap` while gracefully falling back to standard `Enemy` base instances.
+  - Integrated across all map loaders (`levelManager.ts`), horde wave managers (`lvDemo.ts`), and Level Editor placement tools (`levelEditor/tools.ts`).
+- **`e_launcher` (Ballistic Ally Lobber & Tactical Collaboration)**:
+  - **Intentional Collaboration Workflow**: When the launch ability is off cooldown, `e_launcher` broadcasts a `NeedCollabor` call to all eligible allies within 4 tiles (`GRID_SIZE * 4`).
+  - **Partner Response & Approach**: The nearest eligible ally (`cost < 150`, not airborne or in another formation) halts its active task and intentionally navigates straight to the launcher while connected by dynamic energy tether VFX.
+  - **Synchronized 60-Frame Launch Windup**: Upon contact, both the launcher and the ally halt completely for a 60-frame charging duration with particle feedback before the ally is propelled along a ballistic arc landing at 75% distance toward the player.
+  - **Airborne State & Invulnerability**: While in flight (`isAirborne = true`), the launched ally scales dynamically along a smooth parabolic curve with ground shadow rendering, is immune to ground damage and knockback, and cannot be targeted by player or turret weapons.
+- **`e_leader` (Formation Alpha & Snake Chain)**:
+  - **Formation-First Pathfinding**: While below maximum follower capacity (4 followers), `e_leader` actively seeks and navigates toward the nearest eligible ally within 4 tiles to assemble the snake formation before pursuing player or turret targets.
+  - **Snake Formation Collaboration**: Recruits up to 4 lesser-health allies (`maxHealth < 400`), linking them behind the leader as a cohesive snake formation upon contact.
+  - **Trail-Interpolated Segment Following**: Followers track the leader's spatial history trail with smooth angular heading interpolation (`lerpAngle`).
+  - **Retained Non-Movement Capabilities**: Follower movement is locked (`lockActions(['movement'])`), but they retain full capability to fire projectiles, perform melee strikes, or trigger special actions if targets pass within range as they are led by the leader.
+  - **Formation Release on Death**: When `e_leader` is defeated, `releaseFormation()` triggers immediately, unlocking follower actions and restoring autonomous pathfinding and obstacle avoidance.
+- **`e_leader_ring` (Orbital Alpha & Follower Healing Guardian)**:
+  - **Formation-First Pathfinding**: While under its maximum capacity of 8 followers, `e_leader_ring` prioritizes seeking and moving toward allies within 4 tiles to assemble its orbital barrier ring.
+  - **Revolving Protective Ring**: Followers orbit around the leader in an evenly spaced circular ring (`GRID_SIZE * 2` radius) with smooth outward orientation.
+  - **Secondary Ability (`healFollower`)**: Every 120 frames (~2 seconds), the leader emits a restorative wave healing each follower in the ring for 20 HP, complete with green aura pulses, heal flash indicators, and hit spark feedback.
+  - **Formation Release on Death**: Unlocks all orbital followers upon destruction to resume autonomous combat.
+- **`e_hopper` (Ballistic Leaper & Impact Shockwave)**:
+  - **Randomized Rest Interval**: Rest duration between jumps varies randomly within `[110, 130]` frames for organic rhythm.
+  - **0.5-Tile Landing Inaccuracy**: Adds realistic trajectory variation up to 0.5 tiles (`16px`) from the exact target vector.
+  - **Ground Slam Bullet Spawning**: Replaced hardcoded melee checks with spawning an impact bullet (`b_hopper_slam`) upon touchdown, delivering 5 damage across a 2-tile AOE (64px) with dirt shockwave particles and camera feedback.
+- **`e_frontshield` (Directional Barrier Vanguard)**:
+  - **Frontal Shield Projection**: Projects a 90-degree energy shield arc positioned 2 tiles ahead of the enemy's facing direction with 1000 shield HP.
+  - **Selective Bullet Interception**: Friendly fire passes through freely without hindrance; only player- and turret-originated direct projectiles are intercepted and absorbed.
+  - **High-Arc Siege Bypass**: Projectiles with high-arc ballistic trajectories (`b.config.highArcConfig`, e.g. mortars and lobbers) naturally bypass the front shield as they descend from the sky directly onto the enemy's coordinates.
+  - **Visuals & Dynamic Break Effects**: Displays an active glowing cyan energy arc with impact flash feedback and shield damage numbers, accompanied by dedicated audio cues and a dispersion spark effect upon shield depletion.
+- **Combat Targeting & Friendly-Fire Safety**:
+  - **Hostile vs. Friendly Resolution**: Melee attacks (`ActionMeleeAttack`) and ranged attacks (`ActionShoot`) strictly distinguish between hostile targets and friendly allies using `isEnemy` and `c_hypnotized` condition checks.
+  - **Player & Turret Target Engagement**: Non-hypnotized enemies immediately execute attack animations, lunges, and damage application against the player, attached turrets, and placed world turrets without falsely categorizing player entities with conditions as friendly allies.
+  - **Hypnotized Entity Behavior**: Hypnotized enemies exclusively engage hostile enemies, while un-hypnotized enemies engage the player, turrets, and hypnotized enemies. Allied followers and collaboration partners are protected from friendly fire.
+  - **Hopper Slam Bullet Routing**: Landing impact bullets (`b_hopper_slam`) are properly routed to `state.enemyBullets` (or `state.bullets` if hypnotized) to ensure correct damage targeting across player and turrets.
 
+---
 
-
-
+## 🛠️ Level Editor Architecture & UX Systems
+The Level Editor is structured around high-performance dual-grid caching, decoupled inspection states, and immediate-mode UI tooling:
+- **Font & Input Normalization**: All input fields across the editor (steppers, text buffers, numeric displays, and Level Config panels) utilize the normalized `UI_FONT_INPUT` (`'Consolas, monospace'`) token to ensure uniform character width, optimal number legibility, and predictable caret navigation.
+- **Spawner Instance Decoupling**: Spawner blocks maintain completely isolated `customSpawnerConfig` instances. Copying or inspecting world spawners clones configuration data by value to prevent cross-block mutation of other world spawners or global prefab dictionaries.
+- **Dual-Grid Dirty Invalidation**: World modifications explicitly invoke `dirtyChunkAndNeighbors` across the affected chunk coordinate and adjacent borders, guaranteeing seamless visual synchronization between static chunk buffers and dynamic overlays.
+- **Zoom-Adaptive Level Editor Culling**: Viewport culling frustums dynamically scale with the camera's zoom factor (`state.camera.zoom`), ensuring chunk buffers, terrain meshes, obstacle overlays, and entity gizmos remain completely visible across the entire screen regardless of zoom-out distance.
+- **Multi-Spawner Radius Gizmo Pass**: When selecting, placing, snapping, or inspecting spawners, the viewport dynamically projects concentric operational boundaries across all visible spawners:
+  - **Trigger Range (Amber/Orange)**: Projects player proximity activation radii with high-contrast text distance tags.
+  - **Spawn Radius (Magenta/Purple)**: Delineates entity dispersion zones.
+  - **Contextual Radii & Active Focus**: Active/hovered spawners receive prominent luminous fills and measurement labels, while neighboring spawners display subtle ambient rings to help level designers balance encounter density and avoid unintentional overlap.
+- **Obstacle & Multi-Category Lasso Tool (`toolMode: 'lasso'`)**: Introduces a freeform polygon lasso tool:
+  - Accessible directly via the top toolbar (`LASSO` button) or hotkey `3`/`L`.
+  - Supports arbitrary continuous freeform paths with real-time polygon previews and spatial point down-sampling.
+  - On mouse release, a fast point-in-polygon scan calculates all enclosed grid tiles and automatically applies operations across the active category: sets or clears obstacles, places or removes overlays, paints or clears liquids, or toggles win condition flags, while batch-invalidating chunk render caches.
+- **Bi-Directional History Stack (Undo & Redo)**:
+  - Complete history tracking with `undoStack` and `redoStack` (supporting up to 30 snapshots).
+  - Reversible operations via toolbar buttons (`↩ UNDO`, `↷ REDO`) and standard shortcuts (`Ctrl+Z`, `Ctrl+Y`, and `Ctrl+Shift+Z`).
+  - Seamlessly restores world layout while preserving active camera position, zoom factor, tool selection, and item categories, coupled with neighbor-aware chunk dirtying.
+- **Level Editor Rapid Tool Switching**:
+  - Hotkey integration (`1`/`B` for Brush, `2`/`F` for Fill, `3`/`L` for Lasso, `4` for Spawn Area) with responsive transient toast feedback.
+  - Camera navigation locking while modals, tooltips, or text fields are actively edited.
 
 
 

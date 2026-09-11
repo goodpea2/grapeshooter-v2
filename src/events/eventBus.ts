@@ -7,6 +7,8 @@
 export type GameEventType =
   | 'ENEMY_KILLED'
   | 'ENEMY_DAMAGED'
+  | 'ENEMY_COLLAB'
+  | 'SHIELD_DAMAGED'
   | 'TURRET_FIRED'
   | 'TURRET_PLACED'
   | 'TURRET_MERGED'
@@ -22,6 +24,8 @@ export type GameEventType =
 export interface GameEventPayloads {
   ENEMY_KILLED: { enemy: any; source: any; pos: { x: number; y: number }; isBoss?: boolean; typeKey: string };
   ENEMY_DAMAGED: { enemy: any; source: any; amount: number; isCrit?: boolean };
+  ENEMY_COLLAB: { type: 'launch' | 'need_collab' | 'collab_respond' | 'chain_attach' | 'chain_release' | 'ring_attach' | 'ring_release' | 'heal_follower'; source: any; target?: any; amount?: number };
+  SHIELD_DAMAGED: { enemy: any; shieldHp: number; maxShieldHp: number; amount: number };
   TURRET_FIRED: { turret: any; bullet?: any; targetPos?: any };
   TURRET_PLACED: { turret: any; isAttached: boolean; pos: any };
   TURRET_MERGED: { resultTurret: any; ingredientTypes: string[]; pos: any };
@@ -30,7 +34,7 @@ export interface GameEventPayloads {
   PAYGATE_UNLOCKED: { paygate: any; cost?: any };
   WAVE_SPAWNED: { waveIndex: number; budget: number };
   PLAYER_HEALED: { amount: number; source?: any };
-  PLAYER_DAMAGED: { amount: number; source?: any };
+  PLAYER_DAMAGED: { amount: number; source?: any; player?: any };
   UPGRADE_SELECTED: { turretType: string; upgradeId: string };
   UI_NOTIFICATION: { text: string; type?: 'info' | 'warn' | 'success'; color?: string };
 }

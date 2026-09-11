@@ -2,7 +2,7 @@ import { TurretConfig } from '../turretConfig';
 import { GRID_SIZE, HOUR_FRAMES } from '../../../constants';
 
 export const t_farm_crystal: TurretConfig = {
-  name: 'Crystal Pot', costs: { sun: 40 }, costAlmanac: { soil: 30 }, drops: { shard: 2 }, health: 100, color: [100, 200, 255], size: 22, tier: 1,
+  name: 'Crystal Pot', costs: { sun: 40 }, costAlmanac: { soil: 30 }, drops: { shard: 2 }, health: 200, color: [100, 200, 255], size: 22, tier: 1,
   tooltip: "Grows a bulb that drops shards on harvest, attracts and consumes elixir",
   animationBodyType: 'tough',
   actionType: ['farm'],

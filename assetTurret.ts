@@ -48,9 +48,15 @@ export const TYPE_MAP: Record<string, string> = {
   't2_icebomb': 't_icebomb',
   't2_stun': 't_stun',
   't2_spike': 't_spike',
-  't2_wallaser': 't_puncher',
-  't2_heallaser': 't_iceray',
-  't2_icewall': 't_wall',
+  't_spike': 't_spike',
+  't2_wallaser': 't_wallaser_stage1',
+  't_wallaser_stage1': 't_wallaser_stage1',
+  't_wallaser_stage2': 't_wallaser_stage2',
+  't_wallaser_stage3': 't_wallaser_stage3',
+  't2_heallaser': 't_heallaser',
+  't_heallaser': 't_heallaser',
+  't2_icewall': 't_icewall',
+  't_icewall': 't_icewall',
   't2_torchwood': 't_flamethrower',
   // Tier 3
   't3_triplepea': 't_triplepea',
@@ -65,22 +71,59 @@ export const TYPE_MAP: Record<string, string> = {
   't3_snowpeanut': 't_snowpeanut',
   't3_skymortar': 't_skymortar',
   't3_laser3': 't_laser3',
+  't3_puncher': 't_puncher_stage1',
+  't3_puncher_stage1': 't_puncher_stage1',
+  't3_puncher_stage2': 't_puncher_stage2',
+  't3_puncher_stage3': 't_puncher_stage3',
+  't_puncher_stage1': 't_puncher_stage1',
+  't_puncher_stage2': 't_puncher_stage2',
+  't_puncher_stage3': 't_puncher_stage3',
   't3_puncher2': 't_puncher2',
-  't3_gatling': 't_triplepea',
-  't3_firecharge': 't_flamethrower',
-  't3_minecharge': 't_mine',
+  't3_witch': 't_witch',
+  't_witch': 't_witch',
+  't3_hypno': 't_hypno',
+  't_hypno': 't_hypno',
+  't3_magnet': 't_magnet',
+  't_magnet': 't_magnet',
+  't3_heallaser': 't_heallaserbig',
+  't3_heallaser2': 't_heallaserbig',
+  't_heallaserbig': 't_heallaserbig',
+  't3_gatling': 't_gatling',
+  't_gatling': 't_gatling',
+  't3_firecharge': 't_firecharge',
+  't_firecharge': 't_firecharge',
+  't3_minecharge': 't_minecharge_charge3',
+  't_minecharge_charge1': 't_minecharge_charge1',
+  't_minecharge_charge2': 't_minecharge_charge2',
+  't_minecharge_charge3': 't_minecharge_charge3',
+  't_minecharge_unarmed': 't_minecharge_unarmed',
   't3_aoelaser': 't_aoelaser',
+  't_aoelaser': 't_aoelaser',
   't3_iceray2': 't_iceray2',
   't3_miningbomb': 't_miningbomb',
   't3_tesla': 't_tesla',
   't3_icepuncher': 't_icepuncher',
-  't3_densnut': 't_densenut',
+  't3_densnut': 't_densnut',
+  't_densnut': 't_densnut',
+  't_densenut': 't_densnut',
   't3_durian': 't_durian',
   't3_spike2': 't_spike2',
   't3_holonut': 't_holonut',
+  't_holonut': 't_holonut',
   't3_minefield': 't_minefield',
   't3_frostfield': 't_frostfield',
   't3_triberg': 't_triberg',
+  't3_icecharge': 't_icecharge_charge3',
+  't_icecharge_charge1': 't_icecharge_charge1',
+  't_icecharge_charge2': 't_icecharge_charge2',
+  't_icecharge_charge3': 't_icecharge_charge3',
+  't_icecharge_unarmed': 't_icecharge_unarmed',
+  't3_powerbank': 't_powerbank_stage3',
+  't_powerbank_stage1': 't_powerbank_stage1',
+  't_powerbank_stage2': 't_powerbank_stage2',
+  't_powerbank_stage3': 't_powerbank_stage3',
+  't3_speeder': 't_speeder',
+  't_speeder': 't_speeder',
   // Special Turrets
   't0_puffshroom': 't0_puffshroom',
   't0_grapeshot': 't0_grapeshot',
@@ -101,13 +144,21 @@ export const TYPE_MAP: Record<string, string> = {
 
 // Units that do not have a back-facing asset
 const NO_BACK_UNITS = new Set([
-  't_wall', 't2_tall', 't2_pulse', 't2_spike', 't_sunflower', 't_seed', 't_seed2', 't_lilypad',
+  't_wall', 't2_tall', 't2_pulse', 't2_spike', 't_spike', 't_sunflower', 't_seed', 't_seed2', 't_lilypad',
   't0_jalapeno', 't0_firecherry', 't0_starfruit', 't0_iceshroom', 't0_cherrybomb','t0_hypnobomb',
   't_farm_bush', 't_farm_crystal', 't_farm_mob',
   't_dummy', 'tx_goldengrape',
+  't2_wallaser', 't_wallaser_stage1', 't_wallaser_stage2', 't_wallaser_stage3',
+  't2_icewall', 't_icewall',
   // T3 additions that have no back asset provided
-  't3_repulser', 't3_skymortar', 't3_miningbomb', 't3_tesla', 't3_densnut', 't3_durian',
-  't3_spike2', 't3_holonut', 't3_minefield', 't3_frostfield', 't3_triberg'
+  't3_repulser', 't3_skymortar', 't3_miningbomb', 't3_tesla', 't3_densnut', 't_densnut', 't_densenut', 't3_durian',
+  't3_spike2', 't3_holonut', 't_holonut', 't3_minefield', 't3_frostfield', 't3_triberg', 't3_magnet', 't_magnet',
+  't3_hypno', 't_hypno',
+  't3_powerbank', 't_powerbank_stage1', 't_powerbank_stage2', 't_powerbank_stage3',
+  't3_speeder', 't_speeder',
+  't3_firecharge', 't_firecharge',
+  't3_icecharge', 't_icecharge_charge1', 't_icecharge_charge2', 't_icecharge_charge3', 't_icecharge_unarmed',
+  't3_minecharge', 't_minecharge_charge1', 't_minecharge_charge2', 't_minecharge_charge3', 't_minecharge_unarmed'
 ]);
 
 export function hasTurretSprite(type: string): boolean {
@@ -189,11 +240,11 @@ export function drawTurretSprite(t: any) {
     spriteKey = config.farmConfig.assetImg[t.farmStage];
   } else if (onCooldown) {
     spriteKey = `img_${baseKey}_unarmed`;
-  } else if (!NO_BACK_UNITS.has(t.type) && isBack) {
+  } else if (!NO_BACK_UNITS.has(t.type) && !NO_BACK_UNITS.has(baseKey) && isBack && state.assets[`img_${baseKey}_back`]) {
     spriteKey = `img_${baseKey}_back`;
   }
 
-  let sprite = state.assets[spriteKey] || state.assets[`img_${baseKey}_front`] || state.assets[`img_${baseKey}`];
+  let sprite = state.assets[spriteKey] || state.assets[`img_${baseKey}_front`] || state.assets[`img_${baseKey}`] || state.assets[`img_${t.type}_front`] || state.assets[`img_${t.type}`];
 
   if (sprite) {
     const ctx = (window as any).drawingContext;
@@ -214,10 +265,14 @@ export function drawTurretSprite(t: any) {
         }
     }
 
-    // HEAL / DAMAGE FLASH (Requires Tint)
+    // HEAL / DAMAGE FLASH / RAGED CONDITION TINT (Requires Tint)
+    const isRaged = t.conditions?.has('c_raged') || t.conditions?.has('c_raged_visualonly');
     if (t.flashTimer > 0) {
       if (t.flashType === 'heal') tint(100, 255, 100, t.alpha);
       else tint(255, 100, 100, t.alpha);
+      useTint = true;
+    } else if (isRaged) {
+      tint(255, 100 + sin(state.frames * 0.4) * 100, 200, t.alpha);
       useTint = true;
     }
 

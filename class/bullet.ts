@@ -249,10 +249,40 @@ export class Bullet {
     }
 
     if (this.damageTargets.includes('enemy')) {
+      const isFriendlyBullet = !this.damageTargets.includes('player') && !this.damageTargets.includes('turret');
+
+      // Check Front Shield Interception: Player and turret bullets are blocked by front shields
+      if (!this.config.highArcConfig && state.enemies) {
+        for (const e of state.enemies) {
+          if (!e || e.isDying || !e.frontShieldAction || e.frontShieldAction.shieldHp <= 0) continue;
+          if (isFriendlyBullet && e.conditions?.has('c_hypnotized')) continue;
+
+          const sRad = e.frontShieldAction.shieldRadius || 68;
+          const edx = this.pos.x - e.pos.x;
+          const edy = this.pos.y - e.pos.y;
+          if (edx * edx + edy * edy > (sRad + 30) ** 2) continue;
+
+          if (e.frontShieldAction.testBulletIntersection(this.pos.x, this.pos.y, this.prevPos?.x, this.prevPos?.y)) {
+            e.frontShieldAction.takeShieldDamage(this.dmg, this.source);
+            this.handleCollision();
+            if (this.life <= 0) {
+              this.checkLifetimeExplode();
+              return;
+            }
+          }
+        }
+      }
+
       const grid = state.spatialGrid;
       if (grid) {
         grid.queryCircleEnemies(this.pos.x, this.pos.y, 4, (e: any) => {
           if (this.hitTargets.has(e.uid)) return;
+          if (e.isDying || e.isAirborne) return;
+
+          // Hypnotized friendly check:
+          // Friendly bullets (from player, turrets, or hypnotized enemies) don't damage hypnotized allies
+          if (isFriendlyBullet && e.conditions?.has('c_hypnotized')) return;
+
           this.hitTargets.add(e.uid);
           this.applyBulletConditions(e);
           
@@ -273,7 +303,8 @@ export class Bullet {
           }
 
           const killed = e.takeDamage(this.dmg, this.source); 
-          soundEngine.playSFXGroup('projectile_hit_enemy');
+          const hitSfx = e.config?.hitSfx || 'projectile_hit_enemy';
+          soundEngine.playSFXGroup(hitSfx);
           if (killed && this.source && this.source.onTargetKilled) {
             this.source.onTargetKilled(e);
           }
@@ -328,6 +359,28 @@ export class Bullet {
       }
     }
 
+    // Hostile enemy bullets can hit hypnotized friendly allies
+    if ((this.damageTargets.includes('player') || this.damageTargets.includes('turret')) && !this.damageTargets.includes('enemy')) {
+      const grid = state.spatialGrid;
+      if (grid) {
+        grid.queryCircleEnemies(this.pos.x, this.pos.y, 4, (e: any) => {
+          if (!e.conditions?.has('c_hypnotized')) return;
+          if (this.hitTargets.has(e.uid) || e.isDying || e.isAirborne) return;
+          this.hitTargets.add(e.uid);
+          this.applyBulletConditions(e);
+          e.takeDamage(this.dmg, this.source);
+          const hitSfx = e.config?.hitSfx || 'projectile_hit_enemy';
+          soundEngine.playSFXGroup(hitSfx);
+          this.handleCollision();
+          if (this.life <= 0) return true;
+        });
+        if (this.life <= 0) {
+          this.checkLifetimeExplode();
+          return;
+        }
+      }
+    }
+
     this.checkLifetimeExplode();
   }
 
@@ -360,7 +413,7 @@ export class Bullet {
     if (!target.applyCondition) return;
     if (this.config.appliedConditions) {
       for (const cond of this.config.appliedConditions) {
-        target.applyCondition(cond.type, cond.duration);
+        target.applyCondition(cond.type, cond.duration, cond);
       }
     }
     if (this.config.stunDuration > 0) target.applyCondition('c_stun', this.config.stunDuration);
@@ -438,9 +491,12 @@ export class Bullet {
     if (!aoe) return;
     
     if (this.damageTargets.includes('enemy')) {
+      const isFriendlyBullet = !this.damageTargets.includes('player') && !this.damageTargets.includes('turret');
       const grid = state.spatialGrid;
       if (grid) {
         grid.queryCircleEnemies(this.pos.x, this.pos.y, maxR, (e: any) => {
+          if (isFriendlyBullet && e.conditions?.has('c_hypnotized')) return;
+          if (e.isDying || e.isAirborne) return;
           let dSq = (this.pos.x - e.pos.x)**2 + (this.pos.y - e.pos.y)**2;
           if (dSq < maxR * maxR) {
             const d = Math.sqrt(dSq);
@@ -464,6 +520,8 @@ export class Bullet {
         });
       } else {
         for (let e of state.enemies) {
+          if (isFriendlyBullet && e.conditions?.has('c_hypnotized')) continue;
+          if (e.isDying || e.isAirborne) continue;
           let dSq = (this.pos.x - e.pos.x)**2 + (this.pos.y - e.pos.y)**2;
           if (dSq < maxR*maxR) {
             const d = Math.sqrt(dSq);

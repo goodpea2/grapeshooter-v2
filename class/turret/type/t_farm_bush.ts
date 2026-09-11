@@ -2,7 +2,7 @@ import { TurretConfig } from '../turretConfig';
 import { GRID_SIZE, HOUR_FRAMES } from '../../../constants';
 
 export const t_farm_bush: TurretConfig = {
-  name: 'Fern Pot', costs: { sun: 40 }, costAlmanac: { soil: 30 }, drops: { leaf: 2 }, health: 100, color: [50, 150, 50], size: 22, tier: 1,
+  name: 'Fern Pot', costs: { sun: 40 }, costAlmanac: { soil: 30 }, drops: { leaf: 2 }, health: 200, color: [50, 150, 50], size: 22, tier: 1,
   tooltip: "Grows a bush that drop leaves on harvest, attracts and consumes elixir",
   animationBodyType: 'soft',
   actionType: ['farm'],

@@ -4,12 +4,19 @@ import { t2_pulse } from './t2_pulse';
 
 export const t3_repulser: TurretConfig = { 
   ...t2_pulse,
-  name: 'Repulser', costs: { sun: 65 }, costAlmanac: { leaf: 4, shell: 6, fuel: 8 }, drops: { leaf: 1, shell: 1, fuel: 1 }, health: 150, color: [100, 255, 150], size: 22, tier: 3,
+  name: 'Repulser', costs: { sun: 65 }, costAlmanac: { leaf: 4, shell: 6, fuel: 8 }, drops: { leaf: 1, shell: 1, fuel: 1 }, health: 300, color: [100, 255, 150], size: 22, tier: 3,
   tooltip: "Pulses surrounding damage waves at enemies, knocking them back", animationBodyType: 'soft',
   actionConfig: { 
     ...t2_pulse.actionConfig,
     pulseBulletTypeKey: 'b_repulser_pulse', 
     pulseTriggerRadius: GRID_SIZE * 2, 
     pulseCooldown: 45, 
+    pulseAppliedFireRateMultiplier: true,
   },
+  actionTypeWhileCharged: ['pulse'],
+  actionConfigWhileCharged: {
+    pulseBulletTypeKey: 'b_pulse_tier2_charged',
+    pulseTriggerRadius: GRID_SIZE * 4,
+    staminaCostPerBulletSpawned: 12
+  }
 };

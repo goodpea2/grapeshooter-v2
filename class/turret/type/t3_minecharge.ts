@@ -3,53 +3,60 @@ import { GRID_SIZE, HOUR_FRAMES } from '../../../constants';
 import { AttachedTurret } from '../../attachedTurret';
 import { WorldTurret } from '../../worldTurret';
 import { state } from '../../../state';
+import { spawnStaminaAbsorbVFX } from '../../../vfx/index';
 
 export class MinechargeAttachedTurret extends AttachedTurret {
   staminaSpent: number = 0;
-  lastPlayerStamina: number = 100;
+  lastPlayerTotalStaminaSpent: number = 0;
+
+  constructor(type: string, parent: any, hq: number, hr: number) {
+    super(type, parent, hq, hr);
+    this.customAssetImg = 't_minecharge_charge1';
+  }
 
   customUpdate() {
-    const pulseCooldown = this.config.actionConfig.pulseCooldown || (HOUR_FRAMES * 2);
-    const lastPulse = this.actionTimers.get('pulse') || -999999;
-    const isArmed = (state.frames - lastPulse) >= (pulseCooldown / (this.fireRateMultiplier || 1.0)) && this.jumpPhase === null;
+    const isArmed = this.isArmed();
 
     if (!isArmed) {
       if (this.staminaSpent > 0) {
         this.staminaSpent = 0;
         this.growthProgress = 0;
-        this.customAssetImg = 't_mine';
         this.config.actionConfig.pulseBulletTypeKey = 'b_mine_explosion';
       }
-      this.lastPlayerStamina = state.player ? state.player.stamina : 100;
+      this.customAssetImg = 't_minecharge_unarmed';
+      this.conditions.delete('c_raged_visualonly');
+      this.lastPlayerTotalStaminaSpent = state.player ? (state.player.totalStaminaSpent || 0) : 0;
       return;
     }
 
     if (state.player) {
-      if (this.isCharged()) {
-        const diff = Math.max(0, this.lastPlayerStamina - state.player.stamina);
-        if (diff > 0) {
-          this.staminaSpent = Math.min(500, this.staminaSpent + diff);
-        } else if (state.player.stamina > 0 && this.staminaSpent < 500) {
-          // Direct charge consumption when player is holding boost
-          const drain = Math.min(state.player.stamina, 0.5);
-          state.player.stamina = Math.max(0, state.player.stamina - drain);
-          this.staminaSpent = Math.min(500, this.staminaSpent + drain);
+      const currentTotal = state.player.totalStaminaSpent || 0;
+      if (this.lastPlayerTotalStaminaSpent === undefined) {
+        this.lastPlayerTotalStaminaSpent = currentTotal;
+      }
+      const diff = Math.max(0, currentTotal - this.lastPlayerTotalStaminaSpent);
+      this.lastPlayerTotalStaminaSpent = currentTotal;
+
+      if (diff > 0 && this.staminaSpent < 500) {
+        this.staminaSpent = Math.min(500, this.staminaSpent + diff);
+        if (state.frames % 6 === 0) {
+          const wPos = this.getWorldPos();
+          spawnStaminaAbsorbVFX(wPos.x, wPos.y);
         }
       }
-      this.lastPlayerStamina = state.player.stamina;
     }
 
     this.growthProgress = this.staminaSpent;
     this.config.actionConfig.maxGrowth = 500;
 
     if (this.staminaSpent >= 500) {
-      this.customAssetImg = 't3_minefield';
+      this.customAssetImg = 't_minecharge_charge3';
       this.config.actionConfig.pulseBulletTypeKey = 'b_mine_explosion3';
     } else if (this.staminaSpent >= 200) {
-      this.customAssetImg = 't2_minespawner';
+      this.customAssetImg = 't_minecharge_charge2';
       this.config.actionConfig.pulseBulletTypeKey = 'b_mine_explosion2';
     } else {
-      this.customAssetImg = 't_mine';
+      this.customAssetImg = 't_minecharge_charge1';
       this.config.actionConfig.pulseBulletTypeKey = 'b_mine_explosion';
     }
   }
@@ -57,20 +64,23 @@ export class MinechargeAttachedTurret extends AttachedTurret {
 
 export class MinechargeWorldTurret extends WorldTurret {
   staminaSpent: number = 0;
-  lastPlayerStamina: number = 100;
+
+  constructor(type: string, gx: number, gy: number) {
+    super(type, gx, gy);
+    this.customAssetImg = 't_minecharge_charge1';
+  }
 
   customUpdate() {
-    const pulseCooldown = this.config.actionConfig.pulseCooldown || (HOUR_FRAMES * 2);
-    const lastPulse = this.actionTimers.get('pulse') || -999999;
-    const isArmed = (state.frames - lastPulse) >= (pulseCooldown / (this.fireRateMultiplier || 1.0)) && this.jumpPhase === null;
+    const isArmed = this.isArmed();
 
     if (!isArmed) {
       if (this.staminaSpent > 0) {
         this.staminaSpent = 0;
         this.growthProgress = 0;
-        this.customAssetImg = 't_mine';
         this.config.actionConfig.pulseBulletTypeKey = 'b_mine_explosion';
       }
+      this.customAssetImg = 't_minecharge_unarmed';
+      this.conditions.delete('c_raged_visualonly');
       return;
     }
 
@@ -78,24 +88,24 @@ export class MinechargeWorldTurret extends WorldTurret {
     this.config.actionConfig.maxGrowth = 500;
 
     if (this.staminaSpent >= 500) {
-      this.customAssetImg = 't3_minefield';
+      this.customAssetImg = 't_minecharge_charge3';
       this.config.actionConfig.pulseBulletTypeKey = 'b_mine_explosion3';
     } else if (this.staminaSpent >= 200) {
-      this.customAssetImg = 't2_minespawner';
+      this.customAssetImg = 't_minecharge_charge2';
       this.config.actionConfig.pulseBulletTypeKey = 'b_mine_explosion2';
     } else {
-      this.customAssetImg = 't_mine';
+      this.customAssetImg = 't_minecharge_charge1';
       this.config.actionConfig.pulseBulletTypeKey = 'b_mine_explosion';
     }
   }
 }
 
 export const t3_minecharge: TurretConfig = {
-  name: 'Mine Charger',
-  costs: { sun: 65 },
+  name: 'Cherry Bomb',
+  costs: { sun: 55 },
   costAlmanac: { fuel: 16, shard: 6 },
   drops: { fuel: 3, shard: 1 },
-  health: 120,
+  health: 100,
   color: [255, 80, 0],
   size: 22,
   tier: 3,
@@ -112,10 +122,19 @@ export const t3_minecharge: TurretConfig = {
     pulseTurretJumpAtTriggerSource: true,
     maxGrowth: 500
   },
-  whileCharged: {
+  actionTypeWhileCharged: ['pulse'],
+  actionConfigWhileCharged: {
+    pulseBulletTypeKey: 'b_mine_explosion',
+    pulseTriggerRadius: GRID_SIZE * 3.5,
+    pulseTriggerBy: ['enemy'],
+    pulseCooldown: HOUR_FRAMES * 2,
+    pulseCenteredAtTriggerSource: true,
+    hasUnarmedAsset: true,
+    pulseTurretJumpAtTriggerSource: true,
+    maxGrowth: 500,
     staminaSpentThresholds: [
-      { staminaSpent: 200, pulseBulletTypeKey: 'b_mine_explosion2', assetImg: 't2_minespawner' },
-      { staminaSpent: 500, pulseBulletTypeKey: 'b_mine_explosion3', assetImg: 't3_minefield' }
+      { staminaSpent: 200, pulseBulletTypeKey: 'b_mine_explosion2', assetImg: 't_minecharge_charge2' },
+      { staminaSpent: 500, pulseBulletTypeKey: 'b_mine_explosion3', assetImg: 't_minecharge_charge3' }
     ]
   },
   targetType: ['enemy'],

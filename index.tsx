@@ -12,15 +12,15 @@ if (typeof HTMLCanvasElement !== 'undefined') {
 
 import { state } from './state';
 import { 
-  GRID_SIZE, HEX_DIST, MAX_VFX, HOUR_FRAMES, CHUNK_SIZE, PLAYER_DRAG_MIN_DISTANCE_TILES, PLAYER_DRAG_MAX_DISTANCE_TILES,
+  GRID_SIZE, HEX_DIST, HOUR_FRAMES, CHUNK_SIZE, PLAYER_DRAG_MIN_DISTANCE_TILES, PLAYER_DRAG_MAX_DISTANCE_TILES,
   VISIBILITY_RADIUS
 } from './constants';
 import { turretTypes } from './balanceTurrets';
-import { findMergeResult } from './dictionaryTurretMerging';
+import { findMergeResult, getBaseIngredientsForType, TURRET_RECIPES } from './dictionaryTurretMerging';
 import { enemyTypes } from './balanceEnemies';
 import { bulletTypes } from './balanceBullets';
 import { WorldManager } from './world';
-import { Player, Enemy, AttachedTurret, WorldTurret, SunLoot, NPCEntity } from './entities';
+import { Player, Enemy, AttachedTurret, WorldTurret, SunLoot, NPCEntity, GroundFeature } from './entities';
 import { createAttachedTurret, createWorldTurret } from './class/turret/TurretRegistry';
 import { getTime, drawUI, drawTurretTooltip } from './ui/ui';
 import { drawAlmanac, handleAlmanacClick } from './ui/almanac/mainLayout';
@@ -32,7 +32,15 @@ import { drawWorldGenPreview, drawTurretPathDebug } from './ui/uiDebug';
 import { uiComponentsShowcase } from './ui/uiComponentsShowcase';
 import { handleNpcUiClick, handleNpcUiPress } from './ui/uiNpcShop';
 import { updateGameSystems, spawnFromBudget, getLightLevel, customDayLightConfig } from './lvDemo';
-import { MergeVFX, ShopFlyVFX, Explosion, explosionPool, DamageNumberVFX, damageNumberPool, HitSpark, hitSparkPool } from './vfx/index';
+import { 
+  MergeVFX, ShopFlyVFX, Explosion, explosionPool, DamageNumberVFX, damageNumberPool, HitSpark, hitSparkPool,
+  StaminaFlyToTurretVFX, staminaFlyToTurretPool, StaminaFlyOutVFX, staminaFlyOutPool, StaminaAbsorbVFX, staminaAbsorbPool,
+  ConditionVFX, conditionPool, GreenEssenceVFX, greenEssencePool,
+  SpeederAuraVFX, speederAuraPool, TorchwoodAuraVFX, torchwoodAuraPool,
+  BugSplatVFX, bugSplatPool, BugSplatVFX2, bugSplat2Pool, BugSplatVFX3, bugSplat3Pool,
+  BugSplatTinyVfx, bugSplatTinyPool, BugSplatMeatChunkVfx, bugSplatMeatChunkPool,
+  BugSplatMeatChunkGiantVfx, bugSplatMeatChunkGiantPool
+} from './vfx/index';
 import { bulletPool } from './class/bullet';
 import { overlayTypes } from './balanceObstacles';
 import { triggerUpgradeHook } from './src/upgrades';
@@ -58,6 +66,9 @@ import {
   handleLevelEditorMouseRelease,
   handleSpawnerKeyInput,
   handleSunGeneratorKeyInput,
+  undoLevelEditorAction,
+  redoLevelEditorAction,
+  showEditorToast,
   paygateModal,
   handlePayGateModalKeyInput,
   handlePayGateCostModalDrag,
@@ -338,11 +349,11 @@ function executePlacement() {
         if (targetInstance instanceof AttachedTurret) {
           const indexToReplace = state.player.attachments.indexOf(targetInstance);
           const newTurret = createAttachedTurret(state.mergeTargetPreview.type, state.player, targetInstance.hq, targetInstance.hr);
-          newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
+          newTurret.baseIngredients = getBaseIngredientsForType(state.mergeTargetPreview.type);
           state.player.attachments[indexToReplace] = newTurret;
         } else if (targetInstance instanceof WorldTurret) {
           const newTurret = createWorldTurret(state.mergeTargetPreview.type, targetInstance.gx, targetInstance.gy);
-          newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
+          newTurret.baseIngredients = getBaseIngredientsForType(state.mergeTargetPreview.type);
           state.world.removeTurret(targetInstance.gx, targetInstance.gy);
           state.world.addTurret(newTurret);
         }
@@ -465,7 +476,7 @@ function executePlacement() {
           }
           const indexToReplace = state.player.attachments.indexOf(target);
           const newTurret = createAttachedTurret(state.mergeTargetPreview.type, state.player, target.hq, target.hr);
-          newTurret.baseIngredients = state.mergeTargetPreview.ingredients;
+          newTurret.baseIngredients = getBaseIngredientsForType(state.mergeTargetPreview.type);
           state.player.attachments[indexToReplace] = newTurret;
           state.totalTurretsAcquired++;
           state.vfx.push(new MergeVFX(target.getWorldPos().x, target.getWorldPos().y, [255, 255, 255]));
@@ -763,6 +774,7 @@ function tick() {
       if (i < state.groundFeatures.length) state.groundFeatures[i] = last;
     }
   }
+  GroundFeature.resolveFireGroundFeatures();
   for (let npc of state.npcs) npc.update(state.player.pos);
   
   if (state.player) {
@@ -770,7 +782,7 @@ function tick() {
   }
 
   for (let i = state.enemies.length - 1; i >= 0; i--) { 
-    state.enemies[i].update(state.player.pos); 
+    state.enemies[i].update(state.player.pos, state.player?.attachments || []); 
     if (state.enemies[i].health <= 0 || state.enemies[i].markedForDespawn) {
       const last = state.enemies.pop()!;
       if (i < state.enemies.length) state.enemies[i] = last;
@@ -925,6 +937,20 @@ function tick() {
         damageNumberPool.release(v);
       } else if (v instanceof HitSpark) {
         hitSparkPool.release(v);
+      } else if (v instanceof StaminaFlyToTurretVFX) {
+        staminaFlyToTurretPool.release(v);
+      } else if (v instanceof StaminaFlyOutVFX) {
+        staminaFlyOutPool.release(v);
+      } else if (v instanceof StaminaAbsorbVFX) {
+        staminaAbsorbPool.release(v);
+      } else if (v instanceof ConditionVFX) {
+        conditionPool.release(v);
+      } else if (v instanceof GreenEssenceVFX) {
+        greenEssencePool.release(v);
+      } else if (v instanceof SpeederAuraVFX) {
+        speederAuraPool.release(v);
+      } else if (v instanceof TorchwoodAuraVFX) {
+        torchwoodAuraPool.release(v);
       }
       const last = state.vfx.pop()!;
       if (i < state.vfx.length) state.vfx[i] = last;
@@ -1205,8 +1231,10 @@ export function getDynamicPlacementZoom(): number {
 
   if ((activePlacementType || state.draggedTurretInstance) && !state.isGameOver) {
     const ghostType = state.draggedTurretInstance ? state.draggedTurretInstance.type : activePlacementType;
-    const ghostConfig = turretTypes[ghostType!]; const ghostLayer = ghostConfig.turretLayer || 'normal';
-    const draggingIngredients = state.draggedTurretInstance ? (state.draggedTurretInstance.baseIngredients || []) : (activePlacementType ? [activePlacementType] : []);
+    const ghostConfig = ghostType ? turretTypes[ghostType] : null; const ghostLayer = ghostConfig?.turretLayer || 'normal';
+    const draggingIngredients = state.draggedTurretInstance 
+      ? (state.draggedTurretInstance.baseIngredients?.length ? state.draggedTurretInstance.baseIngredients : getBaseIngredientsForType(state.draggedTurretInstance.type)) 
+      : (activePlacementType ? getBaseIngredientsForType(activePlacementType) : []);
     
     // Purchase cost only applies if we are placing a NEW turret (not repositioning an instance)
     const isNewPlacement = !!activePlacementType;
@@ -1325,16 +1353,26 @@ export function getDynamicPlacementZoom(): number {
       const d = dist(mWorld.x, mWorld.y, wPos.x, wPos.y);
       const isMergeableLayer = (att.config.turretLayer || 'normal') === 'normal' && ghostLayer === 'normal';
       let mergeInfo = null;
-      if (isMergeableLayer && !att.isFrosted && (draggingIngredients?.length || 0) > 0 && (att.baseIngredients?.length || 0) > 0) {
-        const combinedPool = [...draggingIngredients, ...att.baseIngredients];
-        const resType = findMergeResult(combinedPool);
+      const draggingTier = state.draggedTurretInstance ? (state.draggedTurretInstance.config?.tier || 1) : (ghostConfig?.tier || 1);
+      const targetTier = att.config?.tier || 1;
+      const targetIngredients = att.baseIngredients?.length ? att.baseIngredients : getBaseIngredientsForType(att.type);
+
+      if (isMergeableLayer && !att.isFrosted && draggingTier >= 1 && draggingTier < 3 && targetTier >= 1 && targetTier < 3 && (draggingIngredients?.length || 0) > 0 && (targetIngredients?.length || 0) > 0) {
+        const maxIngredientTier = Math.floor(Math.max(draggingTier, targetTier));
+        const expectedOutputTier = maxIngredientTier + 1;
+        const combinedPool = [...draggingIngredients, ...targetIngredients];
+        const mergeResult = findMergeResult(combinedPool, expectedOutputTier);
+        const resType = mergeResult ? mergeResult.id : null;
+        const missingDuplicates = mergeResult ? mergeResult.missingDuplicates : 0;
         const resConfig = resType ? turretTypes[resType] : null;
         const isAvailable = resType ? (state.unlockedTurrets.includes(resType) || state.makeAllTurretsAvailable) : false;
         if (resType && resConfig && isAvailable) {
-          const ingredientsCostSum = combinedPool.reduce((sum, k) => sum + (turretTypes[k]?.costs?.sun || turretTypes[k]?.cost || 0), 0);
+          const draggingCost = ghostConfig?.costs?.sun || ghostConfig?.cost || 0;
+          const targetCost = att.config?.costs?.sun || att.config?.cost || 0;
+          const inputTurretsCostSum = draggingCost + targetCost;
           const resSunCost = resConfig.costs?.sun || resConfig.cost || 0;
-          const combinedMergeCost = Math.max(0, resSunCost - ingredientsCostSum);
-          mergeInfo = { resType, resConfig, combinedMergeCost, combinedPool };
+          const combinedMergeCost = Math.max(0, resSunCost - inputTurretsCostSum) + (missingDuplicates * 10);
+          mergeInfo = { resType, resConfig, combinedMergeCost, combinedPool, missingDuplicates };
         }
       }
 
@@ -1842,6 +1880,58 @@ export function getDynamicPlacementZoom(): number {
         return false;
       }
     }
+    // Ctrl+Z Undo / Ctrl+Y / Ctrl+Shift+Z Redo for Level Editor
+    if ((event?.ctrlKey || event?.metaKey)) {
+      if (event?.shiftKey && (k === 'z' || k === 'Z' || code === 90)) {
+        if (redoLevelEditorAction()) {
+          return false;
+        }
+      } else if (k === 'y' || k === 'Y' || code === 89) {
+        if (redoLevelEditorAction()) {
+          return false;
+        }
+      } else if (k === 'z' || k === 'Z' || code === 90) {
+        if (undoLevelEditorAction()) {
+          return false;
+        }
+      }
+    }
+
+    // Tool switching hotkeys (when not typing in modal/input)
+    if (!event?.ctrlKey && !event?.metaKey && !event?.altKey && state.levelEditor) {
+      if (k === '1' || k === 'b' || k === 'B') {
+        state.levelEditor.toolMode = 'brush';
+        showEditorToast("Brush Tool (B)");
+        return false;
+      }
+      if (k === '2' || k === 'f' || k === 'F') {
+        state.levelEditor.toolMode = 'bucket';
+        if (state.levelEditor.activeCategory !== 'obstacles' && state.levelEditor.activeCategory !== 'liquids') {
+          state.levelEditor.activeCategory = 'obstacles';
+          state.levelEditor.selectedItemKey = 'o_dirt';
+        }
+        showEditorToast("Fill Tool (F)");
+        return false;
+      }
+      if (k === '3' || k === 'l' || k === 'L') {
+        state.levelEditor.toolMode = 'lasso';
+        const validCats = ['obstacles', 'overlays', 'liquids', 'flags'];
+        if (!validCats.includes(state.levelEditor.activeCategory)) {
+          state.levelEditor.activeCategory = 'obstacles';
+          if (!state.levelEditor.selectedItemKey || state.levelEditor.selectedItemKey === 'empty') {
+            state.levelEditor.selectedItemKey = 'o_dirt';
+          }
+        }
+        showEditorToast("Lasso Tool (L)");
+        return false;
+      }
+      if (k === '4') {
+        state.levelEditor.toolMode = 'spawn_area';
+        showEditorToast("Spawn Area Tool");
+        return false;
+      }
+    }
+    return;
   }
   state.needsTargetReScan = true;
   if (keyCode === 87 || keyCode === 65 || keyCode === 83 || keyCode === 68) { // W, A, S, D

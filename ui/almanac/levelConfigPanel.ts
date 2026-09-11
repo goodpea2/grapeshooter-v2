@@ -33,6 +33,7 @@ declare const floor: any;
 declare const abs: any;
 declare const constrain: any;
 declare const ellipse: any;
+declare const textFont: any;
 
 export const ALL_CURRENCIES = [
   { key: 'sun', label: 'Sun', icon: 'img_icon_sun', color: [255, 220, 60] },
@@ -232,7 +233,7 @@ export function initLevelEditorLevelConfig(layoutData?: any) {
 }
 
 function parseNumberOrArray(strVal: string, fallback: number[]): number | number[] {
-  const clean = (strVal || '').trim();
+  const clean = (strVal || '').replace(/[\[\]]/g, '').trim();
   if (!clean) return [...fallback];
   if (clean.includes(',')) {
     const arr = clean.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
@@ -912,6 +913,17 @@ function renderTextInput(
   const isFocused = state.activeLevelConfigInput?.field === field;
   const isHov = mouseX >= gX && mouseX <= gX + w && mouseY >= gY && mouseY <= gY + h;
 
+  // Handle drag selection update
+  const isMousePressed = !!(window as any).mouseIsPressed;
+  if (isFocused && isMousePressed && state.activeLevelConfigInput?.isDragging) {
+    const activeBuf = state.activeLevelConfigInput.textBuffer || '';
+    const approxCharW = 5.8;
+    const relX = mouseX - (gX + 8);
+    const dragIdx = constrain(Math.round(relX / approxCharW), 0, activeBuf.length);
+    state.activeLevelConfigInput.selectionEnd = dragIdx;
+    state.activeLevelConfigInput.cursor = dragIdx;
+  }
+
   push();
   fill(...color.lightBlue(220));
   textAlign(LEFT, BOTTOM);
@@ -932,12 +944,29 @@ function renderTextInput(
   rect(x, y, w, h, 6);
 
   const displayVal = isFocused ? state.activeLevelConfigInput!.textBuffer : (value || '');
+
+  // Render selection highlight if focused
+  if (isFocused && state.activeLevelConfigInput) {
+    const sStart = Math.min(state.activeLevelConfigInput.selectionStart ?? 0, state.activeLevelConfigInput.selectionEnd ?? 0);
+    const sEnd = Math.max(state.activeLevelConfigInput.selectionStart ?? 0, state.activeLevelConfigInput.selectionEnd ?? 0);
+    if (sStart < sEnd) {
+      const approxCharW = 5.8;
+      const hX = x + 8 + sStart * approxCharW;
+      const hW = (sEnd - sStart) * approxCharW;
+      noStroke();
+      fill(40, 110, 220, 180);
+      rect(hX, y + 3, Math.min(hW, w - 16), h - 6, 2);
+    }
+  }
+
   fill(...(isFocused ? color.white() : [240, 235, 180]));
   noStroke();
   textAlign(LEFT, CENTER);
   textSize(9.5);
+  if (typeof textFont === 'function') textFont('Consolas, monospace');
   const blink = (isFocused && floor(((window as any).frameCount || 0) / 30) % 2 === 0) ? '|' : '';
   text(displayVal + blink, x + 8, y + h / 2);
+  if (typeof textFont === 'function') textFont('sans-serif');
   pop();
 }
 
@@ -949,8 +978,23 @@ function renderStartingResourceControl(
   globalOffsetX: number, globalOffsetY: number
 ) {
   const isFocused = state.activeLevelConfigInput?.field === 'startingResource' && state.activeLevelConfigInput?.subKey === currencyDef.key;
+  const isMousePressed = !!(window as any).mouseIsPressed;
   const btnSize = 22;
   const valBoxW = 44;
+
+  const valX = x + w - (btnSize * 2 + valBoxW + 6) - 8 + btnSize + 3;
+  const gValX = globalOffsetX + valX;
+  const gValY = globalOffsetY + y + (h - btnSize) / 2;
+
+  // Handle drag selection update for starting resource box
+  if (isFocused && isMousePressed && state.activeLevelConfigInput?.isDragging) {
+    const activeBuf = state.activeLevelConfigInput.textBuffer || '';
+    const approxCharW = 5.8;
+    const relX = mouseX - (gValX + 4);
+    const dragIdx = constrain(Math.round(relX / approxCharW), 0, activeBuf.length);
+    state.activeLevelConfigInput.selectionEnd = dragIdx;
+    state.activeLevelConfigInput.cursor = dragIdx;
+  }
 
   push();
   // Container Box (borderless)
@@ -997,8 +1041,6 @@ function renderStartingResourceControl(
   text("-", minusX + btnSize / 2, y + h / 2);
 
   // Value Box
-  const valX = minusX + btnSize + 3;
-  const gValX = globalOffsetX + valX;
   const isValHov = mouseX >= gValX && mouseX <= gValX + valBoxW && mouseY >= gMinusY && mouseY <= gMinusY + btnSize;
   fill(isFocused ? [14, 25, 52] : (isValHov ? [20, 28, 50] : [12, 16, 32]));
   if (isFocused) {
@@ -1017,8 +1059,10 @@ function renderStartingResourceControl(
   noStroke();
   textAlign(CENTER, CENTER);
   textSize(9);
+  if (typeof textFont === 'function') textFont('Consolas, monospace');
   const blink = (isFocused && floor(((window as any).frameCount || 0) / 30) % 2 === 0) ? '|' : '';
   text(displayVal + blink, valX + valBoxW / 2, y + h / 2);
+  if (typeof textFont === 'function') textFont('sans-serif');
 
   // [+] Button
   const plusX = valX + valBoxW + 3;
@@ -1083,53 +1127,74 @@ export function handleLevelConfigClick(
   const card1X = 20;
   const card1W = panelW - 40;
   const fieldH = 24;
+  const col1W = Math.max(120, (card1W - 28 - 20) / 3);
+
+  const focusField = (field: string, val: string) => {
+    const str = val || '';
+    state.activeLevelConfigInput = {
+      field,
+      textBuffer: str,
+      cursor: str.length,
+      selectionStart: 0,
+      selectionEnd: str.length,
+      isDragging: true
+    };
+  };
 
   // ID
-  if (localX >= card1X + 14 && localX <= card1X + 14 + 180 && localY >= 34 && localY <= 34 + fieldH) {
-    state.activeLevelConfigInput = { field: 'id', textBuffer: cfg.id };
+  if (localX >= card1X + 14 && localX <= card1X + 14 + col1W && localY >= 34 && localY <= 34 + fieldH) {
+    focusField('id', cfg.id);
     return true;
   }
 
   // Tag
-  if (localX >= card1X + 210 && localX <= card1X + 210 + 180 && localY >= 34 && localY <= 34 + fieldH) {
-    state.activeLevelConfigInput = { field: 'tag', textBuffer: cfg.tag };
+  const col2X = card1X + 14 + col1W + 10;
+  if (localX >= col2X && localX <= col2X + col1W && localY >= 34 && localY <= 34 + fieldH) {
+    focusField('tag', cfg.tag);
+    return true;
+  }
+
+  // Sun Spawn Interval
+  const col3X = card1X + 14 + (col1W + 10) * 2;
+  if (localX >= col3X && localX <= col3X + col1W && localY >= 34 && localY <= 34 + fieldH) {
+    focusField('sunSpawnHourInterval', String(cfg.sunSpawnHourInterval ?? 0.5));
     return true;
   }
 
   // Name
   if (localX >= card1X + 14 && localX <= card1X + 14 + card1W - 28 && localY >= 68 && localY <= 68 + fieldH) {
-    state.activeLevelConfigInput = { field: 'name', textBuffer: cfg.name };
+    focusField('name', cfg.name);
     return true;
   }
 
   // Description
   if (localX >= card1X + 14 && localX <= card1X + 14 + card1W - 28 && localY >= 102 && localY <= 102 + fieldH) {
-    state.activeLevelConfigInput = { field: 'description', textBuffer: cfg.description };
+    focusField('description', cfg.description);
     return true;
   }
 
   // --- 2. WAVE & HOURLY BUDGETS ---
-  let curY = 145 + 14;
+  let curY = 138 + 14;
   const budgetRowY = curY + 34;
   const colW = (card1W - 48) / 3;
 
   // customBudgetPerNight Input
   if (localX >= card1X + 14 && localX <= card1X + 14 + colW && localY >= budgetRowY && localY <= budgetRowY + fieldH) {
-    state.activeLevelConfigInput = { field: 'customBudgetPerNight', textBuffer: cfg.customBudgetPerNight };
+    focusField('customBudgetPerNight', cfg.customBudgetPerNight);
     return true;
   }
 
   // hourlyBudgetPerDay Input
   const dayColX = card1X + 14 + colW + 10;
   if (localX >= dayColX && localX <= dayColX + colW && localY >= budgetRowY && localY <= budgetRowY + fieldH) {
-    state.activeLevelConfigInput = { field: 'hourlyBudgetPerDay', textBuffer: cfg.hourlyBudgetPerDay };
+    focusField('hourlyBudgetPerDay', cfg.hourlyBudgetPerDay);
     return true;
   }
 
   // hourlyBudgetPerNight Input
   const nightColX = card1X + 14 + (colW + 10) * 2;
   if (localX >= nightColX && localX <= nightColX + colW && localY >= budgetRowY && localY <= budgetRowY + fieldH) {
-    state.activeLevelConfigInput = { field: 'hourlyBudgetPerNight', textBuffer: cfg.hourlyBudgetPerNight };
+    focusField('hourlyBudgetPerNight', cfg.hourlyBudgetPerNight);
     return true;
   }
 
@@ -1141,7 +1206,7 @@ export function handleLevelConfigClick(
 
   // unlockCost Input
   if (localX >= card1X + 14 && localX <= card1X + 14 + inputUnlockW && localY >= unlockRowY && localY <= unlockRowY + fieldH) {
-    state.activeLevelConfigInput = { field: 'unlockCost', textBuffer: cfg.unlockCost };
+    focusField('unlockCost', cfg.unlockCost);
     return true;
   }
 
@@ -1176,30 +1241,21 @@ export function handleLevelConfigClick(
   // Star 1 input click
   const star1X = card1X + 14;
   if (localX >= star1X && localX <= star1X + starColW && localY >= starRowY && localY <= starRowY + fieldH) {
-    state.activeLevelConfigInput = {
-      field: 'star1',
-      textBuffer: String(cfg.starRatingTargets?.star1 ?? 600)
-    };
+    focusField('star1', String(cfg.starRatingTargets?.star1 ?? 600));
     return true;
   }
 
   // Star 2 input click
   const star2X = card1X + 14 + starColW + 10;
   if (localX >= star2X && localX <= star2X + starColW && localY >= starRowY && localY <= starRowY + fieldH) {
-    state.activeLevelConfigInput = {
-      field: 'star2',
-      textBuffer: String(cfg.starRatingTargets?.star2 ?? 300)
-    };
+    focusField('star2', String(cfg.starRatingTargets?.star2 ?? 300));
     return true;
   }
 
   // Star 3 input click
   const star3X = card1X + 14 + (starColW + 10) * 2;
   if (localX >= star3X && localX <= star3X + starColW && localY >= starRowY && localY <= starRowY + fieldH) {
-    state.activeLevelConfigInput = {
-      field: 'star3',
-      textBuffer: String(cfg.starRatingTargets?.star3 ?? 180)
-    };
+    focusField('star3', String(cfg.starRatingTargets?.star3 ?? 180));
     return true;
   }
 
@@ -1266,10 +1322,15 @@ export function handleLevelConfigClick(
       // [Val] Click
       const valX = minusX + btnSize + 3;
       if (localX >= valX && localX <= valX + valBoxW) {
+        const str = String(cfg.startingResource[c.key] || 0);
         state.activeLevelConfigInput = {
           field: 'startingResource',
           subKey: c.key,
-          textBuffer: String(cfg.startingResource[c.key] || 0)
+          textBuffer: str,
+          cursor: str.length,
+          selectionStart: 0,
+          selectionEnd: str.length,
+          isDragging: true
         };
         return true;
       }
@@ -1328,6 +1389,15 @@ export function handleLevelConfigKeyInput(keyStr: string, keyCodeNum: number, ev
   const cfg: EditorLevelConfigData = state.levelEditorLevelConfig;
   if (!cfg) return false;
 
+  let buf = input.textBuffer || '';
+  let cursor = input.cursor !== undefined ? input.cursor : buf.length;
+  let sStart = input.selectionStart !== undefined ? input.selectionStart : cursor;
+  let sEnd = input.selectionEnd !== undefined ? input.selectionEnd : cursor;
+
+  const minSel = Math.min(sStart, sEnd);
+  const maxSel = Math.max(sStart, sEnd);
+  const hasSelection = minSel < maxSel;
+
   // Enter or Escape commits and defocuses
   if (keyCodeNum === 13 || keyCodeNum === 27) {
     applyLevelConfigInputBuffer(cfg, input);
@@ -1335,31 +1405,143 @@ export function handleLevelConfigKeyInput(keyStr: string, keyCodeNum: number, ev
     return true;
   }
 
+  // Ctrl+A / Cmd+A: Select All
+  if ((event?.ctrlKey || event?.metaKey) && (keyStr === 'a' || keyStr === 'A' || keyCodeNum === 65)) {
+    input.selectionStart = 0;
+    input.selectionEnd = buf.length;
+    input.cursor = buf.length;
+    return true;
+  }
+
+  // Arrow Left
+  if (keyCodeNum === 37) {
+    if (event?.shiftKey) {
+      const nextPos = Math.max(0, cursor - 1);
+      input.cursor = nextPos;
+      input.selectionEnd = nextPos;
+    } else {
+      const nextPos = hasSelection ? minSel : Math.max(0, cursor - 1);
+      input.cursor = nextPos;
+      input.selectionStart = nextPos;
+      input.selectionEnd = nextPos;
+    }
+    return true;
+  }
+
+  // Arrow Right
+  if (keyCodeNum === 39) {
+    if (event?.shiftKey) {
+      const nextPos = Math.min(buf.length, cursor + 1);
+      input.cursor = nextPos;
+      input.selectionEnd = nextPos;
+    } else {
+      const nextPos = hasSelection ? maxSel : Math.min(buf.length, cursor + 1);
+      input.cursor = nextPos;
+      input.selectionStart = nextPos;
+      input.selectionEnd = nextPos;
+    }
+    return true;
+  }
+
+  // Home
+  if (keyCodeNum === 36) {
+    input.cursor = 0;
+    if (event?.shiftKey) {
+      input.selectionEnd = 0;
+    } else {
+      input.selectionStart = 0;
+      input.selectionEnd = 0;
+    }
+    return true;
+  }
+
+  // End
+  if (keyCodeNum === 35) {
+    input.cursor = buf.length;
+    if (event?.shiftKey) {
+      input.selectionEnd = buf.length;
+    } else {
+      input.selectionStart = buf.length;
+      input.selectionEnd = buf.length;
+    }
+    return true;
+  }
+
   // Backspace
   if (keyCodeNum === 8) {
-    input.textBuffer = input.textBuffer.slice(0, -1);
+    if (hasSelection) {
+      buf = buf.slice(0, minSel) + buf.slice(maxSel);
+      cursor = minSel;
+    } else if (cursor > 0) {
+      buf = buf.slice(0, cursor - 1) + buf.slice(cursor);
+      cursor--;
+    }
+    input.textBuffer = buf;
+    input.cursor = cursor;
+    input.selectionStart = cursor;
+    input.selectionEnd = cursor;
+    applyLevelConfigInputBuffer(cfg, input);
+    return true;
+  }
+
+  // Delete
+  if (keyCodeNum === 46) {
+    if (hasSelection) {
+      buf = buf.slice(0, minSel) + buf.slice(maxSel);
+      cursor = minSel;
+    } else if (cursor < buf.length) {
+      buf = buf.slice(0, cursor) + buf.slice(cursor + 1);
+    }
+    input.textBuffer = buf;
+    input.cursor = cursor;
+    input.selectionStart = cursor;
+    input.selectionEnd = cursor;
     applyLevelConfigInputBuffer(cfg, input);
     return true;
   }
 
   // Normal character typing
   if (keyStr && keyStr.length === 1 && !event?.ctrlKey && !event?.metaKey) {
-    if (input.field === 'id' || input.field === 'name' || input.field === 'tag' || input.field === 'description' || input.field === 'customBudgetPerNight' || input.field === 'hourlyBudgetPerDay' || input.field === 'hourlyBudgetPerNight' || input.field === 'unlockCost') {
-      const maxLen = input.field === 'unlockCost' ? 500 : (input.field === 'description' ? 120 : 60);
-      if (input.textBuffer.length < maxLen) {
-        input.textBuffer += keyStr;
-        applyLevelConfigInputBuffer(cfg, input);
-      }
-      return true;
-    } else {
-      // Numeric fields (startingResource)
-      if (keyStr >= '0' && keyStr <= '9') {
-        if (input.textBuffer.length < 6) {
-          input.textBuffer += keyStr;
-          applyLevelConfigInputBuffer(cfg, input);
-        }
+    const isArrayBudgetField = input.field === 'customBudgetPerNight' || input.field === 'hourlyBudgetPerDay' || input.field === 'hourlyBudgetPerNight';
+    const isTextField = input.field === 'id' || input.field === 'name' || input.field === 'tag' || input.field === 'description' || input.field === 'unlockCost';
+    const isDecimalField = input.field === 'sunSpawnHourInterval';
+    
+    let isValidChar = false;
+    let maxLen = 60;
+
+    if (isArrayBudgetField) {
+      maxLen = 80;
+      // Allow numbers, commas, spaces, hyphens, periods, and clean brackets
+      if (keyStr === '[' || keyStr === ']') {
         return true;
       }
+      isValidChar = /^[0-9,\.\-\s]$/.test(keyStr);
+    } else if (isTextField) {
+      maxLen = input.field === 'unlockCost' ? 500 : (input.field === 'description' ? 120 : 60);
+      isValidChar = true;
+    } else if (isDecimalField) {
+      maxLen = 6;
+      isValidChar = /^[0-9\.]$/.test(keyStr);
+    } else {
+      // Numeric fields (startingResource, star1, star2, star3)
+      maxLen = 6;
+      isValidChar = /^[0-9]$/.test(keyStr);
+    }
+
+    if (isValidChar && buf.length < maxLen) {
+      if (hasSelection) {
+        buf = buf.slice(0, minSel) + keyStr + buf.slice(maxSel);
+        cursor = minSel + 1;
+      } else {
+        buf = buf.slice(0, cursor) + keyStr + buf.slice(cursor);
+        cursor++;
+      }
+      input.textBuffer = buf;
+      input.cursor = cursor;
+      input.selectionStart = cursor;
+      input.selectionEnd = cursor;
+      applyLevelConfigInputBuffer(cfg, input);
+      return true;
     }
   }
 
@@ -1374,6 +1556,8 @@ function applyLevelConfigInputBuffer(cfg: EditorLevelConfigData, input: { field:
     cfg.name = input.textBuffer;
   } else if (input.field === 'tag') {
     cfg.tag = input.textBuffer;
+  } else if (input.field === 'sunSpawnHourInterval') {
+    cfg.sunSpawnHourInterval = input.textBuffer;
   } else if (input.field === 'description') {
     cfg.description = input.textBuffer;
   } else if (input.field === 'customBudgetPerNight') {

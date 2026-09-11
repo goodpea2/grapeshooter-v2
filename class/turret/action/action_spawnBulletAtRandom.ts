@@ -12,7 +12,7 @@ export class ActionSpawnBulletAtRandom extends TurretAction {
 
   isReady(): boolean {
     if (this.isLocked()) return false;
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const type = 'spawnBulletAtRandom';
     let lastFire = this.turret.actionTimers.get(type) || 0;
     const fireRate = config.spawnBulletAtRandom?.cooldown || 60;
@@ -24,7 +24,7 @@ export class ActionSpawnBulletAtRandom extends TurretAction {
   }
 
   getRange(): number {
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const sbc = config.spawnBulletAtRandom;
     return (sbc?.distRange ? sbc.distRange[1] : 300) * (this.turret.stats.rangeMult || 1);
   }
@@ -35,7 +35,7 @@ export class ActionSpawnBulletAtRandom extends TurretAction {
 
   performExecute() {
     const wPos = this.turret.getWorldPos();
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const type = 'spawnBulletAtRandom';
     
     const sbc = config.spawnBulletAtRandom;
@@ -54,7 +54,8 @@ export class ActionSpawnBulletAtRandom extends TurretAction {
                            (depAct === 'firstStrike' ? config.firstStrikeConfig.triggerRate : 
                            config.pulseCooldown)))));
         const depFr = Array.isArray(depFrValue) ? depFrValue[depStep % depFrValue.length] : depFrValue;
-        dependencyReady = (state.frames - depLastT > (depFr / (this.turret as any).fireRateMultiplier));
+        const frMultiplier = this.turret.getFireRateMultiplier ? this.turret.getFireRateMultiplier() : ((this.turret as any).fireRateMultiplier || 1.0);
+        dependencyReady = (state.frames - depLastT > (depFr / frMultiplier));
     }
 
     if (dependencyReady) {
@@ -64,7 +65,13 @@ export class ActionSpawnBulletAtRandom extends TurretAction {
       const tx = wPos.x + Math.cos(ang) * r; const ty = wPos.y + Math.sin(ang) * r;
       let b = Bullet.create(wPos.x, wPos.y, tx, ty, sbc.bulletKey, 'none', this.turret); 
       (b as any).targetPos = createVector(tx, ty);
-      state.bullets.push(b); 
+      state.bullets.push(b);
+      if (this.turret.isCharged && this.turret.isCharged()) {
+        const stamCost = config.staminaCostPerBulletSpawned || config.StaminaCostPerBulletSpawned || 0;
+        if (stamCost > 0 && state.player) {
+          state.player.spendStamina(stamCost, this.turret);
+        }
+      }
       this.turret.recoil = 8; 
       this.turret.actionTimers.set(type, state.frames); 
       (this.turret as any).pulseAnimTimer = 10;

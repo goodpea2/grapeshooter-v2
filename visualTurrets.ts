@@ -189,12 +189,17 @@ export function drawTurret(t: any) {
       if (config.actionType.includes(act)) {
         const timer = t.actionTimers.get(act) || -999999;
         let fr = 0;
-        if (act === 'pulse') fr = actionConfig.pulseCooldown;
+        let applyFR = true;
+        if (act === 'pulse') {
+          fr = actionConfig.pulseCooldown;
+          applyFR = actionConfig.pulseAppliedFireRateMultiplier ?? false;
+        }
         else if (act === 'shoot') fr = Array.isArray(actionConfig.shootFireRate) ? actionConfig.shootFireRate[0] : actionConfig.shootFireRate;
         else if (act === 'spawnBulletAtRandom') fr = actionConfig.spawnBulletAtRandom.cooldown;
         else if (act === 'passiveSun') fr = actionConfig.sunCooldown;
         
-        const total = (fr || 1) / (t.fireRateMultiplier || 1);
+        const frMult = applyFR ? (t.getFireRateMultiplier ? t.getFireRateMultiplier() : (t.fireRateMultiplier || 1)) : 1.0;
+        const total = (fr || 1) / (frMult || 1);
         const elapsed = state.frames - timer;
         const remaining = total - elapsed;
         
@@ -221,7 +226,11 @@ export function drawTurret(t: any) {
     }
 
     let lifeInfo = "";
-    if (t.staminaSpent !== undefined || t.type === 't3_minecharge') {
+    if (t.type === 't3_powerbank') {
+      const maxStam = (t as any).maxStamina || 100;
+      const cur = (t as any).stamina !== undefined ? (t as any).stamina : (t.growthProgress || 0);
+      lifeInfo = `Stamina: ${floor(cur)}/${maxStam}`;
+    } else if (t.staminaSpent !== undefined || t.type === 't3_minecharge'|| t.type === 't3_icecharge') {
       const maxStam = actionConfig.maxGrowth || 500;
       lifeInfo = `Charge: ${floor(t.staminaSpent || t.growthProgress || 0)}/${maxStam}`;
     } else if (actionConfig.dieAfterDuration) {
@@ -258,8 +267,9 @@ export function drawTurret(t: any) {
       textSize(10);
       textAlign(LEFT, TOP);
       const s = t.activeStats || {};
+      const liveFrMult = t.getFireRateMultiplier ? t.getFireRateMultiplier() : (t.fireRateMultiplier || 1.0);
       let info = `dmgMult: ${s.damageMult?.toFixed(2)}\n`;
-      info += `frMult: ${s.firerateDivider?.toFixed(2)}\n`;
+      info += `frMult: ${liveFrMult.toFixed(2)}x\n`;
       info += `rangeMult: ${s.rangeMult?.toFixed(2)}\n`;
       info += `hp: ${floor(t.health)}/${t.maxHealth?.toFixed(0)}\n`;
       if (t.staminaSpent !== undefined || t.growthProgress > 0) {
@@ -321,9 +331,12 @@ export function drawTurret(t: any) {
     let bc = [...(t.config.color || [100, 100, 100])];
     if (onCooldown) bc = [120, 120, 130];
     
+    const isRaged = t.conditions?.has('c_raged') || t.conditions?.has('c_raged_visualonly');
     if (t.flashTimer > 0) {
         if (t.flashType === 'heal') bc = [100, 255, 100];
         else bc = [255, 100, 100];
+    } else if (isRaged) {
+        bc = [255, 100 + sin(state.frames * 0.4) * 100, 200];
     }
 
     stroke(20, 20, 40, t.alpha);
@@ -379,9 +392,9 @@ export function drawTurret(t: any) {
   }
 
   // t3_minecharge Stamina Step Charge Bar (exact growthBar cyan-flashing visuals)
-  if (t.type === 't3_minecharge') {
+  if (t.type === 't3_minecharge'||t.type === 't3_icecharge') {
     const currentCharge = (t as any).staminaSpent || t.growthProgress || 0;
-    const thresholds: number[] = t.config.whileCharged?.staminaSpentThresholds?.map((x: any) => x.staminaSpent) || [200, 500];
+    const thresholds: number[] = (t.config.actionConfigWhileCharged?.staminaSpentThresholds || t.config.whileCharged?.staminaSpentThresholds)?.map((x: any) => x.staminaSpent) || [200, 500];
     const lastStep = thresholds[thresholds.length - 1] || 500;
 
     // Upon reaching the last staminaStep, the bar no longer shows up
@@ -438,10 +451,33 @@ export function drawTurret(t: any) {
     pop();
   }
 
+  // t3_powerbank Stamina Capacity Bar (reusing the exact growth bar design)
+  if (t.type === 't3_powerbank') {
+    const maxStam = (t as any).maxStamina || t.config.actionConfig?.maxGrowth || 100;
+    const currentStam = (t as any).stamina !== undefined ? (t as any).stamina : (t.growthProgress || 0);
+    const gRatio = Math.max(0, Math.min(1.0, currentStam / maxStam));
+    const barW = t.size + 10;
+    const barH = 4;
+    const glowAlpha = 160 + 80 * sin(state.frames * 0.15);
+
+    push();
+    const hRatio = t.health / t.maxHealth;
+    const verticalOffset = hRatio < 1.0 ? -t.size/2 - 18 : -t.size/2 - 12;
+    translate(0, verticalOffset);
+    noStroke();
+    fill(20, 180);
+    rectMode(CENTER);
+    rect(0, 0, barW, barH, 2);
+    fill(0, 210, 255, glowAlpha);
+    rectMode(CORNER);
+    rect(-barW/2, -barH/2, barW * gRatio, barH, 2);
+    pop();
+  }
+
   let hRatio = t.health / t.maxHealth;
 
-  // Growth / Stamina Charge Bar (for non-seed, non-minecharge turrets)
-  if (t.growthProgress > 0 && t.type !== 't_seed' && t.type !== 't_seed2' && t.type !== 't3_minecharge') {
+  // Growth / Stamina Charge Bar (for non-seed, non-minecharge, non-powerbank turrets)
+  if (t.growthProgress > 0 && t.type !== 't_seed' && t.type !== 't_seed2' && t.type !== 't3_minecharge' && t.type !== 't3_icecharge' && t.type !== 't3_powerbank') {
     const maxG = t.config.actionConfig?.maxGrowth || 500;
     const gRatio = Math.min(1.0, t.growthProgress / maxG);
     push();

@@ -14,7 +14,7 @@ export const conditionTypes: any = {
     conditionVfx: 'condition_burn',
     enemyMovementSpeedMultiplier: 1.0,
     damage: 0, // Set to 0 to avoid unintended stacking with puddle damage
-    damageInterval: 6,
+    damageInterval: 15,
     conditionClashesConfig: {
       override: ['c_chilled']
     }
@@ -62,5 +62,11 @@ export const conditionTypes: any = {
     conditionVfx: 'condition_hypnotized',
     enemyMovementSpeedMultiplier: 1.0,
     visualFlashColor: [255, 0, 255] // Magenta/Purple flash
+  },
+  fireRateUp: {
+    name: 'Fire Rate Up',
+    conditionVfx: 'condition_fireRateUp',
+    firerateBoost: 0.25,
+    visualFlashColor: [255, 230, 80]
   }
 };

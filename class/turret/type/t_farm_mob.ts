@@ -2,7 +2,7 @@ import { TurretConfig } from '../turretConfig';
 import { GRID_SIZE, HOUR_FRAMES } from '../../../constants';
 
 export const t_farm_mob: TurretConfig = {
-  name: 'Raisin Mold', costs: { sun: 30 }, costAlmanac: { elixir: 10, raisin: 1 }, drops: { shell: 2 }, health: 100, color: [150, 50, 200], size: 22, tier: 1,
+  name: 'Raisin Mold', costs: { sun: 30 }, costAlmanac: { elixir: 10, raisin: 1 }, drops: { shell: 2 }, health: 200, color: [150, 50, 200], size: 22, tier: 1,
   tooltip: "Occasionally spawns an enemy nearby",
   animationBodyType: 'soft',
   actionType: ['farm'],

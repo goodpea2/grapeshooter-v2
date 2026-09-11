@@ -1,7 +1,7 @@
 
 import { state } from '../../../state';
 import { TurretAction } from '../../turretAction';
-import { FrostFieldAuraVFX, TorchwoodAuraVFX } from '../../../vfx/index';
+import { FrostFieldAuraVFX, TorchwoodAuraVFX, SpeederAuraVFX, spawnSpeederAuraVFX } from '../../../vfx/index';
 
 declare const floor: any;
 
@@ -48,6 +48,10 @@ export class ActionAura extends TurretAction {
       if (!state.vfx.some((v: any) => v instanceof TorchwoodAuraVFX && v.target === this.turret)) {
         state.vfx.push(new TorchwoodAuraVFX(this.turret, effectiveRadius));
       }
+    } else if (cfg.auraVfx === 'aura_speeder') {
+      if (!state.vfx.some((v: any) => v instanceof SpeederAuraVFX && v.target === this.turret)) {
+        state.vfx.push(spawnSpeederAuraVFX(this.turret, effectiveRadius));
+      }
     }
 
     if (this.turret.specialActivityLevel > 0.1) {
@@ -56,11 +60,12 @@ export class ActionAura extends TurretAction {
       if (cfg.appliedCondition) {
         if (state.spatialGrid) {
           state.spatialGrid.queryCircleEnemies(wPos.x, wPos.y, effectiveRadius, (e: any) => {
+            if (e.conditions?.has('c_hypnotized')) return;
             e.applyCondition(cfg.appliedCondition, cfg.duration || 60);
           });
         } else {
           for (let e of state.enemies) {
-            if (e.health <= 0 || e.isDying) continue;
+            if (e.health <= 0 || e.isDying || e.conditions?.has('c_hypnotized')) continue;
             const dx = e.pos.x - wPos.x;
             const dy = e.pos.y - wPos.y;
             if (dx * dx + dy * dy < auraRadiusSq) {
@@ -101,6 +106,58 @@ export class ActionAura extends TurretAction {
             if (bCfg.flameVisual) {
               b.col = [255, 140, 30];
             }
+          }
+        }
+      }
+
+      // 3. Turret & Player Firerate Buffing (e.g. Speeder stackable firerate boost)
+      if (cfg.boostsTurretConfig) {
+        const tCfg = cfg.boostsTurretConfig;
+        const frBoost = tCfg.firerateBoost || 0.25;
+
+        // Buff attached turrets on player
+        if (state.player?.attachments) {
+          for (const att of state.player.attachments) {
+            if (att === this.turret) continue;
+            const aPos = att.getWorldPos();
+            const dx = aPos.x - wPos.x;
+            const dy = aPos.y - wPos.y;
+            if (dx * dx + dy * dy <= auraRadiusSq) {
+              if ((att as any).applyAuraFirerateBoost) {
+                (att as any).applyAuraFirerateBoost(this.turret.uid, frBoost, 6);
+              }
+              att.applyCondition('fireRateUp', 6);
+            }
+          }
+        }
+
+        // Buff world turrets
+        if (state.world?.getAllTurrets) {
+          const worldTurrets = state.world.getAllTurrets();
+          for (const wt of worldTurrets) {
+            if (wt === this.turret) continue;
+            const pos = wt.getWorldPos();
+            const dx = pos.x - wPos.x;
+            const dy = pos.y - wPos.y;
+            if (dx * dx + dy * dy <= auraRadiusSq) {
+              if ((wt as any).applyAuraFirerateBoost) {
+                (wt as any).applyAuraFirerateBoost(this.turret.uid, frBoost, 6);
+              }
+              wt.applyCondition('fireRateUp', 6);
+            }
+          }
+        }
+
+        // Buff player
+        if (state.player) {
+          const pPos = state.player.pos;
+          const dx = pPos.x - wPos.x;
+          const dy = pPos.y - wPos.y;
+          if (dx * dx + dy * dy <= auraRadiusSq) {
+            if ((state.player as any).applyAuraFirerateBoost) {
+              (state.player as any).applyAuraFirerateBoost(this.turret.uid, frBoost, 6);
+            }
+            state.player.applyCondition('fireRateUp', 6);
           }
         }
       }

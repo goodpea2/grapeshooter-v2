@@ -20,7 +20,7 @@ export class ActionShield extends TurretAction {
   }
 
   getRange(): number {
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const baseRadius = (this.turret as any).activeStats?.shieldRadius || config.shieldRadius || (32 * 1.5);
     return baseRadius * (this.turret.stats.rangeMult || 1);
   }
@@ -31,7 +31,7 @@ export class ActionShield extends TurretAction {
 
   performExecute() {
     const wPos = this.turret.getWorldPos();
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const type = 'shield';
     
     if (this.turret.specialActivityLevel > 0.1) {

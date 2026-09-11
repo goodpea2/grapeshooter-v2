@@ -1,5 +1,5 @@
 import { state } from '../state';
-import { spawnBugSplatVFX } from './BugSplatVFX';
+import { spawnBugSplatVFX, spawnBugSplatVFX2, spawnBugSplatVFX3, spawnBugSplatMeatChunkVFX } from './BugSplatVFX';
 import { spawnExplosion } from './Explosion';
 import { drawPersistentDeathVisual } from './Utils';
 import { ObjectPool } from '../class/pool';
@@ -69,10 +69,16 @@ export class GiantDeathVFX {
     this.life--;
     if (this.life > 20 && state.frames % 3 === 0) {
       this.pos.add(random(-4, 4), random(-4, 4));
-      state.vfx.push(spawnBugSplatVFX(this.pos.x + random(-30, 30), this.pos.y + random(-30, 30), 20, this.color));
+      if (Math.random() < 0.5) {
+        state.vfx.push(spawnBugSplatVFX(this.pos.x + random(-30, 30), this.pos.y + random(-30, 30), 20, this.color));
+      } else {
+        state.vfx.push(spawnBugSplatVFX2(this.pos.x + random(-30, 30), this.pos.y + random(-30, 30), 24, this.color));
+      }
     }
     if (this.life === 20) {
       state.vfx.push(spawnExplosion(this.pos.x, this.pos.y, this.size * 2.5, color(this.color)));
+      state.vfx.push(spawnBugSplatVFX3(this.pos.x, this.pos.y, this.size * 1.5, this.color));
+      state.vfx.push(spawnBugSplatMeatChunkVFX(this.pos.x, this.pos.y, this.size, this.color, true));
       drawPersistentDeathVisual(this.pos.x, this.pos.y, this.size * 1.5, [red(this.color), green(this.color), blue(this.color)]);
     }
   }

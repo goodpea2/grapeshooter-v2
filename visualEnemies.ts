@@ -6,6 +6,7 @@ declare const push: any;
 declare const pop: any;
 declare const translate: any;
 declare const rotate: any;
+declare const scale: any;
 declare const fill: any;
 declare const noFill: any;
 declare const stroke: any;
@@ -67,7 +68,8 @@ function drawHighlight(x: number, y: number, w: number, h: number) {
 }
 
 export function drawPendingSpawn(s: any) {
-  const progress = 1 - (s.timer / 60);
+  const maxTimer = s.initialTimer || 60;
+  const progress = 1 - (s.timer / maxTimer);
   push();
   translate(s.x, s.y);
   
@@ -150,6 +152,24 @@ export function drawEnemy(e: any) {
   // Handle Giant prolonged death visual override
   if (e.isDying) return; 
 
+  // Call custom enemy subclass display (e.g. Front Shield arc)
+  if (e.customDisplay) {
+    e.customDisplay();
+  }
+
+  // Draw Airborne ground shadow if enemy is launched in mid-air from any external or internal source
+  if ((e.airborneHeight && e.airborneHeight > 0) || (e.isAirborne && (e.airborneHeight > 0 || e.airborneDuration > 0))) {
+    push();
+    noStroke();
+    const maxHeight = Math.max(1, e.airborneMaxHeight || 90);
+    const heightRatio = Math.min(1, Math.max(0, (e.airborneHeight || 0) / maxHeight));
+    const shadowAlpha = map(heightRatio, 0, 1, 100, 30);
+    fill(10, 10, 20, shadowAlpha);
+    const shadowScale = Math.max(0.25, 1 - heightRatio * 0.55);
+    ellipse(e.pos.x, e.pos.y, e.size * shadowScale, e.size * 0.45 * shadowScale);
+    pop();
+  }
+
   push();
   // Animation vibration for Giant wind-up
   let vibX = 0;
@@ -160,15 +180,33 @@ export function drawEnemy(e: any) {
       vibY = random(-vibAmt, vibAmt);
   }
 
-  translate(e.pos.x + (e.attackOffset?.x || 0) + vibX, e.pos.y + (e.attackOffset?.y || 0) + vibY);
+  const airZ = (e.airborneHeight && e.airborneHeight > 0) ? -e.airborneHeight : 0;
+  translate(e.pos.x + (e.attackOffset?.x || 0) + vibX, e.pos.y + (e.attackOffset?.y || 0) + vibY + airZ);
   rotate(e.rot);
+  if (e.airborneHeight && e.airborneHeight > 0) {
+    const maxHeight = Math.max(1, e.airborneMaxHeight || 90);
+    const heightRatio = Math.min(1, Math.max(0, e.airborneHeight / maxHeight));
+    const liftScale = 1 + heightRatio * 0.22;
+    scale(liftScale);
+  }
   
   const s = e.size;
   let imgKey = e.type === 'e_swarm' ? 'img_swarm_center' : 'img_' + e.type.slice(2);
   if (e.type === 'e_dummyTarget') imgKey = 'img_giant';
   if (e.type === 'e_hypnotest') imgKey = 'img_armor1';
+  if (e.type === 'e_friendly_armor2') imgKey = 'img_armor2';
   if (e.type === 'e_bomb_mainmenu') imgKey = 'img_bomb';
-  const sprite = state.assets[imgKey];
+  if (e.type === 'e_icebomb') imgKey = 'img_bomb';
+  if (e.type === 'e_launcher') imgKey = 'img_suneater';
+  if (e.type === 'e_leader') imgKey = 'img_armor2';
+  if (e.type === 'e_frontshield') imgKey = 'img_armor1';
+  if (e.type === 'e_basic_nodrop') imgKey = 'img_basic';
+  if (e.type === 'e_critter_nodrop') imgKey = 'img_critter';
+  if (e.type === 'e_cloner') imgKey = 'img_basic';
+  if (e.type === 'e_swarm_chicken') imgKey = 'img_fast';
+  if (e.type === 'e_hopper') imgKey = 'img_rockpuncher';
+  if (e.type === 'e_leader_ring') imgKey = 'img_armor2';
+  const sprite = state.assets[imgKey] || state.assets['img_basic'];
 
   if (sprite) {
     imageMode(CENTER);
@@ -207,18 +245,19 @@ export function drawEnemy(e: any) {
   }
   pop();
 
-  // HP Bar
+  // HP Bar (elevates dynamically with airborne elevation)
   if (e.health < e.maxHealth || state.debugHP) {
+    const hpAirZ = (e.airborneHeight && e.airborneHeight > 0) ? -e.airborneHeight : 0;
     fill(20, 20, 40, 200);
     noStroke();
-    rect(e.pos.x - 14, e.pos.y - e.size / 2 - 12, 28, 5, 2);
+    rect(e.pos.x - 14, e.pos.y - e.size / 2 - 12 + hpAirZ, 28, 5, 2);
     fill(255, 60, 60);
-    rect(e.pos.x - 14, e.pos.y - e.size / 2 - 12, (e.health / e.maxHealth) * 28, 5, 2);
+    rect(e.pos.x - 14, e.pos.y - e.size / 2 - 12 + hpAirZ, (e.health / e.maxHealth) * 28, 5, 2);
     if (state.debugHP) {
       fill(255);
       textAlign(CENTER, CENTER);
       textSize(10);
-      text(floor(e.health), e.pos.x, e.pos.y - e.size / 2 - 20);
+      text(floor(e.health), e.pos.x, e.pos.y - e.size / 2 - 20 + hpAirZ);
     }
   }
 }

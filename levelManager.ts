@@ -4,7 +4,9 @@ import { Player, GroundFeature, NPCEntity, Enemy, LootEntity, TurretLoot, spawnL
 import { GRID_SIZE, CHUNK_SIZE, HOUR_FRAMES } from './constants';
 import { customStartingHour, AlmanacProgression, getActiveAlmanacProgression } from './lvDemo';
 import { createWorldTurret } from './class/turret/TurretRegistry';
+import { createEnemy } from './class/enemy/EnemyRegistry';
 import { obstacleTypes, overlayTypes } from './balanceObstacles';
+import { liquidTypes } from './balanceLiquids';
 import { resetPlayerUpgrades } from './src/playerUpgrades';
 import { serializeLevelEditorPlayerUpgrades } from './ui/almanac/playerUpgradesPanel';
 
@@ -468,14 +470,14 @@ export function deserializeLevelEnemies(enemiesData: any[] | undefined | null): 
       if (item.pos.length > 0 && Array.isArray(item.pos[0])) {
         for (const pt of item.pos) {
           if (Array.isArray(pt) && pt.length >= 2) {
-            const enemy = new Enemy(pt[0], pt[1], type);
+            const enemy = createEnemy(pt[0], pt[1], type);
             enemy.neverDespawn = true;
             if (isWin) enemy.isWinCondition = true;
             state.enemies.push(enemy);
           }
         }
       } else if (item.pos.length >= 2 && typeof item.pos[0] === 'number') {
-        const enemy = new Enemy(item.pos[0], item.pos[1], type);
+        const enemy = createEnemy(item.pos[0], item.pos[1], type);
         enemy.neverDespawn = true;
         if (isWin) enemy.isWinCondition = true;
         state.enemies.push(enemy);
@@ -483,7 +485,7 @@ export function deserializeLevelEnemies(enemiesData: any[] | undefined | null): 
     } 
     // Legacy individual format: { x: 100, y: 200, type: 'e_basic', isWinCondition?: boolean }
     else if (typeof item.x === 'number' && typeof item.y === 'number') {
-      const enemy = new Enemy(item.x, item.y, item.type || 'e_basic');
+      const enemy = createEnemy(item.x, item.y, item.type || 'e_basic');
       enemy.neverDespawn = true;
       if (item.isWinCondition || item.winConditionTagIfDeclared) {
         enemy.isWinCondition = true;
@@ -498,21 +500,65 @@ export function restoreCustomSpawnerPrefabs(prefabs: any[]): void {
   if (!state.levelEditor) state.levelEditor = {};
   state.levelEditor.customSpawnerPrefabs = [...prefabs];
   for (const p of prefabs) {
-    if (p.id && p.config) {
-      overlayTypes[p.id] = {
-        name: p.name || 'Custom Spawner',
-        minHealth: p.config.health || 300,
-        isEnemy: true,
-        isEnemySpawner: true,
-        danger: 3,
-        isDanger: true,
-        obstacleOverlayVfx: 'v_spawner',
-        isConcealedAlongWithObstacle: false,
-        enemySpawnConfig: { ...p.config },
-        assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: true, randomFlip: true },
-        lootConfigOnDeath: 'lc_spawner',
-        isCustomPrefab: true
-      };
+    if (p && p.id && p.config) {
+      const isLiquid = p.category === 'liquids' || p.isLiquid || p.id.startsWith('l_spawner') || !!liquidTypes[p.id];
+      if (isLiquid) {
+        liquidTypes[p.id] = {
+          name: p.name || 'Ground Spawner',
+          color: [140, 30, 180, 220],
+          glowColor: [200, 60, 240, 90],
+          pulseSpeed: 0.04,
+          isDanger: true,
+          isEnemySpawner: true,
+          assetImgConfig: { idleAssetImg: ['img_ground_spawner_a'], randomRotation: false, randomFlip: false },
+          liquidConfig: {
+            playerMovementSpeedMultiplier: 1.0,
+            enemyMovementSpeedMultiplier: 1.0,
+            turretFireRateMultiplier: 1.0,
+            blocksMovement: false
+          },
+          enemySpawnConfig: {
+            enemyTypeKey: Array.isArray(p.config.enemyTypeKey) ? [...p.config.enemyTypeKey] : ['e_basic'],
+            spawnRadius: p.config.spawnRadius !== undefined ? p.config.spawnRadius : 120,
+            spawnTriggerRadius: p.config.spawnTriggerRadius !== undefined ? p.config.spawnTriggerRadius : 200,
+            spawnInterval: p.config.spawnInterval !== undefined ? p.config.spawnInterval : 60,
+            hourlySpawnConfig: p.config.hourlySpawnConfig ? {
+              enabled: p.config.hourlySpawnConfig.enabled !== false,
+              hourlyDaytimeBudget: Array.isArray(p.config.hourlySpawnConfig.hourlyDaytimeBudget) ? [...p.config.hourlySpawnConfig.hourlyDaytimeBudget] : [10, 20, 30],
+              hourlyNighttimeBudget: Array.isArray(p.config.hourlySpawnConfig.hourlyNighttimeBudget) ? [...p.config.hourlySpawnConfig.hourlyNighttimeBudget] : [30, 50, 80],
+              hourlyBudgetMultiplierForFollowingDay: p.config.hourlySpawnConfig.hourlyBudgetMultiplierForFollowingDay ?? 1.25,
+              selfDestructAfterBudgetSpawned: p.config.hourlySpawnConfig.selfDestructAfterBudgetSpawned ?? 0
+            } : {
+              enabled: true,
+              hourlyDaytimeBudget: [10, 20, 30],
+              hourlyNighttimeBudget: [30, 50, 80],
+              hourlyBudgetMultiplierForFollowingDay: 1.25,
+              selfDestructAfterBudgetSpawned: 0
+            }
+          },
+          isCustomPrefab: true
+        };
+      } else {
+        overlayTypes[p.id] = {
+          name: p.name || 'Custom Spawner',
+          minHealth: p.config.health || 300,
+          isEnemy: true,
+          isEnemySpawner: true,
+          danger: 3,
+          isDanger: true,
+          obstacleOverlayVfx: 'v_spawner',
+          isConcealedAlongWithObstacle: false,
+          enemySpawnConfig: {
+            budget: p.config.budget !== undefined ? p.config.budget : 60,
+            enemyTypeKey: Array.isArray(p.config.enemyTypeKey) ? [...p.config.enemyTypeKey] : ['e_basic'],
+            spawnRadius: p.config.spawnRadius !== undefined ? p.config.spawnRadius : 120,
+            health: p.config.health || 300
+          },
+          assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: true, randomFlip: true },
+          lootConfigOnDeath: 'lc_spawner',
+          isCustomPrefab: true
+        };
+      }
     }
   }
 }
@@ -542,7 +588,39 @@ export function serializeChunkBlocks(blocks: Block[]): any[] {
     const customSpawnerBudget = (b.spawnerBudget !== defSpawnerBudget && b.spawnerBudget > 0) ? b.spawnerBudget : undefined;
     const isWinCondition = !!b.isWinCondition;
     const biome = b.biome ? b.biome : undefined;
-    const customSpawnerConfig = b.customSpawnerConfig ? b.customSpawnerConfig : undefined;
+    
+    let customSpawnerConfig: any = undefined;
+    if (b.customSpawnerConfig) {
+      const isLiquid = b.liquidType === 'l_spawner' || (b.liquidType && !!liquidTypes[b.liquidType]?.isEnemySpawner) || (!!b.customSpawnerConfig && !!b.liquidType);
+      if (isLiquid) {
+        customSpawnerConfig = {
+          ...(b.customSpawnerConfig.name ? { name: b.customSpawnerConfig.name } : {}),
+          enemyTypeKey: Array.isArray(b.customSpawnerConfig.enemyTypeKey) ? [...b.customSpawnerConfig.enemyTypeKey] : ['e_basic'],
+          spawnRadius: b.customSpawnerConfig.spawnRadius !== undefined ? b.customSpawnerConfig.spawnRadius : 120,
+          spawnTriggerRadius: b.customSpawnerConfig.spawnTriggerRadius !== undefined ? b.customSpawnerConfig.spawnTriggerRadius : 200,
+          spawnInterval: b.customSpawnerConfig.spawnInterval !== undefined ? b.customSpawnerConfig.spawnInterval : 60,
+          ...(b.customSpawnerConfig.hourlySpawnConfig ? {
+            hourlySpawnConfig: {
+              enabled: b.customSpawnerConfig.hourlySpawnConfig.enabled !== false,
+              hourlyDaytimeBudget: Array.isArray(b.customSpawnerConfig.hourlySpawnConfig.hourlyDaytimeBudget) ? [...b.customSpawnerConfig.hourlySpawnConfig.hourlyDaytimeBudget] : [10, 20, 30],
+              hourlyNighttimeBudget: Array.isArray(b.customSpawnerConfig.hourlySpawnConfig.hourlyNighttimeBudget) ? [...b.customSpawnerConfig.hourlySpawnConfig.hourlyNighttimeBudget] : [30, 50, 80],
+              hourlyBudgetMultiplierForFollowingDay: b.customSpawnerConfig.hourlySpawnConfig.hourlyBudgetMultiplierForFollowingDay !== undefined ? b.customSpawnerConfig.hourlySpawnConfig.hourlyBudgetMultiplierForFollowingDay : 1.25,
+              selfDestructAfterBudgetSpawned: b.customSpawnerConfig.hourlySpawnConfig.selfDestructAfterBudgetSpawned !== undefined ? b.customSpawnerConfig.hourlySpawnConfig.selfDestructAfterBudgetSpawned : 0
+            }
+          } : {})
+        };
+      } else {
+        const minHealth = b.customSpawnerConfig.minHealth !== undefined ? b.customSpawnerConfig.minHealth : (b.customSpawnerConfig.health || 300);
+        customSpawnerConfig = {
+          ...(b.customSpawnerConfig.name ? { name: b.customSpawnerConfig.name } : {}),
+          budget: b.customSpawnerConfig.budget !== undefined ? b.customSpawnerConfig.budget : (b.spawnerBudget || 60),
+          enemyTypeKey: Array.isArray(b.customSpawnerConfig.enemyTypeKey) ? [...b.customSpawnerConfig.enemyTypeKey] : ['e_basic'],
+          spawnRadius: b.customSpawnerConfig.spawnRadius !== undefined ? b.customSpawnerConfig.spawnRadius : 120,
+          minHealth: minHealth,
+          health: b.customSpawnerConfig.health || b.maxHealth || minHealth
+        };
+      }
+    }
     const customText = (b.overlay === 'ov_textsign' || b.customText) ? (b.customText || 'Hint') : undefined;
     const paygateConfig = (b.type === 'o_paygate' || b.paygateConfig) ? {
       resource: b.paygateConfig?.resource || 'soil',
@@ -664,11 +742,43 @@ export function deserializeChunkBlocks(chunk: any, blocksData: any[]): void {
             blk.sunGeneratorConfig = { ...item.sunGeneratorConfig };
           }
           if (item.customSpawnerConfig) {
-            blk.customSpawnerConfig = item.customSpawnerConfig;
-            if (item.customSpawnerConfig.budget !== undefined) blk.spawnerBudget = item.customSpawnerConfig.budget;
-            if (item.customSpawnerConfig.health !== undefined) {
-              blk.health = item.customSpawnerConfig.health;
-              blk.maxHealth = item.customSpawnerConfig.health;
+            const isLiquid = item.liquidType === 'l_spawner' || (item.liquidType && !!liquidTypes[item.liquidType]?.isEnemySpawner) || (!!item.customSpawnerConfig && !!item.liquidType);
+            if (isLiquid) {
+              blk.customSpawnerConfig = {
+                ...(item.customSpawnerConfig.name ? { name: item.customSpawnerConfig.name } : {}),
+                enemyTypeKey: Array.isArray(item.customSpawnerConfig.enemyTypeKey) ? [...item.customSpawnerConfig.enemyTypeKey] : ['e_basic'],
+                spawnRadius: item.customSpawnerConfig.spawnRadius !== undefined ? item.customSpawnerConfig.spawnRadius : 120,
+                spawnTriggerRadius: item.customSpawnerConfig.spawnTriggerRadius !== undefined ? item.customSpawnerConfig.spawnTriggerRadius : 200,
+                spawnInterval: item.customSpawnerConfig.spawnInterval !== undefined ? item.customSpawnerConfig.spawnInterval : 60,
+                hourlySpawnConfig: item.customSpawnerConfig.hourlySpawnConfig ? {
+                  enabled: item.customSpawnerConfig.hourlySpawnConfig.enabled !== false,
+                  hourlyDaytimeBudget: Array.isArray(item.customSpawnerConfig.hourlySpawnConfig.hourlyDaytimeBudget) ? [...item.customSpawnerConfig.hourlySpawnConfig.hourlyDaytimeBudget] : [10, 20, 30],
+                  hourlyNighttimeBudget: Array.isArray(item.customSpawnerConfig.hourlySpawnConfig.hourlyNighttimeBudget) ? [...item.customSpawnerConfig.hourlySpawnConfig.hourlyNighttimeBudget] : [30, 50, 80],
+                  hourlyBudgetMultiplierForFollowingDay: item.customSpawnerConfig.hourlySpawnConfig.hourlyBudgetMultiplierForFollowingDay ?? 1.25,
+                  selfDestructAfterBudgetSpawned: item.customSpawnerConfig.hourlySpawnConfig.selfDestructAfterBudgetSpawned ?? 0
+                } : {
+                  enabled: true,
+                  hourlyDaytimeBudget: [10, 20, 30],
+                  hourlyNighttimeBudget: [30, 50, 80],
+                  hourlyBudgetMultiplierForFollowingDay: 1.25,
+                  selfDestructAfterBudgetSpawned: 0
+                }
+              };
+            } else {
+              const minHealth = item.customSpawnerConfig.minHealth !== undefined ? item.customSpawnerConfig.minHealth : (item.customSpawnerConfig.health || 300);
+              const obstacleHealth = blk.config?.health || blk.health || 0;
+              const finalHealth = Math.max(minHealth, obstacleHealth);
+              blk.customSpawnerConfig = {
+                ...(item.customSpawnerConfig.name ? { name: item.customSpawnerConfig.name } : {}),
+                budget: item.customSpawnerConfig.budget !== undefined ? item.customSpawnerConfig.budget : (item.spawnerBudget || 60),
+                enemyTypeKey: Array.isArray(item.customSpawnerConfig.enemyTypeKey) ? [...item.customSpawnerConfig.enemyTypeKey] : ['e_basic'],
+                spawnRadius: item.customSpawnerConfig.spawnRadius !== undefined ? item.customSpawnerConfig.spawnRadius : 120,
+                minHealth: minHealth,
+                health: finalHealth
+              };
+              blk.spawnerBudget = blk.customSpawnerConfig.budget;
+              blk.health = finalHealth;
+              blk.maxHealth = finalHealth;
             }
           }
           chunk.blocks.push(blk);

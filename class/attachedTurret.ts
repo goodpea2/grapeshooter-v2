@@ -11,6 +11,7 @@ import { LootEntity, SunLoot, spawnLootEntity } from './loot';
 import { Enemy } from './enemy';
 import { drawTurret, drawTurretUI } from '../visualTurrets';
 import { TURRET_RECIPES } from '../dictionaryTurretMerging';
+import { requestFlungSpawn } from '../lvDemo';
 
 declare const p5: any;
 declare const createVector: any;
@@ -62,7 +63,7 @@ export class AttachedTurret extends Turret {
     // Resolve ingredients for merging logic
     if (this.config.tier === 1) {
       this.baseIngredients = [this.type];
-    } else if (this.config.tier === 2) {
+    } else if (this.config.tier === 2 || this.config.tier === 3) {
       const recipe = TURRET_RECIPES.find(r => r.id === this.type);
       if (recipe) {
         this.baseIngredients = [...recipe.ingredients];
@@ -367,7 +368,7 @@ export class AttachedTurret extends Turret {
     const spawnDist = mCfg.spawnDist || GRID_SIZE * 2;
     const sx = wPos.x + cos(spawnAngle) * spawnDist;
     const sy = wPos.y + sin(spawnAngle) * spawnDist;
-    state.enemies.push(new Enemy(sx, sy, enemyType));
+    requestFlungSpawn(wPos.x, wPos.y, sx, sy, enemyType, 15);
     state.vfx.push(new MergeVFX(sx, sy, [255, 255, 255]));
   }
 
@@ -462,7 +463,7 @@ export class AttachedTurret extends Turret {
         const cw = CHUNK_SIZE * GRID_SIZE; const dx = (chunk.cx * cw + cw/2) - wPos.x; const dy = (chunk.cy * cw + cw/2) - wPos.y;
         if (dx*dx + dy*dy > (range + cw)**2) return;
         chunk.blocks.forEach((b: any) => {
-          if (b.isMined || b.type === 'o_barrier' || b.config?.isValidTarget === false || b.isValidTarget === false) return;
+          if (b.isMined || b.type === 'o_barrier' || b.isIndestructible || b.config?.isIndestructible || b.health === Infinity || b.config?.isValidTarget === false || b.isValidTarget === false) return;
           const bcx = b.pos.x + GRID_SIZE/2; const bcy = b.pos.y + GRID_SIZE/2;
           const dSq = (wPos.x - bcx)**2 + (wPos.y - bcy)**2;
           if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, bcx, bcy)) results.push(b);

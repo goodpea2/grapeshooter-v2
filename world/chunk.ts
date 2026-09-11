@@ -91,7 +91,7 @@ export class Chunk {
 
   // OPTIMIZATION: Cache blocks by render requirement
   rebuildOverlayList() {
-    this.overlayBlocks = this.blocks.filter(b => !!b.overlay || b.health < b.maxHealth);
+    this.overlayBlocks = this.blocks.filter(b => !!b.overlay || b.health < b.maxHealth || b.liquidType === 'l_spawner' || !!b.customSpawnerConfig);
     this.liquidBlocks = this.blocks.filter(b => !!b.liquidType);
     this.assetBlocks = this.blocks.filter(b => !!b.config?.assetImgConfig);
     this.winConditionBlocks = this.blocks.filter(b => b.isWinCondition);
@@ -474,19 +474,23 @@ export class Chunk {
   }
 
   display(playerPos: any) {
-    const margin = 200; 
-    const left = state.cameraPos.x - width/2 - margin;
-    const right = state.cameraPos.x + width/2 + margin;
-    const top = state.cameraPos.y - height/2 - margin;
-    const bottom = state.cameraPos.y + height/2 + margin;
+    const isLevelEditor = state.currentScreen === 'level_editor';
+    const zoom = isLevelEditor ? (state.levelEditor?.cameraZoom || 1.0) : (state.cameraZoom || 1.0);
+    const margin = 300; 
+    const halfW = (width / (2 * zoom)) + margin;
+    const halfH = (height / (2 * zoom)) + margin;
+    const left = state.cameraPos.x - halfW;
+    const right = state.cameraPos.x + halfW;
+    const top = state.cameraPos.y - halfH;
+    const bottom = state.cameraPos.y + halfH;
     const chunkW = CHUNK_SIZE * GRID_SIZE;
     const chunkX = this.cx * chunkW;
     const chunkY = this.cy * chunkW;
     if (chunkX + chunkW < left || chunkX > right || chunkY + chunkW < top || chunkY > bottom) return;
     
     // SQUARED DISTANCE OPTIMIZATION
-    const px = playerPos.x;
-    const py = playerPos.y;
+    const px = playerPos ? playerPos.x : state.cameraPos.x;
+    const py = playerPos ? playerPos.y : state.cameraPos.y;
     const visRad = VISIBILITY_RADIUS * GRID_SIZE;
     const visRadSq = visRad * visRad;
     const fadeStart = (VISIBILITY_RADIUS - 1) * GRID_SIZE;
@@ -529,14 +533,16 @@ export class Chunk {
     // Pass 1: Renders custom asset blocks (only blocks with assetImgConfig)
     for (let i = 0; i < this.assetBlocks.length; i++) { 
       const b = this.assetBlocks[i];
-      const dx = b.pos.x + GRID_SIZE/2 - px;
-      const dy = b.pos.y + GRID_SIZE/2 - py;
-      const dSq = dx*dx + dy*dy;
-      if (dSq > visRadSq) continue;
       let opacity = 255;
-      if (dSq > fadeStartSq) {
-        const d = Math.sqrt(dSq);
-        opacity = constrain(map(d, fadeStart, visRad, 255, 0), 0, 255);
+      if (!isLevelEditor) {
+        const dx = b.pos.x + GRID_SIZE/2 - px;
+        const dy = b.pos.y + GRID_SIZE/2 - py;
+        const dSq = dx*dx + dy*dy;
+        if (dSq > visRadSq) continue;
+        if (dSq > fadeStartSq) {
+          const d = Math.sqrt(dSq);
+          opacity = constrain(map(d, fadeStart, visRad, 255, 0), 0, 255);
+        }
       }
       b.renderBase(opacity);
     }
@@ -545,14 +551,16 @@ export class Chunk {
     for (let i = 0; i < this.winConditionBlocks.length; i++) {
       const b = this.winConditionBlocks[i];
       if (b.isMined) continue;
-      const dx = b.pos.x + GRID_SIZE / 2 - px;
-      const dy = b.pos.y + GRID_SIZE / 2 - py;
-      const dSq = dx*dx + dy*dy;
-      if (dSq > visRadSq) continue;
       let opacity = 255;
-      if (dSq > fadeStartSq) {
-        const d = Math.sqrt(dSq);
-        opacity = constrain(map(d, fadeStart, visRad, 255, 0), 0, 255);
+      if (!isLevelEditor) {
+        const dx = b.pos.x + GRID_SIZE / 2 - px;
+        const dy = b.pos.y + GRID_SIZE / 2 - py;
+        const dSq = dx*dx + dy*dy;
+        if (dSq > visRadSq) continue;
+        if (dSq > fadeStartSq) {
+          const d = Math.sqrt(dSq);
+          opacity = constrain(map(d, fadeStart, visRad, 255, 0), 0, 255);
+        }
       }
       push();
       translate(b.pos.x + GRID_SIZE / 2, b.pos.y + GRID_SIZE / 2);
@@ -572,14 +580,16 @@ export class Chunk {
     // Pass 2: Renders overlays (Assets/Pulsing effects/Spawners)
     for (let i = 0; i < this.overlayBlocks.length; i++) {
       const b = this.overlayBlocks[i];
-      const dx = b.pos.x + GRID_SIZE/2 - px;
-      const dy = b.pos.y + GRID_SIZE/2 - py;
-      const dSq = dx*dx + dy*dy;
-      if (dSq > visRadSq) continue;
       let opacity = 255;
-      if (dSq > fadeStartSq) {
-        const d = Math.sqrt(dSq);
-        opacity = constrain(map(d, fadeStart, visRad, 255, 0), 0, 255);
+      if (!isLevelEditor) {
+        const dx = b.pos.x + GRID_SIZE/2 - px;
+        const dy = b.pos.y + GRID_SIZE/2 - py;
+        const dSq = dx*dx + dy*dy;
+        if (dSq > visRadSq) continue;
+        if (dSq > fadeStartSq) {
+          const d = Math.sqrt(dSq);
+          opacity = constrain(map(d, fadeStart, visRad, 255, 0), 0, 255);
+        }
       }
       b.renderOverlay(opacity);
       b.renderSparkles(opacity);

@@ -108,8 +108,8 @@ export function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha
   ellipse(0, 0, size * 0.8);
 
   // --- Sprite ---
-  const baseAssetKey = TYPE_MAP[key];
-  const sprite = state.assets[`img_${baseAssetKey}_front`];
+  const baseAssetKey = TYPE_MAP[key] || key;
+  const sprite = state.assets[`img_${baseAssetKey}_front`] || state.assets[`img_${baseAssetKey}`] || state.assets[`img_${key}_front`] || state.assets[`img_${key}`];
 
   if (sprite) {
     imageMode(CENTER);

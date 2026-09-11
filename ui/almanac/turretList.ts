@@ -213,8 +213,8 @@ function drawTurretGridItem(x: number, y: number, key: string, parentX: number, 
     const recipe = TURRET_RECIPES.find(r => r.id === key);
     const ingredientIcons: string[] = [];
     if (recipe) {
-        recipe.ingredients.forEach(ing => ingredientIcons.push(CLASS_ICON_MAP[ing]));
         for (let i = 0; i < recipe.duplicates; i++) ingredientIcons.push(CLASS_ICON_MAP['duplicate']);
+        recipe.ingredients.forEach(ing => ingredientIcons.push(CLASS_ICON_MAP[ing]));
     } else if (tr.tier && floor(tr.tier) === 1) {
         ingredientIcons.push(CLASS_ICON_MAP[key]);
     }

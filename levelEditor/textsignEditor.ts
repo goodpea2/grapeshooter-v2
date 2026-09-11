@@ -29,6 +29,7 @@ declare const textAlign: any;
 declare const textSize: any;
 declare const textWidth: any;
 declare const textStyle: any;
+declare const textFont: any;
 declare const text: any;
 declare const rect: any;
 declare const triangle: any;
@@ -146,6 +147,7 @@ export function drawInlineTextSignEditor(mWorldX: number, mWorldY: number) {
   const camY = state.cameraPos?.y ?? (height / 2);
 
   push();
+  if (typeof textFont === 'function') textFont('Consolas, monospace');
   textSize(11);
   textStyle(BOLD);
   const fullTextW = textWidth(currentText);
@@ -272,6 +274,7 @@ export function handleInlineTextSignPress(mWorldX: number, mWorldY: number): boo
   const bcx = b.pos.x + GRID_SIZE / 2;
   const bcy = b.pos.y - 14;
 
+  if (typeof textFont === 'function') textFont('Consolas, monospace');
   textSize(11);
   textStyle(BOLD);
   const currentText = textSignEditor.textState.text;
@@ -289,6 +292,7 @@ export function handleInlineTextSignPress(mWorldX: number, mWorldY: number): boo
     const textStartX = bcx - fullTextW / 2;
     const relX = mWorldX - textStartX;
     const idx = getCharIndexAtX(currentText, relX, (s) => textWidth(s));
+    if (typeof textFont === 'function') textFont('sans-serif');
 
     textSignEditor.textState.cursor = idx;
     textSignEditor.textState.selStart = idx;
@@ -296,6 +300,7 @@ export function handleInlineTextSignPress(mWorldX: number, mWorldY: number): boo
     textSignEditor.textState.isDragging = true;
     return true;
   }
+  if (typeof textFont === 'function') textFont('sans-serif');
 
   // Absorb press inside or near editor
   return true;
@@ -363,6 +368,7 @@ export function handleInlineTextSignDrag(mWorldX: number, mWorldY: number): bool
   const b = textSignEditor.block;
   const bcx = b.pos.x + GRID_SIZE / 2;
 
+  if (typeof textFont === 'function') textFont('Consolas, monospace');
   textSize(11);
   textStyle(BOLD);
   const currentText = textSignEditor.textState.text;
@@ -370,6 +376,7 @@ export function handleInlineTextSignDrag(mWorldX: number, mWorldY: number): bool
   const textStartX = bcx - fullTextW / 2;
   const relX = mWorldX - textStartX;
   const idx = getCharIndexAtX(currentText, relX, (s) => textWidth(s));
+  if (typeof textFont === 'function') textFont('sans-serif');
 
   textSignEditor.textState.cursor = idx;
   textSignEditor.textState.selEnd = idx;

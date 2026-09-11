@@ -394,6 +394,10 @@ export class FlowFieldManager {
       return { vx: 0, vy: 0, mode: 'los' };
     }
 
+    const tgx = floor(targetPos.x / GRID_SIZE);
+    const tgy = floor(targetPos.y / GRID_SIZE);
+    const isTargetingThisGoal = Math.abs(tgx - this.targetGx) <= 3 && Math.abs(tgy - this.targetGy) <= 3;
+
     // Convert enemy pos to local grid space
     const egx = floor(enemyPos.x / GRID_SIZE);
     const egy = floor(enemyPos.y / GRID_SIZE);
@@ -401,7 +405,7 @@ export class FlowFieldManager {
     const lx = egx - this.originGx;
     const ly = egy - this.originGy;
 
-    if (lx >= 0 && lx < FIELD_DIM && ly >= 0 && ly < FIELD_DIM) {
+    if (isTargetingThisGoal && lx >= 0 && lx < FIELD_DIM && ly >= 0 && ly < FIELD_DIM) {
       const idx = ly * FIELD_DIM + lx;
       const isGiant = enemySize >= 44;
 
@@ -435,12 +439,125 @@ export class FlowFieldManager {
       }
     }
 
+    // For non-goal targets without direct Line-of-Sight, pick best neighboring passable cell towards targetPos
+    if (!isTargetingThisGoal) {
+      let bestDistSq = directDistSq;
+      let bestDirX = 0;
+      let bestDirY = 0;
+
+      const dxs = [0, 0, -1, 1, -1, 1, -1, 1];
+      const dys = [-1, 1, 0, 0, -1, -1, 1, 1];
+
+      for (let i = 0; i < 8; i++) {
+        const nx = egx + dxs[i];
+        const ny = egy + dys[i];
+        const wx = (nx + 0.5) * GRID_SIZE;
+        const wy = (ny + 0.5) * GRID_SIZE;
+
+        if (state.world && state.world.isBlockAt && state.world.isBlockAt(wx, wy)) continue;
+
+        const dSq = (targetPos.x - wx) ** 2 + (targetPos.y - wy) ** 2;
+        if (dSq < bestDistSq) {
+          bestDistSq = dSq;
+          bestDirX = dxs[i];
+          bestDirY = dys[i];
+        }
+      }
+
+      if (bestDirX !== 0 || bestDirY !== 0) {
+        const d = Math.sqrt(bestDirX * bestDirX + bestDirY * bestDirY);
+        return { vx: bestDirX / d, vy: bestDirY / d, mode: 'direct' };
+      }
+    }
+
     // Fallback: Direct vector towards target
     const d = Math.sqrt(directDistSq);
     if (d > 0.001) {
       return { vx: directDx / d, vy: directDy / d, mode: 'direct' };
     }
     return { vx: 0, vy: 0, mode: 'direct' };
+  }
+
+  getReverseMoveVector(
+    pos: { x: number; y: number },
+    size: number
+  ): { vx: number; vy: number; mode: 'flow' | 'direct' } {
+    if (!state.player) {
+      return { vx: 0, vy: 0, mode: 'direct' };
+    }
+
+    const pdx = pos.x - state.player.pos.x;
+    const pdy = pos.y - state.player.pos.y;
+    const pDistSq = pdx * pdx + pdy * pdy;
+    const pDist = Math.sqrt(pDistSq);
+
+    const egx = floor(pos.x / GRID_SIZE);
+    const egy = floor(pos.y / GRID_SIZE);
+
+    const lx = egx - this.originGx;
+    const ly = egy - this.originGy;
+
+    if (lx >= 0 && lx < FIELD_DIM && ly >= 0 && ly < FIELD_DIM) {
+      const idx = ly * FIELD_DIM + lx;
+      const isGiant = size >= 44;
+      const distField = isGiant ? this.distGiant : this.distNormal;
+      const minClearance = isGiant ? 2 : 1;
+
+      // Gradient ascent: seek neighbor cell with greatest distance from player
+      const dxs = [0, 0, -1, 1, -1, 1, -1, 1];
+      const dys = [-1, 1, 0, 0, -1, -1, 1, 1];
+
+      let bestDist = distField[idx];
+      let bestDirX = 0;
+      let bestDirY = 0;
+
+      for (let i = 0; i < 8; i++) {
+        const nx = lx + dxs[i];
+        const ny = ly + dys[i];
+        if (nx < 0 || nx >= FIELD_DIM || ny < 0 || ny >= FIELD_DIM) continue;
+
+        const nIdx = ny * FIELD_DIM + nx;
+        if (this.clearance[nIdx] < minClearance || distField[nIdx] >= 1e8) continue;
+
+        if (distField[nIdx] > bestDist) {
+          bestDist = distField[nIdx];
+          bestDirX = dxs[i];
+          bestDirY = dys[i];
+        }
+      }
+
+      if (bestDirX !== 0 || bestDirY !== 0) {
+        let vx = bestDirX;
+        let vy = bestDirY;
+
+        const tileCenterX = (egx + 0.5) * GRID_SIZE;
+        const tileCenterY = (egy + 0.5) * GRID_SIZE;
+        const offX = tileCenterX - pos.x;
+        const offY = tileCenterY - pos.y;
+        const centeringWeight = 0.4;
+        vx += Math.max(-0.6, Math.min(0.6, offX / GRID_SIZE)) * centeringWeight;
+        vy += Math.max(-0.6, Math.min(0.6, offY / GRID_SIZE)) * centeringWeight;
+
+        const len = Math.sqrt(vx * vx + vy * vy);
+        if (len > 0.001) {
+          return { vx: vx / len, vy: vy / len, mode: 'flow' };
+        }
+      }
+
+      // If at local plateau or maximum, invert forward flow vector if valid
+      let fvx = isGiant ? this.vecXGiant[idx] : this.vecXNormal[idx];
+      let fvy = isGiant ? this.vecYGiant[idx] : this.vecYNormal[idx];
+      if (Math.abs(fvx) > 0.01 || Math.abs(fvy) > 0.01) {
+        const len = Math.sqrt(fvx * fvx + fvy * fvy);
+        return { vx: -fvx / len, vy: -fvy / len, mode: 'flow' };
+      }
+    }
+
+    // Direct fallback away from player
+    if (pDist > 0.001) {
+      return { vx: pdx / pDist, vy: pdy / pDist, mode: 'direct' };
+    }
+    return { vx: 1, vy: 0, mode: 'direct' };
   }
 
   drawDebug() {
@@ -569,6 +686,13 @@ export class FlowFieldRegistry {
 
     // Default to player flow field
     return this.playerField.getEnemyMoveVector(enemyPos, enemySize, targetPos);
+  }
+
+  getEnemyReverseMoveVector(
+    enemyPos: { x: number; y: number },
+    enemySize: number
+  ): { vx: number; vy: number; mode: 'flow' | 'direct' } {
+    return this.playerField.getReverseMoveVector(enemyPos, enemySize);
   }
 
   drawDebug(): void {

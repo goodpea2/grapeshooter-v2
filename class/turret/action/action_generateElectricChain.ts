@@ -22,7 +22,7 @@ export class ActionGenerateElectricChain extends TurretAction {
   }
 
   getRange(): number {
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     return (config.electricChainMaxLength || 150) * (this.turret.stats.rangeMult || 1);
   }
 
@@ -32,7 +32,7 @@ export class ActionGenerateElectricChain extends TurretAction {
 
   performExecute() {
     const wPos = this.turret.getWorldPos();
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const type = 'generateElectricChain';
     
     const peers = (this.turret as any).getNearbyTurrets();
@@ -51,8 +51,8 @@ export class ActionGenerateElectricChain extends TurretAction {
         const frValue = config.electricChainDamageRate || 60;
         const fr = Array.isArray(frValue) ? frValue[0] : frValue; // Simplified for now
         
-        let frDivider = (this.turret as any).activeStats?.firerateDivider || 1.0;
-        const ready = (state.frames - lastTrigger > (fr / frDivider));
+        const frMultiplier = this.turret.getFireRateMultiplier ? this.turret.getFireRateMultiplier() : (this.turret.fireRateMultiplier || 1.0);
+        const ready = (state.frames - lastTrigger > (fr / frMultiplier));
 
         if (ready) {
             const dmg = config.electricChainDamage || 10;

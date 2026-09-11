@@ -24,15 +24,25 @@ import { ActionShootSpin } from './action/action_shootSpin';
 // Specific turret types are handled generically via config unless they have a custom getActions in config
 
 export class TurretHub {
-  static getActions(turret: Turret): TurretAction[] {
+  static getActions(turret: Turret, forCharged: boolean = false): TurretAction[] {
     let actions: TurretAction[] = [];
 
-    // Check for specific turret type logic
-    if (turret.config.getActions) {
-      actions = turret.config.getActions(turret);
+    if (forCharged) {
+      if (turret.config.actionTypeWhileCharged) {
+        actions = this.getGenericActions(turret, turret.config.actionTypeWhileCharged);
+      } else if (turret.config.getActions) {
+        actions = turret.config.getActions(turret);
+      } else {
+        actions = this.getGenericActions(turret, turret.config.actionType);
+      }
     } else {
-      // Fallback to generic actionType-based initialization
-      actions = this.getGenericActions(turret);
+      // Check for specific turret type logic
+      if (turret.config.getActions) {
+        actions = turret.config.getActions(turret);
+      } else {
+        // Fallback to generic actionType-based initialization
+        actions = this.getGenericActions(turret, turret.config.actionType);
+      }
     }
 
     // Add actions from upgrades
@@ -54,11 +64,11 @@ export class TurretHub {
     return actions;
   }
 
-  private static getGenericActions(turret: Turret): TurretAction[] {
+  private static getGenericActions(turret: Turret, actionTypesInput?: string[] | string): TurretAction[] {
     const actions: TurretAction[] = [];
-    const actionTypes = Array.isArray(turret.config.actionType) ? turret.config.actionType : [turret.config.actionType];
+    const types = actionTypesInput ? (Array.isArray(actionTypesInput) ? actionTypesInput : [actionTypesInput]) : (Array.isArray(turret.config.actionType) ? turret.config.actionType : [turret.config.actionType]);
     
-    for (const type of actionTypes) {
+    for (const type of types) {
       switch (type) {
         case 'shoot': actions.push(new ActionShoot({ turret })); break;
         case 'launch': actions.push(new ActionLaunch({ turret })); break;

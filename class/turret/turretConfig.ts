@@ -38,6 +38,8 @@ export interface TurretConfig {
   countTowardAttachedCapacity?: boolean;
   CountTowardAttachedCapacity?: boolean;
   assetImg?: string;
+  actionTypeWhileCharged?: string[];
+  actionConfigWhileCharged?: any;
   whileCharged?: any;
   getActions?: (turret: Turret) => TurretAction[];
 }

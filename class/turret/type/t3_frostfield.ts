@@ -4,7 +4,7 @@ import { t2_icebomb } from './t2_icebomb';
 
 export const t3_frostfield: TurretConfig = { 
   ...t2_icebomb,
-  name: 'Frost Field', costs: { sun: 50 }, costAlmanac: { fuel: 6, ice: 12 }, drops: { fuel: 2, ice: 1 }, health: 150, color: [180, 240, 255], size: 22, tier: 3, 
+  name: 'Frost Field', costs: { sun: 50 }, costAlmanac: { fuel: 6, ice: 10 }, drops: { fuel: 2, ice: 1 }, health: 300, color: [180, 240, 255], size: 22, tier: 3, 
   tooltip: "Emits a chilling field while armed. Explodes on contact and freezes enemies", animationBodyType: 'soft',
   actionType: ['pulse', 'aura'],
   actionConfig: { 

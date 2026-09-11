@@ -4,7 +4,7 @@ import { t2_iceray } from './t2_iceray';
 
 export const t3_iceray2: TurretConfig = { 
   ...t2_iceray,
-  name: 'Ice Laser MK2', costs: { sun: 45 }, costAlmanac: { shard: 6, ice: 9 }, drops: { shard: 2, ice: 1 }, health: 50, color: [180, 255, 255], size: 22, tier: 3, 
+  name: 'Ice Laser MK2', costs: { sun: 45 }, costAlmanac: { shard: 6, ice: 9 }, drops: { shard: 2, ice: 1 }, health: 100, color: [180, 255, 255], size: 22, tier: 3, 
   tooltip: "Freezes the enemies contacting the laser beam", animationBodyType: 'tough',
   actionConfig: { 
     ...t2_iceray.actionConfig,

@@ -3,14 +3,29 @@ import { AttachedTurret } from '../attachedTurret';
 import { WorldTurret } from '../worldTurret';
 import { PeaAttachedTurret, PeaWorldTurret } from './type/t_pea';
 import { MinechargeAttachedTurret, MinechargeWorldTurret } from './type/t3_minecharge';
+import { IcechargeAttachedTurret, IcechargeWorldTurret } from './type/t3_icecharge';
+import { WitchAttachedTurret, WitchWorldTurret } from './type/t3_witch';
+import { MagnetAttachedTurret, MagnetWorldTurret } from './type/t3_magnet';
+import { DensnutAttachedTurret, DensnutWorldTurret } from './type/t3_densnut';
+import { DurianAttachedTurret, DurianWorldTurret } from './type/t3_durian';
+import { PowerbankAttachedTurret, PowerbankWorldTurret } from './type/t3_powerbank';
+import { PuncherMK2AttachedTurret, PuncherMK2WorldTurret } from './type/t3_puncher';
+import { WallaserAttachedTurret, WallaserWorldTurret } from './type/t2_wallaser';
 
 /**
  * Registry for custom turret logic classes.
  * Maps turret type keys to their respective Attached and World class implementations.
  */
 export const TurretLogicMap: Record<string, { Attached?: any, World?: any }> = {
-
-  't3_minecharge': { Attached: MinechargeAttachedTurret, World: MinechargeWorldTurret }
+  't2_wallaser': { Attached: WallaserAttachedTurret, World: WallaserWorldTurret },
+  't3_minecharge': { Attached: MinechargeAttachedTurret, World: MinechargeWorldTurret },
+  't3_icecharge': { Attached: IcechargeAttachedTurret, World: IcechargeWorldTurret },
+  't3_witch': { Attached: WitchAttachedTurret, World: WitchWorldTurret },
+  't3_magnet': { Attached: MagnetAttachedTurret, World: MagnetWorldTurret },
+  't3_densnut': { Attached: DensnutAttachedTurret, World: DensnutWorldTurret },
+  't3_durian': { Attached: DurianAttachedTurret, World: DurianWorldTurret },
+  't3_powerbank': { Attached: PowerbankAttachedTurret, World: PowerbankWorldTurret },
+  't3_puncher': { Attached: PuncherMK2AttachedTurret, World: PuncherMK2WorldTurret },
 };
 
 /**
@@ -52,6 +67,7 @@ export function copyTurretState(from: any, to: any) {
   if (from.actionTimers) to.actionTimers = new Map(from.actionTimers);
   if (from.growthProgress !== undefined) to.growthProgress = from.growthProgress;
   if (from.staminaSpent !== undefined) to.staminaSpent = from.staminaSpent;
+  if (from.stamina !== undefined) to.stamina = from.stamina;
   if (from.customAssetImg !== undefined) to.customAssetImg = from.customAssetImg;
   if (from.farmStage !== undefined) to.farmStage = from.farmStage;
   if (from.farmGrowthTimer !== undefined) to.farmGrowthTimer = from.farmGrowthTimer;
@@ -61,6 +77,8 @@ export function copyTurretState(from: any, to: any) {
   if (from.frostLevel !== undefined) to.frostLevel = from.frostLevel;
   if (from.isFrosted !== undefined) to.isFrosted = from.isFrosted;
   if (from.iceCubeHealth !== undefined) to.iceCubeHealth = from.iceCubeHealth;
+  if (from.buffStacks !== undefined) to.buffStacks = from.buffStacks;
+  if (from.lastBuffFrame !== undefined) to.lastBuffFrame = from.lastBuffFrame;
 }
 
 /**
@@ -77,6 +95,7 @@ export function extractTurretData(t: any): any {
     actionTimers: t.actionTimers ? Array.from(t.actionTimers.entries()) : undefined,
     growthProgress: t.growthProgress,
     staminaSpent: t.staminaSpent,
+    stamina: t.stamina,
     customAssetImg: t.customAssetImg,
     farmStage: t.farmStage,
     farmGrowthTimer: t.farmGrowthTimer,
@@ -86,6 +105,8 @@ export function extractTurretData(t: any): any {
     frostLevel: t.frostLevel,
     isFrosted: t.isFrosted,
     iceCubeHealth: t.iceCubeHealth,
+    buffStacks: t.buffStacks,
+    lastBuffFrame: t.lastBuffFrame,
   };
 }
 
@@ -102,6 +123,7 @@ export function restoreTurretData(t: any, data: any) {
   if (data.actionTimers) t.actionTimers = new Map(data.actionTimers);
   if (data.growthProgress !== undefined) t.growthProgress = data.growthProgress;
   if (data.staminaSpent !== undefined) t.staminaSpent = data.staminaSpent;
+  if (data.stamina !== undefined) t.stamina = data.stamina;
   if (data.customAssetImg !== undefined) t.customAssetImg = data.customAssetImg;
   if (data.farmStage !== undefined) t.farmStage = data.farmStage;
   if (data.farmGrowthTimer !== undefined) t.farmGrowthTimer = data.farmGrowthTimer;
@@ -111,4 +133,6 @@ export function restoreTurretData(t: any, data: any) {
   if (data.frostLevel !== undefined) t.frostLevel = data.frostLevel;
   if (data.isFrosted !== undefined) t.isFrosted = data.isFrosted;
   if (data.iceCubeHealth !== undefined) t.iceCubeHealth = data.iceCubeHealth;
+  if (data.buffStacks !== undefined) t.buffStacks = data.buffStacks;
+  if (data.lastBuffFrame !== undefined) t.lastBuffFrame = data.lastBuffFrame;
 }

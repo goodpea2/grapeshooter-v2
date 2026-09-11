@@ -34,7 +34,7 @@ export function getAllPaletteItems(): PaletteItem[] {
   for (const key of Object.keys(obstacleTypes)) {
     items.push({
       key,
-      name: obstacleTypes[key].name || key,
+      name: key,
       category: 'obstacles',
       desc: obstacleTypes[key].desc || '',
       color: obstacleTypes[key].color
@@ -45,7 +45,7 @@ export function getAllPaletteItems(): PaletteItem[] {
   for (const key of Object.keys(overlayTypes)) {
     items.push({
       key,
-      name: overlayTypes[key].name || key,
+      name: key,
       category: 'overlays',
       desc: overlayTypes[key].desc || ''
     });
@@ -55,7 +55,7 @@ export function getAllPaletteItems(): PaletteItem[] {
   for (const key of Object.keys(liquidTypes)) {
     items.push({
       key,
-      name: liquidTypes[key].name || key,
+      name: key,
       category: 'liquids',
       desc: liquidTypes[key].desc || '',
       color: liquidTypes[key].color
@@ -65,7 +65,7 @@ export function getAllPaletteItems(): PaletteItem[] {
   // 4. Entities
   items.push({
     key: 'player_spawn',
-    name: 'Player Core',
+    name: 'player_spawn',
     category: 'entities',
     subCategory: 'Player',
     desc: 'Player starting point'
@@ -74,7 +74,7 @@ export function getAllPaletteItems(): PaletteItem[] {
   for (const key of Object.keys(enemyTypes)) {
     items.push({
       key,
-      name: key.replace(/^e_/, '').toUpperCase(),
+      name: key,
       category: 'entities',
       subCategory: 'Enemies',
       desc: enemyTypes[key].desc || '',
@@ -85,7 +85,7 @@ export function getAllPaletteItems(): PaletteItem[] {
   for (const key of Object.keys(npcTypes)) {
     items.push({
       key,
-      name: npcTypes[key].name || key,
+      name: key,
       category: 'entities',
       subCategory: 'NPCs',
       desc: npcTypes[key].description || '',
@@ -96,20 +96,31 @@ export function getAllPaletteItems(): PaletteItem[] {
   for (const key of Object.keys(lootTypes)) {
     items.push({
       key,
-      name: key.toUpperCase() + ' Drop',
+      name: key,
       category: 'entities',
       subCategory: 'Loot',
-      desc: `${key.toUpperCase()} resource drop`,
+      desc: `${key} resource drop`,
       icon: lootTypes[key].idleAssetImg
     });
   }
 
   // 6. Turrets
   for (const key of Object.keys(turretTypes)) {
+    let subCategory = 'Tier 1';
+    if (key.startsWith('t0_')) {
+      subCategory = 'Consumables';
+    } else if (key.startsWith('t2_')) {
+      subCategory = 'Tier 2';
+    } else if (key.startsWith('t3_')) {
+      subCategory = 'Tier 3';
+    } else if (key.startsWith('t_farm_') || key.startsWith('tx_') || key.includes('seed') || key.includes('dummy')) {
+      subCategory = 'Special';
+    }
     items.push({
       key,
-      name: turretTypes[key].name || key,
+      name: key,
       category: 'turrets',
+      subCategory,
       desc: turretTypes[key].desc || ''
     });
   }
@@ -117,7 +128,7 @@ export function getAllPaletteItems(): PaletteItem[] {
   // 7. Flags
   items.push({
     key: 'isWinCondition',
-    name: 'WinCondition',
+    name: 'isWinCondition',
     category: 'flags',
     desc: 'Target boss or win condition entity'
   });

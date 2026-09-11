@@ -23,7 +23,8 @@ export class ActionLaserBeam extends TurretAction {
   }
 
   getRange(): number {
-    return (this.turret.config.actionConfig.beamMaxLength || 300) * (this.turret.stats.rangeMult || 1);
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
+    return (config.beamMaxLength || 300) * (this.turret.stats.rangeMult || 1);
   }
 
   canExecute(): boolean {
@@ -32,7 +33,7 @@ export class ActionLaserBeam extends TurretAction {
 
   performExecute() {
     const wPos = this.turret.getWorldPos();
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const type = 'laserBeam';
     
     const target = this.turret.target;
@@ -71,6 +72,13 @@ export class ActionLaserBeam extends TurretAction {
       if (state.frames - lastDamageFrame >= damageRate) {
         (this.turret as any).lastDamageFrame = state.frames;
         
+        if (this.turret.isCharged && this.turret.isCharged()) {
+          const stamCost = config.staminaCostPerLaserBeamExecuted || config.StaminaCostPerLaserBeamExecuted || 0;
+          if (stamCost > 0 && state.player) {
+            state.player.spendStamina(stamCost, this.turret);
+          }
+        }
+
         // Save target center coordinates before takeDamage might clear target or mine block
         const targetPosBackup = tCenter ? tCenter.copy() : (target.gx !== undefined ? createVector(target.gx * GRID_SIZE + GRID_SIZE / 2, target.gy * GRID_SIZE + GRID_SIZE / 2) : (target.pos ? target.pos.copy() : null));
 
@@ -88,6 +96,12 @@ export class ActionLaserBeam extends TurretAction {
 
         if (config.beamBulletTypeKey && targetPosBackup) {
           state.bullets.push(Bullet.create(targetPosBackup.x, targetPosBackup.y, targetPosBackup.x, targetPosBackup.y, config.beamBulletTypeKey, 'none', this.turret));
+          if (this.turret.isCharged && this.turret.isCharged()) {
+            const stamCost = config.staminaCostPerBulletSpawned || config.StaminaCostPerBulletSpawned || 0;
+            if (stamCost > 0 && state.player) {
+              state.player.spendStamina(stamCost, this.turret);
+            }
+          }
         }
 
         if (config.beamDamageWidth > 0) {
@@ -98,7 +112,7 @@ export class ActionLaserBeam extends TurretAction {
           const searchRadius = beamLen * 0.5 + config.beamDamageWidth + 20;
 
           const checkEnemy = (e: any) => {
-            if (e === target || e.health <= 0 || e.isDying) return;
+            if (e === target || e.health <= 0 || e.isDying || e.conditions?.has('c_hypnotized')) return;
             const dSegSq = (this.turret as any).distToSegmentSq(e.pos, wPos, tCenter);
             if (dSegSq < (widthSq + e.size**2 * 0.25)) {
               e.takeDamage(currentDamage, this.turret);
@@ -124,7 +138,10 @@ export class ActionLaserBeam extends TurretAction {
   }
 
   onTargetKilled(target: any) {
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
+    if (config.onKillHealSelf) {
+      this.turret.heal(config.onKillHealSelf, config.onKillHealBypassMaxHP ?? false);
+    }
     if (config.spawnBulletOnTargetDeath && target) {
       const tc = target.getWorldPos ? target.getWorldPos() : (target.pos ? target.pos.copy() : null);
       if (tc) {
@@ -134,7 +151,7 @@ export class ActionLaserBeam extends TurretAction {
   }
 
   onTargetMined(target: any, context?: any) {
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     if (config.onMineHealSelf) {
       this.turret.heal(config.onMineHealSelf, config.onMineHealBypassMaxHP ?? false);
     }

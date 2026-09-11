@@ -4,7 +4,7 @@ import { t2_minespawner } from './t2_minespawner';
 
 export const t3_minefield: TurretConfig = { 
   ...t2_minespawner,
-  name: 'Mine Field', costs: { sun: 45 }, costAlmanac: { fuel: 15 }, drops: { fuel: 3 }, health: 150, color: [255, 60, 0], size: 22, tier: 3, 
+  name: 'Mine Field', costs: { sun: 45 }, costAlmanac: { fuel: 15 }, drops: { fuel: 3 }, color: [255, 60, 0], size: 22, tier: 3, 
   tooltip: "Launches 8 mini mines upon planting, then keeps launching mines and exploding", animationBodyType: 'soft',
   actionType: ['pulse', 'spawnBulletAtRandom', 'firstStrike'],
   actionConfig: { 

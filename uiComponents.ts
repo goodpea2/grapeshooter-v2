@@ -31,6 +31,19 @@ declare const RIGHT: any;
 declare const TOP: any;
 declare const CORNER: any;
 declare const mouseIsPressed: any;
+declare const textFont: any;
+
+export const UI_FONT_INPUT = 'Consolas, monospace';
+export const UI_FONT_DEFAULT = 'sans-serif';
+
+export function withInputFont<T>(renderFn: () => T): T {
+  try {
+    if (typeof textFont === 'function') textFont(UI_FONT_INPUT);
+    return renderFn();
+  } finally {
+    if (typeof textFont === 'function') textFont(UI_FONT_DEFAULT);
+  }
+}
 
 // ==========================================
 // HITBOX REGISTRY SYSTEM
@@ -727,7 +740,9 @@ export function drawNumberStepper(
   textStyle(NORMAL);
   noStroke();
   fill(...color.yellow());
+  if (typeof textFont === 'function') textFont(UI_FONT_INPUT);
   text(value.toString(), midX + midW / 2, y + h / 2 + 1);
+  if (typeof textFont === 'function') textFont(UI_FONT_DEFAULT);
 
   // Increment button [+]
   drawButton(x + w - btnW, y, btnW, h, '+', {
@@ -792,6 +807,7 @@ export function drawInputField(
   textAlign(LEFT, CENTER);
   textSize(fontSize);
   noStroke();
+  if (typeof textFont === 'function') textFont(UI_FONT_INPUT);
 
   const pad = 10;
   if (!inputState.text && placeholder && !inputState.isFocused) {
@@ -812,4 +828,6 @@ export function drawInputField(
       noStroke();
     }
   }
+
+  if (typeof textFont === 'function') textFont(UI_FONT_DEFAULT);
 }

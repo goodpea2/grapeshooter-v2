@@ -2,7 +2,7 @@ import { TurretConfig } from '../turretConfig';
 import { GRID_SIZE, HOUR_FRAMES } from '../../../constants';
 
 export const t3_triberg: TurretConfig = { 
-  name: 'Iceberg Chain', costs: { sun: 35 }, costAlmanac: { ice: 12 }, drops: { ice: 3 }, health: 150, color: [150, 240, 255], size: 22, tier: 3, 
+  name: 'Iceberg Chain', costs: { sun: 35 }, costAlmanac: { ice: 12 }, drops: { ice: 3 }, health: 300, color: [150, 240, 255], size: 22, tier: 3, 
   tooltip: "Leaves up to 3 gas puddles on enemies within range", animationBodyType: 'soft',
   actionType: ['shootMultiTarget'],
   actionConfig: { 

@@ -2,13 +2,12 @@
 export const GRID_SIZE = 34;
 export const HEX_DIST = 22; 
 export const CHUNK_SIZE = 16;
-export const VISIBILITY_RADIUS = 14;
+export const VISIBILITY_RADIUS = 16;
 export const CHUNK_GEN_RADIUS = 1; // Radius around player to generate/update chunks
 export const WORLD_TURRET_ACTIVE_RANGE = 20; // tiles
-export const VERSION = "Grapeshooter - build 26/8 2:23am"; // absolute time from gmt+7, don't :remove this comment
+export const VERSION = "Grapeshooter - build 10/9"; // absolute time from gmt+7, don't remove this comment
 export const LEVEL_THRESHOLDS = [15, 25, 35, 50, 65, 80, 100, 120, 140, 160];
 export const HOUR_FRAMES = 600;
-export const MAX_VFX = 10;
 export const LEVEL_BUDGET = [30, 60, 60, 90, 120, 150, 200, 250, 300, 350, 400];
 
 // Optimization Tuning
@@ -21,7 +20,7 @@ export const PLAYER_DRAG_MAX_DISTANCE_TILES = 2; // Maximum drag distance in til
 export const FROST_LEVEL_CAP = 1.0;
 export const FROST_BUILDUP_RATE = 1 / 600;
 export const FROST_DECAY_RATE = 1 / 800;
-export const ICECUBE_MAX_HEALTH = 320;
+export const ICECUBE_MAX_HEALTH = 600;
 export const HUD_SAFEZONE = 16;
 
 export const WORLD_GEN_STATS: Record<string, { value: number, chance: number, budget?: number, dangerRange?: [number, number] }[]> = {

@@ -164,4 +164,17 @@ export function drawPlayer(p: any) {
   }
 
   pop();
+
+  // 5. ClickHolding Pulsing Indicator (circle-pulsing on player only to indicate clickHolding)
+  if (p.isClickHolding) {
+    push();
+    translate(p.pos.x + animX, p.pos.y + animY);
+    noFill();
+    const r = (p.size / 2 || 16) + 12;
+    const pulseD = (r * 2) + sin(state.frames * 0.3) * 6;
+    stroke(255, 100, 200, 190);
+    strokeWeight(2.5);
+    ellipse(0, 0, pulseD, pulseD);
+    pop();
+  }
 }

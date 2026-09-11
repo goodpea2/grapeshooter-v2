@@ -28,6 +28,7 @@ declare const textSize: any;
 declare const text: any;
 declare const textWidth: any;
 declare const textStyle: any;
+declare const textFont: any;
 declare const LEFT: any;
 declare const CENTER: any;
 declare const RIGHT: any;
@@ -53,26 +54,31 @@ export function isMouseOverSpawnerTooltip(topBarH: number, paletteH: number): bo
   return mouseX >= tipX && mouseX <= tipX + tipW && mouseY >= tipY && mouseY <= tipY + tipH;
 }
 
-export function openToolbarSpawnerTooltip(key: string) {
-  const isLiquid = key === 'l_spawner' || key.startsWith('l_spawner') || !!liquidTypes[key] || state.levelEditor.activeCategory === 'liquids';
+export function openToolbarSpawnerTooltip(key: string, customBlock?: any) {
+  const isLiquid = key === 'l_spawner' || key.startsWith('l_spawner') || !!liquidTypes[key] || state.levelEditor.activeCategory === 'liquids' || (customBlock && !!customBlock.liquidType);
   const oCfg = isLiquid ? (liquidTypes[key] || {}) : (overlayTypes[key] || {});
-  const spCfg = oCfg.enemySpawnConfig || {};
+  const blkCfg = customBlock?.customSpawnerConfig;
+  const spCfg = blkCfg || oCfg.enemySpawnConfig || {};
+  const activeName = blkCfg?.name || customBlock?.name || oCfg.name || (isLiquid ? (key === 'l_spawner' ? 'Ground Spawner' : key) : (key === 'ov_spawner_custom' ? 'Custom Spawner' : key));
+
   state.levelEditor.toolbarSpawnerTooltip = {
     key: key,
     isLiquid: isLiquid,
-    name: oCfg.name || (isLiquid ? (key === 'l_spawner' ? 'Ground Spawner' : key) : (key === 'ov_spawner_custom' ? 'Custom Spawner' : key)),
+    name: activeName,
+    targetBlock: customBlock || null,
     config: {
       budget: spCfg.budget !== undefined ? spCfg.budget : 60,
       enemyTypeKey: spCfg.enemyTypeKey ? [...spCfg.enemyTypeKey] : ['e_basic'],
       spawnRadius: spCfg.spawnRadius !== undefined ? spCfg.spawnRadius : 120,
       spawnTriggerRadius: spCfg.spawnTriggerRadius !== undefined ? spCfg.spawnTriggerRadius : 200,
       spawnInterval: spCfg.spawnInterval !== undefined ? spCfg.spawnInterval : 60,
-      spawnIntervalConsumeBudget: spCfg.spawnIntervalConsumeBudget !== false,
-      health: oCfg.minHealth || 300,
-      hourlySpawnConfig: spCfg.hourlySpawnConfig ? { ...spCfg.hourlySpawnConfig } : {
+      minHealth: spCfg.minHealth ?? spCfg.health ?? oCfg.minHealth ?? (customBlock?.customSpawnerConfig?.minHealth) ?? (customBlock?.health) ?? 300,
+      health: spCfg.minHealth ?? spCfg.health ?? oCfg.minHealth ?? (customBlock?.customSpawnerConfig?.minHealth) ?? (customBlock?.health) ?? 300,
+      hourlySpawnConfig: spCfg.hourlySpawnConfig ? JSON.parse(JSON.stringify(spCfg.hourlySpawnConfig)) : {
         enabled: isLiquid,
-        hourlyBudgetMultiplier: 1.0,
-        hourlyBudgetAdd: 0,
+        hourlyDaytimeBudget: [10, 20, 30],
+        hourlyNighttimeBudget: [30, 50, 80],
+        hourlyBudgetMultiplierForFollowingDay: 1.25,
         selfDestructAfterBudgetSpawned: 0
       }
     }
@@ -83,50 +89,77 @@ export function syncToolbarSpawnerTooltipToPrefab() {
   const tip = state.levelEditor.toolbarSpawnerTooltip;
   if (!tip || !tip.key) return;
 
+  // 1. Two-way binding: If editing an in-world block instance, update that specific block only!
+  if (tip.targetBlock) {
+    if (!tip.targetBlock.customSpawnerConfig) {
+      tip.targetBlock.customSpawnerConfig = {};
+    }
+    tip.targetBlock.customSpawnerConfig = JSON.parse(JSON.stringify(tip.config));
+    tip.targetBlock.customSpawnerConfig.name = tip.name;
+    if (tip.config.budget !== undefined) {
+      tip.targetBlock.spawnerBudget = tip.config.budget;
+    }
+    if (tip.config.health !== undefined && !tip.targetBlock.liquidType) {
+      tip.targetBlock.health = tip.config.health;
+      tip.targetBlock.maxHealth = tip.config.health;
+    }
+    const cx = Math.floor(tip.targetBlock.gx / CHUNK_SIZE);
+    const cy = Math.floor(tip.targetBlock.gy / CHUNK_SIZE);
+    state.world?.dirtyChunkAndNeighbors(cx, cy);
+    return;
+  }
+
+  // 2. Only mutate custom prefabs, never overwrite global base definitions ('l_spawner' or 'ov_spawner')
+  const isCustomPrefab = tip.key.startsWith('l_spawner_p_') || tip.key.startsWith('ov_spawner_p_') || tip.key === 'ov_spawner_custom' || tip.isCustomPrefab || (state.levelEditor.customSpawnerPrefabs && state.levelEditor.customSpawnerPrefabs.some((pr: any) => pr.id === tip.key));
+
   const isLiquid = tip.isLiquid || tip.key === 'l_spawner' || tip.key.startsWith('l_spawner') || !!liquidTypes[tip.key];
   if (isLiquid) {
-    if (!liquidTypes[tip.key]) {
-      liquidTypes[tip.key] = {
-        name: tip.name,
-        color: [140, 30, 180, 220],
-        glowColor: [200, 60, 240, 90],
-        pulseSpeed: 0.04,
-        isDanger: true,
-        isEnemySpawner: true,
-        assetImgConfig: { idleAssetImg: ['img_ground_spawner_a'], randomRotation: false, randomFlip: false },
-        liquidConfig: {
-          playerMovementSpeedMultiplier: 1.0,
-          enemyMovementSpeedMultiplier: 1.0,
-          turretFireRateMultiplier: 1.0,
-          blocksMovement: false
-        },
-        enemySpawnConfig: { ...tip.config },
-        isCustomPrefab: true
-      };
-    } else {
-      liquidTypes[tip.key].name = tip.name;
-      liquidTypes[tip.key].enemySpawnConfig = { ...tip.config };
+    if (isCustomPrefab) {
+      if (!liquidTypes[tip.key]) {
+        liquidTypes[tip.key] = {
+          name: tip.name,
+          color: [140, 30, 180, 220],
+          glowColor: [200, 60, 240, 90],
+          pulseSpeed: 0.04,
+          isDanger: true,
+          isEnemySpawner: true,
+          assetImgConfig: { idleAssetImg: ['img_ground_spawner_a'], randomRotation: false, randomFlip: false },
+          liquidConfig: {
+            playerMovementSpeedMultiplier: 1.0,
+            enemyMovementSpeedMultiplier: 1.0,
+            turretFireRateMultiplier: 1.0,
+            blocksMovement: false
+          },
+          enemySpawnConfig: JSON.parse(JSON.stringify(tip.config)),
+          isCustomPrefab: true
+        };
+      } else {
+        liquidTypes[tip.key].name = tip.name;
+        liquidTypes[tip.key].enemySpawnConfig = JSON.parse(JSON.stringify(tip.config));
+      }
     }
   } else {
-    if (!overlayTypes[tip.key]) {
-      overlayTypes[tip.key] = {
-        name: tip.name,
-        minHealth: tip.config.health,
-        isEnemy: true,
-        isEnemySpawner: true,
-        danger: 3,
-        isDanger: true,
-        obstacleOverlayVfx: 'v_spawner',
-        isConcealedAlongWithObstacle: false,
-        enemySpawnConfig: { ...tip.config },
-        assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: true, randomFlip: true },
-        lootConfigOnDeath: 'lc_spawner',
-        isCustomPrefab: true
-      };
-    } else {
-      overlayTypes[tip.key].name = tip.name;
-      overlayTypes[tip.key].minHealth = tip.config.health;
-      overlayTypes[tip.key].enemySpawnConfig = { ...tip.config };
+    if (isCustomPrefab) {
+      if (!overlayTypes[tip.key]) {
+        overlayTypes[tip.key] = {
+          name: tip.name,
+          minHealth: tip.config.minHealth ?? tip.config.health ?? 300,
+          isEnemy: true,
+          isEnemySpawner: true,
+          danger: 3,
+          isDanger: true,
+          obstacleOverlayVfx: 'v_spawner',
+          isConcealedAlongWithObstacle: false,
+          enemySpawnConfig: JSON.parse(JSON.stringify(tip.config)),
+          assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: true, randomFlip: true },
+          lootConfigOnDeath: 'lc_spawner',
+          isCustomPrefab: true
+        };
+      } else {
+        overlayTypes[tip.key].name = tip.name;
+        overlayTypes[tip.key].minHealth = tip.config.minHealth ?? tip.config.health ?? 300;
+        overlayTypes[tip.key].enemySpawnConfig = JSON.parse(JSON.stringify(tip.config));
+      }
     }
   }
 
@@ -134,30 +167,25 @@ export function syncToolbarSpawnerTooltipToPrefab() {
     const p = state.levelEditor.customSpawnerPrefabs.find((pr: any) => pr.id === tip.key);
     if (p) {
       p.name = tip.name;
-      p.config = { ...tip.config };
+      p.config = JSON.parse(JSON.stringify(tip.config));
     }
   }
 }
 
 export function drawWorldHoverSpawnerTooltip(blk: any, oCfg: any, topBarH: number, paletteH: number) {
-  const spCfg = blk.customSpawnerConfig || oCfg.enemySpawnConfig || {};
-  const spName = blk.customSpawnerConfig?.name || oCfg.name || 'Spawner';
-  const budget = spCfg.budget !== undefined ? spCfg.budget : (blk.spawnerBudget || 60);
-  const intVal = spCfg.spawnInterval !== undefined ? spCfg.spawnInterval : 60;
-  const intStr = intVal < 0 ? 'Death Only' : `${intVal}f (${(intVal / 60).toFixed(1)}s)`;
-  const trigVal = spCfg.spawnTriggerRadius !== undefined ? spCfg.spawnTriggerRadius : 200;
-  const trigStr = trigVal < 0 ? 'Global' : `${trigVal}px`;
-  const spawnRad = spCfg.spawnRadius !== undefined ? spCfg.spawnRadius : 120;
-  const health = blk.health || oCfg.minHealth || 300;
+  const isLiquid = blk.liquidType === 'l_spawner' || (blk.liquidType && !!liquidTypes[blk.liquidType]?.isEnemySpawner) || (!!blk.customSpawnerConfig && !!blk.liquidType);
+  const spCfg = blk.customSpawnerConfig || oCfg?.enemySpawnConfig || {};
+  const spName = blk.customSpawnerConfig?.name || oCfg?.name || (isLiquid ? 'Ground Spawner' : 'Spawner');
   const enemyTypesList: string[] = spCfg.enemyTypeKey || ['e_basic'];
+  const spawnRad = spCfg.spawnRadius !== undefined ? spCfg.spawnRadius : 120;
 
   const screenPos = {
     x: (blk.pos.x + GRID_SIZE / 2) - state.cameraPos.x + width / 2,
     y: (blk.pos.y + GRID_SIZE / 2) - state.cameraPos.y + height / 2
   };
 
-  const tipW = 230;
-  const tipH = 220;
+  const tipW = isLiquid ? 250 : 230;
+  const tipH = isLiquid ? 260 : 185;
   let tipX = screenPos.x + GRID_SIZE + 10;
   if (tipX + tipW > width - 15) {
     tipX = screenPos.x - tipW - GRID_SIZE - 10;
@@ -171,25 +199,25 @@ export function drawWorldHoverSpawnerTooltip(blk: any, oCfg: any, topBarH: numbe
     radius: 12,
     layer: 100,
     bgColor: [15, 18, 35, 245],
-    borderColor: [54, 62, 114, 255]
+    borderColor: isLiquid ? [120, 60, 180, 255] : [54, 62, 114, 255]
   });
 
   // Header Title
-  fill(...color.yellow());
+  fill(isLiquid ? 220 : 255, isLiquid ? 150 : 230, isLiquid ? 255 : 100);
   textAlign(LEFT, CENTER);
   textSize(11);
   textStyle(BOLD);
-  text("SPAWNER", tipX + 12, tipY + 16);
+  text(isLiquid ? "GROUND SPAWNER (HOURLY)" : "OVERLAY SPAWNER", tipX + 12, tipY + 16);
 
   let curY = tipY + 30;
 
   // Name display pill
   fill(...color.veryDarkBlue());
-  stroke(...color.lightBlue(100));
+  stroke(isLiquid ? [140, 60, 220, 120] : color.lightBlue(100));
   strokeWeight(1);
   rect(tipX + 10, curY, tipW - 20, 20, 6);
 
-  fill(...color.yellow());
+  fill(isLiquid ? [220, 160, 255] : color.yellow());
   noStroke();
   textAlign(LEFT, CENTER);
   textSize(9);
@@ -216,11 +244,32 @@ export function drawWorldHoverSpawnerTooltip(blk: any, oCfg: any, topBarH: numbe
     curY += 18;
   };
 
-  renderStatRow("Budget", `${budget}`);
-  renderStatRow("Interval", intStr);
-  renderStatRow("Trigger Range", trigStr);
-  renderStatRow("Spawn Radius", `${spawnRad}px`);
-  renderStatRow("Health", `${health}`);
+  if (isLiquid) {
+    const rawTrig = spCfg.spawnTriggerRadius !== undefined ? spCfg.spawnTriggerRadius : 200;
+    const trigStr = rawTrig < 0 ? 'Global' : `${Math.max(100, rawTrig)}px`;
+    const intVal = spCfg.spawnInterval !== undefined ? spCfg.spawnInterval : 60;
+    const intStr = `${intVal}f (${(intVal / 60).toFixed(1)}s)`;
+    const hCfg = spCfg.hourlySpawnConfig || {};
+    const dayBudgets = Array.isArray(hCfg.hourlyDaytimeBudget) ? hCfg.hourlyDaytimeBudget : [10, 20, 30];
+    const nightBudgets = Array.isArray(hCfg.hourlyNighttimeBudget) ? hCfg.hourlyNighttimeBudget : [30, 50, 80];
+    const mult = hCfg.hourlyBudgetMultiplierForFollowingDay !== undefined ? hCfg.hourlyBudgetMultiplierForFollowingDay : 1.25;
+    const selfDestruct = hCfg.selfDestructAfterBudgetSpawned || 0;
+
+    renderStatRow("Trigger Range", trigStr);
+    renderStatRow("Spawn Radius", `${spawnRad}px`);
+    renderStatRow("Spawn Interval", intStr);
+    renderStatRow("Day Budgets", `[${dayBudgets.join(', ')}]`);
+    renderStatRow("Night Budgets", `[${nightBudgets.join(', ')}]`);
+    renderStatRow("Follow Mult", `x${mult.toFixed(2)}`);
+    renderStatRow("Self Destruct", selfDestruct > 0 ? `${selfDestruct} limit` : 'Never');
+  } else {
+    const budget = spCfg.budget !== undefined ? spCfg.budget : (blk.spawnerBudget || 60);
+    const health = blk.health || oCfg?.minHealth || spCfg.health || 300;
+
+    renderStatRow("Health", `${health}`);
+    renderStatRow("Budget", `${budget}`);
+    renderStatRow("Spawn Radius", `${spawnRad}px`);
+  }
 
   // Enemy Types display
   fill(...color.lightBlue(220));
@@ -263,7 +312,7 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
 
   const isLiquid = tip.isLiquid || tip.key === 'l_spawner' || tip.key.startsWith('l_spawner') || !!liquidTypes[tip.key];
   const tipW = 290;
-  const tipH = isLiquid ? 490 : 410;
+  const tipH = isLiquid ? 440 : 340;
   const tipX = width - tipW - 15;
   const tipY = constrain(height - paletteH - tipH - 10, topBarH + 10, height - tipH - 10);
   const cfg = tip.config;
@@ -323,8 +372,10 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
   noStroke();
   textAlign(LEFT, CENTER);
   textSize(9.5);
+  if (typeof textFont === 'function') textFont('Consolas, monospace');
   const blink = (isNameFocus && floor(((window as any).frameCount || 0) / 30) % 2 === 0) ? '|' : '';
   text(nameVal + blink, nameBoxX + 8, curY + nameBoxH / 2);
+  if (typeof textFont === 'function') textFont('sans-serif');
 
   curY += 28;
 
@@ -345,18 +396,28 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
       const prefabId = isLiquid ? `l_spawner_p_${Date.now()}` : `ov_spawner_p_${Date.now()}`;
       const defaultName = isLiquid ? 'Ground Spawner' : 'Spawner';
       const prefabName = tip.name || `${defaultName} (${(cfg.enemyTypeKey || ['e_basic']).map((k: string) => k.replace('e_', '')).join(', ')})`;
-      const newPrefab = {
+      const newPrefab: any = {
         id: prefabId,
         category: isLiquid ? 'liquids' : 'overlays',
         name: prefabName,
-        config: {
-          budget: cfg.budget ?? 60,
+        config: isLiquid ? {
           enemyTypeKey: [...(cfg.enemyTypeKey || ['e_basic'])],
           spawnRadius: cfg.spawnRadius ?? 120,
           spawnTriggerRadius: cfg.spawnTriggerRadius ?? 200,
           spawnInterval: cfg.spawnInterval ?? 60,
-          spawnIntervalConsumeBudget: cfg.spawnIntervalConsumeBudget !== false,
-          health: cfg.health ?? 300
+          hourlySpawnConfig: cfg.hourlySpawnConfig ? JSON.parse(JSON.stringify(cfg.hourlySpawnConfig)) : {
+            enabled: true,
+            hourlyDaytimeBudget: [10, 20, 30],
+            hourlyNighttimeBudget: [30, 50, 80],
+            hourlyBudgetMultiplierForFollowingDay: 1.25,
+            selfDestructAfterBudgetSpawned: 0
+          }
+        } : {
+          budget: cfg.budget ?? 60,
+          enemyTypeKey: [...(cfg.enemyTypeKey || ['e_basic'])],
+          spawnRadius: cfg.spawnRadius ?? 120,
+          minHealth: cfg.minHealth ?? cfg.health ?? 300,
+          health: cfg.minHealth ?? cfg.health ?? 300
         }
       };
       if (!state.levelEditor.customSpawnerPrefabs) state.levelEditor.customSpawnerPrefabs = [];
@@ -385,7 +446,7 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
       } else {
         overlayTypes[prefabId] = {
           name: prefabName,
-          minHealth: newPrefab.config.health,
+          minHealth: newPrefab.config.minHealth ?? newPrefab.config.health ?? 300,
           isEnemy: true,
           isEnemySpawner: true,
           danger: 3,
@@ -449,30 +510,30 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
   // 3. Numeric Stepper & Input Rows
   const rowH = 23;
   const labelX = tipX + 12;
-  const valBoxX = tipX + 126;
-  const valBoxW = 72;
-  const btnSize = 20;
+  const valBoxX = tipX + 118;
+  const valBoxW = 86;
+  const btnSize = 18;
 
   const renderEditableStepper = (
     field: string,
     label: string,
     displayVal: string,
-    rawVal: number,
+    rawVal: any,
     onMinus: () => void,
     onPlus: () => void
   ) => {
     noStroke();
     fill(...color.lightBlue(220));
     textAlign(LEFT, CENTER);
-    textSize(9.5);
-    text(label, labelX, curY + 11);
+    textSize(9);
+    text(label, labelX, curY + 9);
 
     // [-] Button
     const minusX = valBoxX;
     drawRedButton(minusX, curY, btnSize, btnSize, '-', {
       id: `sp_dec_${field}`,
       layer: layer + 5,
-      fontSize: 12,
+      fontSize: 11,
       radius: 4,
       depth3D: 1,
       onClick: () => {
@@ -486,6 +547,17 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
     const inputX = minusX + btnSize + 4;
     const isFieldFocus = state.levelEditor.activeSpawnerInput?.field === field;
 
+    // Handle mouse selection drag when focused
+    const isMousePressed = !!(window as any).mouseIsPressed;
+    if (isFieldFocus && isMousePressed && state.levelEditor.activeSpawnerInput?.isDragging) {
+      const activeBuf = state.levelEditor.activeSpawnerInput.textBuffer || '';
+      const approxCharW = 5.6;
+      const relX = mouseX - (inputX + 4);
+      const dragIdx = constrain(Math.round(relX / approxCharW), 0, activeBuf.length);
+      state.levelEditor.activeSpawnerInput.selectionEnd = dragIdx;
+      state.levelEditor.activeSpawnerInput.cursor = dragIdx;
+    }
+
     drawCard(inputX, curY, valBoxW, btnSize, {
       id: `sp_val_${field}`,
       radius: 4,
@@ -495,24 +567,49 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
       bgColor: isFieldFocus ? [25, 34, 65, 255] : [12, 15, 30, 220],
       borderColor: isFieldFocus ? [56, 189, 248, 255] : [35, 45, 80, 255],
       onClick: () => {
-        state.levelEditor.activeSpawnerInput = { field, textBuffer: rawVal.toString() };
+        const rawStr = rawVal !== undefined ? String(rawVal) : '';
+        state.levelEditor.activeSpawnerInput = {
+          field,
+          textBuffer: rawStr,
+          cursor: rawStr.length,
+          selectionStart: 0,
+          selectionEnd: rawStr.length,
+          isDragging: true
+        };
       }
     });
 
-    const shownText = isFieldFocus ? state.levelEditor.activeSpawnerInput!.textBuffer : displayVal;
+    const activeBuf = isFieldFocus ? (state.levelEditor.activeSpawnerInput?.textBuffer || '') : displayVal;
+    
+    // Draw selection highlight if focused
+    if (isFieldFocus && state.levelEditor.activeSpawnerInput) {
+      const sStart = Math.min(state.levelEditor.activeSpawnerInput.selectionStart ?? 0, state.levelEditor.activeSpawnerInput.selectionEnd ?? 0);
+      const sEnd = Math.max(state.levelEditor.activeSpawnerInput.selectionStart ?? 0, state.levelEditor.activeSpawnerInput.selectionEnd ?? 0);
+      if (sStart < sEnd) {
+        const approxCharW = 5.6;
+        const hX = inputX + 4 + sStart * approxCharW;
+        const hW = (sEnd - sStart) * approxCharW;
+        noStroke();
+        fill(40, 110, 220, 180);
+        rect(hX, curY + 2, Math.min(hW, valBoxW - 8), btnSize - 4, 2);
+      }
+    }
+
     fill(isFieldFocus ? [255, 255, 255] : [...color.yellow()]);
     noStroke();
-    textSize(9);
-    textAlign(CENTER, CENTER);
+    textSize(8.5);
+    textAlign(LEFT, CENTER);
+    if (typeof textFont === 'function') textFont('Consolas, monospace');
     const cursor = (isFieldFocus && floor(((window as any).frameCount || 0) / 30) % 2 === 0) ? '|' : '';
-    text(shownText + cursor, inputX + valBoxW / 2, curY + btnSize / 2);
+    text(activeBuf + cursor, inputX + 5, curY + btnSize / 2);
+    if (typeof textFont === 'function') textFont('sans-serif');
 
     // [+] Button
     const plusX = inputX + valBoxW + 4;
     drawGreenButton(plusX, curY, btnSize, btnSize, '+', {
       id: `sp_inc_${field}`,
       layer: layer + 5,
-      fontSize: 12,
+      fontSize: 11,
       radius: 4,
       depth3D: 1,
       onClick: () => {
@@ -525,121 +622,167 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
     curY += rowH;
   };
 
-  // Budget
-  renderEditableStepper(
-    'budget',
-    'Budget',
-    `${cfg.budget ?? 60}`,
-    cfg.budget ?? 60,
-    () => { cfg.budget = Math.max(10, (cfg.budget ?? 60) - 20); },
-    () => { cfg.budget = Math.min(2000, (cfg.budget ?? 60) + 20); }
-  );
-
-  // Interval
-  const intVal = cfg.spawnInterval ?? 60;
-  const intStr = intVal < 0 ? 'Death Only' : `${intVal}f (${(intVal / 60).toFixed(1)}s)`;
-  renderEditableStepper(
-    'spawnInterval',
-    'Interval',
-    intStr,
-    intVal,
-    () => {
-      const cur = cfg.spawnInterval ?? 60;
-      if (cur <= 15) cfg.spawnInterval = -1;
-      else cfg.spawnInterval = cur - 15;
-    },
-    () => {
-      const cur = cfg.spawnInterval ?? 60;
-      if (cur < 0) cfg.spawnInterval = 15;
-      else cfg.spawnInterval = Math.min(360, cur + 15);
-    }
-  );
-
-  // Trigger Range
-  const trigVal = cfg.spawnTriggerRadius ?? 200;
-  const trigStr = trigVal < 0 ? 'Global' : `${trigVal}px`;
-  renderEditableStepper(
-    'spawnTriggerRadius',
-    'Trig Range',
-    trigStr,
-    trigVal,
-    () => {
-      const cur = cfg.spawnTriggerRadius ?? 200;
-      if (cur <= 60) cfg.spawnTriggerRadius = -1;
-      else cfg.spawnTriggerRadius = cur - 20;
-    },
-    () => {
-      const cur = cfg.spawnTriggerRadius ?? 200;
-      if (cur < 0) cfg.spawnTriggerRadius = 60;
-      else cfg.spawnTriggerRadius = Math.min(600, cur + 20);
-    }
-  );
-
-  // Spawn Radius
-  renderEditableStepper(
-    'spawnRadius',
-    'Spawn Rad',
-    `${cfg.spawnRadius ?? 120}px`,
-    cfg.spawnRadius ?? 120,
-    () => { cfg.spawnRadius = Math.max(30, (cfg.spawnRadius ?? 120) - 20); },
-    () => { cfg.spawnRadius = Math.min(600, (cfg.spawnRadius ?? 120) + 20); }
-  );
-
-  // Health (for overlays) or Hourly Controls (for liquid ground spawner)
   if (!isLiquid) {
+    // ----------------------------------------------------
+    // OVERLAY SPAWNER (ov_spawner)
+    // Only Health, Budget, Spawn Radius (no trigger/interval)
+    // ----------------------------------------------------
     renderEditableStepper(
-      'health',
-      'Health',
-      `${cfg.health ?? 300}`,
-      cfg.health ?? 300,
+      'minHealth',
+      'Min Health',
+      `${cfg.minHealth ?? cfg.health ?? 300}`,
+      cfg.minHealth ?? cfg.health ?? 300,
       () => {
-        cfg.health = Math.max(50, (cfg.health ?? 300) - 50);
+        const cur = cfg.minHealth ?? cfg.health ?? 300;
+        cfg.minHealth = Math.max(50, cur - 50);
+        cfg.health = cfg.minHealth;
       },
       () => {
-        cfg.health = Math.min(5000, (cfg.health ?? 300) + 50);
+        const cur = cfg.minHealth ?? cfg.health ?? 300;
+        cfg.minHealth = Math.min(5000, cur + 50);
+        cfg.health = cfg.minHealth;
       }
     );
+
+    renderEditableStepper(
+      'budget',
+      'Budget',
+      `${cfg.budget ?? 60}`,
+      cfg.budget ?? 60,
+      () => { cfg.budget = Math.max(10, (cfg.budget ?? 60) - 20); },
+      () => { cfg.budget = Math.min(2000, (cfg.budget ?? 60) + 20); }
+    );
+
+    renderEditableStepper(
+      'spawnRadius',
+      'Spawn Rad',
+      `${cfg.spawnRadius ?? 120}px`,
+      cfg.spawnRadius ?? 120,
+      () => { cfg.spawnRadius = Math.max(30, (cfg.spawnRadius ?? 120) - 20); },
+      () => { cfg.spawnRadius = Math.min(600, (cfg.spawnRadius ?? 120) + 20); }
+    );
   } else {
+    // ----------------------------------------------------
+    // GROUND LIQUID SPAWNER (l_spawner)
+    // Trig Range (min 100), Spawn Rad, Interval, Hourly Budgets, Follow Mult, Self Destruct
+    // ----------------------------------------------------
     if (!cfg.hourlySpawnConfig) {
       cfg.hourlySpawnConfig = {
         enabled: true,
-        hourlyBudgetMultiplier: 1.0,
-        hourlyBudgetAdd: 0,
-        selfDestructAfterBudgetSpawned: 0
+        hourlyDaytimeBudget: [10, 20, 30],
+        hourlyNighttimeBudget: [30, 50, 80],
+        hourlyBudgetMultiplierForFollowingDay: 1.25,
+        selfDestructAfterBudgetSpawned: 2000
       };
     }
     const hCfg = cfg.hourlySpawnConfig;
 
+    if (!Array.isArray(hCfg.hourlyDaytimeBudget)) {
+      hCfg.hourlyDaytimeBudget = [10, 20, 30];
+    }
+    if (!Array.isArray(hCfg.hourlyNighttimeBudget)) {
+      hCfg.hourlyNighttimeBudget = [30, 50, 80];
+    }
+
+    // Trigger Range (min 100)
+    const rawTrig = cfg.spawnTriggerRadius !== undefined ? cfg.spawnTriggerRadius : 200;
+    const trigVal = rawTrig < 0 ? -1 : Math.max(100, rawTrig);
+    const trigStr = trigVal < 0 ? 'Global' : `${trigVal}px`;
     renderEditableStepper(
-      'hourlyBudgetMultiplier',
-      'Hourly Mult',
-      `x${(hCfg.hourlyBudgetMultiplier ?? 1.0).toFixed(1)}`,
-      hCfg.hourlyBudgetMultiplier ?? 1.0,
+      'spawnTriggerRadius',
+      'Trig Range',
+      trigStr,
+      trigVal < 0 ? -1 : trigVal,
       () => {
-        hCfg.hourlyBudgetMultiplier = Math.max(0.1, Number(((hCfg.hourlyBudgetMultiplier ?? 1.0) - 0.2).toFixed(1)));
+        const cur = cfg.spawnTriggerRadius ?? 200;
+        if (cur <= 100) cfg.spawnTriggerRadius = -1;
+        else cfg.spawnTriggerRadius = Math.max(100, cur - 20);
       },
       () => {
-        hCfg.hourlyBudgetMultiplier = Math.min(10.0, Number(((hCfg.hourlyBudgetMultiplier ?? 1.0) + 0.2).toFixed(1)));
+        const cur = cfg.spawnTriggerRadius ?? 200;
+        if (cur < 0) cfg.spawnTriggerRadius = 100;
+        else cfg.spawnTriggerRadius = Math.min(600, cur + 20);
       }
     );
 
+    // Spawn Radius
     renderEditableStepper(
-      'hourlyBudgetAdd',
-      'Hourly Add',
-      `+${hCfg.hourlyBudgetAdd ?? 0}`,
-      hCfg.hourlyBudgetAdd ?? 0,
+      'spawnRadius',
+      'Spawn Rad',
+      `${cfg.spawnRadius ?? 120}px`,
+      cfg.spawnRadius ?? 120,
+      () => { cfg.spawnRadius = Math.max(30, (cfg.spawnRadius ?? 120) - 20); },
+      () => { cfg.spawnRadius = Math.min(600, (cfg.spawnRadius ?? 120) + 20); }
+    );
+
+    // Interval
+    const intVal = cfg.spawnInterval ?? 60;
+    const intStr = intVal < 0 ? 'Off' : `${intVal}f (${(intVal / 60).toFixed(1)}s)`;
+    renderEditableStepper(
+      'spawnInterval',
+      'Interval',
+      intStr,
+      intVal,
       () => {
-        hCfg.hourlyBudgetAdd = Math.max(0, (hCfg.hourlyBudgetAdd ?? 0) - 20);
+        const cur = cfg.spawnInterval ?? 60;
+        if (cur <= 15) cfg.spawnInterval = 15;
+        else cfg.spawnInterval = cur - 15;
       },
       () => {
-        hCfg.hourlyBudgetAdd = Math.min(2000, (hCfg.hourlyBudgetAdd ?? 0) + 20);
+        const cur = cfg.spawnInterval ?? 60;
+        cfg.spawnInterval = Math.min(360, cur + 15);
       }
     );
 
+    // Day Budgets (clean comma-separated, without brackets)
+    const dayStr = hCfg.hourlyDaytimeBudget.join(', ');
+    renderEditableStepper(
+      'hourlyDaytimeBudget',
+      'Day Budgets',
+      dayStr,
+      dayStr,
+      () => {
+        hCfg.hourlyDaytimeBudget = hCfg.hourlyDaytimeBudget.map((v: number) => Math.max(5, v - 5));
+      },
+      () => {
+        hCfg.hourlyDaytimeBudget = hCfg.hourlyDaytimeBudget.map((v: number) => Math.min(1000, v + 5));
+      }
+    );
+
+    // Night Budgets (clean comma-separated, without brackets)
+    const nightStr = hCfg.hourlyNighttimeBudget.join(', ');
+    renderEditableStepper(
+      'hourlyNighttimeBudget',
+      'Night Budgets',
+      nightStr,
+      nightStr,
+      () => {
+        hCfg.hourlyNighttimeBudget = hCfg.hourlyNighttimeBudget.map((v: number) => Math.max(5, v - 10));
+      },
+      () => {
+        hCfg.hourlyNighttimeBudget = hCfg.hourlyNighttimeBudget.map((v: number) => Math.min(2000, v + 10));
+      }
+    );
+
+    // Follow Mult
+    renderEditableStepper(
+      'hourlyBudgetMultiplierForFollowingDay',
+      'Follow Mult',
+      `x${(hCfg.hourlyBudgetMultiplierForFollowingDay ?? 1.25).toFixed(2)}`,
+      hCfg.hourlyBudgetMultiplierForFollowingDay ?? 1.25,
+      () => {
+        hCfg.hourlyBudgetMultiplierForFollowingDay = Math.max(1.0, Number(((hCfg.hourlyBudgetMultiplierForFollowingDay ?? 1.25) - 0.05).toFixed(2)));
+      },
+      () => {
+        hCfg.hourlyBudgetMultiplierForFollowingDay = Math.min(5.0, Number(((hCfg.hourlyBudgetMultiplierForFollowingDay ?? 1.25) + 0.05).toFixed(2)));
+      }
+    );
+
+    // Self Destruct
     renderEditableStepper(
       'selfDestructAfterBudgetSpawned',
       'Self Destruct',
-      hCfg.selfDestructAfterBudgetSpawned > 0 ? `${hCfg.selfDestructAfterBudgetSpawned} bg` : 'Never',
+      (hCfg.selfDestructAfterBudgetSpawned ?? 0) > 0 ? `${hCfg.selfDestructAfterBudgetSpawned} bg` : 'Never',
       hCfg.selfDestructAfterBudgetSpawned ?? 0,
       () => {
         hCfg.selfDestructAfterBudgetSpawned = Math.max(0, (hCfg.selfDestructAfterBudgetSpawned ?? 0) - 50);
@@ -711,67 +854,209 @@ export function handleSpawnerKeyInput(keyStr: string, keyCodeNum: number, event?
   const activeInput = state.levelEditor.activeSpawnerInput;
   const tip = state.levelEditor.toolbarSpawnerTooltip;
 
-  // Enter or Escape commits and defocuses
+  let buf = activeInput.textBuffer || '';
+  let cursor = activeInput.cursor !== undefined ? activeInput.cursor : buf.length;
+  let sStart = activeInput.selectionStart !== undefined ? activeInput.selectionStart : cursor;
+  let sEnd = activeInput.selectionEnd !== undefined ? activeInput.selectionEnd : cursor;
+
+  const minSel = Math.min(sStart, sEnd);
+  const maxSel = Math.max(sStart, sEnd);
+  const hasSelection = minSel < maxSel;
+
+  // Enter or Escape: Commit & Defocus
   if (keyCodeNum === 13 || keyCodeNum === 27) {
     applySpawnerInputBuffer(tip, activeInput);
     state.levelEditor.activeSpawnerInput = null;
     return true;
   }
 
+  // Ctrl+A / Cmd+A: Select All
+  if ((event?.ctrlKey || event?.metaKey) && (keyStr === 'a' || keyStr === 'A' || keyCodeNum === 65)) {
+    activeInput.selectionStart = 0;
+    activeInput.selectionEnd = buf.length;
+    activeInput.cursor = buf.length;
+    return true;
+  }
+
+  // Arrow Left
+  if (keyCodeNum === 37) {
+    if (event?.shiftKey) {
+      const nextPos = Math.max(0, cursor - 1);
+      activeInput.cursor = nextPos;
+      activeInput.selectionEnd = nextPos;
+    } else {
+      const nextPos = hasSelection ? minSel : Math.max(0, cursor - 1);
+      activeInput.cursor = nextPos;
+      activeInput.selectionStart = nextPos;
+      activeInput.selectionEnd = nextPos;
+    }
+    return true;
+  }
+
+  // Arrow Right
+  if (keyCodeNum === 39) {
+    if (event?.shiftKey) {
+      const nextPos = Math.min(buf.length, cursor + 1);
+      activeInput.cursor = nextPos;
+      activeInput.selectionEnd = nextPos;
+    } else {
+      const nextPos = hasSelection ? maxSel : Math.min(buf.length, cursor + 1);
+      activeInput.cursor = nextPos;
+      activeInput.selectionStart = nextPos;
+      activeInput.selectionEnd = nextPos;
+    }
+    return true;
+  }
+
+  // Home
+  if (keyCodeNum === 36) {
+    activeInput.cursor = 0;
+    if (event?.shiftKey) {
+      activeInput.selectionEnd = 0;
+    } else {
+      activeInput.selectionStart = 0;
+      activeInput.selectionEnd = 0;
+    }
+    return true;
+  }
+
+  // End
+  if (keyCodeNum === 35) {
+    activeInput.cursor = buf.length;
+    if (event?.shiftKey) {
+      activeInput.selectionEnd = buf.length;
+    } else {
+      activeInput.selectionStart = buf.length;
+      activeInput.selectionEnd = buf.length;
+    }
+    return true;
+  }
+
   // Backspace
   if (keyCodeNum === 8) {
-    activeInput.textBuffer = activeInput.textBuffer.slice(0, -1);
+    if (hasSelection) {
+      buf = buf.slice(0, minSel) + buf.slice(maxSel);
+      cursor = minSel;
+    } else if (cursor > 0) {
+      buf = buf.slice(0, cursor - 1) + buf.slice(cursor);
+      cursor--;
+    }
+    activeInput.textBuffer = buf;
+    activeInput.cursor = cursor;
+    activeInput.selectionStart = cursor;
+    activeInput.selectionEnd = cursor;
     applySpawnerInputBuffer(tip, activeInput);
     return true;
   }
 
-  // Normal text typing
+  // Delete
+  if (keyCodeNum === 46) {
+    if (hasSelection) {
+      buf = buf.slice(0, minSel) + buf.slice(maxSel);
+      cursor = minSel;
+    } else if (cursor < buf.length) {
+      buf = buf.slice(0, cursor) + buf.slice(cursor + 1);
+    }
+    activeInput.textBuffer = buf;
+    activeInput.cursor = cursor;
+    activeInput.selectionStart = cursor;
+    activeInput.selectionEnd = cursor;
+    applySpawnerInputBuffer(tip, activeInput);
+    return true;
+  }
+
+  // Printable character input
   if (keyStr && keyStr.length === 1 && !event?.ctrlKey && !event?.metaKey) {
+    const isArrayField = activeInput.field === 'hourlyDaytimeBudget' || activeInput.field === 'hourlyNighttimeBudget';
+    let isValidChar = false;
+
     if (activeInput.field === 'name') {
-      if (activeInput.textBuffer.length < 24) {
-        activeInput.textBuffer += keyStr;
-        applySpawnerInputBuffer(tip, activeInput);
-      }
-      return true;
-    } else {
-      if ((keyStr >= '0' && keyStr <= '9') || (keyStr === '-' && activeInput.textBuffer.length === 0)) {
-        if (activeInput.textBuffer.length < 6) {
-          activeInput.textBuffer += keyStr;
-          applySpawnerInputBuffer(tip, activeInput);
-        }
+      isValidChar = buf.length < 32;
+    } else if (isArrayField) {
+      // Allow numbers, commas, spaces, hyphens, decimals; silently ignore brackets if typed
+      if (keyStr === '[' || keyStr === ']') {
         return true;
       }
+      isValidChar = /^[0-9,\.\-\s]$/.test(keyStr) && buf.length < 60;
+    } else {
+      // Numeric/decimal field
+      isValidChar = /^[0-9\.\-]$/.test(keyStr) && buf.length < 12;
+    }
+
+    if (isValidChar) {
+      if (hasSelection) {
+        buf = buf.slice(0, minSel) + keyStr + buf.slice(maxSel);
+        cursor = minSel + 1;
+      } else {
+        buf = buf.slice(0, cursor) + keyStr + buf.slice(cursor);
+        cursor++;
+      }
+      activeInput.textBuffer = buf;
+      activeInput.cursor = cursor;
+      activeInput.selectionStart = cursor;
+      activeInput.selectionEnd = cursor;
+      applySpawnerInputBuffer(tip, activeInput);
+      return true;
     }
   }
 
   return false;
 }
 
+function parseNumberList(str: string): number[] {
+  const clean = (str || '').replace(/[\[\]]/g, '').trim();
+  if (!clean) return [];
+  return clean
+    .split(',')
+    .map(s => parseFloat(s.trim()))
+    .filter(n => !isNaN(n));
+}
+
 function applySpawnerInputBuffer(tip: any, activeInput: { field: string; textBuffer: string }) {
+  if (!tip || !activeInput) return;
+  if (!tip.config) tip.config = {};
+
   if (activeInput.field === 'name') {
     tip.name = activeInput.textBuffer;
+  } else if (activeInput.field === 'hourlyDaytimeBudget') {
+    if (!tip.config.hourlySpawnConfig) tip.config.hourlySpawnConfig = { enabled: true };
+    const list = parseNumberList(activeInput.textBuffer);
+    if (list.length > 0) {
+      tip.config.hourlySpawnConfig.hourlyDaytimeBudget = list;
+    }
+  } else if (activeInput.field === 'hourlyNighttimeBudget') {
+    if (!tip.config.hourlySpawnConfig) tip.config.hourlySpawnConfig = { enabled: true };
+    const list = parseNumberList(activeInput.textBuffer);
+    if (list.length > 0) {
+      tip.config.hourlySpawnConfig.hourlyNighttimeBudget = list;
+    }
+  } else if (activeInput.field === 'hourlyBudgetMultiplierForFollowingDay') {
+    if (!tip.config.hourlySpawnConfig) tip.config.hourlySpawnConfig = { enabled: true };
+    const num = parseFloat(activeInput.textBuffer);
+    if (!isNaN(num)) {
+      tip.config.hourlySpawnConfig.hourlyBudgetMultiplierForFollowingDay = Math.max(1.0, num);
+    }
+  } else if (activeInput.field === 'selfDestructAfterBudgetSpawned') {
+    if (!tip.config.hourlySpawnConfig) tip.config.hourlySpawnConfig = { enabled: true };
+    const num = parseFloat(activeInput.textBuffer);
+    if (!isNaN(num)) {
+      tip.config.hourlySpawnConfig.selfDestructAfterBudgetSpawned = Math.max(0, num);
+    }
   } else {
     const num = parseFloat(activeInput.textBuffer);
     if (!isNaN(num)) {
       if (activeInput.field === 'budget') {
-        tip.config.budget = num;
+        tip.config.budget = Math.max(0, num);
       } else if (activeInput.field === 'spawnInterval') {
         tip.config.spawnInterval = num;
       } else if (activeInput.field === 'spawnTriggerRadius') {
-        tip.config.spawnTriggerRadius = num;
+        tip.config.spawnTriggerRadius = num < 0 ? -1 : Math.max(100, num);
       } else if (activeInput.field === 'spawnRadius') {
-        tip.config.spawnRadius = num;
-      } else if (activeInput.field === 'health') {
-        tip.config.health = num;
-      } else if (activeInput.field === 'hourlyBudgetMultiplier') {
-        if (!tip.config.hourlySpawnConfig) tip.config.hourlySpawnConfig = { enabled: true };
-        tip.config.hourlySpawnConfig.hourlyBudgetMultiplier = num;
-      } else if (activeInput.field === 'hourlyBudgetAdd') {
-        if (!tip.config.hourlySpawnConfig) tip.config.hourlySpawnConfig = { enabled: true };
-        tip.config.hourlySpawnConfig.hourlyBudgetAdd = num;
-      } else if (activeInput.field === 'selfDestructAfterBudgetSpawned') {
-        if (!tip.config.hourlySpawnConfig) tip.config.hourlySpawnConfig = { enabled: true };
-        tip.config.hourlySpawnConfig.selfDestructAfterBudgetSpawned = num;
+        tip.config.spawnRadius = Math.max(10, num);
+      } else if (activeInput.field === 'health' || activeInput.field === 'minHealth') {
+        const val = Math.max(1, num);
+        tip.config.minHealth = val;
+        tip.config.health = val;
       }
     }
   }
@@ -784,7 +1069,7 @@ export function handleToolbarSpawnerTooltipClick(topBarH: number, paletteH: numb
 
   const isLiquid = tip.isLiquid || tip.key === 'l_spawner' || tip.key.startsWith('l_spawner') || !!liquidTypes[tip.key];
   const tipW = 290;
-  const tipH = isLiquid ? 490 : 410;
+  const tipH = isLiquid ? 440 : 340;
   const tipX = width - tipW - 15;
   const tipY = constrain(height - paletteH - tipH - 10, topBarH + 10, height - tipH - 10);
 

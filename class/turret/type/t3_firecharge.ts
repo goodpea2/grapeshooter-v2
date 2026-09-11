@@ -12,7 +12,7 @@ export const t3_firecharge: TurretConfig = {
   tier: 3,
   tooltip: "Flings fire at random target. Charge speeds up attacking speed",
   animationBodyType: 'soft',
-  assetImg: 't3_flamethrower',
+  assetImg: 't_firecharge',
   actionType: ['launch'],
   actionConfig: {
     bulletTypeKey: 'b_firecharge_shell',
@@ -20,9 +20,13 @@ export const t3_firecharge: TurretConfig = {
     shootFireRate: [78, 6, 6],
     hasUnarmedAsset: true
   },
-  whileCharged: {
+  actionTypeWhileCharged: ['launch'],
+  actionConfigWhileCharged: {
+    bulletTypeKey: 'b_firecharge_shell',
+    hasUnarmedAsset: true,
     shootFireRate: [10],
     shootRange: GRID_SIZE * 8,
+    staminaCostPerBulletSpawned: 0.3,
     shootRandomPosWhenNoTarget: true
   },
   targetType: ['enemy'],

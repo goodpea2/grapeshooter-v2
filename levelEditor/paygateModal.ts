@@ -33,6 +33,7 @@ declare const textAlign: any;
 declare const textSize: any;
 declare const textWidth: any;
 declare const textStyle: any;
+declare const textFont: any;
 declare const text: any;
 declare const rect: any;
 declare const line: any;
@@ -252,6 +253,8 @@ export function drawPayGateCostModal() {
 
   const { start, end, hasSelection } = getSelectionRange(paygateModal.amountState);
 
+  if (typeof textFont === 'function') textFont('Consolas, monospace');
+
   // Draw Selection Background Highlight if active
   if (hasSelection) {
     const selSubStart = amtText.substring(0, start);
@@ -279,6 +282,8 @@ export function drawPayGateCostModal() {
     line(cursorX, numCenterY - 10, cursorX, numCenterY + 10);
     noStroke();
   }
+
+  if (typeof textFont === 'function') textFont('sans-serif');
 
   // 4. Action Buttons (Discard & SAVE) using uiComponents
   const btnW = 130;
@@ -337,6 +342,7 @@ export function handlePayGateCostModalPress(): boolean {
 
   // Check Amount Text Area Click (start text selection)
   if (mouseX >= numAreaX && mouseX <= numAreaX + numAreaW && mouseY >= amtBoxY && mouseY <= amtBoxY + amtBoxH) {
+    if (typeof textFont === 'function') textFont('Consolas, monospace');
     textSize(20);
     textStyle(BOLD);
     const amtText = paygateModal.amountState.text;
@@ -344,6 +350,7 @@ export function handlePayGateCostModalPress(): boolean {
     const textStartX = (amtBoxX + amtBoxW / 2) - fullTextW / 2;
     const relX = mouseX - textStartX;
     const idx = getCharIndexAtX(amtText, relX, (s) => textWidth(s));
+    if (typeof textFont === 'function') textFont('sans-serif');
 
     paygateModal.amountState.cursor = idx;
     paygateModal.amountState.selStart = idx;
@@ -389,6 +396,7 @@ export function handlePayGateCostModalDrag(): boolean {
   const amtBoxX = modalX + 24;
   const amtBoxW = modalW - 48;
 
+  if (typeof textFont === 'function') textFont('Consolas, monospace');
   textSize(20);
   textStyle(BOLD);
   const amtText = paygateModal.amountState.text;
@@ -396,6 +404,7 @@ export function handlePayGateCostModalDrag(): boolean {
   const textStartX = (amtBoxX + amtBoxW / 2) - fullTextW / 2;
   const relX = mouseX - textStartX;
   const idx = getCharIndexAtX(amtText, relX, (s) => textWidth(s));
+  if (typeof textFont === 'function') textFont('sans-serif');
 
   paygateModal.amountState.cursor = idx;
   paygateModal.amountState.selEnd = idx;

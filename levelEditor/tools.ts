@@ -9,6 +9,7 @@ import { turretTypes } from '../balanceTurrets';
 import { Block } from '../world';
 import { GroundFeature, NPCEntity, Enemy, LootEntity, spawnLootEntity } from '../entities';
 import { createWorldTurret } from '../class/turret/TurretRegistry';
+import { createEnemy } from '../class/enemy/EnemyRegistry';
 import { spawnLootAt } from '../economy';
 
 declare const floor: any;
@@ -178,8 +179,12 @@ export function placeSelectedItem(mWorldX: number, mWorldY: number) {
       const oCfg = overlayTypes[key];
       if (key === 'ov_spawner_custom' || oCfg?.isCustomPrefab || oCfg?.isEnemySpawner) {
         const tip = state.levelEditor.toolbarSpawnerTooltip;
-        const activeConfig = (tip && tip.key === key) ? tip.config : (oCfg?.enemySpawnConfig || {});
-        const activeName = (tip && tip.key === key) ? tip.name : (oCfg?.name || 'Custom Spawner');
+        const copiedCfg = state.levelEditor.copiedSpawnerConfig;
+        const activeConfig = copiedCfg ? copiedCfg : ((tip && (tip.key === key || tip.targetBlock)) ? tip.config : (oCfg?.enemySpawnConfig || {}));
+        const activeName = copiedCfg?.name || ((tip && (tip.key === key || tip.targetBlock)) ? tip.name : (oCfg?.name || 'Custom Spawner'));
+        const minHealth = activeConfig.minHealth !== undefined ? activeConfig.minHealth : (activeConfig.health !== undefined ? activeConfig.health : (oCfg?.minHealth ?? 300));
+        const obstacleHealth = block.config?.health || block.health || 0;
+        const finalHealth = Math.max(minHealth, obstacleHealth);
         block.customSpawnerConfig = {
           name: activeName,
           budget: activeConfig.budget !== undefined ? activeConfig.budget : (block.spawnerBudget || 60),
@@ -187,12 +192,12 @@ export function placeSelectedItem(mWorldX: number, mWorldY: number) {
           spawnRadius: activeConfig.spawnRadius !== undefined ? activeConfig.spawnRadius : 120,
           spawnTriggerRadius: activeConfig.spawnTriggerRadius !== undefined ? activeConfig.spawnTriggerRadius : 200,
           spawnInterval: activeConfig.spawnInterval !== undefined ? activeConfig.spawnInterval : 60,
-          spawnIntervalConsumeBudget: activeConfig.spawnIntervalConsumeBudget !== false,
-          health: activeConfig.health || oCfg?.minHealth || block.health || 300
+          minHealth: minHealth,
+          health: finalHealth
         };
         block.spawnerBudget = block.customSpawnerConfig.budget;
-        block.health = block.customSpawnerConfig.health;
-        block.maxHealth = block.customSpawnerConfig.health;
+        block.health = finalHealth;
+        block.maxHealth = finalHealth;
       }
 
       if (key === 'sunGenerator') {
@@ -240,27 +245,33 @@ export function placeSelectedItem(mWorldX: number, mWorldY: number) {
       const cy = floor(gy / CHUNK_SIZE);
       const chunk = state.world.getChunk(cx, cy);
       block = new Block(gx, gy, 'o_dirt');
-      block.isMined = true;
       chunk.blocks.push(block);
       chunk.blockMap.set(`${gx},${gy}`, block);
     }
+    // Clean tile space so liquid/ground spawner is completely uncovered and navigable
+    block.isMined = true;
+    block.overlay = null;
     block.liquidType = key;
     if (key === 'l_spawner' || key.startsWith('l_spawner') || liquidTypes[key]?.isEnemySpawner || liquidTypes[key]?.enemySpawnConfig) {
       const lCfg = liquidTypes[key];
       const tip = state.levelEditor.toolbarSpawnerTooltip;
-      const activeConfig = (tip && tip.key === key) ? tip.config : (lCfg?.enemySpawnConfig || {});
-      const activeName = (tip && tip.key === key) ? tip.name : (lCfg?.name || 'Ground Spawner');
+      const copiedCfg = state.levelEditor.copiedSpawnerConfig;
+      const activeConfig = copiedCfg ? copiedCfg : ((tip && (tip.key === key || tip.targetBlock)) ? tip.config : (lCfg?.enemySpawnConfig || {}));
+      const activeName = copiedCfg?.name || ((tip && (tip.key === key || tip.targetBlock)) ? tip.name : (lCfg?.name || 'Ground Spawner'));
       block.customSpawnerConfig = {
         name: activeName,
-        budget: activeConfig.budget !== undefined ? activeConfig.budget : (block.spawnerBudget || 60),
         enemyTypeKey: activeConfig.enemyTypeKey ? [...activeConfig.enemyTypeKey] : ['e_basic'],
         spawnRadius: activeConfig.spawnRadius !== undefined ? activeConfig.spawnRadius : 120,
         spawnTriggerRadius: activeConfig.spawnTriggerRadius !== undefined ? activeConfig.spawnTriggerRadius : 200,
         spawnInterval: activeConfig.spawnInterval !== undefined ? activeConfig.spawnInterval : 60,
-        spawnIntervalConsumeBudget: activeConfig.spawnIntervalConsumeBudget !== false,
-        health: activeConfig.health || 300
+        hourlySpawnConfig: activeConfig.hourlySpawnConfig ? JSON.parse(JSON.stringify(activeConfig.hourlySpawnConfig)) : {
+          enabled: true,
+          hourlyDaytimeBudget: [10, 20, 30],
+          hourlyNighttimeBudget: [30, 50, 80],
+          hourlyBudgetMultiplierForFollowingDay: 1.25,
+          selfDestructAfterBudgetSpawned: 0
+        }
       };
-      block.spawnerBudget = block.customSpawnerConfig.budget;
       block.lastSpawnTime = state.frames + Math.floor(Math.random() * (block.customSpawnerConfig.spawnInterval || 60));
     }
     const cx = floor(gx / CHUNK_SIZE);
@@ -283,7 +294,7 @@ export function placeSelectedItem(mWorldX: number, mWorldY: number) {
     } else if (enemyTypes[key]) {
       const existing = state.enemies.find((e: any) => dist(e.pos.x, e.pos.y, mWorldX, mWorldY) < 20);
       if (!existing) {
-        state.enemies.push(new Enemy(mWorldX, mWorldY, key));
+        state.enemies.push(createEnemy(mWorldX, mWorldY, key));
       }
     } else if (lootTypes[key]) {
       const cx = floor(gx / CHUNK_SIZE);
@@ -428,16 +439,12 @@ export function deleteAtPosition(mWorldX: number, mWorldY: number, onlyOverlay: 
   // 6. Delete Block / Overlay / Liquid
   const block = state.world.getBlock(gx, gy);
   if (block) {
-    if (block.overlay) {
-      block.overlay = null;
-      block.customSpawnerConfig = null;
-      if (state.levelEditor.selectedCustomSpawner?.gx === gx && state.levelEditor.selectedCustomSpawner?.gy === gy) {
-        state.levelEditor.selectedCustomSpawner = null;
-      }
-    } else if (block.liquidType) {
-      block.liquidType = null;
-    } else if (!block.isMined) {
-      block.isMined = true;
+    block.overlay = null;
+    block.customSpawnerConfig = null;
+    block.liquidType = null;
+    block.isMined = true;
+    if (state.levelEditor.selectedCustomSpawner?.gx === gx && state.levelEditor.selectedCustomSpawner?.gy === gy) {
+      state.levelEditor.selectedCustomSpawner = null;
     }
     state.world.dirtyChunkAndNeighbors(cx, cy);
   }

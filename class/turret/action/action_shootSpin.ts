@@ -19,20 +19,16 @@ export class ActionShootSpin extends TurretAction {
   tags = ['attack', 'projectile'];
 
   private getFireRateInfo() {
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const type = 'shootSpin';
     const step = this.turret.actionSteps.get(type) || 0;
     
     const frValue = config.shootFireRate;
     const fr = Array.isArray(frValue) ? frValue[step % frValue.length] : frValue;
     
-    let frDivider = (this.turret as any).activeStats?.firerateDivider || 1.0;
-    for (const [cKey, duration] of this.turret.conditions) {
-      const cfg = conditionTypes[cKey];
-      if (cfg?.firerateBoost) frDivider += cfg.firerateBoost;
-    }
+    const frMultiplier = this.turret.getFireRateMultiplier ? this.turret.getFireRateMultiplier() : (this.turret.fireRateMultiplier || 1.0);
 
-    let effectiveFireRate = fr / (frDivider * this.turret.fireRateMultiplier);
+    let effectiveFireRate = fr / frMultiplier;
     let bulletsToSpawn = 1;
     if (effectiveFireRate > 0) {
       while (effectiveFireRate < 4) {
@@ -61,7 +57,8 @@ export class ActionShootSpin extends TurretAction {
   }
 
   getRange(): number {
-    return (this.turret.config.actionConfig.shootRange || 300) * (this.turret.stats.rangeMult || 1);
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
+    return (config.shootRange || 300) * (this.turret.stats.rangeMult || 1);
   }
 
   canExecute(): boolean {
@@ -70,7 +67,7 @@ export class ActionShootSpin extends TurretAction {
 
   update() {
     if (this.turret.target) {
-      const config = this.turret.config.actionConfig;
+      const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
       this.turret.spinFrames++;
       // selfSpinSpeed is revs per second (60 frames)
       const speed = (config.selfSpinSpeed || 1) * TWO_PI / 60;
@@ -81,7 +78,7 @@ export class ActionShootSpin extends TurretAction {
 
   performExecute() {
     const wPos = this.turret.getWorldPos();
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const type = 'shootSpin';
     const step = this.turret.actionSteps.get(type) || 0;
     
@@ -110,6 +107,13 @@ export class ActionShootSpin extends TurretAction {
       
       if (i === 0) {
         state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, sa));
+      }
+    }
+
+    if (this.turret.isCharged && this.turret.isCharged()) {
+      const stamCost = config.staminaCostPerBulletSpawned || config.StaminaCostPerBulletSpawned || 0;
+      if (stamCost > 0 && state.player) {
+        state.player.spendStamina(stamCost * totalBullets, this.turret);
       }
     }
 

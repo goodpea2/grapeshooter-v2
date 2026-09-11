@@ -21,24 +21,16 @@ export class ActionShoot extends TurretAction {
   tags = ['attack', 'projectile'];
 
   private getFireRateInfo() {
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const type = 'shoot';
     const step = this.turret.actionSteps.get(type) || 0;
     
-    const isCharged = this.turret.isCharged ? this.turret.isCharged() : false;
     let frValue = config.shootFireRate;
-    if (isCharged && this.turret.config.whileCharged?.shootFireRate !== undefined) {
-      frValue = this.turret.config.whileCharged.shootFireRate;
-    }
     const fr = Array.isArray(frValue) ? frValue[step % frValue.length] : frValue;
     
-    let frDivider = (this.turret as any).activeStats?.firerateDivider || 1.0;
-    for (const [cKey, duration] of this.turret.conditions) {
-      const cfg = conditionTypes[cKey];
-      if (cfg?.firerateBoost) frDivider += cfg.firerateBoost;
-    }
+    const frMultiplier = this.turret.getFireRateMultiplier ? this.turret.getFireRateMultiplier() : (this.turret.fireRateMultiplier || 1.0);
 
-    let effectiveFireRate = fr / (frDivider * this.turret.fireRateMultiplier);
+    let effectiveFireRate = fr / frMultiplier;
     let bulletsToSpawn = 1;
     if (effectiveFireRate > 0) {
       while (effectiveFireRate < 4) {
@@ -63,11 +55,8 @@ export class ActionShoot extends TurretAction {
   }
 
   getRange(): number {
-    const isCharged = this.turret.isCharged ? this.turret.isCharged() : false;
-    let baseRange = this.turret.config.actionConfig.shootRange || 300;
-    if (isCharged && this.turret.config.whileCharged?.shootRange !== undefined) {
-      baseRange = this.turret.config.whileCharged.shootRange;
-    }
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
+    let baseRange = config.shootRange || 300;
     return baseRange * (this.turret.stats.rangeMult || 1);
   }
 
@@ -77,7 +66,7 @@ export class ActionShoot extends TurretAction {
 
   performExecute() {
     const wPos = this.turret.getWorldPos();
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const type = 'shoot';
     const step = this.turret.actionSteps.get(type) || 0;
     
@@ -133,6 +122,13 @@ export class ActionShoot extends TurretAction {
       if (i === 0) {
         state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, sa));
         soundEngine.playSFXGroup('shoot_light');
+      }
+    }
+
+    if (this.turret.isCharged && this.turret.isCharged()) {
+      const stamCost = config.staminaCostPerBulletSpawned || config.StaminaCostPerBulletSpawned || 0;
+      if (stamCost > 0 && state.player) {
+        state.player.spendStamina(stamCost * totalBullets, this.turret);
       }
     }
 

@@ -54,6 +54,27 @@ export const ALL_AUDIO_FILES: { key: string; path: string; category: 'music' | '
   { key: 'turret_bitten_softbody2', path: 'sfx/battle/turret_bitten_softbody2.ogg', category: 'sfx' },
   { key: 'turret_eaten', path: 'sfx/battle/turret_eaten.ogg', category: 'sfx' },
 
+  // Enemy Custom SFX
+  { key: 'enemy_big_death1', path: 'sfx/enemy/enemy_big_death1.ogg', category: 'sfx' },
+  { key: 'enemy_big_death2', path: 'sfx/enemy/enemy_big_death2.ogg', category: 'sfx' },
+  { key: 'enemy_big_death3', path: 'sfx/enemy/enemy_big_death3.ogg', category: 'sfx' },
+  { key: 'enemy_bomb_death', path: 'sfx/enemy/enemy_bomb_death.ogg', category: 'sfx' },
+  { key: 'enemy_critter_death1', path: 'sfx/enemy/enemy_critter_death1.ogg', category: 'sfx' },
+  { key: 'enemy_critter_death2', path: 'sfx/enemy/enemy_critter_death2.ogg', category: 'sfx' },
+  { key: 'enemy_critter_death3', path: 'sfx/enemy/enemy_critter_death3.ogg', category: 'sfx' },
+  { key: 'enemy_giant_death', path: 'sfx/enemy/enemy_giant_death.ogg', category: 'sfx' },
+  { key: 'enemy_shooting_shoot1', path: 'sfx/enemy/enemy_shooting_shoot1.ogg', category: 'sfx' },
+  { key: 'enemy_shooting_shoot2', path: 'sfx/enemy/enemy_shooting_shoot2.ogg', category: 'sfx' },
+  { key: 'enemy_swarm_death1', path: 'sfx/enemy/enemy_swarm_death1.ogg', category: 'sfx' },
+  { key: 'enemy_swarm_death2', path: 'sfx/enemy/enemy_swarm_death2.ogg', category: 'sfx' },
+  { key: 'meatchunk_burst', path: 'sfx/enemy/meatchunk_burst.ogg', category: 'sfx' },
+  { key: 'meatchunk_impact', path: 'sfx/enemy/meatchunk_impact.ogg', category: 'sfx' },
+
+  // Shooting & Projectile Hit SFX
+  { key: 'projectile_hit_hardenemy1', path: 'sfx/shooting/projectile_hit_hardenemy1.ogg', category: 'sfx' },
+  { key: 'projectile_hit_hardenemy2', path: 'sfx/shooting/projectile_hit_hardenemy2.ogg', category: 'sfx' },
+  { key: 'projectile_hit_hardenemy3', path: 'sfx/shooting/projectile_hit_hardenemy3.ogg', category: 'sfx' },
+
   // Turret SFX
   { key: 'turret/b_cherry_explosion', path: 'sfx/turret/b_cherry_explosion.ogg', category: 'sfx' },
   { key: 'turret/b_mine_explosion', path: 'sfx/turret/b_mine_explosion.ogg', category: 'sfx' },
@@ -552,13 +573,29 @@ export class SoundEngine {
       | 'player_step'
       | 'turret_place'
       | 'punch_hit'
-      | 'playerprojectile_hit',
+      | 'playerprojectile_hit'
+      | 'enemy_big_death'
+      | 'enemy_critter_death'
+      | 'enemy_swarm_death'
+      | 'enemy_shooting_shoot'
+      | 'projectile_hit_hardenemy'
+      | 'enemy_bomb_death'
+      | 'enemy_giant_death'
+      | (string & {}),
     volumeScale: number = 1.0
   ): void {
     // All SFX are normalized, multiplied by x1.0
     const normalizedVol = volumeScale * 1.0;
 
     switch (group) {
+      case 'enemy_bomb_death': {
+        this.playSFX('enemy_bomb_death', normalizedVol, 0.05);
+        break;
+      }
+      case 'enemy_giant_death': {
+        this.playSFX('enemy_giant_death', normalizedVol, 0.05);
+        break;
+      }
       case 'block_death': {
         const r = Math.random();
         const choice = r < 0.33 ? 'block_death1' : r < 0.66 ? 'block_death2' : 'block_death3';
@@ -568,6 +605,34 @@ export class SoundEngine {
       case 'enemy_death': {
         const r = Math.random();
         const choice = r < 0.33 ? 'enemy_death1' : r < 0.66 ? 'enemy_death2' : 'enemy_death3';
+        this.playSFX(choice, normalizedVol, 0.05);
+        break;
+      }
+      case 'enemy_big_death': {
+        const r = Math.random();
+        const choice = r < 0.33 ? 'enemy_big_death1' : r < 0.66 ? 'enemy_big_death2' : 'enemy_big_death3';
+        this.playSFX(choice, normalizedVol, 0.05);
+        break;
+      }
+      case 'enemy_critter_death': {
+        const r = Math.random();
+        const choice = r < 0.33 ? 'enemy_critter_death1' : r < 0.66 ? 'enemy_critter_death2' : 'enemy_critter_death3';
+        this.playSFX(choice, normalizedVol, 0.05);
+        break;
+      }
+      case 'enemy_swarm_death': {
+        const choice = Math.random() < 0.5 ? 'enemy_swarm_death1' : 'enemy_swarm_death2';
+        this.playSFX(choice, normalizedVol, 0.05);
+        break;
+      }
+      case 'enemy_shooting_shoot': {
+        const choice = Math.random() < 0.5 ? 'enemy_shooting_shoot1' : 'enemy_shooting_shoot2';
+        this.playSFX(choice, normalizedVol, 0.05);
+        break;
+      }
+      case 'projectile_hit_hardenemy': {
+        const r = Math.random();
+        const choice = r < 0.33 ? 'projectile_hit_hardenemy1' : r < 0.66 ? 'projectile_hit_hardenemy2' : 'projectile_hit_hardenemy3';
         this.playSFX(choice, normalizedVol, 0.05);
         break;
       }
@@ -629,6 +694,11 @@ export class SoundEngine {
       case 'playerprojectile_hit': {
         const choice = Math.random() < 0.5 ? 'playerprojectile_hit1' : 'playerprojectile_hit2';
         this.playSFX(choice, normalizedVol, 0.05);
+        break;
+      }
+      default: {
+        // Direct audio key fallback (e.g. 'enemy_bomb_death', 'enemy_giant_death', 'meatchunk_burst', 'meatchunk_impact')
+        this.playSFX(group, normalizedVol, 0.05);
         break;
       }
     }

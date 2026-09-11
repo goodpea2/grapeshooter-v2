@@ -6,6 +6,13 @@ export const t3_flamethrower: TurretConfig = {
   tooltip: "Shoots and spread flaming puddles along the way", animationBodyType: 'soft',
   actionType: ['shoot'],
   actionConfig: { bulletTypeKey: 'b_flame_shot', shootRange: GRID_SIZE * 5, shootFireRate: [75,15] },
+  actionTypeWhileCharged: ['shoot'],
+  actionConfigWhileCharged: {
+    bulletTypeKey: 'b_flame_shot',
+    shootRange: GRID_SIZE * 5,
+    shootFireRate: [50,10],
+    staminaCostPerBulletSpawned: 1
+  },
   targetType: ['enemy', 'obstacle'],
   targetConfig: { enemyPriority: 'random', obstaclePriority: 'valuable' }
 };

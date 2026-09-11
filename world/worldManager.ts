@@ -4,9 +4,11 @@ import {
 } from '../constants';
 import { obstacleTypes, overlayTypes } from '../balanceObstacles';
 import { liquidTypes } from '../balanceLiquids';
+import { enemyTypes } from '../balanceEnemies';
 import { spawnLootInFlightVFX } from '../vfx/index';
 import { releaseLoot } from '../class/loot';
-import { spawnFromBudget, getCurrentLevelHourlyBudget } from '../lvDemo';
+import { spawnFromBudget, getCurrentLevelHourlyBudget, getLightLevel } from '../lvDemo';
+import { getTime } from '../ui/ui';
 import { generateRoomDirectorData } from '../debug/roomDirectorGenerator';
 import { flowField } from '../pathfinding';
 import { drawPayGateBubble } from '../ui/overlay/TurretMergeOverlay';
@@ -242,8 +244,18 @@ export class WorldManager {
         b.isMined = false;
         b.type = typeKey;
         b.config = obstacleTypes[typeKey];
-        b.health = b.config.health;
-        b.maxHealth = b.health;
+        if (b.customSpawnerConfig) {
+          const minH = b.customSpawnerConfig.minHealth !== undefined ? b.customSpawnerConfig.minHealth : (b.customSpawnerConfig.health || 300);
+          const obstacleH = b.config?.health || 0;
+          const finalH = Math.max(minH, obstacleH);
+          b.health = finalH;
+          b.maxHealth = finalH;
+          b.customSpawnerConfig.health = finalH;
+          b.customSpawnerConfig.minHealth = minH;
+        } else {
+          b.health = b.config.health;
+          b.maxHealth = b.health;
+        }
       }
     }
     this.dirtyBlock(gx, gy);
@@ -292,7 +304,10 @@ export class WorldManager {
 
       const isNearPlayer = dSq < activeRadiusSq;
       const hasActiveTurrets = chunk.turrets.length > 0;
-      const hasActiveOverlays = chunk.overlayBlocks && chunk.overlayBlocks.some((b: any) => !b.isMined && (b.overlay === 'sunGenerator' || b.overlay?.startsWith('spawner') || b.overlay === 'ov_spawner' || b.overlay === 'catalyst_clay'));
+      const hasActiveOverlays = chunk.overlayBlocks && chunk.overlayBlocks.some((b: any) => 
+        (b.liquidType === 'l_spawner' || (b.liquidType && liquidTypes[b.liquidType]?.enemySpawnConfig) || (b.customSpawnerConfig && b.liquidType)) ||
+        (!b.isMined && (b.overlay === 'sunGenerator' || b.overlay?.startsWith('spawner') || b.overlay === 'ov_spawner' || b.overlay === 'catalyst_clay' || !!b.customSpawnerConfig))
+      );
 
       if (isNearPlayer || hasActiveTurrets || hasActiveOverlays) {
         state.activeChunkKeys.add(`${chunk.cx},${chunk.cy}`);
@@ -302,10 +317,10 @@ export class WorldManager {
           chunk.turrets[i].update();
         }
 
-        // Actively tick overlay blocks (e.g. sun generators, spawners, catalysts) in active chunks
+        // Actively tick overlay blocks and ground spawners in active chunks
         if (chunk.overlayBlocks) {
           for (let b of chunk.overlayBlocks) {
-            if (!b.isMined) {
+            if (!b.isMined || b.liquidType === 'l_spawner' || (b.liquidType && liquidTypes[b.liquidType]?.enemySpawnConfig) || (b.customSpawnerConfig && b.liquidType)) {
               b.update();
             }
           }
@@ -733,18 +748,21 @@ export class WorldManager {
     const bcy = b.pos.y + GRID_SIZE / 2;
 
     push();
-    // 1. Draw Trigger Range circle
-    const trigRad = sCfg.spawnTriggerRadius > 0 ? sCfg.spawnTriggerRadius : (sCfg.spawnTriggerRadius === 0 ? 0 : 200);
-    if (sCfg.spawnTriggerRadius >= 0 && trigRad > 0) {
-      noFill();
-      stroke(255, 200, 50, 160);
-      strokeWeight(2);
-      ellipse(bcx, bcy, trigRad * 2, trigRad * 2);
-      noStroke();
-      fill(255, 220, 80, 220);
-      textAlign(CENTER, BOTTOM);
-      textSize(10);
-      text(`Trigger Range: ${trigRad}px`, bcx, bcy - trigRad - 4);
+    // 1. Trigger Range circle (ONLY for l_spawner, min 100px)
+    if (isLiquid) {
+      const rawTrig = sCfg.spawnTriggerRadius !== undefined ? sCfg.spawnTriggerRadius : 200;
+      const trigRad = rawTrig < 0 ? 0 : Math.max(100, rawTrig);
+      if (trigRad > 0) {
+        noFill();
+        stroke(255, 200, 50, 160);
+        strokeWeight(2);
+        ellipse(bcx, bcy, trigRad * 2, trigRad * 2);
+        noStroke();
+        fill(255, 220, 80, 220);
+        textAlign(CENTER, BOTTOM);
+        textSize(10);
+        text(`Trigger Range: ${trigRad}px`, bcx, bcy - trigRad - 4);
+      }
     }
 
     // 2. Draw Spawn Radius circle
@@ -760,42 +778,62 @@ export class WorldManager {
     text(`Spawn Radius: ${spawnRad}px`, bcx, bcy + spawnRad + 4);
 
     // 3. Stats Tooltip Card
-    const isHourly = !!sCfg.hourlySpawnConfig?.enabled;
-    const tipW = 160;
-    const tipH = isHourly ? 115 : 95;
+    const tipW = isLiquid ? 230 : 190;
+    const tipH = isLiquid ? 116 : 66;
     const tx = bcx + 15;
-    const ty = bcy - 70;
+    const ty = bcy - (isLiquid ? 72 : 40);
 
-    fill(0, 220);
+    fill(0, 225);
     stroke(255, 100);
-    rect(tx, ty, tipW, tipH, 4);
+    strokeWeight(1);
+    rect(tx, ty, tipW, tipH, 5);
 
     noStroke();
     fill(255);
     textSize(10);
     textAlign(LEFT, TOP);
 
-    const spName = b.customSpawnerConfig?.name || oCfg.name || (isLiquid ? 'Ground Spawner' : 'Overlay Spawner');
-    let info = `Type: ${spName}\n`;
-    if (isHourly) {
-      const hCfg = sCfg.hourlySpawnConfig;
-      const currentHourly = getCurrentLevelHourlyBudget();
-      const mult = hCfg.hourlyBudgetMultiplier !== undefined ? hCfg.hourlyBudgetMultiplier : 1.0;
-      const add = hCfg.hourlyBudgetAdd || 0;
-      const rate = currentHourly * mult + add;
-      info += `Hourly Rate: ${rate.toFixed(1)}/hr (base: ${currentHourly})\n`;
-      info += `Accrued: ${(b.hourlySpawnBudgetAccrued || 0).toFixed(1)}\n`;
-      info += `Spawned: ${b.totalBudgetSpawned || 0} / ${hCfg.selfDestructAfterBudgetSpawned || '∞'}\n`;
-    } else {
-      info += `Budget: ${b.spawnerBudget !== undefined ? b.spawnerBudget : (sCfg.budget ?? 60)}\n`;
-    }
-    info += `Interval: ${sCfg.spawnInterval || 60}f (min)\n`;
-    info += `Trigger: ${sCfg.spawnTriggerRadius >= 0 ? `${sCfg.spawnTriggerRadius}px` : 'Global'}\n`;
-    info += `Spawn Rad: ${spawnRad}px\n`;
-    const eTypes = sCfg.enemyTypeKey || ['e_basic'];
-    info += `Enemies: ${eTypes.map((k: string) => k.replace('e_', '')).join(', ')}`;
+    const spName = b.customSpawnerConfig?.name || oCfg.name || (isLiquid ? 'Ground Spawner' : 'Spawner');
+    const cachedStr = (b.cachedSpawnList && b.cachedSpawnList.length > 0)
+      ? b.cachedSpawnList.map((k: string) => k.replace('e_', '')).join(', ')
+      : '';
 
-    text(info, tx + 6, ty + 6);
+    let info = '';
+    if (isLiquid) {
+      const rawTrig = sCfg.spawnTriggerRadius !== undefined ? sCfg.spawnTriggerRadius : 200;
+      const trigRad = rawTrig < 0 ? 'Global' : `${Math.max(100, rawTrig)}px`;
+      const t = getTime();
+      const isNight = getLightLevel(t.hour) === 0;
+      const hCfg = sCfg.hourlySpawnConfig || {};
+      const dayIdx = Math.max(0, (t.day || 1) - 1);
+      const mult = hCfg.hourlyBudgetMultiplierForFollowingDay !== undefined ? hCfg.hourlyBudgetMultiplierForFollowingDay : 1.25;
+      const dayArr: number[] = Array.isArray(hCfg.hourlyDaytimeBudget) && hCfg.hourlyDaytimeBudget.length > 0
+        ? hCfg.hourlyDaytimeBudget
+        : (typeof hCfg.hourlyDaytimeBudget === 'number' ? [hCfg.hourlyDaytimeBudget] : [10, 20, 30]);
+      const nightArr: number[] = Array.isArray(hCfg.hourlyNighttimeBudget) && hCfg.hourlyNighttimeBudget.length > 0
+        ? hCfg.hourlyNighttimeBudget
+        : (typeof hCfg.hourlyNighttimeBudget === 'number' ? [hCfg.hourlyNighttimeBudget] : [30, 50, 80]);
+      const activeArr = isNight ? nightArr : dayArr;
+      let hourlyRate: number;
+      if (dayIdx < activeArr.length) {
+        hourlyRate = activeArr[dayIdx] ?? 10;
+      } else {
+        const lastVal = activeArr[activeArr.length - 1] ?? 10;
+        hourlyRate = Math.round(lastVal * Math.pow(mult, dayIdx - (activeArr.length - 1)));
+      }
+      
+      const poolValue = (b.cachedSpawnList || []).reduce((sum: number, k: string) => sum + (enemyTypes[k]?.cost || 0), 0) + (b.hourlySpawnBudgetAccrued || 0);
+      const spent = b.totalBudgetSpawned || 0;
+      const selfDestructMax = (hCfg.selfDestructAfterBudgetSpawned && hCfg.selfDestructAfterBudgetSpawned > 0)
+        ? `${hCfg.selfDestructAfterBudgetSpawned}`
+        : '∞';
+
+      info = `Type: ${spName}\nHourly Budget: ${hourlyRate} (${isNight ? 'Night' : 'Day'})\nAccumulated: ${poolValue}\nSpawned: ${spent} / ${selfDestructMax}\nTrigger Radius: ${trigRad}\nSpawn Radius: ${spawnRad}px\nCached: [${cachedStr}]`;
+    } else {
+      info = `Type: ${spName}\nSpawn Radius: ${spawnRad}px\nCached: [${cachedStr}]`;
+    }
+
+    text(info, tx + 7, ty + 6, tipW - 14, tipH - 10);
     pop();
   }
 
