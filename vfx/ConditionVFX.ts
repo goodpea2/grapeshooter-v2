@@ -34,7 +34,9 @@ export class ConditionVFX {
   update() {}
 
   isDone() {
-    return !this.target || this.target.health <= 0 || !this.target.conditions || !this.target.conditions.has(this.type);
+    if (!this.target || this.target.health <= 0 || this.target.isMined === true || this.target.isDetached === true) return true;
+    if (this.target.parent && state.player?.attachments && !state.player.attachments.includes(this.target)) return true;
+    return !this.target.conditions || !this.target.conditions.has(this.type);
   }
 
   display() {
@@ -111,6 +113,18 @@ export class ConditionVFX {
         fill(255, 240, 100, 220);
         noStroke();
         ellipse(sx, sy, 4, 4);
+      }
+    } else if (this.type === 'c_weakbody') {
+      const r = (this.target.size / 2 || 15);
+      noStroke();
+      // Particles flying from above downwards
+      for (let i = 0; i < 4; i++) {
+        const xOff = ((i * 13 + 5) % (r * 1.6)) - (r * 0.8);
+        const cycle = ((state.frames * 1.8 + i * 14) % 36) / 36; // 0 to 1 downwards
+        const py = -r - 12 + cycle * (r * 2.2 + 16);
+        const alpha = Math.sin(cycle * Math.PI) * 220;
+        fill(210, 130, 255, alpha);
+        ellipse(xOff, py, 3.5, 5.5);
       }
     }
     pop();

@@ -3,6 +3,7 @@ import { state } from '../../state';
 import { HOUR_FRAMES } from '../../constants';
 import { TYPE_MAP } from '../../assetTurret';
 import { soundEngine } from '../../src/audio/soundEngine';
+import { applyHoverTransform } from '../../uiComponents';
 
 let lastNotEnoughSoundFrame = -999;
 
@@ -62,17 +63,8 @@ export function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha
   const isSelected = state.selectedTurretType === key || isDraggingThis;
 
   push();
-
-  // --- Hover lift ---
-  let liftY = 0;
-  let hoverScale = 1;
-  if (hov) {
-    liftY = -3;
-    hoverScale = 1.05;
-  }
-
-  translate(x, y + liftY);
-  scale(hoverScale);
+  translate(x, y);
+  applyHoverTransform(`hud_turret_${key}`, 0, 0, hov, { elevation: 3.5, scale: 0.05 });
 
   // --- Selection ring ---
   if (isSelected) {

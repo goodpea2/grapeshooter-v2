@@ -91,9 +91,10 @@ export class ActionLaunch extends TurretAction {
     const { effectiveFireRate, bulletsToSpawn } = this.getFireRateInfo();
     const bulletCount = config.shootBulletCount || 1;
     const totalBullets = bulletsToSpawn * bulletCount;
+    const totalInaccuracy = (config.inaccuracy || 0) + (this.turret.stats?.inaccuracyAdd || this.turret.activeStats?.inaccuracyAdd || 0);
 
     for (let i = 0; i < totalBullets; i++) {
-      let sa = this.turret.angle + (config.inaccuracy ? random(-radians(config.inaccuracy), radians(config.inaccuracy)) : 0);
+      let sa = this.turret.angle + (totalInaccuracy ? random(-radians(totalInaccuracy), radians(totalInaccuracy)) : 0);
       let startX = wPos.x;
       let startY = wPos.y;
       let targetX = tCenter.x + (config.spread ? random(-config.spread, config.spread) : 0);

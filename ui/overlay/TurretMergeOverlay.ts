@@ -47,6 +47,25 @@ export function drawSelectionHighlight(x: number, y: number, size: number, alpha
  * The bubble color changes based on affordability and confirmation state.
  */
 export function drawMergeBubble(x: number, y: number, outputType: string, cost: number, canAfford: boolean, isConfirming: boolean, alpha: number = 255) {
+  if (outputType === 'player_heal') {
+    push();
+    translate(x, y);
+    const bubbleW = 34;
+    const bubbleH = 20;
+    const bubbleY = -22;
+    fill(100, 255, 120, alpha);
+    noStroke();
+    triangle(0, bubbleY + bubbleH/2 + 5, -5, bubbleY + bubbleH/2 - 5, 5, bubbleY + bubbleH/2 - 5);
+    rectMode(CENTER);
+    rect(0, bubbleY, bubbleW, bubbleH, 4);
+    fill(0, 100, 0);
+    textAlign(CENTER, CENTER);
+    textSize(8);
+    text('+50 HP', 0, bubbleY);
+    pop();
+    return;
+  }
+
   const config = turretTypes[outputType];
   if (!config) return;
 
@@ -166,6 +185,42 @@ export function drawPayGateBubble(
   noStroke();
   textAlign(LEFT, CENTER);
   text(costText, startX + iconSize + gap, bubbleY);
+
+  pop();
+}
+
+/**
+ * Draws a small "swap" hint bubble text on a target turret when hovering to swap.
+ */
+export function drawSwapBubble(x: number, y: number, alpha: number = 255) {
+  push();
+  translate(x, y);
+
+  const bubbleW = 34;
+  const bubbleH = 16;
+  const bubbleY = -22;
+
+  // Drop shadow
+  fill(0, 0, 0, alpha * 0.45);
+  noStroke();
+  rectMode(CENTER);
+  rect(0, bubbleY + 1.5, bubbleW + 2, bubbleH + 2, 4);
+
+  // Bubble tail
+  fill(255, 255, 255, alpha);
+  stroke(70, 140, 240, alpha * 0.9);
+  strokeWeight(1.2);
+  triangle(0, bubbleY + bubbleH / 2 + 4, -4, bubbleY + bubbleH / 2 - 1, 4, bubbleY + bubbleH / 2 - 1);
+
+  // Bubble body
+  rect(0, bubbleY, bubbleW, bubbleH, 4);
+
+  // Text "SWAP"
+  noStroke();
+  fill(24, 48, 88, alpha);
+  textAlign(CENTER, CENTER);
+  textSize(8);
+  text('SWAP', 0, bubbleY);
 
   pop();
 }

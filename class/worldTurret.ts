@@ -1,4 +1,6 @@
 
+import { createWorldTurret } from './turret/TurretRegistry';
+import { triggerUpgradeHook, recalculateAllStats } from '../src/upgrades';
 import { Turret } from './turret';
 import { state } from '../state';
 import { GRID_SIZE, WORLD_TURRET_ACTIVE_RANGE } from '../constants';
@@ -94,9 +96,11 @@ export class WorldTurret extends Turret {
   }
 
   replaceWith(type: string) {
-    const newTurret = new WorldTurret(type, this.gx, this.gy);
+    const newTurret = createWorldTurret(type, this.gx, this.gy);
     state.world.removeTurret(this.gx, this.gy);
     state.world.addTurret(newTurret);
+    triggerUpgradeHook('onPlant', newTurret, { isAttached: false, pos: newTurret.getWorldPos() });
+    recalculateAllStats();
   }
 
   isPowered(): boolean {

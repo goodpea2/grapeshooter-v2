@@ -3,7 +3,20 @@ import { state } from '../state';
 import { GRID_SIZE, CHUNK_SIZE } from '../constants';
 import { groundFeatureTypes } from '../balanceGroundFeatures';
 import { enemyTypes } from '../balanceEnemies';
-import { FirePuddleVFX, StunGasVFX, PoisonGasVFX, ForcefieldVFX, BugSplatVFX, spawnBugSplatVFX3, spawnBugSplatMeatChunkVFX, MuzzleFlash } from '../vfx';
+import {
+  FirePuddleVFX,
+  StunGasVFX,
+  PoisonGasVFX,
+  ForcefieldVFX,
+  BugSplatVFX,
+  spawnBugSplatVFX3,
+  spawnBugSplatMeatChunkVFX,
+  MuzzleFlash,
+  getOrCreateTileFirePuddleVFX,
+  updateTileFirePuddles,
+  displayTileFirePuddles,
+  clearTileFirePuddles
+} from '../vfx';
 import { requestSpawn, requestFlungSpawn } from '../lvDemo';
 
 declare const createVector: any;
@@ -26,13 +39,16 @@ export class GroundFeature {
   life: number;
   typeKey: string;
   vfx: any;
+  radius: number;
   spawnerBudget: number = 0;
   lastSpawnTime: number = 0;
   customSpawnerConfig?: any;
+  source?: any;
 
-  constructor(x: number, y: number, typeKey: string) {
+  constructor(x: number, y: number, typeKey: string, customRadius?: number) {
     this.typeKey = typeKey;
     this.config = groundFeatureTypes[typeKey] || {};
+    this.radius = customRadius !== undefined ? customRadius : (this.config.radius || 30);
     this.pos = createVector(x, y);
     this.life = this.config.life !== undefined ? this.config.life : 60;
     
@@ -40,10 +56,24 @@ export class GroundFeature {
       this.spawnerBudget = this.config.enemySpawnConfig.budget || 60;
     }
 
-    if (this.config.vfxType === 'fire_puddle') this.vfx = new FirePuddleVFX(x, y, this.config.radius, this.config.life);
-    if (this.config.vfxType === 'stun_gas') this.vfx = new StunGasVFX(x, y, this.config.radius, this.config.life);
-    if (this.config.vfxType === 'poison_gas') this.vfx = new PoisonGasVFX(x, y, this.config.radius, this.config.life);
-    if (this.config.vfxType === 'forcefield') this.vfx = new ForcefieldVFX(x, y, this.config.radius, this.config.life);
+    if (this.config.vfxType === 'fire_puddle') {
+      // Tile-based VFX: 1 instance per tile with centralized lifecycle & spark limit
+      const gx = floor(x / GRID_SIZE);
+      const gy = floor(y / GRID_SIZE);
+      const tileKey = `${gx},${gy}`;
+      const centerX = (gx + 0.5) * GRID_SIZE;
+      const centerY = (gy + 0.5) * GRID_SIZE;
+      const baseRadius = this.radius;
+      const baseLife = this.config.life !== undefined ? this.config.life : 60;
+      getOrCreateTileFirePuddleVFX(tileKey, centerX, centerY, baseRadius, baseLife);
+      this.vfx = null;
+    } else if (this.config.vfxType === 'stun_gas') {
+      this.vfx = new StunGasVFX(x, y, this.radius, this.config.life);
+    } else if (this.config.vfxType === 'poison_gas') {
+      this.vfx = new PoisonGasVFX(x, y, this.radius, this.config.life);
+    } else if (this.config.vfxType === 'forcefield') {
+      this.vfx = new ForcefieldVFX(x, y, this.radius, this.config.life);
+    }
   }
 
   update() {
@@ -119,7 +149,7 @@ export class GroundFeature {
        const dx = state.player.pos.x - this.pos.x;
        const dy = state.player.pos.y - this.pos.y;
        const dSq = dx*dx + dy*dy;
-       const rSum = state.player.size / 2 + this.config.radius;
+       const rSum = state.player.size / 2 + this.radius;
        if (dSq < rSum * rSum) {
          const d = Math.sqrt(dSq);
          const pushForce = (rSum - d) * 0.5;
@@ -135,20 +165,38 @@ export class GroundFeature {
       const dmgCfg = cfg.damageConfig;
       const targets = cfg.damageTargets || ['enemy', 'obstacle'];
 
-      const enemyDmg = dmgCfg ? (dmgCfg.enemy ?? dmgCfg.Enemy ?? 0) : (targets.includes('enemy') ? (cfg.damage || 0) : 0);
+      const baseEnemyDmg = dmgCfg ? (dmgCfg.enemy ?? dmgCfg.Enemy ?? 0) : (targets.includes('enemy') ? (cfg.damage || 0) : 0);
+      const pDmgMult = 1 + (this.source?.activeStats?.puddleDamageMult || this.source?.stats?.puddleDamageMult || 0);
+      const enemyDmg = baseEnemyDmg * pDmgMult;
       const playerDmg = dmgCfg ? (dmgCfg.player ?? dmgCfg.Player ?? 0) : (targets.includes('player') ? (cfg.damage || 0) : 0);
       const turretDmg = dmgCfg ? (dmgCfg.turret ?? dmgCfg.Turret ?? 0) : (targets.includes('turret') ? (cfg.damage || 0) : 0);
       const obstacleDmg = dmgCfg ? (dmgCfg.obstacle ?? dmgCfg.Obstacle ?? 0) : (targets.includes('obstacle') ? (cfg.damage || 0) : 0);
       
       if (enemyDmg > 0 || cfg.appliedCondition) {
         for (let e of state.enemies) {
-          if (e.health > 0 && dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y) < cfg.radius + e.size/2) {
+          if (e.health > 0 && dist(this.pos.x, this.pos.y, e.pos.x, e.pos.y) < this.radius + e.size/2) {
             const cond = cfg.appliedCondition;
             if (cond && e.applyCondition) {
                if (typeof cond === 'string') {
                  e.applyCondition(cond, 60);
                } else {
-                 for (const c of cond) e.applyCondition(c.type, c.duration || 60, c);
+                 for (const c of cond) {
+                   let dur = c.duration || 60;
+                   if (c.type === 'c_stun' && (this.source as any)?.activeStats?.stunDurationMult) {
+                     dur *= (1 + (this.source as any).activeStats.stunDurationMult);
+                   }
+                   e.applyCondition(c.type, Math.max(1, Math.round(dur)), c);
+                   if (c.type === 'c_stun') {
+                     if (this.typeKey !== 'gf_stun_gas' && this.typeKey !== 'gf_stun_gas_t3' && (this.source as any)?.type !== 't2_stun') {
+                       if ((state.turretUpgrades?.['t_ice'] || []).includes('u_t_ice_3')) {
+                         e.applyCondition('c_hypnotized', (this.source as any)?.activeStats?.hypnotizeDuration || 360);
+                       }
+                     }
+                     if (((this.source as any)?.type === 't2_stun' || this.typeKey === 'gf_stun_gas' || this.typeKey === 'gf_stun_gas_t3') && (state.turretUpgrades?.['t2_stun'] || []).includes('u_t2_stun_5')) {
+                       e.applyCondition('c_weakbody', Math.max(1, Math.round(dur)));
+                     }
+                   }
+                 }
                }
             }
             if (enemyDmg > 0) e.takeDamage(enemyDmg, { type: 'groundFeature', key: this.typeKey });
@@ -157,7 +205,7 @@ export class GroundFeature {
       }
 
       if (playerDmg > 0 && state.player && state.player.health > 0) {
-        if (dist(this.pos.x, this.pos.y, state.player.pos.x, state.player.pos.y) < cfg.radius + state.player.size/2) {
+        if (dist(this.pos.x, this.pos.y, state.player.pos.x, state.player.pos.y) < this.radius + state.player.size/2) {
           state.player.takeDamage(playerDmg, { type: 'groundFeature', key: this.typeKey });
         }
       }
@@ -166,7 +214,7 @@ export class GroundFeature {
         for (let a of state.player.attachments) {
           if (a.health > 0) {
             const awPos = a.getWorldPos();
-            if (dist(this.pos.x, this.pos.y, awPos.x, awPos.y) < cfg.radius + a.size/2) {
+            if (dist(this.pos.x, this.pos.y, awPos.x, awPos.y) < this.radius + a.size/2) {
               a.takeDamage(turretDmg);
             }
           }
@@ -175,7 +223,7 @@ export class GroundFeature {
           for (let wt of state.world.getAllTurrets()) {
             if (wt.health > 0) {
               const wPos = wt.getWorldPos();
-              if (dist(this.pos.x, this.pos.y, wPos.x, wPos.y) < cfg.radius + wt.size/2) {
+              if (dist(this.pos.x, this.pos.y, wPos.x, wPos.y) < this.radius + wt.size/2) {
                 wt.takeDamage(turretDmg);
               }
             }
@@ -184,10 +232,10 @@ export class GroundFeature {
       }
 
       if (obstacleDmg > 0 && state.world) {
-        let gxStart = floor((this.pos.x - cfg.radius) / GRID_SIZE);
-        let gxEnd = floor((this.pos.x + cfg.radius) / GRID_SIZE);
-        let gyStart = floor((this.pos.y - cfg.radius) / GRID_SIZE);
-        let gyEnd = floor((this.pos.y + cfg.radius) / GRID_SIZE);
+        let gxStart = floor((this.pos.x - this.radius) / GRID_SIZE);
+        let gxEnd = floor((this.pos.x + this.radius) / GRID_SIZE);
+        let gyStart = floor((this.pos.y - this.radius) / GRID_SIZE);
+        let gyEnd = floor((this.pos.y + this.radius) / GRID_SIZE);
         for (let gx = gxStart; gx <= gxEnd; gx++) {
           for (let gy = gyStart; gy <= gyEnd; gy++) {
             let cx = floor(gx / CHUNK_SIZE); let cy = floor(gy / CHUNK_SIZE);
@@ -195,7 +243,7 @@ export class GroundFeature {
             let block = chunk?.blocks.find((b: any) => !b.isMined && b.gx === gx && b.gy === gy);
             if (block) {
               let bx = block.pos.x + GRID_SIZE/2; let by = block.pos.y + GRID_SIZE/2;
-              if (dist(this.pos.x, this.pos.y, bx, by) < cfg.radius + GRID_SIZE/2) {
+              if (dist(this.pos.x, this.pos.y, bx, by) < this.radius + GRID_SIZE/2) {
                 block.takeDamage(obstacleDmg);
               }
             }
@@ -212,7 +260,7 @@ export class GroundFeature {
       if (sprite) {
         push();
         imageMode(CENTER);
-        const rSize = (this.config.radius || 34) * 2;
+        const rSize = (this.radius || 34) * 2;
         image(sprite, this.pos.x, this.pos.y, rSize, rSize);
         pop();
       }
@@ -245,10 +293,12 @@ export class GroundFeature {
       let hitSourceKey = 'gf_fire';
 
       for (let gf of fireFeatures) {
-        const rad = gf.config.radius + e.size / 2;
+        const rad = gf.radius + e.size / 2;
         const dSq = (gf.pos.x - e.pos.x) ** 2 + (gf.pos.y - e.pos.y) ** 2;
         if (dSq < rad * rad) {
-          const dmg = gf.config.damageConfig?.enemy ?? gf.config.damageConfig?.Enemy ?? 0;
+          const baseDmg = gf.config.damageConfig?.enemy ?? gf.config.damageConfig?.Enemy ?? 0;
+          const pDmgMult = 1 + (gf.source?.activeStats?.puddleDamageMult || gf.source?.stats?.puddleDamageMult || 0);
+          const dmg = baseDmg * pDmgMult;
           if (dmg > maxDmg) {
             maxDmg = dmg;
             hitSourceKey = gf.typeKey;
@@ -289,7 +339,7 @@ export class GroundFeature {
       let hitSourceKey = 'gf_fire';
 
       for (let gf of fireFeatures) {
-        const rad = gf.config.radius + state.player.size / 2;
+        const rad = gf.radius + state.player.size / 2;
         const dSq = (gf.pos.x - state.player.pos.x) ** 2 + (gf.pos.y - state.player.pos.y) ** 2;
         if (dSq < rad * rad) {
           const dmg = gf.config.damageConfig?.player ?? gf.config.damageConfig?.Player ?? 0;
@@ -340,7 +390,7 @@ export class GroundFeature {
       let highestCondDmg = -1;
 
       for (let gf of fireFeatures) {
-        const rad = gf.config.radius + (t.size || 24) / 2;
+        const rad = gf.radius + (t.size || 24) / 2;
         const dSq = (gf.pos.x - tPos.x) ** 2 + (gf.pos.y - tPos.y) ** 2;
         if (dSq < rad * rad) {
           const dmg = gf.config.damageConfig?.turret ?? gf.config.damageConfig?.Turret ?? 0;
@@ -380,10 +430,10 @@ export class GroundFeature {
         const obsDmg = gf.config.damageConfig?.obstacle ?? gf.config.damageConfig?.Obstacle ?? 0;
         if (obsDmg <= 0) continue;
 
-        let gxStart = floor((gf.pos.x - gf.config.radius) / GRID_SIZE);
-        let gxEnd = floor((gf.pos.x + gf.config.radius) / GRID_SIZE);
-        let gyStart = floor((gf.pos.y - gf.config.radius) / GRID_SIZE);
-        let gyEnd = floor((gf.pos.y + gf.config.radius) / GRID_SIZE);
+        let gxStart = floor((gf.pos.x - gf.radius) / GRID_SIZE);
+        let gxEnd = floor((gf.pos.x + gf.radius) / GRID_SIZE);
+        let gyStart = floor((gf.pos.y - gf.radius) / GRID_SIZE);
+        let gyEnd = floor((gf.pos.y + gf.radius) / GRID_SIZE);
 
         for (let gx = gxStart; gx <= gxEnd; gx++) {
           for (let gy = gyStart; gy <= gyEnd; gy++) {
@@ -393,7 +443,7 @@ export class GroundFeature {
             if (block) {
               let bx = block.pos.x + GRID_SIZE / 2;
               let by = block.pos.y + GRID_SIZE / 2;
-              const rad = gf.config.radius + GRID_SIZE / 2;
+              const rad = gf.radius + GRID_SIZE / 2;
               const dSq = (gf.pos.x - bx) ** 2 + (gf.pos.y - by) ** 2;
               if (dSq < rad * rad) {
                 const current = blockDamageMap.get(block) || 0;
@@ -412,5 +462,26 @@ export class GroundFeature {
         }
       }
     }
+  }
+
+  /**
+   * Update all tile-based fire puddle VFX instances.
+   */
+  static updateTileFireVfx() {
+    updateTileFirePuddles();
+  }
+
+  /**
+   * Render all tile-based fire puddle VFX instances once per frame.
+   */
+  static displayTileFireVfx(vp?: any) {
+    displayTileFirePuddles(vp);
+  }
+
+  /**
+   * Clear all tile-based fire puddle VFX instances on level load/reset.
+   */
+  static clearTileFireVfx() {
+    clearTileFirePuddles();
   }
 }

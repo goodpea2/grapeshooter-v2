@@ -15,8 +15,10 @@ import {
 import {
   isMouseOverSpawnerTooltip,
   drawWorldHoverSpawnerTooltip,
+  drawHoverSpawnerTooltipFromConfig,
   drawToolbarSpawnerTooltip,
   openToolbarSpawnerTooltip,
+  openSpawnerModal,
   isMouseOverSunGeneratorTooltip,
   drawToolbarSunGeneratorTooltip,
   openToolbarSunGeneratorTooltip
@@ -46,6 +48,7 @@ import {
   drawGreenButton,
   drawCyanButton,
   drawCard,
+  applyHoverTransform,
   registerUIHitbox
 } from '../uiComponents';
 import { color } from '../uiColors';
@@ -231,6 +234,73 @@ export function drawLevelEditor() {
   }
   for (let y = startY; y <= endY; y += GRID_SIZE) {
     line(startX, y, endX, y);
+  }
+
+  // Draw HP Heatmap Overlay over grids when showHpHeatmap is active
+  if (state.levelEditor.showHpHeatmap && state.world) {
+    push();
+    let minHp = Infinity;
+    let maxHp = -Infinity;
+    const candidateBlocks: { block: any; hp: number }[] = [];
+
+    state.world.chunks.forEach((chunk: any) => {
+      chunk.blocks.forEach((b: any) => {
+        if (!b.isMined) {
+          const hp = (b.customSpawnerConfig && (b.customSpawnerConfig.minHealth || b.customSpawnerConfig.health)) || b.health;
+          if (typeof hp === 'number' && hp > 0 && isFinite(hp)) {
+            if (b.pos.x >= startX - GRID_SIZE && b.pos.x <= endX &&
+                b.pos.y >= startY - GRID_SIZE && b.pos.y <= endY) {
+              candidateBlocks.push({ block: b, hp });
+              if (hp < minHp) minHp = hp;
+              if (hp > maxHp) maxHp = hp;
+            }
+          }
+        }
+      });
+    });
+
+    if (minHp === Infinity) {
+      minHp = 50;
+      maxHp = 600;
+    } else if (minHp === maxHp) {
+      maxHp = minHp + 1;
+    }
+
+    noStroke();
+    for (let i = 0; i < candidateBlocks.length; i++) {
+      const { block: b, hp } = candidateBlocks[i];
+      const t = constrain((hp - minHp) / (maxHp - minHp), 0, 1);
+      // Green (lowest: 34, 197, 94) -> Yellow (mid: 234, 179, 8) -> Deep Red (highest: 185, 28, 28)
+      let r: number, g: number, bl: number;
+      if (t < 0.5) {
+        const localT = t / 0.5;
+        r = Math.round(34 + (234 - 34) * localT);
+        g = Math.round(197 + (179 - 197) * localT);
+        bl = Math.round(94 + (8 - 94) * localT);
+      } else {
+        const localT = (t - 0.5) / 0.5;
+        r = Math.round(234 + (185 - 234) * localT);
+        g = Math.round(179 + (28 - 179) * localT);
+        bl = Math.round(8 + (28 - 8) * localT);
+      }
+
+      fill(r, g, bl, 160);
+      rect(b.pos.x, b.pos.y, GRID_SIZE, GRID_SIZE, 3);
+
+      // Value labels: show HP values when zoomed in
+      if (zoom >= 0.75) {
+        push();
+        textAlign(CENTER, CENTER);
+        textSize(zoom >= 1.2 ? 10 : 8.5);
+        stroke(0, 0, 0, 230);
+        strokeWeight(2);
+        fill(255, 255, 255);
+        const hpText = hp >= 1000 ? `${(hp / 1000).toFixed(1)}k` : `${Math.round(hp)}`;
+        text(hpText, b.pos.x + GRID_SIZE / 2, b.pos.y + GRID_SIZE / 2);
+        pop();
+      }
+    }
+    pop();
   }
 
   // Visual feedback: Fade Purple Tint on all designated spawnArea tiles (ONLY when MarkSpawnArea tool is active)
@@ -619,7 +689,7 @@ export function drawLevelEditor() {
 
   // 5.3 Editable Toolbar Spawner Tooltip
   if (state.levelEditor.toolbarSpawnerTooltip) {
-    drawToolbarSpawnerTooltip(topBarH, 0);
+    drawToolbarSpawnerTooltip();
   }
 
   // 5.4 Editable Toolbar Sun Generator Tooltip
@@ -1003,7 +1073,22 @@ export function drawTopBar(headerH: number, leftPanelW: number) {
       redoLevelEditorAction();
     }
   });
-  curX += 46 + 8;
+  curX += 46 + 6;
+
+  // HP Heatmap Toggle Button
+  const isHeatmapActive = !!state.levelEditor.showHpHeatmap;
+  drawButton(curX, btnY, 68, btnH, 'HP HEATMAP', {
+    id: 'le_top_hp_heatmap',
+    variant: isHeatmapActive ? 'yellow' : 'dark',
+    isSelected: isHeatmapActive,
+    fontSize: 7.5,
+    radius: 5,
+    depth3D: 1,
+    onClick: () => {
+      state.levelEditor.showHpHeatmap = !state.levelEditor.showHpHeatmap;
+    }
+  });
+  curX += 68 + 8;
 
   // 2. Right Action Buttons
   const rightGap = 5;
@@ -1154,10 +1239,7 @@ export function drawLeftPalettePanel(leftPanelW: number, topBarH: number) {
         if (inTab.length > 0 && !inTab.some(it => it.key === state.levelEditor.selectedItemKey)) {
           const first = inTab[0];
           state.levelEditor.selectedItemKey = first.key;
-          if ((first.category === 'overlays' && first.key.startsWith('ov_spawner')) || (first.category === 'liquids' && (first.key === 'l_spawner' || first.key.startsWith('l_spawner'))) || first.key === 'l_spawner' || first.key.startsWith('l_spawner')) {
-            openToolbarSpawnerTooltip(first.key);
-            state.levelEditor.toolbarSunGeneratorTooltip = null;
-          } else if (first.category === 'overlays' && first.key === 'sunGenerator') {
+          if (first.category === 'overlays' && first.key === 'sunGenerator') {
             openToolbarSunGeneratorTooltip();
             state.levelEditor.toolbarSpawnerTooltip = null;
           } else {
@@ -1226,6 +1308,7 @@ export function drawLeftPalettePanel(leftPanelW: number, topBarH: number) {
   }
 
   let curY = viewportY + 6 + scrollY;
+  let hoveredToolbarSpawner: { key: string; isLiquid: boolean; y: number } | null = null;
 
   for (const g of groups) {
     if (g.items.length === 0) continue;
@@ -1270,24 +1353,51 @@ export function drawLeftPalettePanel(leftPanelW: number, topBarH: number) {
 
       if (cy + cardH > viewportY && cy < viewportY + viewportH) {
         const isSelected = state.levelEditor.selectedItemKey === item.key;
+        const isSpawnerItem = (item.category === 'overlays' && (item.key.startsWith('ov_spawner') || !!overlayTypes[item.key]?.isEnemySpawner)) ||
+                              (item.category === 'liquids' && (item.key === 'l_spawner' || item.key.startsWith('l_spawner') || !!liquidTypes[item.key]?.isEnemySpawner)) ||
+                              item.key === 'l_spawner' || item.key.startsWith('l_spawner');
+
+        const isHovered = mouseX >= cx && mouseX <= cx + cardW && mouseY >= cy && mouseY <= cy + cardH && mouseY >= viewportY && mouseY <= viewportY + viewportH;
+
+        // Check hover for spawner items
+        if (isHovered) {
+          if (isSpawnerItem && !state.levelEditor.editingSpawnerModal) {
+            hoveredToolbarSpawner = {
+              key: item.key,
+              isLiquid: item.category === 'liquids' || item.key === 'l_spawner' || item.key.startsWith('l_spawner'),
+              y: cy
+            };
+          }
+        }
+
+        push();
+        applyHoverTransform(`le_card_${item.key}`, cx + cardW / 2, cy + cardH / 2, isHovered, { elevation: 3.5, scale: 0.04 });
 
         drawCard(cx, cy, cardW, cardH, {
           radius: 5,
           isSelected,
-          isHoverable: true,
+          isHoverable: false,
+          skipTransform: true,
           id: `le_card_${item.key}`,
           onClick: () => {
             state.levelEditor.activeCategory = item.category;
             state.levelEditor.selectedItemKey = item.key;
-            if ((item.category === 'overlays' && item.key.startsWith('ov_spawner')) || (item.category === 'liquids' && (item.key === 'l_spawner' || item.key.startsWith('l_spawner'))) || item.key === 'l_spawner' || item.key.startsWith('l_spawner')) {
-              openToolbarSpawnerTooltip(item.key);
-              state.levelEditor.toolbarSunGeneratorTooltip = null;
-            } else if (item.category === 'overlays' && item.key === 'sunGenerator') {
-              openToolbarSunGeneratorTooltip();
-              state.levelEditor.toolbarSpawnerTooltip = null;
+            const now = Date.now();
+            const last = state.levelEditor.lastPaletteItemClick;
+
+            if (isSpawnerItem && last && last.key === item.key && (now - last.time) <= 300) {
+              // Double click opens SpawnerModal
+              openSpawnerModal(item.key);
+              state.levelEditor.lastPaletteItemClick = null;
             } else {
-              state.levelEditor.toolbarSpawnerTooltip = null;
-              state.levelEditor.toolbarSunGeneratorTooltip = null;
+              state.levelEditor.lastPaletteItemClick = { key: item.key, time: now };
+              if (item.category === 'overlays' && item.key === 'sunGenerator') {
+                openToolbarSunGeneratorTooltip();
+                state.levelEditor.toolbarSpawnerTooltip = null;
+              } else {
+                state.levelEditor.toolbarSpawnerTooltip = null;
+                state.levelEditor.toolbarSunGeneratorTooltip = null;
+              }
             }
           }
         });
@@ -1309,6 +1419,8 @@ export function drawLeftPalettePanel(leftPanelW: number, topBarH: number) {
         for (let li = 0; li < maxLines; li++) {
           text(lines[li], cx + cardW / 2, startTextY + li * lineH);
         }
+
+        pop();
       }
     }
 
@@ -1318,6 +1430,24 @@ export function drawLeftPalettePanel(leftPanelW: number, topBarH: number) {
 
   if (dc) {
     dc.restore();
+  }
+
+  // Draw Hover Spawner Tooltip for toolbar items when hovered
+  if (hoveredToolbarSpawner && !state.levelEditor.editingSpawnerModal) {
+    const isLiquid = hoveredToolbarSpawner.isLiquid;
+    const sKey = hoveredToolbarSpawner.key;
+    const oCfg = isLiquid ? liquidTypes[sKey] : overlayTypes[sKey];
+    const spCfg = oCfg?.enemySpawnConfig || {
+      spawnRadius: 120,
+      spawnTriggerRadius: 200,
+      spawnInterval: 60,
+      budget: 60,
+      enemyTypeKey: ['e_basic']
+    };
+    const spName = oCfg?.name || (isLiquid ? 'Ground Spawner' : 'Spawner');
+    const tipX = leftPanelW + 10;
+    const tipY = Math.max(tabAreaH + 10, Math.min(height - 250, hoveredToolbarSpawner.y));
+    drawHoverSpawnerTooltipFromConfig(spName, spCfg, isLiquid, tipX, tipY);
   }
 
   // Draw Slim Scrollbar Track & Thumb

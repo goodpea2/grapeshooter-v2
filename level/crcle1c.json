@@ -1,0 +1,8455 @@
+{
+  "version": 2,
+  "levelId": "circle",
+  "levelName": "The Circle",
+  "levelDescription": "Survival-styled level.",
+  "tag": "SURVIVAL",
+  "enableWorldGen": false,
+  "almanacProgression": {
+    "StartingTurret": [
+      "t_pea",
+      "t_laser",
+      "t_wall",
+      "t_mine",
+      "t_ice",
+      "t2_repeater",
+      "t2_firepea",
+      "t2_laser2",
+      "t2_peanut",
+      "t2_tall",
+      "t2_mortar",
+      "t2_pulse",
+      "t2_laserexplode",
+      "t2_minespawner",
+      "t2_snowpea",
+      "t2_stun",
+      "t3_triplepea",
+      "t3_firepea2",
+      "t3_mortar2",
+      "t3_snowpea2",
+      "t3_aoelaser",
+      "t3_densnut",
+      "t3_durian",
+      "t3_holonut",
+      "t3_frostfield",
+      "t3_bowling",
+      "t3_flamethrower",
+      "t3_repulser",
+      "t3_skymortar",
+      "t3_laser3",
+      "t2_wallaser",
+      "t2_heallaser",
+      "t2_icewall",
+      "t2_torchwood",
+      "t3_puncher",
+      "t3_gatling",
+      "t3_firecharge",
+      "t3_minecharge",
+      "t3_witch",
+      "t3_hypno",
+      "t3_magnet",
+      "t3_heallaser2",
+      "t3_icecharge",
+      "t3_powerbank",
+      "t3_speeder"
+    ],
+    "UnlockedByDiscoverTurret": [],
+    "LockedTurret": [],
+    "BannedTurrets": [
+      "t_dummy",
+      "t_dummyupgradable",
+      "t0_cherrybomb",
+      "t0_firecherry",
+      "t0_iceshroom",
+      "t0_hypnobomb",
+      "t0_starfruit",
+      "t0_jalapeno",
+      "t0_puffshroom",
+      "t0_grapeshot",
+      "t_sunflower",
+      "t_seed",
+      "t_seed2",
+      "t_lilypad",
+      "tx_goldengrape",
+      "t_farm_bush",
+      "t_farm_crystal",
+      "t_farm_mob",
+      "t3_spinnut",
+      "t3_inferno",
+      "t3_snowpeanut",
+      "t3_puncher2",
+      "t3_iceray2",
+      "t3_miningbomb",
+      "t3_tesla",
+      "t3_icepuncher",
+      "t3_spike2",
+      "t3_minefield",
+      "t3_triberg",
+      "t2_iceray",
+      "t2_spike",
+      "t2_icebomb",
+      "t2_puncher"
+    ],
+    "EnabledTurrets": [
+      "t_pea",
+      "t_laser",
+      "t_wall",
+      "t_mine",
+      "t_ice",
+      "t2_repeater",
+      "t2_firepea",
+      "t2_laser2",
+      "t2_peanut",
+      "t2_tall",
+      "t2_mortar",
+      "t2_pulse",
+      "t2_laserexplode",
+      "t2_minespawner",
+      "t2_snowpea",
+      "t2_stun",
+      "t3_triplepea",
+      "t3_firepea2",
+      "t3_mortar2",
+      "t3_snowpea2",
+      "t3_aoelaser",
+      "t3_densnut",
+      "t3_durian",
+      "t3_holonut",
+      "t3_frostfield",
+      "t3_bowling",
+      "t3_flamethrower",
+      "t3_repulser",
+      "t3_skymortar",
+      "t3_laser3",
+      "t2_wallaser",
+      "t2_heallaser",
+      "t2_icewall",
+      "t2_torchwood",
+      "t3_puncher",
+      "t3_gatling",
+      "t3_firecharge",
+      "t3_minecharge",
+      "t3_witch",
+      "t3_hypno",
+      "t3_magnet",
+      "t3_heallaser2",
+      "t3_icecharge",
+      "t3_powerbank",
+      "t3_speeder"
+    ],
+    "DisabledTurrets": [
+      "t_dummy",
+      "t_dummyupgradable",
+      "t0_cherrybomb",
+      "t0_firecherry",
+      "t0_iceshroom",
+      "t0_hypnobomb",
+      "t0_starfruit",
+      "t0_jalapeno",
+      "t0_puffshroom",
+      "t0_grapeshot",
+      "t_sunflower",
+      "t_seed",
+      "t_seed2",
+      "t_lilypad",
+      "tx_goldengrape",
+      "t_farm_bush",
+      "t_farm_crystal",
+      "t_farm_mob",
+      "t3_spinnut",
+      "t3_inferno",
+      "t3_snowpeanut",
+      "t3_puncher2",
+      "t3_iceray2",
+      "t3_miningbomb",
+      "t3_tesla",
+      "t3_icepuncher",
+      "t3_spike2",
+      "t3_minefield",
+      "t3_triberg",
+      "t2_iceray",
+      "t2_spike",
+      "t2_icebomb",
+      "t2_puncher"
+    ],
+    "UnlockCost": [],
+    "AllTurretCrafting": true,
+    "AllTurretUpgrade": true,
+    "CraftingCostOverride": []
+  },
+  "turretAvailability": {
+    "StartingTurret": [
+      "t_pea",
+      "t_laser",
+      "t_wall",
+      "t_mine",
+      "t_ice",
+      "t2_repeater",
+      "t2_firepea",
+      "t2_laser2",
+      "t2_peanut",
+      "t2_tall",
+      "t2_mortar",
+      "t2_pulse",
+      "t2_laserexplode",
+      "t2_minespawner",
+      "t2_snowpea",
+      "t2_stun",
+      "t3_triplepea",
+      "t3_firepea2",
+      "t3_mortar2",
+      "t3_snowpea2",
+      "t3_aoelaser",
+      "t3_densnut",
+      "t3_durian",
+      "t3_holonut",
+      "t3_frostfield",
+      "t3_bowling",
+      "t3_flamethrower",
+      "t3_repulser",
+      "t3_skymortar",
+      "t3_laser3",
+      "t2_wallaser",
+      "t2_heallaser",
+      "t2_icewall",
+      "t2_torchwood",
+      "t3_puncher",
+      "t3_gatling",
+      "t3_firecharge",
+      "t3_minecharge",
+      "t3_witch",
+      "t3_hypno",
+      "t3_magnet",
+      "t3_heallaser2",
+      "t3_icecharge",
+      "t3_powerbank",
+      "t3_speeder"
+    ],
+    "UnlockedByDiscoverTurret": [],
+    "LockedTurret": [],
+    "BannedTurrets": [
+      "t_dummy",
+      "t_dummyupgradable",
+      "t0_cherrybomb",
+      "t0_firecherry",
+      "t0_iceshroom",
+      "t0_hypnobomb",
+      "t0_starfruit",
+      "t0_jalapeno",
+      "t0_puffshroom",
+      "t0_grapeshot",
+      "t_sunflower",
+      "t_seed",
+      "t_seed2",
+      "t_lilypad",
+      "tx_goldengrape",
+      "t_farm_bush",
+      "t_farm_crystal",
+      "t_farm_mob",
+      "t3_spinnut",
+      "t3_inferno",
+      "t3_snowpeanut",
+      "t3_puncher2",
+      "t3_iceray2",
+      "t3_miningbomb",
+      "t3_tesla",
+      "t3_icepuncher",
+      "t3_spike2",
+      "t3_minefield",
+      "t3_triberg",
+      "t2_iceray",
+      "t2_spike",
+      "t2_icebomb",
+      "t2_puncher"
+    ],
+    "EnabledTurrets": [
+      "t_pea",
+      "t_laser",
+      "t_wall",
+      "t_mine",
+      "t_ice",
+      "t2_repeater",
+      "t2_firepea",
+      "t2_laser2",
+      "t2_peanut",
+      "t2_tall",
+      "t2_mortar",
+      "t2_pulse",
+      "t2_laserexplode",
+      "t2_minespawner",
+      "t2_snowpea",
+      "t2_stun",
+      "t3_triplepea",
+      "t3_firepea2",
+      "t3_mortar2",
+      "t3_snowpea2",
+      "t3_aoelaser",
+      "t3_densnut",
+      "t3_durian",
+      "t3_holonut",
+      "t3_frostfield",
+      "t3_bowling",
+      "t3_flamethrower",
+      "t3_repulser",
+      "t3_skymortar",
+      "t3_laser3",
+      "t2_wallaser",
+      "t2_heallaser",
+      "t2_icewall",
+      "t2_torchwood",
+      "t3_puncher",
+      "t3_gatling",
+      "t3_firecharge",
+      "t3_minecharge",
+      "t3_witch",
+      "t3_hypno",
+      "t3_magnet",
+      "t3_heallaser2",
+      "t3_icecharge",
+      "t3_powerbank",
+      "t3_speeder"
+    ],
+    "DisabledTurrets": [
+      "t_dummy",
+      "t_dummyupgradable",
+      "t0_cherrybomb",
+      "t0_firecherry",
+      "t0_iceshroom",
+      "t0_hypnobomb",
+      "t0_starfruit",
+      "t0_jalapeno",
+      "t0_puffshroom",
+      "t0_grapeshot",
+      "t_sunflower",
+      "t_seed",
+      "t_seed2",
+      "t_lilypad",
+      "tx_goldengrape",
+      "t_farm_bush",
+      "t_farm_crystal",
+      "t_farm_mob",
+      "t3_spinnut",
+      "t3_inferno",
+      "t3_snowpeanut",
+      "t3_puncher2",
+      "t3_iceray2",
+      "t3_miningbomb",
+      "t3_tesla",
+      "t3_icepuncher",
+      "t3_spike2",
+      "t3_minefield",
+      "t3_triberg",
+      "t2_iceray",
+      "t2_spike",
+      "t2_icebomb",
+      "t2_puncher"
+    ],
+    "UnlockCost": [],
+    "AllTurretCrafting": true,
+    "AllTurretUpgrade": true,
+    "CraftingCostOverride": []
+  },
+  "playerUpgrades": {
+    "movementSpeed": {
+      "costs": [
+        5,
+        15,
+        30,
+        50,
+        75,
+        100
+      ]
+    }
+  },
+  "sunSpawnHourInterval": 0.5,
+  "customBudgetPerNight": [
+    200,
+    600,
+    1500,
+    3000,
+    6000
+  ],
+  "hourlyBudgetPerDay": [
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "hourlyBudgetPerNight": [
+    20,
+    40,
+    80,
+    120,
+    150
+  ],
+  "enabledCurrency": [
+    "sun",
+    "elixir",
+    "soil"
+  ],
+  "startingResource": {
+    "sun": 3,
+    "elixir": 0,
+    "soil": 0,
+    "raisin": 0,
+    "leaf": 0,
+    "shard": 0,
+    "shell": 0,
+    "fuel": 0,
+    "ice": 0
+  },
+  "globalEnemySpawnConfig": {
+    "1_day": {
+      "e_fast": 1,
+      "e_shooting_giant": 1
+    },
+    "1_night": {
+      "e_fast": 1,
+      "e_basic": 1,
+      "e_shooting_giant": 1,
+      "e_fly": 1
+    },
+    "2_day": {
+      "e_fast": 1,
+      "e_basic": 1,
+      "e_shooting_giant": 1,
+      "e_fly": 1
+    },
+    "2_night": {
+      "e_fast": 1,
+      "e_basic": 1,
+      "e_armor1": 0.5,
+      "e_shooting_giant": 1,
+      "e_fly": 1,
+      "e_fly_armor2": 0.5
+    },
+    "3_day": {
+      "e_fast": 1,
+      "e_basic": 1,
+      "e_armor1": 0.5,
+      "e_shooting_giant": 1,
+      "e_fly": 1,
+      "e_fly_armor2": 0.5
+    },
+    "3_night": {
+      "e_fast": 1,
+      "e_basic": 1,
+      "e_armor1": 1,
+      "e_armor3": 0.5,
+      "e_shooting_giant": 1,
+      "e_fly": 1,
+      "e_fly_armor2": 1
+    },
+    "4_day": {
+      "e_fast": 1,
+      "e_basic": 1,
+      "e_armor1": 0.5,
+      "e_shooting_giant": 1,
+      "e_fly": 0.5,
+      "e_fly_armor2": 1,
+      "e_snowthrower_giant": 0.5,
+      "e_icebomb": 1
+    },
+    "4_night": {
+      "e_fast": 0.5,
+      "e_basic": 1,
+      "e_armor1": 1,
+      "e_armor2": 0.5,
+      "e_armor3": 0.5,
+      "e_shooting": 0.25,
+      "e_giant": 0.5,
+      "e_shooting_giant": 1,
+      "e_fly": 1,
+      "e_fly_armor1": 0.5,
+      "e_fly_armor2": 0.5,
+      "e_snowthrower_giant": 0.5,
+      "e_bomb": 0.25,
+      "e_icebomb": 1
+    },
+    "5_day": {
+      "e_fast": 0.5,
+      "e_basic": 1,
+      "e_armor1": 0.5,
+      "e_armor2": 0.5,
+      "e_armor3": 0.5,
+      "e_shooting": 0.25,
+      "e_giant": 0.5,
+      "e_shooting_giant": 1,
+      "e_fly": 0.5,
+      "e_fly_armor1": 0.5,
+      "e_fly_armor2": 0.5,
+      "e_snowthrower_giant": 0.5,
+      "e_bomb": 0.25,
+      "e_icebomb": 1
+    },
+    "5_night": {
+      "e_fast": 0.5,
+      "e_basic": 1,
+      "e_armor1": 1,
+      "e_armor2": 0.5,
+      "e_armor3": 1,
+      "e_shooting": 0.5,
+      "e_giant": 1,
+      "e_shooting_giant": 1,
+      "e_fly": 1,
+      "e_fly_armor1": 0.5,
+      "e_snowthrower_giant": 1,
+      "e_bomb": 0.5,
+      "e_icebomb": 1
+    },
+    "6_day": {
+      "e_basic": 1,
+      "e_armor1": 0.5,
+      "e_giant": 1,
+      "e_shooting_giant": 0.5,
+      "e_fly_armor1": 1,
+      "e_fly_armor2": 1,
+      "e_snowthrower": 0.5,
+      "e_bomb": 1,
+      "e_poison": 1,
+      "e_icebomb": 0.5
+    },
+    "6_night": {
+      "e_basic": 0.5,
+      "e_armor1": 0.5,
+      "e_armor2": 0.25,
+      "e_armor3": 0.5,
+      "e_shooting": 0.5,
+      "e_swarm": 0.5,
+      "e_giant": 0.5,
+      "e_shooting_giant": 0.5,
+      "e_fly": 1,
+      "e_fly_armor1": 1,
+      "e_fly_armor2": 0.5,
+      "e_snowthrower": 0.5,
+      "e_snowthrower_giant": 0.5,
+      "e_bomb": 0.5,
+      "e_poison": 1,
+      "e_icebomb": 0.5
+    },
+    "7_day": {
+      "e_fast": 0.5,
+      "e_basic": 0.5,
+      "e_armor1": 0.5,
+      "e_armor3": 0.5,
+      "e_shooting": 0.5,
+      "e_swarm": 0.5,
+      "e_giant": 0.5,
+      "e_shooting_giant": 0.5,
+      "e_fly": 0.5,
+      "e_fly_armor1": 1,
+      "e_fly_armor2": 0.5,
+      "e_snowthrower": 0.5,
+      "e_snowthrower_giant": 0.5,
+      "e_bomb": 0.5,
+      "e_poison": 1,
+      "e_icebomb": 0.5
+    },
+    "7_night": {
+      "e_armor3": 1,
+      "e_shooting": 1,
+      "e_swarm": 1,
+      "e_shooting_giant": 0.5,
+      "e_fly": 1,
+      "e_fly_armor1": 1,
+      "e_fly_armor2": 0.5,
+      "e_snowthrower": 1,
+      "e_snowthrower_giant": 1,
+      "e_bomb": 0.5,
+      "e_poison": 1
+    },
+    "8_day": {
+      "e_fast": 1,
+      "e_basic": 1,
+      "e_armor1": 1,
+      "e_giant": 1,
+      "e_fly": 0.5,
+      "e_fly_armor1": 1,
+      "e_fly_armor2": 1,
+      "e_snowthrower": 1,
+      "e_bomb": 1,
+      "e_poison": 0.5,
+      "e_icebomb": 0.5
+    },
+    "8_night": {
+      "e_fast": 0.5,
+      "e_basic": 0.5,
+      "e_armor1": 0.5,
+      "e_armor2": 0.25,
+      "e_armor3": 0.5,
+      "e_shooting": 0.5,
+      "e_swarm": 0.5,
+      "e_giant": 1,
+      "e_fly": 0.25,
+      "e_fly_armor1": 1,
+      "e_fly_armor2": 0.5,
+      "e_snowthrower": 1,
+      "e_snowthrower_giant": 0.5,
+      "e_bomb": 0.5,
+      "e_poison": 1,
+      "e_icebomb": 0.5
+    },
+    "9_day": {
+      "e_fast": 0.5,
+      "e_basic": 0.5,
+      "e_armor1": 0.5,
+      "e_armor2": 0.25,
+      "e_armor3": 0.5,
+      "e_shooting": 0.5,
+      "e_swarm": 0.5,
+      "e_giant": 1,
+      "e_fly": 0.25,
+      "e_fly_armor1": 1,
+      "e_fly_armor2": 0.5,
+      "e_snowthrower": 1,
+      "e_snowthrower_giant": 0.5,
+      "e_bomb": 0.5,
+      "e_poison": 1,
+      "e_icebomb": 0.5
+    },
+    "9_night": {
+      "e_armor1": 0.5,
+      "e_armor2": 0.5,
+      "e_armor3": 0.5,
+      "e_shooting": 1,
+      "e_swarm": 1,
+      "e_giant": 1,
+      "e_fly_armor1": 1,
+      "e_fly_armor2": 0.5,
+      "e_snowthrower": 1,
+      "e_snowthrower_giant": 0.5,
+      "e_bomb": 0.5,
+      "e_poison": 1,
+      "e_icebomb": 0.5
+    }
+  },
+  "starRatingTargets": {
+    "star1": 600,
+    "star2": 300,
+    "star3": 180
+  },
+  "timestamp": "2026-09-12T19:13:24.884Z",
+  "playerSpawn": {
+    "x": 108,
+    "y": 175
+  },
+  "chunks": [
+    {
+      "cx": 0,
+      "cy": 0,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_dirt",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              8,
+              1,
+              9
+            ],
+            [
+              13,
+              1,
+              11
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "pos": [
+            [
+              8,
+              8,
+              0
+            ],
+            [
+              9,
+              7,
+              1
+            ],
+            [
+              9,
+              4,
+              2
+            ],
+            [
+              14,
+              2,
+              2
+            ],
+            [
+              9,
+              7,
+              3
+            ],
+            [
+              9,
+              7,
+              4
+            ],
+            [
+              9,
+              7,
+              5
+            ],
+            [
+              9,
+              7,
+              6
+            ],
+            [
+              8,
+              8,
+              7
+            ],
+            [
+              8,
+              8,
+              8
+            ],
+            [
+              7,
+              1,
+              9
+            ],
+            [
+              9,
+              7,
+              9
+            ],
+            [
+              5,
+              5,
+              10
+            ],
+            [
+              11,
+              5,
+              10
+            ],
+            [
+              1,
+              12,
+              11
+            ],
+            [
+              14,
+              2,
+              11
+            ],
+            [
+              0,
+              6,
+              12
+            ],
+            [
+              7,
+              9,
+              12
+            ],
+            [
+              0,
+              16,
+              13
+            ],
+            [
+              0,
+              16,
+              14
+            ],
+            [
+              0,
+              16,
+              15
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "health": 2000,
+          "pos": [
+            [
+              6,
+              1,
+              12
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "sunGeneratorConfig": {
+            "damagePerSun": 300,
+            "maxSun": 30,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              13,
+              1,
+              2
+            ],
+            [
+              10,
+              1,
+              10
+            ],
+            [
+              0,
+              1,
+              11
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "overlayType": "sunTiny",
+          "pos": [
+            [
+              9,
+              1,
+              0
+            ],
+            [
+              10,
+              1,
+              1
+            ],
+            [
+              10,
+              1,
+              3
+            ],
+            [
+              10,
+              1,
+              4
+            ],
+            [
+              10,
+              1,
+              5
+            ],
+            [
+              10,
+              1,
+              6
+            ],
+            [
+              14,
+              1,
+              6
+            ],
+            [
+              9,
+              1,
+              7
+            ],
+            [
+              13,
+              1,
+              7
+            ],
+            [
+              13,
+              1,
+              9
+            ],
+            [
+              7,
+              1,
+              10
+            ],
+            [
+              13,
+              1,
+              10
+            ],
+            [
+              5,
+              2,
+              11
+            ],
+            [
+              13,
+              1,
+              11
+            ],
+            [
+              0,
+              5,
+              12
+            ],
+            [
+              13,
+              1,
+              12
+            ],
+            [
+              10,
+              1,
+              13
+            ],
+            [
+              12,
+              2,
+              13
+            ],
+            [
+              8,
+              2,
+              14
+            ],
+            [
+              0,
+              5,
+              15
+            ]
+          ]
+        },
+        {
+          "customSpawnerId": "ov_spawner_p_lv1",
+          "pos": [
+            [
+              6,
+              1,
+              12
+            ]
+          ]
+        },
+        {
+          "overlayType": "sunGenerator",
+          "pos": [
+            [
+              13,
+              1,
+              2
+            ],
+            [
+              10,
+              1,
+              10
+            ],
+            [
+              0,
+              1,
+              11
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -1,
+      "cy": -1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_dirt",
+          "pos": [
+            [
+              -2,
+              2,
+              -8
+            ],
+            [
+              -6,
+              6,
+              -7
+            ],
+            [
+              -8,
+              8,
+              -6
+            ],
+            [
+              -9,
+              9,
+              -5
+            ],
+            [
+              -11,
+              10,
+              -4
+            ],
+            [
+              -12,
+              12,
+              -3
+            ],
+            [
+              -12,
+              12,
+              -2
+            ],
+            [
+              -13,
+              5,
+              -1
+            ],
+            [
+              -7,
+              5,
+              -1
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "health": 2000,
+          "pos": [
+            [
+              -1,
+              1,
+              -4
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "sunGeneratorConfig": {
+            "damagePerSun": 300,
+            "maxSun": 30,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              -8,
+              1,
+              -1
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "pos": [
+            [
+              -2,
+              2,
+              -16
+            ],
+            [
+              -5,
+              5,
+              -15
+            ],
+            [
+              -7,
+              7,
+              -14
+            ],
+            [
+              -8,
+              8,
+              -13
+            ],
+            [
+              -8,
+              4,
+              -12
+            ],
+            [
+              -3,
+              3,
+              -12
+            ],
+            [
+              -9,
+              9,
+              -11
+            ],
+            [
+              -10,
+              9,
+              -10
+            ],
+            [
+              -13,
+              13,
+              -9
+            ],
+            [
+              -16,
+              14,
+              -8
+            ],
+            [
+              -16,
+              10,
+              -7
+            ],
+            [
+              -16,
+              4,
+              -6
+            ],
+            [
+              -11,
+              3,
+              -6
+            ],
+            [
+              -16,
+              4,
+              -5
+            ],
+            [
+              -11,
+              2,
+              -5
+            ],
+            [
+              -16,
+              5,
+              -4
+            ],
+            [
+              -16,
+              4,
+              -3
+            ],
+            [
+              -16,
+              4,
+              -2
+            ],
+            [
+              -16,
+              3,
+              -1
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "health": 6000,
+          "pos": [
+            [
+              -12,
+              1,
+              -6
+            ],
+            [
+              -12,
+              1,
+              -5
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              -4,
+              1,
+              -12
+            ],
+            [
+              -1,
+              1,
+              -10
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              -16,
+              14,
+              -16
+            ],
+            [
+              -16,
+              11,
+              -15
+            ],
+            [
+              -16,
+              2,
+              -14
+            ],
+            [
+              -13,
+              6,
+              -14
+            ],
+            [
+              -16,
+              8,
+              -13
+            ],
+            [
+              -16,
+              7,
+              -12
+            ],
+            [
+              -16,
+              7,
+              -11
+            ],
+            [
+              -16,
+              6,
+              -10
+            ],
+            [
+              -16,
+              3,
+              -9
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "health": 16000,
+          "pos": [
+            [
+              -9,
+              1,
+              -12
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "sunGeneratorConfig": {
+            "damagePerSun": 1800,
+            "maxSun": 200,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              -14,
+              1,
+              -14
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "overlayType": "sunTiny",
+          "pos": [
+            [
+              -3,
+              1,
+              -5
+            ],
+            [
+              -9,
+              1,
+              -4
+            ],
+            [
+              -5,
+              2,
+              -4
+            ],
+            [
+              -9,
+              1,
+              -3
+            ],
+            [
+              -6,
+              2,
+              -3
+            ],
+            [
+              -3,
+              3,
+              -2
+            ],
+            [
+              -4,
+              2,
+              -1
+            ]
+          ]
+        },
+        {
+          "customSpawnerId": "ov_spawner_p_lv1",
+          "pos": [
+            [
+              -1,
+              1,
+              -4
+            ]
+          ]
+        },
+        {
+          "overlayType": "sunGenerator",
+          "pos": [
+            [
+              -14,
+              1,
+              -14
+            ],
+            [
+              -4,
+              1,
+              -12
+            ],
+            [
+              -8,
+              1,
+              -1
+            ]
+          ]
+        },
+        {
+          "customSpawnerId": "ov_spawner_p_1789239066855",
+          "pos": [
+            [
+              -9,
+              1,
+              -12
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -1,
+      "cy": 0,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_dirt",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              -9,
+              1,
+              5
+            ],
+            [
+              -12,
+              1,
+              7
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "pos": [
+            [
+              -13,
+              12,
+              0
+            ],
+            [
+              -13,
+              11,
+              1
+            ],
+            [
+              -14,
+              11,
+              2
+            ],
+            [
+              -14,
+              11,
+              3
+            ],
+            [
+              -14,
+              7,
+              4
+            ],
+            [
+              -6,
+              3,
+              4
+            ],
+            [
+              -14,
+              5,
+              5
+            ],
+            [
+              -8,
+              4,
+              5
+            ],
+            [
+              -14,
+              10,
+              6
+            ],
+            [
+              -14,
+              2,
+              7
+            ],
+            [
+              -11,
+              8,
+              7
+            ],
+            [
+              -13,
+              7,
+              8
+            ],
+            [
+              -5,
+              2,
+              8
+            ],
+            [
+              -12,
+              9,
+              9
+            ],
+            [
+              -9,
+              9,
+              10
+            ],
+            [
+              -8,
+              8,
+              11
+            ],
+            [
+              -7,
+              7,
+              12
+            ],
+            [
+              -7,
+              7,
+              13
+            ],
+            [
+              -7,
+              7,
+              14
+            ],
+            [
+              -7,
+              7,
+              15
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "sunGeneratorConfig": {
+            "damagePerSun": 300,
+            "maxSun": 30,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              -7,
+              1,
+              4
+            ],
+            [
+              -6,
+              1,
+              8
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "pos": [
+            [
+              -16,
+              3,
+              0
+            ],
+            [
+              -16,
+              3,
+              1
+            ],
+            [
+              -16,
+              2,
+              2
+            ],
+            [
+              -16,
+              2,
+              3
+            ],
+            [
+              -16,
+              2,
+              4
+            ],
+            [
+              -16,
+              2,
+              5
+            ],
+            [
+              -16,
+              2,
+              6
+            ],
+            [
+              -16,
+              2,
+              7
+            ],
+            [
+              -16,
+              3,
+              8
+            ],
+            [
+              -16,
+              4,
+              9
+            ],
+            [
+              -16,
+              6,
+              10
+            ],
+            [
+              -16,
+              8,
+              11
+            ],
+            [
+              -16,
+              9,
+              12
+            ],
+            [
+              -16,
+              6,
+              13
+            ],
+            [
+              -9,
+              2,
+              13
+            ],
+            [
+              -16,
+              9,
+              14
+            ],
+            [
+              -16,
+              1,
+              15
+            ],
+            [
+              -14,
+              7,
+              15
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "health": 6000,
+          "pos": [
+            [
+              -10,
+              1,
+              10
+            ],
+            [
+              -15,
+              1,
+              15
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              -10,
+              1,
+              13
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "overlayType": "sunTiny",
+          "pos": [
+            [
+              -4,
+              1,
+              0
+            ],
+            [
+              -9,
+              1,
+              1
+            ],
+            [
+              -4,
+              1,
+              1
+            ],
+            [
+              -10,
+              2,
+              2
+            ],
+            [
+              -4,
+              1,
+              2
+            ],
+            [
+              -10,
+              1,
+              3
+            ],
+            [
+              -5,
+              1,
+              3
+            ],
+            [
+              -10,
+              1,
+              4
+            ],
+            [
+              -5,
+              1,
+              4
+            ],
+            [
+              -12,
+              2,
+              6
+            ],
+            [
+              -7,
+              2,
+              6
+            ],
+            [
+              -10,
+              1,
+              7
+            ],
+            [
+              -5,
+              1,
+              7
+            ],
+            [
+              -9,
+              1,
+              8
+            ],
+            [
+              -5,
+              1,
+              8
+            ],
+            [
+              -9,
+              1,
+              9
+            ],
+            [
+              -4,
+              1,
+              9
+            ],
+            [
+              -8,
+              1,
+              10
+            ],
+            [
+              -3,
+              1,
+              10
+            ],
+            [
+              -7,
+              3,
+              11
+            ],
+            [
+              -3,
+              2,
+              11
+            ],
+            [
+              -2,
+              2,
+              12
+            ],
+            [
+              -2,
+              2,
+              15
+            ]
+          ]
+        },
+        {
+          "overlayType": "sunGenerator",
+          "pos": [
+            [
+              -7,
+              1,
+              4
+            ],
+            [
+              -6,
+              1,
+              8
+            ],
+            [
+              -10,
+              1,
+              13
+            ]
+          ]
+        },
+        {
+          "customSpawnerId": "ov_spawner_p_1789238979556",
+          "pos": [
+            [
+              -10,
+              1,
+              10
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -1,
+      "cy": 1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_dirt",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              -3,
+              1,
+              16
+            ],
+            [
+              -8,
+              1,
+              26
+            ],
+            [
+              -6,
+              1,
+              29
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "pos": [
+            [
+              -6,
+              3,
+              16
+            ],
+            [
+              -2,
+              2,
+              16
+            ],
+            [
+              -4,
+              4,
+              17
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "pos": [
+            [
+              -16,
+              1,
+              16
+            ],
+            [
+              -14,
+              1,
+              16
+            ],
+            [
+              -12,
+              6,
+              16
+            ],
+            [
+              -15,
+              11,
+              17
+            ],
+            [
+              -14,
+              14,
+              18
+            ],
+            [
+              -10,
+              2,
+              19
+            ],
+            [
+              -7,
+              7,
+              19
+            ],
+            [
+              -9,
+              9,
+              20
+            ],
+            [
+              -9,
+              6,
+              21
+            ],
+            [
+              -2,
+              2,
+              21
+            ],
+            [
+              -9,
+              9,
+              22
+            ],
+            [
+              -10,
+              10,
+              23
+            ],
+            [
+              -10,
+              10,
+              24
+            ],
+            [
+              -10,
+              10,
+              25
+            ],
+            [
+              -10,
+              2,
+              26
+            ],
+            [
+              -7,
+              7,
+              26
+            ],
+            [
+              -11,
+              11,
+              27
+            ],
+            [
+              -10,
+              10,
+              28
+            ],
+            [
+              -9,
+              3,
+              29
+            ],
+            [
+              -5,
+              5,
+              29
+            ],
+            [
+              -8,
+              5,
+              30
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "health": 6000,
+          "pos": [
+            [
+              -15,
+              1,
+              16
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "health": 12000,
+          "pos": [
+            [
+              -3,
+              1,
+              21
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              -16,
+              1,
+              17
+            ],
+            [
+              -16,
+              2,
+              18
+            ],
+            [
+              -16,
+              6,
+              19
+            ],
+            [
+              -16,
+              7,
+              20
+            ],
+            [
+              -16,
+              7,
+              21
+            ],
+            [
+              -16,
+              7,
+              22
+            ],
+            [
+              -16,
+              6,
+              23
+            ],
+            [
+              -16,
+              3,
+              24
+            ],
+            [
+              -12,
+              2,
+              24
+            ],
+            [
+              -16,
+              6,
+              25
+            ],
+            [
+              -16,
+              5,
+              26
+            ],
+            [
+              -16,
+              5,
+              27
+            ],
+            [
+              -15,
+              5,
+              28
+            ],
+            [
+              -16,
+              7,
+              29
+            ],
+            [
+              -16,
+              8,
+              30
+            ],
+            [
+              -3,
+              3,
+              30
+            ],
+            [
+              -16,
+              16,
+              31
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "health": 16000,
+          "pos": [
+            [
+              -11,
+              1,
+              26
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              -13,
+              1,
+              16
+            ],
+            [
+              -8,
+              1,
+              19
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "sunGeneratorConfig": {
+            "damagePerSun": 1800,
+            "maxSun": 200,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              -13,
+              1,
+              24
+            ],
+            [
+              -16,
+              1,
+              28
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "customSpawnerId": "ov_spawner_p_1789238968599",
+          "pos": [
+            [
+              -3,
+              1,
+              21
+            ]
+          ]
+        },
+        {
+          "customSpawnerId": "ov_spawner_p_1789239066855",
+          "pos": [
+            [
+              -11,
+              1,
+              26
+            ]
+          ]
+        },
+        {
+          "overlayType": "sunGenerator",
+          "pos": [
+            [
+              -13,
+              1,
+              16
+            ],
+            [
+              -8,
+              1,
+              19
+            ],
+            [
+              -13,
+              1,
+              24
+            ],
+            [
+              -16,
+              1,
+              28
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 0,
+      "cy": -1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_dirt",
+          "pos": [
+            [
+              0,
+              1,
+              -8
+            ],
+            [
+              2,
+              2,
+              -8
+            ],
+            [
+              0,
+              11,
+              -7
+            ],
+            [
+              0,
+              13,
+              -6
+            ],
+            [
+              0,
+              6,
+              -5
+            ],
+            [
+              7,
+              8,
+              -5
+            ],
+            [
+              0,
+              16,
+              -4
+            ],
+            [
+              0,
+              16,
+              -3
+            ],
+            [
+              0,
+              14,
+              -2
+            ],
+            [
+              15,
+              1,
+              -2
+            ],
+            [
+              7,
+              9,
+              -1
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "pos": [
+            [
+              0,
+              5,
+              -16
+            ],
+            [
+              6,
+              1,
+              -16
+            ],
+            [
+              0,
+              12,
+              -15
+            ],
+            [
+              0,
+              12,
+              -14
+            ],
+            [
+              1,
+              12,
+              -13
+            ],
+            [
+              0,
+              14,
+              -12
+            ],
+            [
+              0,
+              10,
+              -11
+            ],
+            [
+              11,
+              5,
+              -11
+            ],
+            [
+              0,
+              16,
+              -10
+            ],
+            [
+              0,
+              13,
+              -9
+            ],
+            [
+              14,
+              2,
+              -9
+            ],
+            [
+              1,
+              1,
+              -8
+            ],
+            [
+              5,
+              11,
+              -8
+            ],
+            [
+              11,
+              5,
+              -7
+            ],
+            [
+              13,
+              3,
+              -6
+            ],
+            [
+              15,
+              1,
+              -5
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "health": 12000,
+          "pos": [
+            [
+              13,
+              1,
+              -9
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "health": 6000,
+          "pos": [
+            [
+              4,
+              1,
+              -8
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "sunGeneratorConfig": {
+            "damagePerSun": 300,
+            "maxSun": 30,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              6,
+              1,
+              -5
+            ],
+            [
+              14,
+              1,
+              -2
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              5,
+              1,
+              -16
+            ],
+            [
+              7,
+              8,
+              -16
+            ],
+            [
+              12,
+              4,
+              -15
+            ],
+            [
+              12,
+              4,
+              -14
+            ],
+            [
+              13,
+              3,
+              -13
+            ],
+            [
+              14,
+              2,
+              -12
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "sunGeneratorConfig": {
+            "damagePerSun": 1800,
+            "maxSun": 200,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              15,
+              1,
+              -16
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              0,
+              1,
+              -13
+            ],
+            [
+              10,
+              1,
+              -11
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "overlayType": "sunTiny",
+          "pos": [
+            [
+              10,
+              1,
+              -5
+            ],
+            [
+              10,
+              2,
+              -4
+            ],
+            [
+              1,
+              3,
+              -3
+            ],
+            [
+              5,
+              1,
+              -3
+            ],
+            [
+              11,
+              2,
+              -3
+            ],
+            [
+              0,
+              1,
+              -2
+            ],
+            [
+              6,
+              3,
+              -2
+            ],
+            [
+              9,
+              1,
+              -1
+            ]
+          ]
+        },
+        {
+          "customSpawnerId": "ov_spawner_p_1789238968599",
+          "pos": [
+            [
+              13,
+              1,
+              -9
+            ]
+          ]
+        },
+        {
+          "customSpawnerId": "ov_spawner_p_1789238979556",
+          "pos": [
+            [
+              4,
+              1,
+              -8
+            ]
+          ]
+        },
+        {
+          "overlayType": "sunGenerator",
+          "pos": [
+            [
+              15,
+              1,
+              -16
+            ],
+            [
+              0,
+              1,
+              -13
+            ],
+            [
+              10,
+              1,
+              -11
+            ],
+            [
+              6,
+              1,
+              -5
+            ],
+            [
+              14,
+              1,
+              -2
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 0,
+      "cy": 1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_dirt",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              14,
+              1,
+              22
+            ],
+            [
+              11,
+              1,
+              24
+            ],
+            [
+              0,
+              1,
+              25
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "pos": [
+            [
+              15,
+              1,
+              17
+            ],
+            [
+              14,
+              2,
+              18
+            ],
+            [
+              0,
+              4,
+              19
+            ],
+            [
+              12,
+              4,
+              19
+            ],
+            [
+              0,
+              16,
+              20
+            ],
+            [
+              0,
+              16,
+              21
+            ],
+            [
+              0,
+              14,
+              22
+            ],
+            [
+              15,
+              1,
+              22
+            ],
+            [
+              0,
+              4,
+              23
+            ],
+            [
+              5,
+              11,
+              23
+            ],
+            [
+              0,
+              11,
+              24
+            ],
+            [
+              12,
+              4,
+              24
+            ],
+            [
+              1,
+              15,
+              25
+            ],
+            [
+              0,
+              16,
+              26
+            ],
+            [
+              0,
+              12,
+              27
+            ],
+            [
+              0,
+              6,
+              28
+            ],
+            [
+              0,
+              2,
+              29
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "health": 6000,
+          "pos": [
+            [
+              11,
+              1,
+              19
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              12,
+              4,
+              27
+            ],
+            [
+              6,
+              10,
+              28
+            ],
+            [
+              2,
+              14,
+              29
+            ],
+            [
+              0,
+              16,
+              30
+            ],
+            [
+              0,
+              2,
+              31
+            ],
+            [
+              3,
+              13,
+              31
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              4,
+              1,
+              23
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "pos": [
+            [
+              0,
+              16,
+              16
+            ],
+            [
+              0,
+              6,
+              17
+            ],
+            [
+              8,
+              7,
+              17
+            ],
+            [
+              0,
+              14,
+              18
+            ],
+            [
+              4,
+              6,
+              19
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "health": 6000,
+          "pos": [
+            [
+              10,
+              1,
+              19
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "sunGeneratorConfig": {
+            "damagePerSun": 1800,
+            "maxSun": 200,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              2,
+              1,
+              31
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "sunGeneratorConfig": {
+            "damagePerSun": 300,
+            "maxSun": 30,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              6,
+              2,
+              17
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "customSpawnerId": "ov_spawner_p_1789238979556",
+          "pos": [
+            [
+              11,
+              1,
+              19
+            ]
+          ]
+        },
+        {
+          "overlayType": "sunGenerator",
+          "pos": [
+            [
+              6,
+              2,
+              17
+            ],
+            [
+              4,
+              1,
+              23
+            ],
+            [
+              2,
+              1,
+              31
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 1,
+      "cy": -1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_dirt",
+          "pos": [
+            [
+              16,
+              1,
+              -4
+            ],
+            [
+              16,
+              3,
+              -3
+            ],
+            [
+              16,
+              3,
+              -2
+            ],
+            [
+              16,
+              3,
+              -1
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "pos": [
+            [
+              16,
+              1,
+              -10
+            ],
+            [
+              16,
+              1,
+              -9
+            ],
+            [
+              16,
+              3,
+              -8
+            ],
+            [
+              16,
+              3,
+              -7
+            ],
+            [
+              16,
+              4,
+              -6
+            ],
+            [
+              16,
+              5,
+              -5
+            ],
+            [
+              17,
+              5,
+              -4
+            ],
+            [
+              19,
+              5,
+              -3
+            ],
+            [
+              19,
+              6,
+              -2
+            ],
+            [
+              19,
+              3,
+              -1
+            ],
+            [
+              23,
+              3,
+              -1
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              16,
+              3,
+              -16
+            ],
+            [
+              16,
+              4,
+              -15
+            ],
+            [
+              16,
+              4,
+              -14
+            ],
+            [
+              16,
+              5,
+              -13
+            ],
+            [
+              16,
+              6,
+              -12
+            ],
+            [
+              16,
+              7,
+              -11
+            ],
+            [
+              17,
+              7,
+              -10
+            ],
+            [
+              17,
+              9,
+              -9
+            ],
+            [
+              19,
+              8,
+              -8
+            ],
+            [
+              19,
+              8,
+              -7
+            ],
+            [
+              20,
+              3,
+              -6
+            ],
+            [
+              24,
+              5,
+              -6
+            ],
+            [
+              21,
+              9,
+              -5
+            ],
+            [
+              23,
+              8,
+              -4
+            ],
+            [
+              24,
+              8,
+              -3
+            ],
+            [
+              25,
+              7,
+              -2
+            ],
+            [
+              26,
+              6,
+              -1
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "health": 16000,
+          "pos": [
+            [
+              22,
+              1,
+              -4
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "sunGeneratorConfig": {
+            "damagePerSun": 1800,
+            "maxSun": 200,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              23,
+              1,
+              -6
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              22,
+              1,
+              -1
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              19,
+              13,
+              -16
+            ],
+            [
+              20,
+              12,
+              -15
+            ],
+            [
+              20,
+              12,
+              -14
+            ],
+            [
+              21,
+              11,
+              -13
+            ],
+            [
+              22,
+              10,
+              -12
+            ],
+            [
+              23,
+              9,
+              -11
+            ],
+            [
+              24,
+              8,
+              -10
+            ],
+            [
+              26,
+              6,
+              -9
+            ],
+            [
+              27,
+              5,
+              -8
+            ],
+            [
+              27,
+              5,
+              -7
+            ],
+            [
+              29,
+              3,
+              -6
+            ],
+            [
+              30,
+              2,
+              -5
+            ],
+            [
+              31,
+              1,
+              -4
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "customSpawnerId": "ov_spawner_p_1789239066855",
+          "pos": [
+            [
+              22,
+              1,
+              -4
+            ]
+          ]
+        },
+        {
+          "overlayType": "sunGenerator",
+          "pos": [
+            [
+              23,
+              1,
+              -6
+            ],
+            [
+              22,
+              1,
+              -1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 1,
+      "cy": 0,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_dirt",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              21,
+              1,
+              13
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "pos": [
+            [
+              16,
+              2,
+              0
+            ],
+            [
+              16,
+              2,
+              1
+            ],
+            [
+              16,
+              2,
+              2
+            ],
+            [
+              16,
+              1,
+              3
+            ],
+            [
+              16,
+              1,
+              4
+            ],
+            [
+              16,
+              2,
+              5
+            ],
+            [
+              16,
+              2,
+              6
+            ],
+            [
+              16,
+              2,
+              7
+            ],
+            [
+              16,
+              2,
+              8
+            ],
+            [
+              16,
+              2,
+              9
+            ],
+            [
+              16,
+              2,
+              10
+            ],
+            [
+              16,
+              2,
+              11
+            ],
+            [
+              16,
+              1,
+              12
+            ],
+            [
+              16,
+              1,
+              13
+            ],
+            [
+              16,
+              1,
+              14
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "pos": [
+            [
+              18,
+              8,
+              0
+            ],
+            [
+              18,
+              9,
+              1
+            ],
+            [
+              18,
+              9,
+              2
+            ],
+            [
+              17,
+              8,
+              3
+            ],
+            [
+              26,
+              2,
+              3
+            ],
+            [
+              18,
+              10,
+              4
+            ],
+            [
+              18,
+              10,
+              5
+            ],
+            [
+              18,
+              10,
+              6
+            ],
+            [
+              18,
+              10,
+              7
+            ],
+            [
+              18,
+              9,
+              8
+            ],
+            [
+              18,
+              8,
+              9
+            ],
+            [
+              18,
+              8,
+              10
+            ],
+            [
+              18,
+              8,
+              11
+            ],
+            [
+              17,
+              5,
+              12
+            ],
+            [
+              23,
+              3,
+              12
+            ],
+            [
+              17,
+              4,
+              13
+            ],
+            [
+              22,
+              4,
+              13
+            ],
+            [
+              17,
+              9,
+              14
+            ],
+            [
+              16,
+              5,
+              15
+            ],
+            [
+              22,
+              4,
+              15
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "health": 6000,
+          "pos": [
+            [
+              17,
+              1,
+              4
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "health": 12000,
+          "pos": [
+            [
+              21,
+              1,
+              15
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              26,
+              6,
+              0
+            ],
+            [
+              27,
+              5,
+              1
+            ],
+            [
+              27,
+              5,
+              2
+            ],
+            [
+              28,
+              4,
+              3
+            ],
+            [
+              28,
+              2,
+              4
+            ],
+            [
+              31,
+              1,
+              4
+            ],
+            [
+              28,
+              4,
+              5
+            ],
+            [
+              28,
+              4,
+              6
+            ],
+            [
+              28,
+              4,
+              7
+            ],
+            [
+              27,
+              5,
+              8
+            ],
+            [
+              26,
+              6,
+              9
+            ],
+            [
+              26,
+              6,
+              10
+            ],
+            [
+              26,
+              6,
+              11
+            ],
+            [
+              26,
+              6,
+              12
+            ],
+            [
+              26,
+              6,
+              13
+            ],
+            [
+              26,
+              6,
+              14
+            ],
+            [
+              26,
+              6,
+              15
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "sunGeneratorConfig": {
+            "damagePerSun": 1800,
+            "maxSun": 200,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              30,
+              1,
+              4
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              25,
+              1,
+              3
+            ],
+            [
+              22,
+              1,
+              12
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "customSpawnerId": "ov_spawner_p_1789238979556",
+          "pos": [
+            [
+              17,
+              1,
+              4
+            ]
+          ]
+        },
+        {
+          "customSpawnerId": "ov_spawner_p_1789238968599",
+          "pos": [
+            [
+              21,
+              1,
+              15
+            ]
+          ]
+        },
+        {
+          "overlayType": "sunGenerator",
+          "pos": [
+            [
+              25,
+              1,
+              3
+            ],
+            [
+              30,
+              1,
+              4
+            ],
+            [
+              22,
+              1,
+              12
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 1,
+      "cy": 1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_dirt",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              22,
+              1,
+              17
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              26,
+              6,
+              16
+            ],
+            [
+              26,
+              6,
+              17
+            ],
+            [
+              26,
+              6,
+              18
+            ],
+            [
+              26,
+              6,
+              19
+            ],
+            [
+              26,
+              6,
+              20
+            ],
+            [
+              25,
+              7,
+              21
+            ],
+            [
+              24,
+              8,
+              22
+            ],
+            [
+              23,
+              7,
+              23
+            ],
+            [
+              31,
+              1,
+              23
+            ],
+            [
+              22,
+              10,
+              24
+            ],
+            [
+              20,
+              12,
+              25
+            ],
+            [
+              16,
+              16,
+              26
+            ],
+            [
+              16,
+              1,
+              27
+            ],
+            [
+              18,
+              14,
+              27
+            ],
+            [
+              16,
+              16,
+              28
+            ],
+            [
+              16,
+              6,
+              29
+            ],
+            [
+              23,
+              9,
+              29
+            ],
+            [
+              16,
+              16,
+              30
+            ],
+            [
+              16,
+              3,
+              31
+            ],
+            [
+              20,
+              12,
+              31
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "health": 16000,
+          "pos": [
+            [
+              19,
+              1,
+              25
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "health": 6000,
+          "pos": [
+            [
+              17,
+              1,
+              27
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "pos": [
+            [
+              16,
+              10,
+              16
+            ],
+            [
+              16,
+              6,
+              17
+            ],
+            [
+              23,
+              1,
+              17
+            ],
+            [
+              25,
+              1,
+              17
+            ],
+            [
+              16,
+              10,
+              18
+            ],
+            [
+              16,
+              10,
+              19
+            ],
+            [
+              16,
+              10,
+              20
+            ],
+            [
+              16,
+              9,
+              21
+            ],
+            [
+              16,
+              8,
+              22
+            ],
+            [
+              16,
+              7,
+              23
+            ],
+            [
+              16,
+              2,
+              24
+            ],
+            [
+              19,
+              3,
+              24
+            ],
+            [
+              16,
+              3,
+              25
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "health": 6000,
+          "pos": [
+            [
+              24,
+              1,
+              17
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "sunGeneratorConfig": {
+            "damagePerSun": 1800,
+            "maxSun": 200,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              30,
+              1,
+              23
+            ],
+            [
+              22,
+              1,
+              29
+            ],
+            [
+              19,
+              1,
+              31
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              18,
+              1,
+              24
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "customSpawnerId": "ov_spawner_p_1789239066855",
+          "pos": [
+            [
+              19,
+              1,
+              25
+            ]
+          ]
+        },
+        {
+          "overlayType": "sunGenerator",
+          "pos": [
+            [
+              30,
+              1,
+              23
+            ],
+            [
+              18,
+              1,
+              24
+            ],
+            [
+              22,
+              1,
+              29
+            ],
+            [
+              19,
+              1,
+              31
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 2,
+      "cy": -1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              32,
+              1,
+              -2
+            ],
+            [
+              32,
+              2,
+              -1
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              32,
+              16,
+              -16
+            ],
+            [
+              32,
+              16,
+              -15
+            ],
+            [
+              32,
+              16,
+              -14
+            ],
+            [
+              32,
+              16,
+              -13
+            ],
+            [
+              32,
+              16,
+              -12
+            ],
+            [
+              32,
+              16,
+              -11
+            ],
+            [
+              32,
+              16,
+              -10
+            ],
+            [
+              32,
+              16,
+              -9
+            ],
+            [
+              32,
+              16,
+              -8
+            ],
+            [
+              32,
+              16,
+              -7
+            ],
+            [
+              32,
+              16,
+              -6
+            ],
+            [
+              32,
+              16,
+              -5
+            ],
+            [
+              32,
+              16,
+              -4
+            ],
+            [
+              32,
+              16,
+              -3
+            ],
+            [
+              33,
+              15,
+              -2
+            ],
+            [
+              34,
+              14,
+              -1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 2,
+      "cy": 0,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              32,
+              3,
+              0
+            ],
+            [
+              32,
+              3,
+              1
+            ],
+            [
+              32,
+              4,
+              2
+            ],
+            [
+              32,
+              4,
+              3
+            ],
+            [
+              32,
+              4,
+              4
+            ],
+            [
+              32,
+              4,
+              5
+            ],
+            [
+              32,
+              4,
+              6
+            ],
+            [
+              32,
+              4,
+              7
+            ],
+            [
+              32,
+              4,
+              8
+            ],
+            [
+              32,
+              4,
+              9
+            ],
+            [
+              32,
+              3,
+              10
+            ],
+            [
+              32,
+              3,
+              11
+            ],
+            [
+              32,
+              3,
+              12
+            ],
+            [
+              32,
+              2,
+              13
+            ],
+            [
+              32,
+              1,
+              14
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              35,
+              13,
+              0
+            ],
+            [
+              35,
+              13,
+              1
+            ],
+            [
+              36,
+              12,
+              2
+            ],
+            [
+              36,
+              12,
+              3
+            ],
+            [
+              36,
+              12,
+              4
+            ],
+            [
+              36,
+              12,
+              5
+            ],
+            [
+              36,
+              12,
+              6
+            ],
+            [
+              36,
+              12,
+              7
+            ],
+            [
+              36,
+              12,
+              8
+            ],
+            [
+              36,
+              12,
+              9
+            ],
+            [
+              35,
+              13,
+              10
+            ],
+            [
+              35,
+              13,
+              11
+            ],
+            [
+              35,
+              13,
+              12
+            ],
+            [
+              34,
+              14,
+              13
+            ],
+            [
+              33,
+              15,
+              14
+            ],
+            [
+              32,
+              16,
+              15
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 2,
+      "cy": 1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              32,
+              1,
+              17
+            ],
+            [
+              32,
+              1,
+              18
+            ],
+            [
+              32,
+              1,
+              19
+            ],
+            [
+              32,
+              2,
+              20
+            ],
+            [
+              32,
+              2,
+              21
+            ],
+            [
+              32,
+              2,
+              22
+            ],
+            [
+              32,
+              2,
+              23
+            ],
+            [
+              32,
+              2,
+              24
+            ],
+            [
+              32,
+              2,
+              25
+            ],
+            [
+              32,
+              2,
+              26
+            ],
+            [
+              32,
+              2,
+              27
+            ],
+            [
+              32,
+              2,
+              28
+            ],
+            [
+              32,
+              2,
+              29
+            ],
+            [
+              32,
+              1,
+              30
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              32,
+              16,
+              16
+            ],
+            [
+              33,
+              15,
+              17
+            ],
+            [
+              33,
+              15,
+              18
+            ],
+            [
+              33,
+              15,
+              19
+            ],
+            [
+              34,
+              14,
+              20
+            ],
+            [
+              34,
+              14,
+              21
+            ],
+            [
+              34,
+              14,
+              22
+            ],
+            [
+              34,
+              14,
+              23
+            ],
+            [
+              34,
+              14,
+              24
+            ],
+            [
+              34,
+              14,
+              25
+            ],
+            [
+              34,
+              14,
+              26
+            ],
+            [
+              34,
+              14,
+              27
+            ],
+            [
+              34,
+              14,
+              28
+            ],
+            [
+              34,
+              14,
+              29
+            ],
+            [
+              33,
+              15,
+              30
+            ],
+            [
+              32,
+              16,
+              31
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -1,
+      "cy": 2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              -15,
+              15,
+              32
+            ],
+            [
+              -14,
+              14,
+              33
+            ],
+            [
+              -13,
+              13,
+              34
+            ],
+            [
+              -11,
+              11,
+              35
+            ],
+            [
+              -9,
+              9,
+              36
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -16,
+              1,
+              32
+            ],
+            [
+              -16,
+              2,
+              33
+            ],
+            [
+              -16,
+              3,
+              34
+            ],
+            [
+              -16,
+              5,
+              35
+            ],
+            [
+              -16,
+              7,
+              36
+            ],
+            [
+              -16,
+              16,
+              37
+            ],
+            [
+              -16,
+              16,
+              38
+            ],
+            [
+              -16,
+              16,
+              39
+            ],
+            [
+              -16,
+              16,
+              40
+            ],
+            [
+              -16,
+              16,
+              41
+            ],
+            [
+              -16,
+              16,
+              42
+            ],
+            [
+              -16,
+              16,
+              43
+            ],
+            [
+              -16,
+              16,
+              44
+            ],
+            [
+              -16,
+              16,
+              45
+            ],
+            [
+              -16,
+              16,
+              46
+            ],
+            [
+              -16,
+              16,
+              47
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 0,
+      "cy": 2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              0,
+              6,
+              32
+            ],
+            [
+              7,
+              9,
+              32
+            ],
+            [
+              0,
+              16,
+              33
+            ],
+            [
+              0,
+              16,
+              34
+            ],
+            [
+              0,
+              10,
+              35
+            ],
+            [
+              0,
+              1,
+              36
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "sunGeneratorConfig": {
+            "damagePerSun": 1800,
+            "maxSun": 200,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              6,
+              1,
+              32
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              10,
+              6,
+              35
+            ],
+            [
+              1,
+              15,
+              36
+            ],
+            [
+              0,
+              16,
+              37
+            ],
+            [
+              0,
+              16,
+              38
+            ],
+            [
+              0,
+              16,
+              39
+            ],
+            [
+              0,
+              16,
+              40
+            ],
+            [
+              0,
+              16,
+              41
+            ],
+            [
+              0,
+              16,
+              42
+            ],
+            [
+              0,
+              16,
+              43
+            ],
+            [
+              0,
+              16,
+              44
+            ],
+            [
+              0,
+              16,
+              45
+            ],
+            [
+              0,
+              16,
+              46
+            ],
+            [
+              0,
+              16,
+              47
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "overlayType": "sunGenerator",
+          "pos": [
+            [
+              6,
+              1,
+              32
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 1,
+      "cy": 2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              16,
+              15,
+              32
+            ],
+            [
+              16,
+              13,
+              33
+            ],
+            [
+              16,
+              10,
+              34
+            ],
+            [
+              23,
+              1,
+              35
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              31,
+              1,
+              32
+            ],
+            [
+              29,
+              3,
+              33
+            ],
+            [
+              26,
+              6,
+              34
+            ],
+            [
+              16,
+              7,
+              35
+            ],
+            [
+              24,
+              8,
+              35
+            ],
+            [
+              16,
+              16,
+              36
+            ],
+            [
+              16,
+              16,
+              37
+            ],
+            [
+              16,
+              16,
+              38
+            ],
+            [
+              16,
+              16,
+              39
+            ],
+            [
+              16,
+              16,
+              40
+            ],
+            [
+              16,
+              16,
+              41
+            ],
+            [
+              16,
+              16,
+              42
+            ],
+            [
+              16,
+              16,
+              43
+            ],
+            [
+              16,
+              16,
+              44
+            ],
+            [
+              16,
+              16,
+              45
+            ],
+            [
+              16,
+              16,
+              46
+            ],
+            [
+              16,
+              16,
+              47
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -2,
+      "cy": -1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_clay",
+          "pos": [
+            [
+              -18,
+              2,
+              -8
+            ],
+            [
+              -20,
+              4,
+              -7
+            ],
+            [
+              -22,
+              6,
+              -6
+            ],
+            [
+              -23,
+              6,
+              -5
+            ],
+            [
+              -23,
+              6,
+              -4
+            ],
+            [
+              -23,
+              7,
+              -3
+            ],
+            [
+              -24,
+              5,
+              -2
+            ],
+            [
+              -18,
+              2,
+              -2
+            ],
+            [
+              -24,
+              8,
+              -1
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "health": 12000,
+          "pos": [
+            [
+              -17,
+              1,
+              -5
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "health": 6000,
+          "pos": [
+            [
+              -17,
+              1,
+              -4
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              -19,
+              1,
+              -2
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              -17,
+              1,
+              -16
+            ],
+            [
+              -17,
+              1,
+              -15
+            ],
+            [
+              -18,
+              2,
+              -14
+            ],
+            [
+              -19,
+              3,
+              -13
+            ],
+            [
+              -23,
+              7,
+              -12
+            ],
+            [
+              -26,
+              10,
+              -11
+            ],
+            [
+              -27,
+              11,
+              -10
+            ],
+            [
+              -28,
+              12,
+              -9
+            ],
+            [
+              -30,
+              12,
+              -8
+            ],
+            [
+              -30,
+              10,
+              -7
+            ],
+            [
+              -31,
+              9,
+              -6
+            ],
+            [
+              -32,
+              9,
+              -5
+            ],
+            [
+              -32,
+              9,
+              -4
+            ],
+            [
+              -32,
+              9,
+              -3
+            ],
+            [
+              -32,
+              8,
+              -2
+            ],
+            [
+              -32,
+              8,
+              -1
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -32,
+              15,
+              -16
+            ],
+            [
+              -32,
+              15,
+              -15
+            ],
+            [
+              -32,
+              14,
+              -14
+            ],
+            [
+              -32,
+              13,
+              -13
+            ],
+            [
+              -32,
+              9,
+              -12
+            ],
+            [
+              -32,
+              6,
+              -11
+            ],
+            [
+              -32,
+              5,
+              -10
+            ],
+            [
+              -32,
+              4,
+              -9
+            ],
+            [
+              -32,
+              2,
+              -8
+            ],
+            [
+              -32,
+              2,
+              -7
+            ],
+            [
+              -32,
+              1,
+              -6
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "customSpawnerId": "ov_spawner_p_1789238968599",
+          "pos": [
+            [
+              -17,
+              1,
+              -5
+            ]
+          ]
+        },
+        {
+          "overlayType": "sunGenerator",
+          "pos": [
+            [
+              -19,
+              1,
+              -2
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -2,
+      "cy": 0,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_clay",
+          "sunGeneratorConfig": {
+            "damagePerSun": 900,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              -17,
+              1,
+              1
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_clay",
+          "pos": [
+            [
+              -23,
+              7,
+              0
+            ],
+            [
+              -23,
+              6,
+              1
+            ],
+            [
+              -23,
+              7,
+              2
+            ],
+            [
+              -23,
+              7,
+              3
+            ],
+            [
+              -23,
+              7,
+              4
+            ],
+            [
+              -22,
+              6,
+              5
+            ],
+            [
+              -22,
+              6,
+              6
+            ],
+            [
+              -21,
+              5,
+              7
+            ],
+            [
+              -21,
+              5,
+              8
+            ],
+            [
+              -20,
+              4,
+              9
+            ],
+            [
+              -20,
+              4,
+              10
+            ],
+            [
+              -19,
+              3,
+              11
+            ],
+            [
+              -19,
+              3,
+              12
+            ],
+            [
+              -18,
+              2,
+              13
+            ],
+            [
+              -18,
+              2,
+              14
+            ],
+            [
+              -17,
+              1,
+              15
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              -32,
+              8,
+              0
+            ],
+            [
+              -32,
+              9,
+              1
+            ],
+            [
+              -32,
+              9,
+              2
+            ],
+            [
+              -32,
+              6,
+              3
+            ],
+            [
+              -25,
+              2,
+              3
+            ],
+            [
+              -32,
+              9,
+              4
+            ],
+            [
+              -31,
+              8,
+              5
+            ],
+            [
+              -31,
+              9,
+              6
+            ],
+            [
+              -30,
+              9,
+              7
+            ],
+            [
+              -30,
+              9,
+              8
+            ],
+            [
+              -30,
+              10,
+              9
+            ],
+            [
+              -29,
+              9,
+              10
+            ],
+            [
+              -29,
+              10,
+              11
+            ],
+            [
+              -28,
+              9,
+              12
+            ],
+            [
+              -28,
+              10,
+              13
+            ],
+            [
+              -28,
+              10,
+              14
+            ],
+            [
+              -27,
+              10,
+              15
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "health": 16000,
+          "pos": [
+            [
+              -23,
+              1,
+              5
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "sunGeneratorConfig": {
+            "damagePerSun": 1800,
+            "maxSun": 200,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              -24,
+              1,
+              0
+            ],
+            [
+              -26,
+              1,
+              3
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -32,
+              1,
+              5
+            ],
+            [
+              -32,
+              1,
+              6
+            ],
+            [
+              -32,
+              2,
+              7
+            ],
+            [
+              -32,
+              2,
+              8
+            ],
+            [
+              -32,
+              2,
+              9
+            ],
+            [
+              -32,
+              3,
+              10
+            ],
+            [
+              -32,
+              3,
+              11
+            ],
+            [
+              -32,
+              4,
+              12
+            ],
+            [
+              -32,
+              4,
+              13
+            ],
+            [
+              -32,
+              4,
+              14
+            ],
+            [
+              -32,
+              5,
+              15
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "overlayType": "sunGenerator",
+          "pos": [
+            [
+              -24,
+              1,
+              0
+            ],
+            [
+              -17,
+              1,
+              1
+            ],
+            [
+              -26,
+              1,
+              3
+            ]
+          ]
+        },
+        {
+          "customSpawnerId": "ov_spawner_p_1789239066855",
+          "pos": [
+            [
+              -23,
+              1,
+              5
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -2,
+      "cy": 1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              -27,
+              11,
+              16
+            ],
+            [
+              -27,
+              11,
+              17
+            ],
+            [
+              -27,
+              11,
+              18
+            ],
+            [
+              -26,
+              10,
+              19
+            ],
+            [
+              -26,
+              10,
+              20
+            ],
+            [
+              -25,
+              9,
+              21
+            ],
+            [
+              -25,
+              9,
+              22
+            ],
+            [
+              -24,
+              8,
+              23
+            ],
+            [
+              -24,
+              8,
+              24
+            ],
+            [
+              -23,
+              7,
+              25
+            ],
+            [
+              -22,
+              6,
+              26
+            ],
+            [
+              -21,
+              5,
+              27
+            ],
+            [
+              -20,
+              4,
+              28
+            ],
+            [
+              -19,
+              3,
+              29
+            ],
+            [
+              -18,
+              2,
+              30
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -32,
+              5,
+              16
+            ],
+            [
+              -32,
+              5,
+              17
+            ],
+            [
+              -32,
+              5,
+              18
+            ],
+            [
+              -32,
+              6,
+              19
+            ],
+            [
+              -32,
+              6,
+              20
+            ],
+            [
+              -32,
+              7,
+              21
+            ],
+            [
+              -32,
+              7,
+              22
+            ],
+            [
+              -32,
+              8,
+              23
+            ],
+            [
+              -32,
+              8,
+              24
+            ],
+            [
+              -32,
+              9,
+              25
+            ],
+            [
+              -32,
+              10,
+              26
+            ],
+            [
+              -32,
+              11,
+              27
+            ],
+            [
+              -32,
+              12,
+              28
+            ],
+            [
+              -32,
+              13,
+              29
+            ],
+            [
+              -32,
+              14,
+              30
+            ],
+            [
+              -32,
+              16,
+              31
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -1,
+      "cy": -2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              -8,
+              8,
+              -23
+            ],
+            [
+              -11,
+              11,
+              -22
+            ],
+            [
+              -13,
+              13,
+              -21
+            ],
+            [
+              -14,
+              12,
+              -20
+            ],
+            [
+              -1,
+              1,
+              -20
+            ],
+            [
+              -15,
+              15,
+              -19
+            ],
+            [
+              -15,
+              15,
+              -18
+            ],
+            [
+              -16,
+              16,
+              -17
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_stone",
+          "sunGeneratorConfig": {
+            "damagePerSun": 1800,
+            "maxSun": 200,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              -2,
+              1,
+              -20
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -16,
+              16,
+              -32
+            ],
+            [
+              -16,
+              16,
+              -31
+            ],
+            [
+              -16,
+              16,
+              -30
+            ],
+            [
+              -16,
+              16,
+              -29
+            ],
+            [
+              -16,
+              16,
+              -28
+            ],
+            [
+              -16,
+              16,
+              -27
+            ],
+            [
+              -16,
+              16,
+              -26
+            ],
+            [
+              -16,
+              16,
+              -25
+            ],
+            [
+              -16,
+              16,
+              -24
+            ],
+            [
+              -16,
+              8,
+              -23
+            ],
+            [
+              -16,
+              5,
+              -22
+            ],
+            [
+              -16,
+              3,
+              -21
+            ],
+            [
+              -16,
+              2,
+              -20
+            ],
+            [
+              -16,
+              1,
+              -19
+            ],
+            [
+              -16,
+              1,
+              -18
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "overlayType": "sunGenerator",
+          "pos": [
+            [
+              -2,
+              1,
+              -20
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 0,
+      "cy": -2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              0,
+              3,
+              -23
+            ],
+            [
+              0,
+              8,
+              -22
+            ],
+            [
+              0,
+              13,
+              -21
+            ],
+            [
+              0,
+              15,
+              -20
+            ],
+            [
+              0,
+              16,
+              -19
+            ],
+            [
+              0,
+              16,
+              -18
+            ],
+            [
+              0,
+              16,
+              -17
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              0,
+              16,
+              -32
+            ],
+            [
+              0,
+              16,
+              -31
+            ],
+            [
+              0,
+              16,
+              -30
+            ],
+            [
+              0,
+              16,
+              -29
+            ],
+            [
+              0,
+              16,
+              -28
+            ],
+            [
+              0,
+              16,
+              -27
+            ],
+            [
+              0,
+              16,
+              -26
+            ],
+            [
+              0,
+              16,
+              -25
+            ],
+            [
+              0,
+              16,
+              -24
+            ],
+            [
+              3,
+              13,
+              -23
+            ],
+            [
+              8,
+              8,
+              -22
+            ],
+            [
+              13,
+              3,
+              -21
+            ],
+            [
+              15,
+              1,
+              -20
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 1,
+      "cy": -2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              16,
+              1,
+              -18
+            ],
+            [
+              16,
+              2,
+              -17
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              16,
+              16,
+              -32
+            ],
+            [
+              16,
+              16,
+              -31
+            ],
+            [
+              16,
+              16,
+              -30
+            ],
+            [
+              16,
+              16,
+              -29
+            ],
+            [
+              16,
+              16,
+              -28
+            ],
+            [
+              16,
+              16,
+              -27
+            ],
+            [
+              16,
+              16,
+              -26
+            ],
+            [
+              16,
+              16,
+              -25
+            ],
+            [
+              16,
+              16,
+              -24
+            ],
+            [
+              16,
+              16,
+              -23
+            ],
+            [
+              16,
+              16,
+              -22
+            ],
+            [
+              16,
+              16,
+              -21
+            ],
+            [
+              16,
+              16,
+              -20
+            ],
+            [
+              16,
+              16,
+              -19
+            ],
+            [
+              17,
+              15,
+              -18
+            ],
+            [
+              18,
+              14,
+              -17
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -3,
+      "cy": 0,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              -34,
+              2,
+              0
+            ],
+            [
+              -33,
+              1,
+              1
+            ],
+            [
+              -33,
+              1,
+              2
+            ],
+            [
+              -33,
+              1,
+              3
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -48,
+              14,
+              0
+            ],
+            [
+              -48,
+              15,
+              1
+            ],
+            [
+              -48,
+              15,
+              2
+            ],
+            [
+              -48,
+              15,
+              3
+            ],
+            [
+              -48,
+              16,
+              4
+            ],
+            [
+              -48,
+              16,
+              5
+            ],
+            [
+              -48,
+              16,
+              6
+            ],
+            [
+              -48,
+              16,
+              7
+            ],
+            [
+              -48,
+              16,
+              8
+            ],
+            [
+              -48,
+              16,
+              9
+            ],
+            [
+              -48,
+              16,
+              10
+            ],
+            [
+              -48,
+              16,
+              11
+            ],
+            [
+              -48,
+              16,
+              12
+            ],
+            [
+              -48,
+              16,
+              13
+            ],
+            [
+              -48,
+              16,
+              14
+            ],
+            [
+              -48,
+              16,
+              15
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -3,
+      "cy": -1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_stone",
+          "pos": [
+            [
+              -33,
+              1,
+              -3
+            ],
+            [
+              -33,
+              1,
+              -2
+            ],
+            [
+              -33,
+              1,
+              -1
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -48,
+              16,
+              -16
+            ],
+            [
+              -48,
+              16,
+              -15
+            ],
+            [
+              -48,
+              16,
+              -14
+            ],
+            [
+              -48,
+              16,
+              -13
+            ],
+            [
+              -48,
+              16,
+              -12
+            ],
+            [
+              -48,
+              16,
+              -11
+            ],
+            [
+              -48,
+              16,
+              -10
+            ],
+            [
+              -48,
+              16,
+              -9
+            ],
+            [
+              -48,
+              16,
+              -8
+            ],
+            [
+              -48,
+              16,
+              -7
+            ],
+            [
+              -48,
+              16,
+              -6
+            ],
+            [
+              -48,
+              16,
+              -5
+            ],
+            [
+              -48,
+              16,
+              -4
+            ],
+            [
+              -48,
+              15,
+              -3
+            ],
+            [
+              -48,
+              15,
+              -2
+            ],
+            [
+              -48,
+              15,
+              -1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -3,
+      "cy": 1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -48,
+              16,
+              16
+            ],
+            [
+              -48,
+              16,
+              17
+            ],
+            [
+              -48,
+              16,
+              18
+            ],
+            [
+              -48,
+              16,
+              19
+            ],
+            [
+              -48,
+              16,
+              20
+            ],
+            [
+              -48,
+              16,
+              21
+            ],
+            [
+              -48,
+              16,
+              22
+            ],
+            [
+              -48,
+              16,
+              23
+            ],
+            [
+              -48,
+              16,
+              24
+            ],
+            [
+              -48,
+              16,
+              25
+            ],
+            [
+              -48,
+              16,
+              26
+            ],
+            [
+              -48,
+              16,
+              27
+            ],
+            [
+              -48,
+              16,
+              28
+            ],
+            [
+              -48,
+              16,
+              29
+            ],
+            [
+              -48,
+              16,
+              30
+            ],
+            [
+              -48,
+              16,
+              31
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -3,
+      "cy": 2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -48,
+              16,
+              32
+            ],
+            [
+              -47,
+              15,
+              33
+            ],
+            [
+              -46,
+              14,
+              34
+            ],
+            [
+              -45,
+              13,
+              35
+            ],
+            [
+              -44,
+              12,
+              36
+            ],
+            [
+              -43,
+              3,
+              37
+            ],
+            [
+              -39,
+              7,
+              37
+            ],
+            [
+              -42,
+              1,
+              38
+            ],
+            [
+              -38,
+              6,
+              38
+            ],
+            [
+              -37,
+              5,
+              39
+            ],
+            [
+              -36,
+              4,
+              40
+            ],
+            [
+              -35,
+              3,
+              41
+            ],
+            [
+              -34,
+              2,
+              42
+            ],
+            [
+              -33,
+              1,
+              43
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -2,
+      "cy": 2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -32,
+              16,
+              32
+            ],
+            [
+              -32,
+              16,
+              33
+            ],
+            [
+              -32,
+              16,
+              34
+            ],
+            [
+              -32,
+              16,
+              35
+            ],
+            [
+              -32,
+              16,
+              36
+            ],
+            [
+              -32,
+              16,
+              37
+            ],
+            [
+              -32,
+              16,
+              38
+            ],
+            [
+              -32,
+              16,
+              39
+            ],
+            [
+              -32,
+              16,
+              40
+            ],
+            [
+              -32,
+              16,
+              41
+            ],
+            [
+              -32,
+              16,
+              42
+            ],
+            [
+              -32,
+              16,
+              43
+            ],
+            [
+              -32,
+              16,
+              44
+            ],
+            [
+              -31,
+              15,
+              45
+            ],
+            [
+              -30,
+              14,
+              46
+            ],
+            [
+              -29,
+              13,
+              47
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -2,
+      "cy": 3,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -28,
+              12,
+              48
+            ],
+            [
+              -27,
+              11,
+              49
+            ],
+            [
+              -26,
+              10,
+              50
+            ],
+            [
+              -25,
+              9,
+              51
+            ],
+            [
+              -24,
+              8,
+              52
+            ],
+            [
+              -23,
+              7,
+              53
+            ],
+            [
+              -22,
+              6,
+              54
+            ],
+            [
+              -21,
+              5,
+              55
+            ],
+            [
+              -20,
+              4,
+              56
+            ],
+            [
+              -19,
+              3,
+              57
+            ],
+            [
+              -18,
+              2,
+              58
+            ],
+            [
+              -17,
+              1,
+              59
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -1,
+      "cy": 3,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -16,
+              16,
+              48
+            ],
+            [
+              -16,
+              16,
+              49
+            ],
+            [
+              -16,
+              13,
+              50
+            ],
+            [
+              -2,
+              2,
+              50
+            ],
+            [
+              -16,
+              12,
+              51
+            ],
+            [
+              -1,
+              1,
+              51
+            ],
+            [
+              -16,
+              11,
+              52
+            ],
+            [
+              -16,
+              10,
+              53
+            ],
+            [
+              -16,
+              9,
+              54
+            ],
+            [
+              -16,
+              8,
+              55
+            ],
+            [
+              -16,
+              7,
+              56
+            ],
+            [
+              -16,
+              6,
+              57
+            ],
+            [
+              -16,
+              5,
+              58
+            ],
+            [
+              -16,
+              4,
+              59
+            ],
+            [
+              -16,
+              4,
+              60
+            ],
+            [
+              -16,
+              3,
+              61
+            ],
+            [
+              -15,
+              1,
+              62
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 0,
+      "cy": 3,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              0,
+              16,
+              48
+            ],
+            [
+              0,
+              16,
+              49
+            ],
+            [
+              0,
+              16,
+              50
+            ],
+            [
+              0,
+              16,
+              51
+            ],
+            [
+              0,
+              16,
+              52
+            ],
+            [
+              1,
+              15,
+              53
+            ],
+            [
+              2,
+              14,
+              54
+            ],
+            [
+              3,
+              13,
+              55
+            ],
+            [
+              4,
+              12,
+              56
+            ],
+            [
+              5,
+              11,
+              57
+            ],
+            [
+              6,
+              10,
+              58
+            ],
+            [
+              7,
+              9,
+              59
+            ],
+            [
+              8,
+              8,
+              60
+            ],
+            [
+              9,
+              7,
+              61
+            ],
+            [
+              10,
+              6,
+              62
+            ],
+            [
+              11,
+              5,
+              63
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 1,
+      "cy": 3,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              16,
+              16,
+              48
+            ],
+            [
+              16,
+              16,
+              49
+            ],
+            [
+              16,
+              16,
+              50
+            ],
+            [
+              16,
+              16,
+              51
+            ],
+            [
+              16,
+              13,
+              52
+            ],
+            [
+              31,
+              1,
+              52
+            ],
+            [
+              16,
+              12,
+              53
+            ],
+            [
+              16,
+              11,
+              54
+            ],
+            [
+              16,
+              10,
+              55
+            ],
+            [
+              16,
+              9,
+              56
+            ],
+            [
+              16,
+              8,
+              57
+            ],
+            [
+              16,
+              7,
+              58
+            ],
+            [
+              16,
+              6,
+              59
+            ],
+            [
+              16,
+              5,
+              60
+            ],
+            [
+              16,
+              4,
+              61
+            ],
+            [
+              16,
+              3,
+              62
+            ],
+            [
+              16,
+              2,
+              63
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -4,
+      "cy": -1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -59,
+              11,
+              -16
+            ],
+            [
+              -60,
+              12,
+              -15
+            ],
+            [
+              -61,
+              13,
+              -14
+            ],
+            [
+              -62,
+              14,
+              -13
+            ],
+            [
+              -63,
+              15,
+              -12
+            ],
+            [
+              -64,
+              16,
+              -11
+            ],
+            [
+              -64,
+              16,
+              -10
+            ],
+            [
+              -64,
+              16,
+              -9
+            ],
+            [
+              -64,
+              16,
+              -8
+            ],
+            [
+              -64,
+              16,
+              -7
+            ],
+            [
+              -64,
+              16,
+              -6
+            ],
+            [
+              -64,
+              16,
+              -5
+            ],
+            [
+              -64,
+              16,
+              -4
+            ],
+            [
+              -64,
+              16,
+              -3
+            ],
+            [
+              -64,
+              16,
+              -2
+            ],
+            [
+              -64,
+              16,
+              -1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -4,
+      "cy": 0,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -64,
+              16,
+              0
+            ],
+            [
+              -64,
+              16,
+              1
+            ],
+            [
+              -64,
+              16,
+              2
+            ],
+            [
+              -64,
+              16,
+              3
+            ],
+            [
+              -63,
+              15,
+              4
+            ],
+            [
+              -62,
+              14,
+              5
+            ],
+            [
+              -61,
+              13,
+              6
+            ],
+            [
+              -60,
+              12,
+              7
+            ],
+            [
+              -60,
+              12,
+              8
+            ],
+            [
+              -59,
+              11,
+              9
+            ],
+            [
+              -58,
+              10,
+              10
+            ],
+            [
+              -57,
+              9,
+              11
+            ],
+            [
+              -56,
+              8,
+              12
+            ],
+            [
+              -55,
+              7,
+              13
+            ],
+            [
+              -54,
+              6,
+              14
+            ],
+            [
+              -55,
+              7,
+              15
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -4,
+      "cy": 1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -56,
+              8,
+              16
+            ],
+            [
+              -57,
+              9,
+              17
+            ],
+            [
+              -58,
+              10,
+              18
+            ],
+            [
+              -59,
+              11,
+              19
+            ],
+            [
+              -59,
+              11,
+              20
+            ],
+            [
+              -58,
+              10,
+              21
+            ],
+            [
+              -57,
+              9,
+              22
+            ],
+            [
+              -57,
+              9,
+              23
+            ],
+            [
+              -56,
+              8,
+              24
+            ],
+            [
+              -55,
+              7,
+              25
+            ],
+            [
+              -54,
+              6,
+              26
+            ],
+            [
+              -53,
+              5,
+              27
+            ],
+            [
+              -52,
+              4,
+              28
+            ],
+            [
+              -51,
+              3,
+              29
+            ],
+            [
+              -50,
+              2,
+              30
+            ],
+            [
+              -49,
+              1,
+              31
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -5,
+      "cy": -1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -65,
+              1,
+              -10
+            ],
+            [
+              -66,
+              2,
+              -9
+            ],
+            [
+              -67,
+              3,
+              -8
+            ],
+            [
+              -68,
+              4,
+              -7
+            ],
+            [
+              -69,
+              5,
+              -6
+            ],
+            [
+              -70,
+              6,
+              -5
+            ],
+            [
+              -71,
+              7,
+              -4
+            ],
+            [
+              -70,
+              6,
+              -3
+            ],
+            [
+              -69,
+              5,
+              -2
+            ],
+            [
+              -68,
+              4,
+              -1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -5,
+      "cy": 0,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -67,
+              3,
+              0
+            ],
+            [
+              -66,
+              2,
+              1
+            ],
+            [
+              -65,
+              1,
+              2
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -4,
+      "cy": -2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -49,
+              1,
+              -26
+            ],
+            [
+              -50,
+              2,
+              -25
+            ],
+            [
+              -51,
+              3,
+              -24
+            ],
+            [
+              -52,
+              4,
+              -23
+            ],
+            [
+              -53,
+              5,
+              -22
+            ],
+            [
+              -54,
+              6,
+              -21
+            ],
+            [
+              -55,
+              7,
+              -20
+            ],
+            [
+              -56,
+              8,
+              -19
+            ],
+            [
+              -57,
+              9,
+              -18
+            ],
+            [
+              -58,
+              10,
+              -17
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -3,
+      "cy": -2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -47,
+              1,
+              -28
+            ],
+            [
+              -48,
+              3,
+              -27
+            ],
+            [
+              -33,
+              1,
+              -27
+            ],
+            [
+              -48,
+              4,
+              -26
+            ],
+            [
+              -34,
+              2,
+              -26
+            ],
+            [
+              -48,
+              5,
+              -25
+            ],
+            [
+              -35,
+              3,
+              -25
+            ],
+            [
+              -48,
+              6,
+              -24
+            ],
+            [
+              -36,
+              4,
+              -24
+            ],
+            [
+              -48,
+              7,
+              -23
+            ],
+            [
+              -37,
+              5,
+              -23
+            ],
+            [
+              -48,
+              8,
+              -22
+            ],
+            [
+              -38,
+              6,
+              -22
+            ],
+            [
+              -48,
+              16,
+              -21
+            ],
+            [
+              -48,
+              16,
+              -20
+            ],
+            [
+              -48,
+              16,
+              -19
+            ],
+            [
+              -48,
+              16,
+              -18
+            ],
+            [
+              -48,
+              16,
+              -17
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -2,
+      "cy": -2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -28,
+              12,
+              -32
+            ],
+            [
+              -29,
+              13,
+              -31
+            ],
+            [
+              -30,
+              14,
+              -30
+            ],
+            [
+              -31,
+              15,
+              -29
+            ],
+            [
+              -32,
+              16,
+              -28
+            ],
+            [
+              -32,
+              16,
+              -27
+            ],
+            [
+              -32,
+              16,
+              -26
+            ],
+            [
+              -32,
+              16,
+              -25
+            ],
+            [
+              -32,
+              16,
+              -24
+            ],
+            [
+              -32,
+              16,
+              -23
+            ],
+            [
+              -32,
+              16,
+              -22
+            ],
+            [
+              -32,
+              16,
+              -21
+            ],
+            [
+              -32,
+              16,
+              -20
+            ],
+            [
+              -32,
+              16,
+              -19
+            ],
+            [
+              -32,
+              16,
+              -18
+            ],
+            [
+              -32,
+              16,
+              -17
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 2,
+      "cy": -2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              32,
+              4,
+              -32
+            ],
+            [
+              32,
+              5,
+              -31
+            ],
+            [
+              32,
+              6,
+              -30
+            ],
+            [
+              32,
+              7,
+              -29
+            ],
+            [
+              32,
+              8,
+              -28
+            ],
+            [
+              32,
+              9,
+              -27
+            ],
+            [
+              32,
+              10,
+              -26
+            ],
+            [
+              32,
+              11,
+              -25
+            ],
+            [
+              32,
+              12,
+              -24
+            ],
+            [
+              32,
+              13,
+              -23
+            ],
+            [
+              32,
+              14,
+              -22
+            ],
+            [
+              32,
+              15,
+              -21
+            ],
+            [
+              32,
+              16,
+              -20
+            ],
+            [
+              32,
+              16,
+              -19
+            ],
+            [
+              32,
+              16,
+              -18
+            ],
+            [
+              32,
+              16,
+              -17
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 2,
+      "cy": 2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              32,
+              16,
+              32
+            ],
+            [
+              32,
+              16,
+              33
+            ],
+            [
+              32,
+              16,
+              34
+            ],
+            [
+              32,
+              16,
+              35
+            ],
+            [
+              32,
+              16,
+              36
+            ],
+            [
+              32,
+              16,
+              37
+            ],
+            [
+              32,
+              16,
+              38
+            ],
+            [
+              32,
+              16,
+              39
+            ],
+            [
+              32,
+              16,
+              40
+            ],
+            [
+              32,
+              16,
+              41
+            ],
+            [
+              32,
+              16,
+              42
+            ],
+            [
+              32,
+              15,
+              43
+            ],
+            [
+              32,
+              14,
+              44
+            ],
+            [
+              32,
+              13,
+              45
+            ],
+            [
+              32,
+              12,
+              46
+            ],
+            [
+              32,
+              11,
+              47
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 2,
+      "cy": 3,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              32,
+              10,
+              48
+            ],
+            [
+              32,
+              9,
+              49
+            ],
+            [
+              32,
+              8,
+              50
+            ],
+            [
+              32,
+              7,
+              51
+            ],
+            [
+              32,
+              6,
+              52
+            ],
+            [
+              32,
+              5,
+              53
+            ],
+            [
+              33,
+              3,
+              54
+            ],
+            [
+              34,
+              1,
+              55
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 3,
+      "cy": -2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              48,
+              1,
+              -19
+            ],
+            [
+              48,
+              2,
+              -18
+            ],
+            [
+              48,
+              3,
+              -17
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 3,
+      "cy": -1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              48,
+              3,
+              -16
+            ],
+            [
+              48,
+              2,
+              -15
+            ],
+            [
+              48,
+              3,
+              -14
+            ],
+            [
+              48,
+              4,
+              -13
+            ],
+            [
+              48,
+              5,
+              -12
+            ],
+            [
+              48,
+              6,
+              -11
+            ],
+            [
+              48,
+              7,
+              -10
+            ],
+            [
+              48,
+              8,
+              -9
+            ],
+            [
+              48,
+              9,
+              -8
+            ],
+            [
+              48,
+              10,
+              -7
+            ],
+            [
+              48,
+              11,
+              -6
+            ],
+            [
+              48,
+              12,
+              -5
+            ],
+            [
+              48,
+              13,
+              -4
+            ],
+            [
+              48,
+              14,
+              -3
+            ],
+            [
+              48,
+              15,
+              -2
+            ],
+            [
+              48,
+              16,
+              -1
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 3,
+      "cy": 0,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              48,
+              16,
+              0
+            ],
+            [
+              48,
+              16,
+              1
+            ],
+            [
+              48,
+              15,
+              2
+            ],
+            [
+              48,
+              14,
+              3
+            ],
+            [
+              48,
+              13,
+              4
+            ],
+            [
+              48,
+              12,
+              5
+            ],
+            [
+              48,
+              11,
+              6
+            ],
+            [
+              48,
+              10,
+              7
+            ],
+            [
+              48,
+              9,
+              8
+            ],
+            [
+              48,
+              9,
+              9
+            ],
+            [
+              48,
+              8,
+              10
+            ],
+            [
+              48,
+              7,
+              11
+            ],
+            [
+              48,
+              6,
+              12
+            ],
+            [
+              48,
+              5,
+              13
+            ],
+            [
+              48,
+              4,
+              14
+            ],
+            [
+              48,
+              3,
+              15
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 3,
+      "cy": 1,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              48,
+              2,
+              16
+            ],
+            [
+              48,
+              1,
+              17
+            ],
+            [
+              48,
+              1,
+              19
+            ],
+            [
+              48,
+              2,
+              20
+            ],
+            [
+              48,
+              3,
+              21
+            ],
+            [
+              48,
+              4,
+              22
+            ],
+            [
+              48,
+              5,
+              23
+            ],
+            [
+              48,
+              6,
+              24
+            ],
+            [
+              48,
+              7,
+              25
+            ],
+            [
+              48,
+              8,
+              26
+            ],
+            [
+              48,
+              8,
+              27
+            ],
+            [
+              48,
+              9,
+              28
+            ],
+            [
+              48,
+              10,
+              29
+            ],
+            [
+              48,
+              11,
+              30
+            ],
+            [
+              48,
+              11,
+              31
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 3,
+      "cy": 2,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              48,
+              10,
+              32
+            ],
+            [
+              48,
+              9,
+              33
+            ],
+            [
+              48,
+              8,
+              34
+            ],
+            [
+              48,
+              7,
+              35
+            ],
+            [
+              48,
+              6,
+              36
+            ],
+            [
+              48,
+              5,
+              37
+            ],
+            [
+              48,
+              4,
+              38
+            ],
+            [
+              48,
+              3,
+              39
+            ],
+            [
+              48,
+              2,
+              40
+            ],
+            [
+              48,
+              1,
+              41
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 4,
+      "cy": 0,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              64,
+              1,
+              0
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -2,
+      "cy": -3,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -20,
+              1,
+              -41
+            ],
+            [
+              -20,
+              1,
+              -40
+            ],
+            [
+              -21,
+              3,
+              -39
+            ],
+            [
+              -22,
+              6,
+              -38
+            ],
+            [
+              -23,
+              7,
+              -37
+            ],
+            [
+              -24,
+              8,
+              -36
+            ],
+            [
+              -25,
+              9,
+              -35
+            ],
+            [
+              -26,
+              10,
+              -34
+            ],
+            [
+              -27,
+              11,
+              -33
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -1,
+      "cy": -3,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -8,
+              8,
+              -48
+            ],
+            [
+              -9,
+              9,
+              -47
+            ],
+            [
+              -10,
+              10,
+              -46
+            ],
+            [
+              -10,
+              10,
+              -45
+            ],
+            [
+              -11,
+              11,
+              -44
+            ],
+            [
+              -12,
+              12,
+              -43
+            ],
+            [
+              -13,
+              13,
+              -42
+            ],
+            [
+              -14,
+              14,
+              -41
+            ],
+            [
+              -15,
+              15,
+              -40
+            ],
+            [
+              -16,
+              16,
+              -39
+            ],
+            [
+              -16,
+              16,
+              -38
+            ],
+            [
+              -16,
+              16,
+              -37
+            ],
+            [
+              -16,
+              16,
+              -36
+            ],
+            [
+              -16,
+              16,
+              -35
+            ],
+            [
+              -16,
+              16,
+              -34
+            ],
+            [
+              -16,
+              16,
+              -33
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 0,
+      "cy": -3,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              0,
+              3,
+              -48
+            ],
+            [
+              0,
+              4,
+              -47
+            ],
+            [
+              0,
+              5,
+              -46
+            ],
+            [
+              0,
+              6,
+              -45
+            ],
+            [
+              0,
+              6,
+              -44
+            ],
+            [
+              0,
+              7,
+              -43
+            ],
+            [
+              0,
+              8,
+              -42
+            ],
+            [
+              0,
+              9,
+              -41
+            ],
+            [
+              0,
+              10,
+              -40
+            ],
+            [
+              0,
+              11,
+              -39
+            ],
+            [
+              0,
+              12,
+              -38
+            ],
+            [
+              0,
+              13,
+              -37
+            ],
+            [
+              0,
+              14,
+              -36
+            ],
+            [
+              0,
+              15,
+              -35
+            ],
+            [
+              0,
+              16,
+              -34
+            ],
+            [
+              0,
+              16,
+              -33
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 1,
+      "cy": -3,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              26,
+              1,
+              -42
+            ],
+            [
+              25,
+              3,
+              -41
+            ],
+            [
+              24,
+              5,
+              -40
+            ],
+            [
+              23,
+              7,
+              -39
+            ],
+            [
+              22,
+              9,
+              -38
+            ],
+            [
+              22,
+              9,
+              -37
+            ],
+            [
+              21,
+              11,
+              -36
+            ],
+            [
+              20,
+              12,
+              -35
+            ],
+            [
+              19,
+              13,
+              -34
+            ],
+            [
+              16,
+              1,
+              -33
+            ],
+            [
+              18,
+              14,
+              -33
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 2,
+      "cy": -3,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              32,
+              1,
+              -35
+            ],
+            [
+              32,
+              2,
+              -34
+            ],
+            [
+              32,
+              3,
+              -33
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": -1,
+      "cy": -4,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              -3,
+              1,
+              -53
+            ],
+            [
+              -4,
+              3,
+              -52
+            ],
+            [
+              -5,
+              5,
+              -51
+            ],
+            [
+              -6,
+              6,
+              -50
+            ],
+            [
+              -7,
+              7,
+              -49
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 0,
+      "cy": -4,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              0,
+              1,
+              -50
+            ],
+            [
+              0,
+              2,
+              -49
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 0,
+      "cy": 4,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              12,
+              4,
+              64
+            ],
+            [
+              13,
+              3,
+              65
+            ],
+            [
+              14,
+              1,
+              66
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "cx": 1,
+      "cy": 4,
+      "localChunkLevel": 0,
+      "prefabId": null,
+      "obstacles": [
+        {
+          "obstacleType": "o_barrier",
+          "pos": [
+            [
+              16,
+              1,
+              64
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "customSpawnerPrefabs": [
+    {
+      "id": "ov_spawner_p_1789238968599",
+      "name": "lv3",
+      "category": "overlays",
+      "isLiquid": false,
+      "config": {
+        "budget": 2000,
+        "minHealth": 12000,
+        "spawnRadius": 80,
+        "enemyTypeKey": [
+          "e_giant",
+          "e_fly",
+          "e_fly_armor1",
+          "e_swarm",
+          "e_armor3",
+          "e_critter"
+        ]
+      }
+    },
+    {
+      "id": "ov_spawner_p_1789238979556",
+      "name": "lv2",
+      "category": "overlays",
+      "isLiquid": false,
+      "config": {
+        "budget": 900,
+        "minHealth": 6000,
+        "spawnRadius": 80,
+        "enemyTypeKey": [
+          "e_armor1",
+          "e_armor2",
+          "e_swarm",
+          "e_armor3"
+        ]
+      }
+    },
+    {
+      "id": "ov_spawner_p_1789239066855",
+      "name": "lv4",
+      "category": "overlays",
+      "isLiquid": false,
+      "config": {
+        "budget": 4000,
+        "minHealth": 16000,
+        "spawnRadius": 200,
+        "enemyTypeKey": [
+          "e_giant",
+          "e_bomb",
+          "e_shooting_giant",
+          "e_fly",
+          "e_fly_armor1",
+          "e_fly_armor2",
+          "e_snowthrower_giant",
+          "e_swarm_chicken",
+          "e_cloner"
+        ]
+      }
+    },
+    {
+      "id": "ov_spawner_p_lv1",
+      "name": "lv1",
+      "category": "overlays",
+      "isLiquid": false,
+      "config": {
+        "budget": 300,
+        "minHealth": 2000,
+        "spawnRadius": 80,
+        "enemyTypeKey": [
+          "e_basic",
+          "e_armor1",
+          "e_fast"
+        ]
+      }
+    }
+  ],
+  "groundFeatures": [],
+  "npcs": [],
+  "enemies": [],
+  "loots": []
+}

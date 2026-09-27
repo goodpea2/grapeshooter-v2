@@ -3,10 +3,12 @@ import { state } from '../../state';
 import { drawCloseButton } from '../../uiComponents';
 import { drawTurretList } from './turretList';
 import { drawTurretInfoPanel } from './turretInfoPanel';
-import { drawTurretUnlockButton, isTurretUnlockAvailable } from './turretUnlockButton';
 import { drawUpgradeSelectionPopup } from './upgradeSelectionPopup';
 import { drawPlayerUpgradesPanel, handlePlayerUpgradesClick } from './playerUpgradesPanel';
-import { drawLevelConfigPanel, handleLevelConfigClick } from './levelConfigPanel';
+import { drawLevelConfigPanel, handleLevelConfigClick, syncLevelConfigToLayoutData } from './levelConfigPanel';
+import { drawTurretUnlockTreePanel, handleTurretUnlockTreeClick } from './turretUnlockTree';
+import { drawSkillTreeConfigPanel, handleSkillTreeConfigClick } from './skillTreeConfigPanel';
+import { drawTurretUnlockChoiceModal, handleTurretUnlockChoiceModalClick } from './turretUnlockModal';
 
 declare const push: any;
 declare const pop: any;
@@ -151,6 +153,14 @@ export function drawAlmanac() {
     drawLevelConfigPanel(20, 50, modalW - 40, modalH - 70, x, y);
   } else if (state.almanacTab === 'Upgrades') {
     drawPlayerUpgradesPanel(20, 50, modalW - 40, modalH - 70, x, y);
+  } else if (state.almanacTab === 'TurretUnlock') {
+    if (state.isAlmanacEditorMode) {
+      const cfgW = 370;
+      drawSkillTreeConfigPanel(20, 50, cfgW, modalH - 70, x, y);
+      drawTurretUnlockTreePanel(20 + cfgW + 15, 50, modalW - 40 - cfgW - 15, modalH - 70, x, y);
+    } else {
+      drawTurretUnlockTreePanel(20, 50, modalW - 40, modalH - 70, x, y);
+    }
   } else {
     // Left Panel: Turret Grid Area
     push();
@@ -161,18 +171,11 @@ export function drawAlmanac() {
     drawTurretList(10, 10, leftPanelW - 20, modalH - 80, x + 20, y + 60);
     pop();
 
-    // Right Panel: Turret Details
+    // Right Panel: Turret Details (Expanded to full height without the unlock button)
     const rightX = leftPanelW + 20;
-    const showUnlock = isTurretUnlockAvailable();
-    const unlockH = showUnlock ? 180 : 0;
-    const infoH = showUnlock ? ((modalH) - unlockH - 20) : (modalH - 70);
+    const infoH = modalH - 70;
     
     drawTurretInfoPanel(rightX, 20, rightPanelW, infoH, x, y);
-
-    // Bottom Right Unlock Area
-    if (showUnlock) {
-      drawTurretUnlockButton(rightX, 5 + infoH, rightPanelW, unlockH, x, y);
-    }
   }
 
   // Upgrade Selection Popup (Overlays everything in Almanac)
@@ -182,8 +185,13 @@ export function drawAlmanac() {
 
   pop();
 
+  // Turret Unlock Choice Modal (Overlays entire screen including Almanac)
+  if (state.turretUnlockChoiceModal) {
+    drawTurretUnlockChoiceModal();
+  }
+
   // Close Button (Rendered on top in absolute screen coordinates)
-  if (!state.upgradeSelection) {
+  if (!state.upgradeSelection && !state.turretUnlockChoiceModal) {
     drawCloseButton(x + modalW - 46, y + 16, 34, () => closeAlmanac(), { layer: 150 });
   }
 }
@@ -193,6 +201,7 @@ function drawTabs(x: number, y: number, modalX: number, modalY: number) {
   const tabH = 60;
   const tabs = [
     { id: 'Turrets', icon: 'img_icon_almanac' },
+    { id: 'TurretUnlock', icon: 'img_t_sunflower_front' },
     // { id: 'Enemies', icon: 'img_npc_shadie_front' },
     { id: 'Upgrades', icon: 'img_icon_playerupgrade' }
   ];
@@ -249,7 +258,10 @@ function drawTabs(x: number, y: number, modalX: number, modalY: number) {
     
     pop();
 
-    if (hov && mouseIsPressed && !state.upgradeSelection) {
+    if (hov && mouseIsPressed && !state.upgradeSelection && !state.turretUnlockChoiceModal) {
+      if (state.almanacTab === 'LevelConfig') {
+        syncLevelConfigToLayoutData();
+      }
       state.almanacTab = tab.id;
       (window as any).mouseIsPressed = false;
     }
@@ -257,6 +269,9 @@ function drawTabs(x: number, y: number, modalX: number, modalY: number) {
 }
 
 export function closeAlmanac() {
+  if (state.almanacTab === 'LevelConfig' || state.levelEditorLevelConfig) {
+    syncLevelConfigToLayoutData();
+  }
   state.isAlmanacOpen = false;
   state.isPaused = false;
   state.isAlmanacEditorMode = false;
@@ -275,6 +290,7 @@ export function closeAlmanac() {
 export function handleAlmanacClick(): boolean {
   if (!state.isAlmanacOpen) return false;
   if (state.upgradeSelection) return true; // Block interaction if upgrade selection is open
+  if (handleTurretUnlockChoiceModalClick()) return true;
   
   const modalW = Math.min(1050, width * 0.9);
   const modalH = Math.min(650, height * 0.9);
@@ -292,6 +308,23 @@ export function handleAlmanacClick(): boolean {
   if (state.almanacTab === 'Upgrades') {
     if (handlePlayerUpgradesClick(mouseX, mouseY, x, y, modalW, modalH)) {
       return true;
+    }
+  }
+
+  // Handle Turret Unlock Matrix click
+  if (state.almanacTab === 'TurretUnlock') {
+    if (state.isAlmanacEditorMode) {
+      const cfgW = 370;
+      if (handleSkillTreeConfigClick(20, 50, cfgW, modalH - 70, x, y)) {
+        return true;
+      }
+      if (handleTurretUnlockTreeClick(20 + cfgW + 15, 50, modalW - 40 - cfgW - 15, modalH - 70, x, y)) {
+        return true;
+      }
+    } else {
+      if (handleTurretUnlockTreeClick(20, 50, modalW - 40, modalH - 70, x, y)) {
+        return true;
+      }
     }
   }
 

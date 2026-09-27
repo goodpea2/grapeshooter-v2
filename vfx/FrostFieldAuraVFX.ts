@@ -89,7 +89,11 @@ export class FrostFieldAuraVFX {
     }
   }
 
-  isDone() { return !this.target || this.target.health <= 0 || (this.target.isMined === true); }
+  isDone() { 
+    if (!this.target || this.target.health <= 0 || this.target.isMined === true || this.target.isDetached === true) return true;
+    if (this.target.parent && state.player?.attachments && !state.player.attachments.includes(this.target)) return true;
+    return false;
+  }
 
   display() {
     if (!this.target) return;

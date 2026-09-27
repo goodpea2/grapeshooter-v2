@@ -1,6 +1,7 @@
 
 import { AttachedTurret } from '../attachedTurret';
 import { WorldTurret } from '../worldTurret';
+import { state } from '../../state';
 import { PeaAttachedTurret, PeaWorldTurret } from './type/t_pea';
 import { MinechargeAttachedTurret, MinechargeWorldTurret } from './type/t3_minecharge';
 import { IcechargeAttachedTurret, IcechargeWorldTurret } from './type/t3_icecharge';
@@ -34,10 +35,15 @@ export const TurretLogicMap: Record<string, { Attached?: any, World?: any }> = {
  */
 export function createAttachedTurret(type: string, parent: any, hq: number, hr: number): AttachedTurret {
   const entry = TurretLogicMap[type];
-  if (entry?.Attached) {
-    return new entry.Attached(type, parent, hq, hr);
+  const instance = entry?.Attached ? new entry.Attached(type, parent, hq, hr) : new AttachedTurret(type, parent, hq, hr);
+  if (type === 't_ice' && (state.turretUpgrades?.['t_ice'] || []).includes('u_t_ice_4')) {
+    const count = (state.turretUpgrades['t_ice'] || []).filter((id: string) => id === 'u_t_ice_4').length;
+    instance.instantArmCharges = Math.max(1, count);
+    if (instance.actionTimers) {
+      instance.actionTimers.set('pulse', -999999);
+    }
   }
-  return new AttachedTurret(type, parent, hq, hr);
+  return instance;
 }
 
 /**
@@ -46,10 +52,15 @@ export function createAttachedTurret(type: string, parent: any, hq: number, hr: 
  */
 export function createWorldTurret(type: string, gx: number, gy: number): WorldTurret {
   const entry = TurretLogicMap[type];
-  if (entry?.World) {
-    return new entry.World(type, gx, gy);
+  const instance = entry?.World ? new entry.World(type, gx, gy) : new WorldTurret(type, gx, gy);
+  if (type === 't_ice' && (state.turretUpgrades?.['t_ice'] || []).includes('u_t_ice_4')) {
+    const count = (state.turretUpgrades['t_ice'] || []).filter((id: string) => id === 'u_t_ice_4').length;
+    instance.instantArmCharges = Math.max(1, count);
+    if (instance.actionTimers) {
+      instance.actionTimers.set('pulse', -999999);
+    }
   }
-  return new WorldTurret(type, gx, gy);
+  return instance;
 }
 
 /**
@@ -79,6 +90,7 @@ export function copyTurretState(from: any, to: any) {
   if (from.iceCubeHealth !== undefined) to.iceCubeHealth = from.iceCubeHealth;
   if (from.buffStacks !== undefined) to.buffStacks = from.buffStacks;
   if (from.lastBuffFrame !== undefined) to.lastBuffFrame = from.lastBuffFrame;
+  if (from.deathDmgBonus !== undefined) to.deathDmgBonus = from.deathDmgBonus;
 }
 
 /**
@@ -107,6 +119,7 @@ export function extractTurretData(t: any): any {
     iceCubeHealth: t.iceCubeHealth,
     buffStacks: t.buffStacks,
     lastBuffFrame: t.lastBuffFrame,
+    deathDmgBonus: t.deathDmgBonus,
   };
 }
 
@@ -135,4 +148,5 @@ export function restoreTurretData(t: any, data: any) {
   if (data.iceCubeHealth !== undefined) t.iceCubeHealth = data.iceCubeHealth;
   if (data.buffStacks !== undefined) t.buffStacks = data.buffStacks;
   if (data.lastBuffFrame !== undefined) t.lastBuffFrame = data.lastBuffFrame;
+  if (data.deathDmgBonus !== undefined) t.deathDmgBonus = data.deathDmgBonus;
 }

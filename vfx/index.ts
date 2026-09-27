@@ -34,16 +34,27 @@ export { HitSpark, hitSparkPool, spawnHitSpark } from './HitSpark';
 export { SparkVFX, sparkPool, spawnSparkVFX } from './SparkVFX';
 export { BlockDebris, blockDebrisPool, spawnBlockDebris } from './BlockDebris';
 export { Explosion, explosionPool, spawnExplosion } from './Explosion';
-export { FirePuddleVFX, firePuddlePool, spawnFirePuddleVFX } from './FirePuddleVFX';
+export {
+  FirePuddleVFX,
+  firePuddlePool,
+  spawnFirePuddleVFX,
+  getOrCreateTileFirePuddleVFX,
+  updateTileFirePuddles,
+  displayTileFirePuddles,
+  clearTileFirePuddles
+} from './FirePuddleVFX';
 export { StunGasVFX, stunGasPool, spawnStunGasVFX } from './StunGasVFX';
 export { PoisonGasVFX, poisonGasPool, spawnPoisonGasVFX } from './PoisonGasVFX';
 export { ForcefieldVFX, forcefieldPool, spawnForcefieldVFX } from './ForcefieldVFX';
 export { MergeVFX, mergePool, spawnMergeVFX } from './MergeVFX';
-export { DamageNumberVFX, damageNumberPool, spawnDamageNumber } from './DamageNumberVFX';
+export { DamageNumberVFX, damageNumberPool, spawnDamageNumber, spawnStatChangePopup } from './DamageNumberVFX';
+export { NeighborBuffParticleVFX, neighborBuffParticlePool, spawnNeighborBuffParticle } from './NeighborBuffParticleVFX';
 export { BlockHitVFX, blockHitPool, spawnBlockHitVFX } from './BlockHitVFX';
 export { FireworkVFX, fireworkPool, spawnFireworkVFX } from './FireworkVFX';
 export { StaminaFlyToTurretVFX, staminaFlyToTurretPool, spawnStaminaFlyToTurretVFX } from './StaminaFlyToTurretVFX';
 export { StaminaFlyOutVFX, staminaFlyOutPool, spawnStaminaFlyOutVFX } from './StaminaFlyOutVFX';
 export { StaminaAbsorbVFX, staminaAbsorbPool, spawnStaminaAbsorbVFX } from './StaminaAbsorbVFX';
 export { GreenEssenceVFX, greenEssencePool, spawnGreenEssenceVFX } from './GreenEssenceVFX';
+export { FlungSpawnPodVFX } from './FlungSpawnPodVFX';
+export { NodeUnlockVFX, nodeUnlockPool, spawnNodeUnlockVFX } from './NodeUnlockVFX';
 export { drawPersistentDeathVisual } from './Utils';

@@ -49,9 +49,10 @@ import {
   saveLevelLayout,
   startLevel,
   triggerImportLevelJson,
-  serializeChunkBlocks,
+  serializeChunkLayers,
+  buildPrefabsMap,
   serializeChunkTurrets,
-  deserializeChunkBlocks,
+  deserializeChunk,
   deserializeChunkTurrets,
   serializeSpawnAreaTiles,
   deserializeSpawnAreaTiles,
@@ -63,7 +64,8 @@ import {
 } from '../levelManager';
 import { handleAlmanacClick } from '../ui/almanac/mainLayout';
 import { isMouseOverLevelInfoPanel } from './canvas';
-import { createDefaultEditorAlmanacProgression, AlmanacProgression } from '../lvDemo';
+import { formatGlobalEnemySpawnConfig } from '../ui/almanac/levelConfigPanel';
+import { createDefaultEditorAlmanacProgression, AlmanacProgression, buildExportAlmanacProgression } from '../lvDemo';
 import { initLevelEditorPlayerUpgradesFromData, serializeLevelEditorPlayerUpgrades } from '../ui/almanac/playerUpgradesPanel';
 import { initLevelEditorLevelConfig, serializeLevelEditorLevelConfig } from '../ui/almanac/levelConfigPanel';
 import { handleRegisteredUIClick } from '../uiComponents';
@@ -86,6 +88,7 @@ export function startLevelEditor() {
   state.enemies = [];
   state.npcs = [];
   state.groundFeatures = [];
+  GroundFeature.clearTileFireVfx();
   state.vfx = [];
   state.uiVfx = [];
   state.trails = [];
@@ -227,9 +230,16 @@ export function handleLevelEditorPress(mx: number, my: number): boolean {
         openSunGeneratorModal(clickedBlock);
         return true;
       } else if ((clickedBlock.overlay && (clickedBlock.overlay.startsWith('ov_spawner') || clickedBlock.overlay.startsWith('spawner_'))) || clickedBlock.liquidType === 'l_spawner' || (clickedBlock.liquidType && !!liquidTypes[clickedBlock.liquidType]?.isEnemySpawner) || clickedBlock.customSpawnerConfig) {
-        state.levelEditor.isWorldDragActive = false;
-        openToolbarSpawnerTooltip(clickedBlock.overlay || clickedBlock.liquidType || 'l_spawner', clickedBlock);
-        return true;
+        const now = Date.now();
+        const last = state.levelEditor.lastCanvasTileClick;
+        if (last && last.gx === gx && last.gy === gy && (now - last.time) <= 300) {
+          state.levelEditor.isWorldDragActive = false;
+          state.levelEditor.lastCanvasTileClick = null;
+          openToolbarSpawnerTooltip(clickedBlock.overlay || clickedBlock.liquidType || 'l_spawner', clickedBlock);
+          return true;
+        } else {
+          state.levelEditor.lastCanvasTileClick = { gx, gy, time: now };
+        }
       }
     }
   }
@@ -416,6 +426,7 @@ export function serializeLevelLayout() {
   const prog = state.levelEditorAlmanacProgression || createDefaultEditorAlmanacProgression();
   const playerUpgrades = serializeLevelEditorPlayerUpgrades();
   const levelCfg = serializeLevelEditorLevelConfig() || {};
+  const exportedProgression = buildExportAlmanacProgression(prog);
 
   const levelData: any = {
     version: 2,
@@ -424,23 +435,22 @@ export function serializeLevelLayout() {
     levelDescription: levelCfg.levelDescription || 'Custom exported level layout.',
     tag: levelCfg.tag || 'CUSTOM MAP',
     enableWorldGen: false,
-    almanacProgression: {
-      StartingTurret: [...(prog.StartingTurret || [])],
-      UnlockedByDiscoverTurret: [...(prog.UnlockedByDiscoverTurret || [])],
-      LockedTurret: [...(prog.LockedTurret || [])],
-      BannedTurrets: [...(prog.BannedTurrets || [])],
-      UnlockCost: [...(prog.UnlockCost || [])],
-      AllTurretCrafting: prog.AllTurretCrafting === true,
-      AllTurretUpgrade: prog.AllTurretUpgrade !== false,
-      CraftingCostOverride: [...(prog.CraftingCostOverride || [])]
-    },
+    almanacProgression: exportedProgression,
     ...(playerUpgrades ? { playerUpgrades } : {}),
+    ...(levelCfg.sunSpawnHourInterval !== undefined ? { sunSpawnHourInterval: levelCfg.sunSpawnHourInterval } : {}),
     ...(levelCfg.customBudgetPerNight !== undefined ? { customBudgetPerNight: levelCfg.customBudgetPerNight } : {}),
     ...(levelCfg.hourlyBudgetPerDay !== undefined ? { hourlyBudgetPerDay: levelCfg.hourlyBudgetPerDay } : {}),
     ...(levelCfg.hourlyBudgetPerNight !== undefined ? { hourlyBudgetPerNight: levelCfg.hourlyBudgetPerNight } : {}),
     ...(levelCfg.enabledCurrency !== undefined ? { enabledCurrency: levelCfg.enabledCurrency } : {}),
     ...(levelCfg.startingResource !== undefined ? { startingResource: levelCfg.startingResource } : {}),
-    ...(levelCfg.globalEnemySpawnConfig !== undefined ? { globalEnemySpawnConfig: levelCfg.globalEnemySpawnConfig } : {}),
+    globalEnemySpawnConfig: formatGlobalEnemySpawnConfig(levelCfg.globalEnemySpawnConfig || {}),
+    ...(levelCfg.starRatingTargets !== undefined ? { starRatingTargets: levelCfg.starRatingTargets } : {}),
+    ...(levelCfg.nightsToPass !== undefined ? { nightsToPass: levelCfg.nightsToPass } : {}),
+    ...(levelCfg.enemyBudgetValueToKill !== undefined ? { enemyBudgetValueToKill: levelCfg.enemyBudgetValueToKill } : {}),
+    ...(levelCfg.collectResource && Object.keys(levelCfg.collectResource).length > 0 ? { collectResource: levelCfg.collectResource } : {}),
+    ...(levelCfg.huntEnemy && Object.keys(levelCfg.huntEnemy).length > 0 ? { huntEnemy: levelCfg.huntEnemy } : {}),
+    ...(levelCfg.breakObstacle && Object.keys(levelCfg.breakObstacle).length > 0 ? { breakObstacle: levelCfg.breakObstacle } : {}),
+    destroyAllEnemySpawners: levelCfg.destroyAllEnemySpawners ?? true,
     timestamp: new Date().toISOString(),
     playerSpawn: {
       x: state.player ? Math.round(state.player.pos.x) : (8 * GRID_SIZE + GRID_SIZE / 2),
@@ -453,18 +463,26 @@ export function serializeLevelLayout() {
     chunks: []
   };
 
+  const prefabsMap = buildPrefabsMap();
+  if (prefabsMap.size > 0) {
+    levelData.customSpawnerPrefabs = Array.from(prefabsMap.values());
+  }
+
   if (state.world && state.world.chunks) {
     state.world.chunks.forEach((chunk: any) => {
-      const chunkData: any = {
-        cx: chunk.cx,
-        cy: chunk.cy,
-        localChunkLevel: chunk.localChunkLevel,
-        prefabId: chunk.prefabId,
-        blocks: serializeChunkBlocks(chunk.blocks),
-        turrets: serializeChunkTurrets(chunk.turrets)
-      };
+      const { obstacles, overlays } = serializeChunkLayers(chunk.blocks, prefabsMap);
+      const turrets = serializeChunkTurrets(chunk.turrets);
 
-      if (chunkData.blocks.length > 0 || chunkData.turrets.length > 0) {
+      if (obstacles.length > 0 || overlays.length > 0 || turrets.length > 0) {
+        const chunkData: any = {
+          cx: chunk.cx,
+          cy: chunk.cy,
+          localChunkLevel: chunk.localChunkLevel,
+          prefabId: chunk.prefabId
+        };
+        if (obstacles.length > 0) chunkData.obstacles = obstacles;
+        if (overlays.length > 0) chunkData.overlays = overlays;
+        if (turrets.length > 0) chunkData.turrets = turrets;
         levelData.chunks.push(chunkData);
       }
     });
@@ -489,10 +507,6 @@ export function serializeLevelLayout() {
     levelData.spawnAreaTiles = serializeSpawnAreaTiles(state.world.spawnAreaSet);
   }
 
-  if (state.levelEditor?.customSpawnerPrefabs && state.levelEditor.customSpawnerPrefabs.length > 0) {
-    levelData.customSpawnerPrefabs = state.levelEditor.customSpawnerPrefabs;
-  }
-
   return levelData;
 }
 
@@ -503,19 +517,13 @@ export function restoreLevelFromCache(layout: any) {
   state.isEditorPlaytest = false;
   state.isAlmanacOpen = false;
   state.isAlmanacEditorMode = false;
+  if (state.levelEditor) {
+    state.levelEditor.toolbarSpawnerTooltip = null;
+  }
 
   if (layout && (layout.almanacProgression || layout.AlmanacProgression)) {
     const raw = layout.almanacProgression || layout.AlmanacProgression;
-    state.levelEditorAlmanacProgression = {
-      StartingTurret: [...(raw.StartingTurret || [])],
-      UnlockedByDiscoverTurret: [...(raw.UnlockedByDiscoverTurret || [])],
-      LockedTurret: (raw.LockedTurret || []).map((t: any) => typeof t === 'string' ? { type: t, weight: 10 } : t),
-      BannedTurrets: [...(raw.BannedTurrets || [])],
-      UnlockCost: raw.UnlockCost !== undefined ? JSON.parse(JSON.stringify(raw.UnlockCost)) : [],
-      AllTurretCrafting: raw.AllTurretCrafting === true,
-      AllTurretUpgrade: raw.AllTurretUpgrade !== false,
-      CraftingCostOverride: raw.CraftingCostOverride ? JSON.parse(JSON.stringify(raw.CraftingCostOverride)) : []
-    };
+    state.levelEditorAlmanacProgression = buildExportAlmanacProgression(raw);
   } else {
     state.levelEditorAlmanacProgression = createDefaultEditorAlmanacProgression();
   }
@@ -529,6 +537,7 @@ export function restoreLevelFromCache(layout: any) {
   state.enemies = [];
   state.npcs = [];
   state.groundFeatures = [];
+  GroundFeature.clearTileFireVfx();
   state.vfx = [];
   state.uiVfx = [];
   state.trails = [];
@@ -541,9 +550,11 @@ export function restoreLevelFromCache(layout: any) {
   // Load Spawn Area Tiles if provided
   deserializeSpawnAreaTiles(state.world, layout?.spawnAreaTiles);
 
-  // Restore Custom Spawner Prefabs if provided
-  if (layout?.customSpawnerPrefabs) {
+  // Restore Custom Spawner Prefabs if provided (re-register into overlayTypes & liquidTypes)
+  if (layout?.customSpawnerPrefabs && Array.isArray(layout.customSpawnerPrefabs)) {
     restoreCustomSpawnerPrefabs(layout.customSpawnerPrefabs);
+  } else if (state.levelEditor?.customSpawnerPrefabs && state.levelEditor.customSpawnerPrefabs.length > 0) {
+    restoreCustomSpawnerPrefabs(state.levelEditor.customSpawnerPrefabs);
   }
 
   const spawnX = layout?.playerSpawn?.x ?? (8 * GRID_SIZE + GRID_SIZE / 2);
@@ -562,9 +573,7 @@ export function restoreLevelFromCache(layout: any) {
       const cy = chunkData.cy;
       const chunk = state.world.getChunk(cx, cy);
 
-      if (chunkData.blocks) {
-        deserializeChunkBlocks(chunk, chunkData.blocks);
-      }
+      deserializeChunk(chunk, chunkData);
 
       if (chunkData.turrets) {
         deserializeChunkTurrets(chunk, chunkData.turrets);
@@ -786,7 +795,11 @@ export function copyTilePropertiesToBrush(worldX: number, worldY: number): boole
     if (isSpawner) {
       const oCfg = overlayTypes[blk.overlay];
       const cfg = blk.customSpawnerConfig || oCfg?.enemySpawnConfig || {};
-      state.levelEditor.copiedSpawnerConfig = JSON.parse(JSON.stringify(cfg));
+      const copied = JSON.parse(JSON.stringify(cfg));
+      if (copied.budget === undefined && blk.spawnerBudget !== undefined) {
+        copied.budget = blk.spawnerBudget;
+      }
+      state.levelEditor.copiedSpawnerConfig = copied;
       openToolbarSpawnerTooltip(blk.overlay, blk);
     }
     if (blk.sunGeneratorConfig || blk.customSunGeneratorConfig) {

@@ -79,6 +79,10 @@ export class LootInFlightVFX {
       soundEngine.playSFX('collect_sun', 0.9, 0.08);
       // Apply the value to state
       if (this.type === 'currency') {
+        const resKey = this.itemKey || 'sun';
+        if (!state.accumulatedCollectedResources) state.accumulatedCollectedResources = {};
+        state.accumulatedCollectedResources[resKey] = (state.accumulatedCollectedResources[resKey] || 0) + this.value;
+
         if (this.itemKey === 'sun') {
           const sunCap = getPlayerUpgradeStat('sunBankCapacity') || 20;
           state.sunCurrency = Math.min(sunCap, state.sunCurrency + this.value);

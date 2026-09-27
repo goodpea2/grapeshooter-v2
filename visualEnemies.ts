@@ -189,6 +189,9 @@ export function drawEnemy(e: any) {
     const liftScale = 1 + heightRatio * 0.22;
     scale(liftScale);
   }
+  if (e.conditions && e.conditions.has('c_weakbody')) {
+    scale(0.8);
+  }
   
   const s = e.size;
   let imgKey = e.type === 'e_swarm' ? 'img_swarm_center' : 'img_' + e.type.slice(2);

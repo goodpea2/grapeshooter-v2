@@ -1,6 +1,8 @@
 {
-  "name": "Grapeshooter - v2migrate 6/9",
+  "name": "Grapeshooter - v2migrate 28/9",
   "requestFramePermissions": [],
   "description": "A procedural 2D survival game. Mine resources, expand your mobile base with turrets, and survive the encroaching darkness.",
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

@@ -4,7 +4,7 @@ import { closeAlmanac } from './almanac/mainLayout';
 import { drawButton, drawDarkButton, drawCyanButton, registerUIHitbox } from '../uiComponents';
 import { startLevelEditor, restoreLevelFromCache } from '../levelEditor';
 import { createWorldTurret } from '../class/turret/TurretRegistry';
-import { MergeVFX } from '../vfx/index';
+import { MergeVFX, ConditionVFX } from '../vfx/index';
 import { flowField } from '../pathfinding';
 import { GRID_SIZE } from '../constants';
 import { triggerUpgradeHook } from '../src/upgrades';
@@ -61,6 +61,31 @@ export function detachAllTurrets() {
     wt.health = att.health;
     wt.baseIngredients = att.baseIngredients ? [...att.baseIngredients] : [att.type];
     wt.mustExitProximityFirst = true;
+
+    // Transfer conditions to the new world turret and mark att as detached
+    att.isDetached = true;
+    if (att.conditions && att.conditions.size > 0) {
+      if (!wt.conditions) wt.conditions = new Map();
+      for (const [cKey, cVal] of att.conditions.entries()) {
+        wt.conditions.set(cKey, cVal);
+      }
+    }
+
+    // Clean up aura VFX and rebind ConditionVFX from att to wt
+    if (state.vfx) {
+      for (let i = state.vfx.length - 1; i >= 0; i--) {
+        const v = state.vfx[i];
+        if (v && v.target === att) {
+          if (v instanceof ConditionVFX) {
+            v.target = wt;
+          } else {
+            state.vfx.splice(i, 1);
+          }
+        }
+      }
+    }
+    att.conditions?.clear();
+
     state.world.addTurret(wt);
 
     triggerUpgradeHook('onDetach', att, {});
@@ -104,17 +129,7 @@ declare const tint: any;
 declare const noTint: any;
 
 export function drawGameSpeedButtons() {
-  const costIdx = Math.min(state.unlockCount, AlmanacProgression.UnlockCost.length - 1);
-  const costObj = AlmanacProgression.UnlockCost[costIdx];
-  const costType = Object.keys(costObj)[0];
-  const costVal = (costObj as any)[costType];
-  
-  let currentCurrency = 0;
-  if (costType === 'raisin') currentCurrency = state.raisinCurrency;
-  else if (costType === 'soil') currentCurrency = state.soilCurrency;
-  else if (costType === 'elixir') currentCurrency = state.elixirCurrency;
-  
-  const canAfford = currentCurrency >= costVal && state.lockedTurrets.length > 0;
+  const canAfford = state.raisinCurrency > 0;
 
   push();
   const btnMargin = 10;

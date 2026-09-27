@@ -8,7 +8,7 @@ export const t3_aoelaser: TurretConfig = {
   tooltip: "Fires laser that also damages nearby obstacles", animationBodyType: 'tough',
   actionConfig: { 
     ...t2_laser2.actionConfig,
-    beamDamage: 10, beamDamageRate: 3, beamWidth: 6, beamFireRate: 6, beamMaxLength: GRID_SIZE * 8, beamBulletTypeKey: 'b_aoelaser_hit' 
+    beamBulletTypeKey: 'b_aoelaser_hit' 
   },
   targetType: ['obstacle'],
   targetConfig: { obstaclePriority: 'valuable' }

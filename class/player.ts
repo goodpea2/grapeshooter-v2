@@ -33,7 +33,7 @@ declare const radians: any;
 declare const TWO_PI: any;
 
 export class Player {
-  pos: any; prevPos: any; size = 30; attachments: AttachedTurret[] = []; health = 100; maxHealth = 100; speed = 3.0; flash = 0; autoTurretAngle = 0; autoTurretLastShot = 0; autoTurretRange = GRID_SIZE * 6; autoTurretFireRate = 22; recoil = 0; target: any = null;
+  pos: any; prevPos: any; size = 30; attachments: AttachedTurret[] = []; health = 300; maxHealth = 300; speed = 3.0; flash = 0; autoTurretAngle = 0; autoTurretLastShot = 0; autoTurretRange = GRID_SIZE * 6; autoTurretFireRate = 22; recoil = 0; target: any = null;
   stamina = 100;
   maxStamina = 100;
   totalStaminaSpent = 0;
@@ -51,6 +51,10 @@ export class Player {
   // Input tracking for orientation and state locking
   moveInputVec: any;
   isMovingIntent: boolean = false;
+  getEffectiveRange(): number {
+    const baseAutoTurretRange = GRID_SIZE * 6;
+    return baseAutoTurretRange * (state.playerBonuses?.rangeMult || 1.0);
+  }
   activeStats: any = {
     damageMult: 1.0,
     speedMult: 1.0,
@@ -214,23 +218,25 @@ export class Player {
     }
 
     // Update Max Stamina from upgrades
-    const currentMaxStam = getPlayerUpgradeStat('maxStamina') || 100;
+    const currentMaxStam = Math.max(0, (getPlayerUpgradeStat('maxStamina') || 100) + (state.playerBonuses?.maxStaminaAdd || 0));
     if (currentMaxStam !== this.maxStamina) {
       const diff = currentMaxStam - this.maxStamina;
       this.maxStamina = currentMaxStam;
       if (diff > 0) {
         this.stamina = Math.min(this.maxStamina, this.stamina + diff);
       } else {
-        this.stamina = Math.min(this.maxStamina, this.stamina);
+        this.stamina = Math.min(this.maxStamina, Math.max(0, this.stamina + diff));
       }
     }
 
     // Stamina auto-recovery: only when player is not moving and >= 1 second (60 frames) since last stamina spent
-    // Recovery rate: 2 per 6 frames (1/3 per frame)
+    // Recovery rate: 2 per 6 frames (1/3 per frame) * recharge multiplier
     const isMoving = this.isMovingIntent;
     const timeSinceLastSpent = state.frames - this.lastStaminaSpentFrame;
     if (!isMoving && timeSinceLastSpent >= 60 && this.stamina < this.maxStamina) {
-      this.stamina = Math.min(this.maxStamina, this.stamina + (2 / 6));
+      const upgradeBonus = getPlayerUpgradeStat('staminaRecoveryRate') || 0;
+      const rechargeMult = 1 + upgradeBonus + (state.playerBonuses?.staminaRechargeMult || 0);
+      this.stamina = Math.min(this.maxStamina, this.stamina + (2 / 6) * Math.max(0.1, rechargeMult));
       if (state.frames % 8 === 0) {
         spawnStaminaAbsorbVFX(this.pos.x, this.pos.y);
       }
@@ -473,6 +479,7 @@ export class Player {
       
       // Check collision with attachments
       for (const a of this.attachments) {
+        if (a.isCollidable && !a.isCollidable()) continue;
         const aPos = a.getWorldPos();
         const aRadius = a.size * 0.5;
         const dAttSq = (aPos.x - wtPos.x)**2 + (aPos.y - wtPos.y)**2;
@@ -730,6 +737,10 @@ export class Player {
   updateAutoTurret(fireRateMult: number) {
     const isRaged = this.conditions.has('c_raged') || this.conditions.has('c_raged_visualonly');
     
+    // Scale player auto turret range with range bonuses (such as u_t2_firepea_1)
+    const baseAutoTurretRange = GRID_SIZE * 6;
+    this.autoTurretRange = baseAutoTurretRange * (state.playerBonuses?.rangeMult || 1.0);
+
     // Resolve ClickHold boost from upgrade
     const boostStat = getPlayerUpgradeStat('clickHoldBoost');
     const boostVal = boostStat !== undefined ? boostStat : 1.0;
@@ -984,6 +995,7 @@ export class Player {
     this.flash = 6;
     this.hurtAnimTimer = 10;
     if (this.health <= 0) this.health = 0;
+    state.damageFlash = 1.0;
     eventBus.emit('PLAYER_DAMAGED', { player: this, source, amount: dmg });
   }
   

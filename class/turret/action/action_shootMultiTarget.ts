@@ -4,6 +4,7 @@ import { TurretAction } from '../../turretAction';
 import { Bullet } from '../../bullet';
 import { MuzzleFlash } from '../../../vfx/index';
 import { triggerUpgradeHook } from '../../../src/upgrades';
+import { GRID_SIZE } from '../../../constants';
 
 declare const createVector: any;
 declare const atan2: any;
@@ -80,14 +81,16 @@ export class ActionShootMultiTarget extends TurretAction {
     }
     
     if (subStep > 0) {
-      const delay = config.multiTargetShootDelay || 6;
+      const frMultiplier = this.turret.getFireRateMultiplier ? this.turret.getFireRateMultiplier() : (this.turret.fireRateMultiplier || 1);
+      const baseDelay = config.multiTargetShootDelay || 6;
+      const delay = Math.max(1, Math.round(baseDelay / frMultiplier));
       if (state.frames - lastSub >= delay) {
         const range = this.getRange();
         const potentialTargets = (this.turret as any).findAllTargetsWithin(range);
         if (potentialTargets.length > 0) {
           const targetIdx = (subStep - 1) % potentialTargets.length;
           const target = potentialTargets[targetIdx];
-          const tc = target.getWorldPos ? target.getWorldPos() : (target.gx !== undefined ? createVector(target.gx * 32 + 16, target.gy * 32 + 16) : target.pos);
+          const tc = target.getWorldPos ? target.getWorldPos() : (target.gx !== undefined ? createVector(target.gx * GRID_SIZE + GRID_SIZE / 2, target.gy * GRID_SIZE + GRID_SIZE / 2) : target.pos);
           if (tc) {
             const sa = atan2(tc.y - wPos.y, tc.x - wPos.x);
             const bulletCount = config.shootBulletCount || 1;
@@ -108,7 +111,12 @@ export class ActionShootMultiTarget extends TurretAction {
             }
             state.vfx.push(new MuzzleFlash(wPos.x, wPos.y, sa));
             this.turret.recoil = 6;
-            this.turret.angle = sa;
+            const mainTargetCenter = this.turret.getTargetCenter();
+            if (mainTargetCenter) {
+              this.turret.angle = atan2(mainTargetCenter.y - wPos.y, mainTargetCenter.x - wPos.x);
+            } else {
+              this.turret.angle = sa;
+            }
             this.turret.pulseAnimTimer = 8;
           }
         }

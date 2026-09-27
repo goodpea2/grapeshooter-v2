@@ -174,463 +174,85 @@
     "ice": 0
   },
   "globalEnemySpawnConfig": {
-    "1_day": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "1_night": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "2_day": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "2_night": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "3_day": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "3_night": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "4_day": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "4_night": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "5_day": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "5_night": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "6_day": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "6_night": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "7_day": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "7_night": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "8_day": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "8_night": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "9_day": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ],
-    "9_night": [
-      0.25,
-      1,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0,
-      0
-    ]
+    "1_day": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "1_night": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "2_day": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "2_night": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "3_day": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "3_night": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "4_day": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "4_night": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "5_day": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "5_night": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "6_day": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "6_night": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "7_day": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "7_night": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "8_day": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "8_night": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "9_day": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    },
+    "9_night": {
+      "e_fast": 0.25,
+      "e_basic": 1
+    }
   },
   "starRatingTargets": {
     "star1": 480,
     "star2": 360,
     "star3": 240
   },
-  "timestamp": "2026-08-25T16:34:18.415Z",
+  "timestamp": "2026-09-12T18:44:10.014Z",
   "playerSpawn": {
     "x": -565,
     "y": 288
@@ -641,9 +263,9 @@
       "cy": 0,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               0,
@@ -672,12 +294,7 @@
             ],
             [
               0,
-              10,
-              5
-            ],
-            [
-              11,
-              5,
+              16,
               5
             ],
             [
@@ -708,8 +325,40 @@
           ]
         },
         {
-          "type": "o_barrier",
-          "overlay": "ov_textsign",
+          "obstacleType": "o_dirt",
+          "pos": [
+            [
+              9,
+              3,
+              7
+            ],
+            [
+              9,
+              2,
+              8
+            ],
+            [
+              9,
+              3,
+              9
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "health": 100,
+          "pos": [
+            [
+              11,
+              1,
+              8
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "overlayType": "ov_textsign",
           "customText": "Break blocks for sun and buy a peashooter",
           "pos": [
             [
@@ -720,42 +369,7 @@
           ]
         },
         {
-          "type": "o_dirt",
-          "pos": [
-            [
-              9,
-              3,
-              7
-            ],
-            [
-              9,
-              1,
-              8
-            ],
-            [
-              9,
-              3,
-              9
-            ]
-          ]
-        },
-        {
-          "type": "o_dirt",
-          "overlay": "ov_spawner_custom",
-          "health": 100,
-          "spawnerBudget": 80,
-          "customSpawnerConfig": {
-            "name": "Custom Spawner",
-            "budget": 80,
-            "enemyTypeKey": [
-              "e_basic"
-            ],
-            "spawnRadius": 300,
-            "spawnTriggerRadius": 120,
-            "spawnInterval": 240,
-            "spawnIntervalConsumeBudget": true,
-            "health": 100
-          },
+          "customSpawnerId": "ov_spawner_p_custom_spawner",
           "pos": [
             [
               11,
@@ -765,8 +379,7 @@
           ]
         },
         {
-          "type": "o_dirt",
-          "overlay": "sunClump",
+          "overlayType": "sunClump",
           "pos": [
             [
               10,
@@ -775,17 +388,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": -1,
       "cy": -1,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               -16,
@@ -804,17 +416,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": -1,
       "cy": 0,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               -16,
@@ -843,12 +454,7 @@
             ],
             [
               -16,
-              14,
-              5
-            ],
-            [
-              -1,
-              1,
+              16,
               5
             ],
             [
@@ -879,19 +485,7 @@
           ]
         },
         {
-          "type": "o_barrier",
-          "overlay": "ov_textsign",
-          "customText": "The player automatically shoot. No need for aiming!",
-          "pos": [
-            [
-              -2,
-              1,
-              5
-            ]
-          ]
-        },
-        {
-          "type": "o_dirt",
+          "obstacleType": "o_dirt",
           "pos": [
             [
               -2,
@@ -921,16 +515,28 @@
           ]
         }
       ],
-      "turrets": []
+      "overlays": [
+        {
+          "overlayType": "ov_textsign",
+          "customText": "The player automatically shoot. No need for aiming!",
+          "pos": [
+            [
+              -2,
+              1,
+              5
+            ]
+          ]
+        }
+      ]
     },
     {
       "cx": -1,
       "cy": 1,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               -16,
@@ -954,17 +560,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": 0,
       "cy": -1,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               0,
@@ -983,17 +588,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": 0,
       "cy": 1,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               0,
@@ -1017,17 +621,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": 1,
       "cy": -1,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               16,
@@ -1046,17 +649,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": 1,
       "cy": 0,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               16,
@@ -1085,12 +687,7 @@
             ],
             [
               16,
-              6,
-              5
-            ],
-            [
-              23,
-              9,
+              16,
               5
             ],
             [
@@ -1121,8 +718,60 @@
           ]
         },
         {
-          "type": "o_barrier",
-          "overlay": "ov_textsign",
+          "obstacleType": "o_dirt",
+          "pos": [
+            [
+              20,
+              7,
+              6
+            ],
+            [
+              20,
+              7,
+              7
+            ],
+            [
+              20,
+              7,
+              8
+            ],
+            [
+              20,
+              7,
+              9
+            ],
+            [
+              20,
+              4,
+              10
+            ],
+            [
+              25,
+              2,
+              10
+            ]
+          ]
+        },
+        {
+          "obstacleType": "o_dirt",
+          "sunGeneratorConfig": {
+            "damagePerSun": 250,
+            "maxSun": 100,
+            "accumulatedDamage": 0,
+            "sunsDropped": 0
+          },
+          "pos": [
+            [
+              24,
+              1,
+              10
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "overlayType": "ov_textsign",
           "customText": "Press SPACE or click on the Player to shoot faster",
           "pos": [
             [
@@ -1133,53 +782,17 @@
           ]
         },
         {
-          "type": "o_dirt",
+          "overlayType": "sunGenerator",
           "pos": [
             [
-              20,
-              7,
-              6
-            ],
-            [
-              20,
-              1,
-              7
-            ],
-            [
-              22,
-              5,
-              7
-            ],
-            [
-              20,
-              3,
-              8
-            ],
-            [
               24,
-              3,
-              8
-            ],
-            [
-              20,
-              2,
-              9
-            ],
-            [
-              23,
-              4,
-              9
-            ],
-            [
-              20,
-              7,
+              1,
               10
             ]
           ]
         },
         {
-          "type": "o_dirt",
-          "overlay": "sunOre",
+          "overlayType": "sunOre",
           "pos": [
             [
               21,
@@ -1198,17 +811,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": 1,
       "cy": 1,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               16,
@@ -1237,17 +849,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": 2,
       "cy": -1,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               37,
@@ -1291,17 +902,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": 2,
       "cy": 0,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               32,
@@ -1345,12 +955,7 @@
             ],
             [
               32,
-              2,
-              5
-            ],
-            [
-              35,
-              4,
+              7,
               5
             ],
             [
@@ -1406,20 +1011,13 @@
           ]
         },
         {
-          "type": "o_barrier",
-          "overlay": "ov_textsign",
-          "customText": "You can pick up placed plants and move it",
+          "obstacleType": "o_dirt",
           "pos": [
             [
-              34,
-              1,
+              39,
+              4,
               5
-            ]
-          ]
-        },
-        {
-          "type": "o_dirt",
-          "pos": [
+            ],
             [
               35,
               4,
@@ -1454,12 +1052,29 @@
               35,
               4,
               10
+            ],
+            [
+              39,
+              4,
+              11
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "overlayType": "ov_textsign",
+          "customText": "You can pick up placed plants and move it",
+          "pos": [
+            [
+              34,
+              1,
+              5
             ]
           ]
         },
         {
-          "type": "o_dirt",
-          "overlay": "sunTiny",
+          "overlayType": "sunTiny",
           "pos": [
             [
               39,
@@ -1473,17 +1088,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": 2,
       "cy": 1,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               32,
@@ -1537,17 +1151,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": 3,
       "cy": -1,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               48,
@@ -1591,17 +1204,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": 3,
       "cy": 0,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               48,
@@ -1661,7 +1273,7 @@
           ]
         },
         {
-          "type": "o_dirt",
+          "obstacleType": "o_dirt",
           "pos": [
             [
               55,
@@ -1674,13 +1286,8 @@
               3
             ],
             [
-              56,
-              1,
-              3
-            ],
-            [
-              58,
-              6,
+              55,
+              9,
               3
             ],
             [
@@ -1690,12 +1297,7 @@
             ],
             [
               55,
-              3,
-              4
-            ],
-            [
-              59,
-              5,
+              9,
               4
             ],
             [
@@ -1704,28 +1306,18 @@
               5
             ],
             [
-              60,
-              4,
+              57,
+              7,
               5
             ],
             [
               48,
-              1,
-              6
-            ],
-            [
-              50,
-              3,
+              5,
               6
             ],
             [
               57,
-              1,
-              6
-            ],
-            [
-              60,
-              4,
+              7,
               6
             ],
             [
@@ -1734,23 +1326,18 @@
               7
             ],
             [
-              59,
-              4,
+              58,
+              5,
               7
             ],
             [
               48,
-              3,
+              6,
               8
             ],
             [
-              52,
-              2,
-              8
-            ],
-            [
-              59,
-              2,
+              58,
+              4,
               8
             ],
             [
@@ -1765,17 +1352,12 @@
             ],
             [
               48,
-              2,
+              5,
               10
             ],
             [
-              51,
-              2,
-              10
-            ],
-            [
-              59,
-              3,
+              58,
+              4,
               10
             ],
             [
@@ -1785,37 +1367,17 @@
             ],
             [
               56,
-              1,
+              6,
               11
             ],
             [
-              59,
-              3,
-              11
-            ],
-            [
-              58,
-              1,
-              12
-            ],
-            [
-              60,
-              3,
+              55,
+              8,
               12
             ],
             [
               53,
-              1,
-              13
-            ],
-            [
-              56,
-              1,
-              13
-            ],
-            [
-              59,
-              5,
+              11,
               13
             ],
             [
@@ -1826,22 +1388,35 @@
           ]
         },
         {
-          "type": "o_dirt",
-          "overlay": "ov_spawner_custom",
+          "obstacleType": "o_dirt",
           "health": 100,
-          "spawnerBudget": 40,
-          "customSpawnerConfig": {
-            "name": "Custom Spawner",
-            "budget": 40,
-            "enemyTypeKey": [
-              "e_basic"
+          "pos": [
+            [
+              52,
+              1,
+              5
             ],
-            "spawnRadius": 300,
-            "spawnTriggerRadius": 140,
-            "spawnInterval": 30,
-            "spawnIntervalConsumeBudget": true,
-            "health": 100
-          },
+            [
+              56,
+              1,
+              5
+            ],
+            [
+              53,
+              1,
+              9
+            ],
+            [
+              57,
+              1,
+              10
+            ]
+          ]
+        }
+      ],
+      "overlays": [
+        {
+          "customSpawnerId": "ov_spawner_p_custom_spawner",
           "pos": [
             [
               52,
@@ -1866,8 +1441,7 @@
           ]
         },
         {
-          "type": "o_dirt",
-          "overlay": "sunClump",
+          "overlayType": "sunClump",
           "pos": [
             [
               49,
@@ -1887,8 +1461,7 @@
           ]
         },
         {
-          "type": "o_dirt",
-          "overlay": "sunTiny",
+          "overlayType": "sunTiny",
           "pos": [
             [
               55,
@@ -1948,8 +1521,7 @@
           ]
         },
         {
-          "type": "o_dirt",
-          "overlay": "sunOre",
+          "overlayType": "sunOre",
           "pos": [
             [
               58,
@@ -1979,8 +1551,7 @@
           ]
         },
         {
-          "type": "o_dirt",
-          "overlay": "ov_textsign",
+          "overlayType": "ov_textsign",
           "customText": "Eliminate these grapes to win",
           "pos": [
             [
@@ -1990,17 +1561,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": 3,
       "cy": 1,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               48,
@@ -2054,17 +1624,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": 4,
       "cy": -1,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               64,
@@ -2108,17 +1677,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": 4,
       "cy": 0,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               64,
@@ -2203,7 +1771,7 @@
           ]
         },
         {
-          "type": "o_dirt",
+          "obstacleType": "o_dirt",
           "pos": [
             [
               64,
@@ -2227,17 +1795,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": 4,
       "cy": 1,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               64,
@@ -2291,17 +1858,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": -2,
       "cy": -1,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               -30,
@@ -2320,29 +1886,16 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
     },
     {
       "cx": -2,
       "cy": 0,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
-          "overlay": "ov_textsign",
-          "customText": "use WASD, or drag on the screen to move",
-          "pos": [
-            [
-              -17,
-              1,
-              5
-            ]
-          ]
-        },
-        {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               -32,
@@ -2371,7 +1924,7 @@
             ],
             [
               -32,
-              15,
+              16,
               5
             ],
             [
@@ -2427,16 +1980,28 @@
           ]
         }
       ],
-      "turrets": []
+      "overlays": [
+        {
+          "overlayType": "ov_textsign",
+          "customText": "use WASD, or drag on the screen to move",
+          "pos": [
+            [
+              -17,
+              1,
+              5
+            ]
+          ]
+        }
+      ]
     },
     {
       "cx": -2,
       "cy": 1,
       "localChunkLevel": 0,
       "prefabId": null,
-      "blocks": [
+      "obstacles": [
         {
-          "type": "o_barrier",
+          "obstacleType": "o_barrier",
           "pos": [
             [
               -32,
@@ -2460,8 +2025,53 @@
             ]
           ]
         }
-      ],
-      "turrets": []
+      ]
+    }
+  ],
+  "customSpawnerPrefabs": [
+    {
+      "id": "ov_spawner_p_1786991561757",
+      "name": "a2",
+      "category": "overlays",
+      "isLiquid": false,
+      "config": {
+        "budget": 900,
+        "minHealth": 300,
+        "spawnRadius": 2000,
+        "enemyTypeKey": [
+          "e_fast",
+          "e_armor1"
+        ]
+      }
+    },
+    {
+      "id": "ov_spawner_p_1786995029088",
+      "name": "a2",
+      "category": "overlays",
+      "isLiquid": false,
+      "config": {
+        "budget": 400,
+        "minHealth": 300,
+        "spawnRadius": 700,
+        "enemyTypeKey": [
+          "e_fast",
+          "e_armor1"
+        ]
+      }
+    },
+    {
+      "id": "ov_spawner_p_custom_spawner",
+      "name": "Custom Spawner",
+      "category": "overlays",
+      "isLiquid": false,
+      "config": {
+        "budget": 80,
+        "minHealth": 100,
+        "spawnRadius": 300,
+        "enemyTypeKey": [
+          "e_basic"
+        ]
+      }
     }
   ],
   "groundFeatures": [],
@@ -2547,6 +2157,7 @@
       "isWinCondition": true
     }
   ],
+  "loots": [],
   "spawnAreaTiles": [
     [
       50,
@@ -2663,39 +2274,5 @@
       12,
       14
     ]
-  ],
-  "customSpawnerPrefabs": [
-    {
-      "id": "ov_spawner_p_1786991561757",
-      "name": "a2",
-      "config": {
-        "budget": 900,
-        "enemyTypeKey": [
-          "e_fast",
-          "e_armor1"
-        ],
-        "spawnRadius": 2000,
-        "spawnTriggerRadius": 2000,
-        "spawnInterval": 120,
-        "spawnIntervalConsumeBudget": true,
-        "health": 300
-      }
-    },
-    {
-      "id": "ov_spawner_p_1786995029088",
-      "name": "a2",
-      "config": {
-        "budget": 400,
-        "enemyTypeKey": [
-          "e_fast",
-          "e_armor1"
-        ],
-        "spawnRadius": 700,
-        "spawnTriggerRadius": 700,
-        "spawnInterval": 120,
-        "spawnIntervalConsumeBudget": true,
-        "health": 300
-      }
-    }
   ]
 }

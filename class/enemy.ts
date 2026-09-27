@@ -431,8 +431,9 @@ export class Enemy {
                 if (ent instanceof Enemy) {
                   if (!ent.conditions.has('c_hypnotized')) continue;
                 } else {
-                   // If it's a turret, check if it's active
+                   // If it's a turret, check if it's active & collidable
                    if (ent.config && ent.config.collideWithEnemy === false) continue;
+                   if (ent.isCollidable && !ent.isCollidable()) continue;
                    if (ent.isWaterlogged || ent.isFrosted) continue;
                    if (ent.isActive && !ent.isActive()) continue;
                 }
@@ -447,6 +448,31 @@ export class Enemy {
           }
           this.target = nearestT || state.player;
         }
+      }
+    }
+
+    if (!isHypnotized) {
+      // Prioritize attacking shield turrets if their shield covers this enemy (shield in the way)
+      let shieldTarget = null;
+      let minShieldDistSq = Infinity;
+      const allTurrets = [...state.player.attachments, ...state.world.getAllTurrets()];
+      for (const t of allTurrets) {
+        if (!t || t.health <= 0 || t.isDying || t.isWaterlogged || t.isFrosted) continue;
+        const hasShield = t.config.actionType?.includes('shield') || (t.activeStats?.shieldRadius > 0) || t.config.actionConfig?.shieldRadius;
+        if (!hasShield) continue;
+
+        const twPos = t.getWorldPos();
+        const sRad = t.activeStats?.shieldRadius || t.config.actionConfig?.shieldRadius || (GRID_SIZE * 2.8);
+        const dSq = (this.pos.x - twPos.x)**2 + (this.pos.y - twPos.y)**2;
+        if (dSq <= sRad * sRad) {
+          if (dSq < minShieldDistSq) {
+            minShieldDistSq = dSq;
+            shieldTarget = t;
+          }
+        }
+      }
+      if (shieldTarget) {
+        this.target = shieldTarget;
       }
     }
 
@@ -775,6 +801,7 @@ export class Enemy {
     
     for (let t of allTurrets) {
       if (t.config.collideWithEnemy !== false) {
+        if (t.isCollidable && !t.isCollidable()) continue;
         const isRetracted = !state.isStationary && !t.config.isActiveWhileMoving && t.isAttachedToPlayer();
         const isInactive = isRetracted || t.isWaterlogged || t.isFrosted;
         if (isInactive) continue;
@@ -923,6 +950,11 @@ export class Enemy {
       }
     }
 
+    if (dmg > 0 && this.conditions && this.conditions.has('c_weakbody')) {
+      const mult = conditionTypes['c_weakbody']?.damageTakenMultiplier ?? 2.0;
+      dmg *= mult;
+    }
+
     this.health -= dmg; 
     this.flash = 6; 
     this.flashType = dmg < 0 ? 'heal' : 'damage';
@@ -935,7 +967,8 @@ export class Enemy {
     const pending = state.pendingDamage.get(this.uid) || 0;
 
     const numColor = dmg < 0 ? [80, 255, 120] : [255, 255, 255];
-    state.vfx.push(spawnDamageNumber(this.pos.x, this.pos.y - this.size * 0.5, Math.abs(dmg), numColor));
+    const dmgVfx = spawnDamageNumber(this.pos.x, this.pos.y - this.size * 0.5, Math.abs(dmg), numColor, this);
+    if (dmgVfx) state.vfx.push(dmgVfx);
 
     // BugSplatTinyVfx: Tiny splat on damage taken
     if (dmg > 0) {
@@ -954,6 +987,11 @@ export class Enemy {
       this.isDying = true;
       state.totalEnemiesDead++;
       state.killsByType[this.type] = (state.killsByType[this.type] || 0) + 1;
+      const eCost = enemyTypes[this.type]?.cost || 10;
+      state.accumulatedEnemyBudgetKilled = (state.accumulatedEnemyBudgetKilled || 0) + eCost;
+      if (!state.accumulatedHuntEnemy) state.accumulatedHuntEnemy = {};
+      state.accumulatedHuntEnemy[this.type] = (state.accumulatedHuntEnemy[this.type] || 0) + 1;
+      state.accumulatedHuntEnemy['any'] = (state.accumulatedHuntEnemy['any'] || 0) + 1;
 
       // Play Enemy Death SFX (uses custom defined sfx or falls back to enemy_death)
       const deathSfx = this.config?.deathSfx || 'enemy_death';

@@ -1,18 +1,12 @@
 
-export const EnabledTurrets: string[] = [
-  't_pea', 't_laser', 't_wall', 't_mine', 't_ice', 't_sunflower', 't_seed', 't_lilypad',
-  't2_repeater', 't2_firepea', 't2_laser2', 't2_peanut', 't2_tall', 't2_mortar', 
-  't2_pulse', 't2_laserexplode', 't2_minespawner', 't2_snowpea', 't2_iceray', 't2_spike', 
-  't2_icebomb', 't2_stun', 't2_puncher',
-  't3_triplepea', 't3_repulser', 't3_bowling', 't3_snowpeanut', 't3_skymortar',
-  't3_puncher2', 't3_aoelaser', 't3_iceray2', 't3_miningbomb', 't3_tesla', 't3_icepuncher',
-  't3_densnut', 't3_durian', 't3_spike2', 't3_holonut',
-  't3_firepea2', 't3_spinnut', 't3_mortar2', 't3_snowpea2', 't3_inferno',
-  't3_flamethrower', 't3_laser3', 't3_minefield', 't3_frostfield', 't3_triberg',
-  't3_gatling', 't3_firecharge','t3_icecharge', 't3_minecharge'
-];
+import { turretTypeRegistry } from '../class/turret/type';
 
 export const DisabledTurrets: string[] = [
-   't_dummy','t0_hypnobomb'
+  't_dummy', 't0_hypnobomb'
   // do not delete this line, we use it to test new turrets
 ];
+
+// Dynamically includes all registered turrets into TurretAvailability
+export const EnabledTurrets: string[] = Object.keys(turretTypeRegistry).filter(
+  k => !DisabledTurrets.includes(k)
+);

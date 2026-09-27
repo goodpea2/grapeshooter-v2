@@ -18,5 +18,40 @@ export const t3_bowling: TurretConfig = {
     staminaCostPerBulletSpawned: 2
   },
   targetType: ['enemy'],
-  targetConfig: { enemyPriority: 'closest' }
+  targetConfig: { enemyPriority: 'closest' },
+  upgrades: [
+    {
+      id: 'u_t3_bowling_1',
+      description: "Player's attack fire rate +35%, for each Bowling Bulb attached",
+      modifiers: { playerFirerateAdd: 0.35 }
+    },
+    {
+      id: 'u_t3_bowling_2',
+      stackable: false,
+      description: "Fire rate -50%, damage +100%",
+      modifiers: { firerateMult: -0.5, damageMult: 1.0 }
+    },
+    {
+      id: 'u_t3_bowling_3',
+      description: "Damage +15% for every neighboring [c_shard]",
+      conditionals: [
+        { type: 'neighbor_count', targetClass: 'c_shard', bonus: { damageMult: 0.15 } }
+      ]
+    },
+    {
+      id: 'u_t3_bowling_4',
+      description: "Range +15% for every neighboring [c_fuel]",
+      conditionals: [
+        { type: 'neighbor_count', targetClass: 'c_fuel', bonus: { rangeMult: 0.15 } }
+      ]
+    },
+    {
+      id: 'u_t3_bowling_5',
+      stackable: false,
+      description: "Damage +100% and fire rate +50% while Charged, stamina cost +3 per shot",
+      conditionals: [
+        { type: 'charged', bonus: { damageMult: 1.0, firerateMult: 0.5, staminaCostAdd: 3 } }
+      ]
+    }
+  ]
 };

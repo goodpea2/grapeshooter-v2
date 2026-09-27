@@ -44,7 +44,12 @@ export const state: any = {
     lastFlagToggleFrame: 0,
     lastBucketFrame: 0,
     cameraZoom: 1.0,
-    isWorldDragActive: false
+    isWorldDragActive: false,
+    showHpHeatmap: false,
+    editingSpawnerModal: false,
+    lastPaletteItemClick: null as { key: string; time: number } | null,
+    lastCanvasTileClick: null as { gx: number; gy: number; time: number } | null,
+    levelConfigSelectedEnemies: null as string[] | null
   },
   suppressGameplayMouseUntilRelease: false,
   currentLevelLayoutData: null,
@@ -79,15 +84,25 @@ export const state: any = {
   unlockPopupTimer: 0,
   isAlmanacOpen: false,
   isAlmanacEditorMode: false,
-  almanacTab: 'Turrets', // 'Turrets' | 'Enemies' | 'Upgrades' | 'LevelConfig'
+  almanacTab: 'Turrets', // 'Turrets' | 'Enemies' | 'Upgrades' | 'LevelConfig' | 'TurretUnlock'
+  worldSeed: 2026,
+  turretUnlockTree: null as any,
+  turretUnlockTreeScroll: { x: 0, y: 0, zoom: 0.88, targetZoom: 0.88 },
+  turretUnlockChoiceModal: null as {
+    type: 'upgrade' | 'loot';
+    nodeId: string;
+    options: any[];
+    openedAtFrame?: number;
+  } | null,
   almanacEditorToggledKeys: new Set(),
   levelEditorAlmanacProgression: null,
   levelEditorPlayerUpgrades: null as any,
-  activePlayerUpgradeInput: null as { key: string; field: 'stat' | 'cost' } | null,
+  activePlayerUpgradeInput: null as { key: string; field: 'stat' | 'cost'; textBuffer: string; cursor?: number; selectionStart?: number; selectionEnd?: number; isDragging?: boolean } | null,
   editorPlayerUpgradesScrollY: 0,
   editorPlayerUpgradesScrollVelocity: 0,
   levelEditorLevelConfig: null as any,
   activeLevelConfigInput: null as { field: string; subKey?: string; textBuffer: string; cursor?: number; selectionStart?: number; selectionEnd?: number; isDragging?: boolean } | null,
+  activeSkillTreeConfigInput: null as { field: 'TurretUnlockNodes' | 'TurretUpgradeNodes' | 'LootNodes'; textBuffer: string; cursor?: number; selectionStart?: number; selectionEnd?: number; isDragging?: boolean } | null,
   levelConfigScrollY: 0,
   levelConfigScrollVelocity: 0,
   almanacSelectedTurret: 't_pea', // should be dynamic with previous user selection
@@ -101,6 +116,9 @@ export const state: any = {
   cameraPos: { x: 0, y: 0 },
   cameraZoom: 1.0,
   targetCameraZoom: 1.0,
+  turretZoomOffset: 0,
+  fovZoomOffset: 0,
+  damageFlash: 0,
   cameraShake: 0, // Current camera shake intensity
   cameraShakeFalloff: 0.95, // Default decay rate
   viewportBounds: { minX: 0, maxX: 0, minY: 0, maxY: 0 },
@@ -110,6 +128,10 @@ export const state: any = {
   currentChunkLevel: 0,
   spawnedNpcKeys: new Set(),
   frames: customStartingHour * HOUR_FRAMES,
+  accumulatedEnemyBudgetKilled: 0,
+  accumulatedCollectedResources: {},
+  accumulatedHuntEnemy: {},
+  accumulatedBreakObstacle: {},
   
   // Game Over state
   isGameOver: false,
@@ -220,8 +242,10 @@ export const state: any = {
   debugGizmosEnemies: false,
   debugHP: false,
   hoveredTurretInstance: null, 
+  isPlayerHovered: false,
   previewSnapPos: null,
   previewWorldSnap: null, // { gx, gy } if snapping to world grid
+  swapTargetPreview: null, // Target turret instance for swap placement
   activeNPC: null,
   npcUiPanelPos: 0, // Animation progress for NPC UI
   activeNpcDialogueIdx: 0,
@@ -320,6 +344,7 @@ export const state: any = {
     magnetRadius: 0,
     damageMultAdd: 0,
     maxStamina: 0,
+    staminaRecoveryRate: 0,
     clickHoldBoost: 0,
     movementSpeed: 0
   },

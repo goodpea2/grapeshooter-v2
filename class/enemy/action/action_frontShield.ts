@@ -105,7 +105,8 @@ export class ActionFrontShield extends EnemyAction {
     const hitX = this.enemy.pos.x + Math.cos(shieldAngle) * this.shieldRadius;
     const hitY = this.enemy.pos.y + Math.sin(shieldAngle) * this.shieldRadius;
 
-    state.vfx.push(spawnDamageNumber(hitX, hitY, dmg, [100, 220, 255]));
+    const dmgVfx = spawnDamageNumber(hitX, hitY, dmg, [100, 220, 255], this.enemy);
+    if (dmgVfx) state.vfx.push(dmgVfx);
     state.vfx.push(spawnHitSpark(hitX, hitY, [120, 240, 255]));
 
     soundEngine.playSFXGroup('projectile_hit_shield');

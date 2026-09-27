@@ -15,7 +15,22 @@ export const t3_heallaser2: TurretConfig = {
   actionConfig: { 
     ...t2_heallaser.actionConfig,
     spawnOnTargetDeathConfig: { 
-      bulletTypeKey: 'b_healing_pulse_radius25'
+      count: 1, 
+      bulletTypeKey: 'b_healing_pulse_dense_big', 
+      pattern: 'single', 
+      spawnAt: 'turret', 
+      triggerOnMine: true 
+    }
+  },
+  actionTypeWhileCharged: ['laserBeam', 'spawnOnTargetDeath'],
+  actionConfigWhileCharged: {
+    ...t2_heallaser.actionConfigWhileCharged,
+    spawnOnTargetDeathConfig: { 
+      count: 1, 
+      bulletTypeKey: 'b_healing_pulse_dense_big', 
+      pattern: 'single', 
+      spawnAt: 'turret', 
+      triggerOnMine: true 
     }
   }
 };

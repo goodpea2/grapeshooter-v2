@@ -79,17 +79,27 @@ Base expansion is built on a **Hex-Axial Coordinate System** (q, r).
 ---
 
 ## 📖 The Almanac & Progression
-The Almanac (v4.0) serves as the central hub for discovery, purchasing, and recipe management.
-- **Dynamic Progression Config (`AlmanacProgression`)**: Level layouts and campaign missions can configure their own turret availability matrices:
+The Almanac (v4.0) serves as the central hub for discovery, purchasing, skill tree unlocks, and recipe management.
+- **Dynamic Progression Config (`AlmanacProgression`)**: Level layouts and campaign missions configure their progression schema:
     - `StartingTurret`: Turrets pre-unlocked and available at the start of the level.
-    - `UnlockedByDiscoverTurret`: Turrets that start hidden/locked and are only unlocked upon in-world discovery (marked with a `?` indicator in editor).
-    - `LockedTurret`: Turrets unlockable via the Unlock Shop button or research progression.
-    - `BannedTurrets`: Turrets completely excluded and hidden from the Almanac (marked with an `x` indicator in editor).
-    - `UnlockCost`: Custom cost overrides for unlocking locked turrets.
-    - `AllTurretCrafting`: Global toggle (`false` hides the buy button across all turrets).
-    - `AllTurretUpgrade`: Global toggle (`false` hides the upgrade button across all turrets).
-    - `CraftingCostOverride`: Granular purchase cost overrides and `canBePurchased: false` overrides per turret type.
-- **Level Editor AlmanacConfig UI**: In Level Editor mode, clicking the `ALMANAC CONFIG` button opens the interactive Almanac editor. Clicking any turret slot cycles its progression state seamlessly (`Available` -> `Locked` -> `NeedDiscovery` (`?`) -> `Banned` (`x`)). Level layout serialization automatically exports the customized `almanacProgression` configuration within the exported level JSON.
+    - `UnlockedByDiscoverTurret`: Turrets that start hidden/locked and are only unlocked upon in-world discovery.
+    - `LockedTurret`: Array of `{ type, weight }` objects determining turret unlock probabilities across hex rings.
+    - `SkillTreeConfig`: Matrix specifying the count of `TurretUnlockNodes`, `TurretUpgradeNodes`, and `LootNodes` for each hex ring (0 through 6).
+    - `AllTurretCrafting`: Global toggle (default `false`) controlling turret crafting in the Almanac.
+    - `CraftingCostOverride`: Granular purchase cost overrides per turret type.
+    - *Banned-by-Default Policy*: Any turret type not explicitly registered in `StartingTurret`, `UnlockedByDiscoverTurret`, or `LockedTurret` is treated as banned by default.
+- **Hex Unlock Tree (`turretUnlockTree`)**:
+    - Generates an interactive 7-ring hex-axial skill tree centered at `(0,0)`.
+    - Nodes are dynamically placed and populated based on `SkillTreeConfig`.
+    - Rings 0 to 6 distribute Turret Unlock nodes (weighted by `LockedTurret.weight`), Turret Upgrade nodes (triggering 3-card choice modals), Loot nodes (Sun & Elixir rewards), and Empty/Connector nodes.
+    - Unlocking nodes triggers directional ring reveals, node unlock burst VFX (`NodeUnlockVFX`), and choice selection modals.
+- **Turret Unlock Modal & Card Reveal**:
+    - Displays choices for upgrades and loot with a sequential `CardReveal` ease-in animation.
+    - Interactive "SELECT" and "CLAIM" buttons appear only when hovering over cards and require a direct click.
+    - Closing the modal emits `NodeUnlockVFX` and triggers unlock audio feedback.
+- **Level Editor SkillTreeConfig UI**:
+    - In Level Editor mode, the Turret Unlock tab displays a specialized `SkillTreeConfigPanel` alongside the live preview tree.
+    - Allows adjusting node counts per ring with "Regenerate" and "Reset" actions. Level serialization persists the node count configuration rather than the static layout.
 - **Discovery-Based Unlocks**: Certain turrets (e.g., Sunflower, Lilypad, and various consumables) start locked and are only revealed once "discovered" by the player—either by finding them in the world, receiving them from NPCs, or attaching them to the base.
 - **Integrated Shop**: Players can purchase unlocked turrets directly from the Almanac using a combination of Sun, Elixir, Soil, and rare resources. Purchased items are delivered to the player's inventory via a visual fly-VFX.
 - **Multi-Resource Economy**: The game features a tiered resource system:
@@ -711,8 +721,415 @@ The Level Editor is structured around high-performance dual-grid caching, decoup
 - **Level Editor Rapid Tool Switching**:
   - Hotkey integration (`1`/`B` for Brush, `2`/`F` for Fill, `3`/`L` for Lasso, `4` for Spawn Area) with responsive transient toast feedback.
   - Camera navigation locking while modals, tooltips, or text fields are actively edited.
+- **PlayTest Mode Cache & Custom Spawner Lifecycle**:
+  - **Full Custom Spawner Serialization**: Seamlessly preserves custom spawner prefabs and per-block configurations—including `spawnTriggerRadius`, `spawnInterval`, `hourlySpawnConfig`, and `minHealth`—across transitions to PlayTest mode and back via deep cloning.
+  - **Pre-Deserialization Spawner Prefab Restoration**: Automatically re-registers custom prefabs into `overlayTypes` and `liquidTypes` prior to chunk deserialization, preventing custom spawners from losing their metadata or reverting to default blocks.
+  - **Dynamic Budget Synchronization & Cached Spawn List**: Custom spawner budget values (`customSpawnerConfig.budget` and `block.spawnerBudget`) are tightly bound via `block.setCustomSpawnerConfig()`. Deserializing chunk blocks immediately executes `initCachedSpawnList()`, ensuring in-game spawner instances populate their cached enemy roster using their full configured budget (e.g. 400 budget spawning multi-tiered waves rather than falling back to the 60 base spawner default).
+  - **Auto-Discovery & Prefab Export Pipeline**: `saveLevelLayout` and `serializeLevelLayout` inspect world chunk blocks to auto-discover any custom spawner instances and compile them into `levelData.customSpawnerPrefabs`. Upon loading or playtesting any level, the engine registers any discovered custom prefabs before chunk blocks are instantiated.
+  - **Hover Tooltip & In-World Diagnostics**: World spawner hover tooltips (`drawWorldHoverSpawnerTooltip`) render comprehensive stats including real-time spawner Health (`curHealth/maxHealth`), effective Spawner Budget, Trigger Radius, and Cached Enemy pool.
+  - **LevelConfig Reactive Buffering & Parsing**: Active text input buffers in the LevelConfig panel are automatically applied and synchronized upon panel close, tab switches, and level export. Custom budget fields support flexible parsing of both comma-separated and space-separated number arrays without data loss.
+- **Typography & Signature Font Consistency**:
+  - **Viga Signature Font Protection**: Global text styling and UI components strictly default to `'Viga'`. All canvas font resets throughout modals (PayGate, Sun Generator, Text Sign), toolbars, and debug components (including `ShowUIComponent`) safely reset back to `'Viga'` instead of system fallback fonts (`sans-serif`/`Arial`).
 
+---
 
+## 📦 Refactored LevelData JSON Schema (Decoupled Layers & Sparse Configuration)
+Exported level layouts (`levelData`) feature an optimized, human-readable, and compact JSON structure that decouples obstacle terrain from overlays and spawner entities:
+
+- **Decoupled Chunk Layer Separation (`obstacles` vs. `overlays`)**:
+  - Instead of interleaving spawner definitions, liquid types, and overlay metadata into each obstacle block, chunk data separates world elements into dedicated layers:
+    ```json
+    {
+      "cx": 0,
+      "cy": 0,
+      "localChunkLevel": 1,
+      "prefabId": "chunk_0_0",
+      "obstacles": [
+        {
+          "obstacleType": "o_dirt",
+          "pos": [[0, 16, 0], [0, 16, 1]]
+        }
+      ],
+      "overlays": [
+        {
+          "customSpawnerId": "ov_spawner_p_a",
+          "pos": [[5, 1, 5]]
+        },
+        {
+          "customGroundSpawnerId": "l_spawner_p_b",
+          "pos": [[8, 1, 8]]
+        }
+      ]
+    }
+    ```
+- **Prefab-Referenced Spawner Architecture & Trimmed Parameters**:
+  - Spawners in the `overlays` layer point cleanly to unique prefab identifiers (`customSpawnerId` for block overlays, `customGroundSpawnerId` for ground/liquid spawners).
+  - Complete spawner configurations reside once in the top-level `customSpawnerPrefabs` catalog, stripping redundant parameters:
+    - **`ov_spawner`**: Serializes only essential parameters: `budget`, `minHealth`, `spawnRadius`, and `enemyTypeKey`.
+    - **`l_spawner`**: Serializes only hourly parameters: `hourlySpawnConfig` (with `enabled=true` omitted since it is the only ground spawner mode), `minHealth`, `spawnRadius`, `spawnTriggerRadius`, `spawnInterval`, and `enemyTypeKey`.
+    - Eliminates duplicate runtime flags (`enabled`, `name`, `health`, `isCustomPrefab`, `lootConfigOnDeath`) across exported JSONs.
+- **Sparse `globalEnemySpawnConfig` Format**:
+  - Global wave and daytime/nighttime enemy distribution uses an explicit key-value dictionary format filtering out inactive enemies (`weight > 0`):
+    ```json
+    "globalEnemySpawnConfig": {
+      "1_day": {
+        "e_basic": 0.25,
+        "e_fast": 0.5
+      },
+      "1_night": {
+        "e_basic": 0.5,
+        "e_armor1": 0.25
+      }
+    }
+    ```
+  - Explicit enemy typename keys (`e_basic`, `e_fast`, etc.) future-proof levels against registry reordering or newly introduced enemy types.
+- **Strict V2 JSON Schema Parsing & Legacy Format Deprecation**:
+  - `deserializeChunk` strictly ingests the decoupled `{ obstacles, overlays }` schema matching exported level layouts. Legacy monolithic `blocks` arrays have been deprecated in favor of separate obstacle runs and spawner/overlay layers.
+  - `deserializeSpawnAreaTiles` expects standardized run-length span tuples `[startGx, spanLen, gy]`.
+  - `deserializeLevelEnemies` and `deserializeLevelLoots` strictly parse grouped positional coordinate arrays (`{ type, pos: [[x, y], ...] }` and `{ lootType, pos: [[x, y], ...] }`), removing legacy single-object positional fallbacks.
+  - Spawner prefabs are directly restored from root `levelData.customSpawnerPrefabs` prior to chunk deserialization, removing legacy chunk-scanning fallbacks in both runtime (`startLevel`) and the Level Editor (`loadLayoutIntoEditor`).
+  - `deserializeChunkBlocks` is formally marked `@deprecated` as the codebase standardizes on decoupled chunk architecture.
+
+---
+
+## 🛠️ Level Editor & Almanac UX Enhancements
+- **Spawner Prefab Modal & Confirmation Workflow**:
+  - Replaced the ephemeral tooltip with a centered, high-contrast modal featuring explicit **[SAVE]** and **[Discard]** buttons (matching the PayGateModal token system).
+  - Editing properties buffers user changes in a draft state; clicking Discard or hitting `Escape` restores the previous spawner state, while clicking Save or hitting `Enter` commits changes to the active prefab registry and world blocks.
+- **Double-Click & Hover Interactions**:
+  - Single-clicking spawner items on the left palette selects the item without opening the editor modal.
+  - Hovering over spawner items in the palette displays a non-intrusive spawner info popup card matching canvas world hover inspections.
+  - Double-clicking (<=300ms) spawner palette items or spawner grids on the world canvas opens the `SpawnerModal`.
+- **World HP Heatmap Overlay (`showHpHeatmap`)**:
+  - Added a dedicated top-bar toggle button (`HP HEATMAP`).
+  - When enabled, renders a color-coded overlay across world obstacle blocks based on health values, gradient-interpolating from green (lowest HP) to deep red (highest HP).
+  - When zoomed in (zoom >= 0.75), legible numeric HP value labels are rendered over each grid cell.
+- **Almanac Global Enemy Spawn Config Matrix Row Filter**:
+  - Embedded a togglable enemy selection chips row above the spawn matrix in `LevelConfigPanel`.
+  - Allows designers to selectively toggle which enemy types appear as matrix rows, keeping the table compact and focused on relevant enemies for each stage.
+
+- **Modularized Level Config Panel & Global Enemy Spawn Matrix (`levelConfig/`)**:
+  - Refactored and revamped `levelConfigPanel.ts` into clean smaller modular files (`generalPanel.ts`, `currencyPanel.ts`, `resourcesPanel.ts`, `spawnsPanel.ts`, `enemiesPanel.ts`, `configActions.ts`, `types.ts`), strictly reusing design tokens from `uiComponents.ts`.
+  - Upgraded `GlobalEnemySpawnConfig` to share the exact same enemy list and togglable chip style as `SpawnerModal` (`ALL_ENEMY_TYPES_LIST`), with matrix table rows ordered according to `enemyTypes`.
+  - Implemented advanced drag interactions: left-click-drag cycles cell spawn weights (`0 ➔ 0.25 ➔ 0.5 ➔ 1`, capping at 1 without wrapping), right-click-drag sets cell values to 0, and clicking/right-clicking row and column headers instantly cycles or zeros out entire rows and columns.
+
+---
+
+## 🔥 Tile-Based Ground Feature Visual Optimization (`fire_puddle`)
+- **Single VFX Instance per Tile**:
+  - Prevented dense visual stacking and GPU overdraw by enforcing a maximum of 1 `FirePuddleVFX` per grid tile (`tileFirePuddleMap`).
+  - Spawning multiple fire ground features within the same tile extends/refreshes the tile's active fire VFX duration and radius rather than allocating duplicate particle emitters.
+- **Spark & Particle Rate Limiting**:
+  - Spark generation is capped at the tile level to prevent intense visual blowouts and alpha compounding when clusters of fire ground features overlap.
+- **Combat Logic Decoupling**:
+  - Ground feature combat calculations (`GroundFeature.resolveFireGroundFeatures`) remain completely independent and fully intact, ensuring authentic damage areas, 15-frame tick intervals, and burn conditions are maintained.
+
+---
+
+## 🎯 Projectile AOE & Advanced Enemy AI Behaviors
+- **Projectile AOE Parameter Extensions**:
+  - `b_icebomb_death`: Added `aoeFrostAmount = 1` to `aoeConfig`, applying freezing levels and ice block encapsulation to caught turrets in its blast radius.
+  - `b_tnt_explosion`: Configured `aoeTurretDamageMultiplier = 0.25` and `aoePlayerDamageMultiplier = 0.1` in `aoeConfig`, tuning friendly fire splash damage against the player and base structures while maintaining full demolition force against obstacles and hostile enemies.
+- **Hopper Targeting AI (`e_hopper` / `ActionHopJump`)**:
+  - Hoppers calculate jump trajectories dynamically toward their active `enemy.target` (hostile enemies or spawners when hypnotized, or turrets/player when hostile) rather than blindly jumping to the player.
+  - Hypnotized hoppers without active hostile targets hop away from the player along the reverse distance gradient.
+  - Landing AoE damage targets are routed correctly (`['enemy', 'obstacle', 'icecube']` for friendly hypnotized hoppers; `['player', 'turret', 'obstacle', 'icecube']` for hostile hoppers).
+- **Hypnotized Launcher Ally Collaboration (`e_launcher` / `ActionLaunchAlly`)**:
+  - When under `c_hypnotized`, `e_launcher` continues to initiate collaboration calls and partner with nearby enemy allies.
+  - Upon launching the partner, instead of firing them toward the player base, it launches them **away from the player** with a `2.0 launchDistanceRatio`, effectively repelling enemy waves into the distance.
+- **Almanac Turret Unlock Popup Revamp (`turretUnlockPopup.ts`)**:
+  - Rebuilt modal structure and layout using standardized design tokens from `uiComponents.ts` (`drawModalFrame`, `drawYellowButton`, `drawCloseButton`, `color`, `setUILayer`).
+  - Fixed premature dismissal bug by tracking modal open frame and requiring deliberate mouse clicks, preventing the popup from immediately closing on the mouse release of the unlock button.
+
+---
+
+## ⬡ Turret Unlock Hex Matrix System (`turretUnlockTree.ts`)
+A procedurally generated 6-ring hex-matrix unlocking tree integrated directly into the Almanac:
+- **Hex Matrix Geometry & Seeded Generation**:
+  - Generates 127 hex nodes arranged in concentric rings (Rings 0 through 6) using deterministic Mulberry32 PRNG seeded by `state.worldSeed`.
+  - Node composition adheres strictly to ring balancing tables:
+    - **Ring 0** (1 node): 1 Starting Loot Cache (0 Raisin cost; grants +3 Sun).
+    - **Ring 1** (6 nodes): 3 Turret Unlocks, 3 Upgrades, 0 Loot, 0 Empty (1 Raisin cost).
+    - **Ring 2** (12 nodes): 5 Turret Unlocks, 4 Upgrades, 1 Loot, 2 Empty (1 Raisin cost).
+    - **Ring 3** (18 nodes): 7 Turret Unlocks, 5 Upgrades, 2 Loot, 4 Empty (2 Raisin cost).
+    - **Ring 4** (24 nodes): 10 Turret Unlocks, 6 Upgrades, 3 Loot, 5 Empty (2 Raisin cost).
+    - **Ring 5** (30 nodes): 8 Turret Unlocks, 8 Upgrades, 6 Loot, 8 Empty (3 Raisin cost).
+    - **Ring 6** (36 nodes): 7 Turret Unlocks, 10 Upgrades, 10 Loot, 9 Empty (3 Raisin cost).
+  - Turret unlock nodes dynamically sample from `AlmanacProgression.LockedTurret` non-repeating pools. When the pool of unique locked turrets is exhausted, any remaining turret unlock slots gracefully fall back to empty nodes.
+- **Node Adjacency & Exploration Progression**:
+  - Players start at Ring 0 (Center). Unlocking any node reveals adjacent neighbors as available for unlocking.
+  - **Dynamic Connecting Traces**: Renders glowing amber energy lines between unlocked neighbors, solid light-blue pathways toward available nodes, and faint dark guides to fogged nodes.
+- **Node Interactions & Choice Modals**:
+  - **Turret Unlock Nodes**: Deducts raisins, triggers `NodeUnlockVFX`, reveals plant unlock splash modal, unlocks turret in catalog, and updates `state.unlockedTurrets`.
+  - **Turret Upgrade Nodes**: Opens a 3-choice modal (`turretUnlockModal.ts`) featuring unlocked turrets and enhancement descriptions. The modal's darkened backdrop covers the entire screen.
+  - **Loot Nodes**: Ring 0 awards +3 Sun free on click; outer loot nodes open a 2-choice modal offering `+20 Sun` or `+20 Elixir`.
+  - **Empty Nodes**: Require raisin cost to carve strategic connection pathways across the matrix.
+- **Tactile Visuals, Confirmation Step & Hover Animations**:
+  - Unlocked nodes feature golden 3D discs with plant animations, upgrade arrow badges, and loot icons.
+  - Available nodes present clean indigo 3D tactile buttons without static outlines; outlines only appear on mouse hover with no pulsing effect.
+  - **Round Purple Confirmation Button**: Clicking an available node transforms it into a round purple disc button matching the node shape and displaying the Raisin cost (or `FREE`). Outlines only appear on hover without pulsing. Clicking the purple button confirms the unlock.
+  - **Smooth Hover Lift & 1.1x Scaling**: Interactive nodes smoothly raise up and scale to 1.1x when hovered with snappy lerped transition animations.
+  - **Standardized Gameplay Tooltip Integration**: Re-uses the actual gameplay turret tooltip (`UITurretTooltip.ts`) for turret unlock nodes. Turret upgrade, loot, and empty nodes adhere strictly to that exact navy rounded frame aesthetic.
+- **Reusable Node Unlock VFX (`NodeUnlockVFX.ts`)**:
+  - Spawns expanding radiant shockwave rings, secondary fast echo rings, 4-point central glints, and bursting directional spark particles whenever a node is unlocked.
+  - Pooled via `ObjectPool<NodeUnlockVFX>` and exposed via `spawnNodeUnlockVFX(x, y, theme)`.
+- **Panel Edge Clipping & Coordinate Alignment**:
+  - Fixed visual coordinate offset by strictly separating the Almanac modal transform from the panel's internal viewport space.
+  - Inner canvas is strictly clipped to the panel bounds with soft linear gradient edge fade vignettes.
+  - Features smooth mouse-wheel zooming (`handleTurretUnlockTreeScroll`) with lerped scaling and mouse drag panning.
+- **Almanac Integration & Expanded Info Panel**:
+  - Integrated under the new Almanac tab using `img_t_sunflower_front`.
+  - The legacy bottom-right unlock button and per-turret Upgrade button in the Turrets tab are removed, and the `TurretInfoPanel` is cleanly dedicated to plant stats and lore.
+- **Skill Tree Config Panel (Editor Mode)**:
+  - Streamlined to strictly adhere to the game's `uiComponent` design tokens.
+  - Features array input fields for `TurretUnlockNodes:`, `TurretUpgradeNodes:`, and `LootNodes:`, paired with a tactile "Regenerate" button for instant preview updates.
+- **Line-of-Sight (LOS) Discovery System**:
+  - Turrets designated under `UnlockedByDiscoverTurret` no longer require attachment; players discover them simply by having a clear Line of Sight (LOS) toward any matching world turret.
+- **Global Hover Animations Expansion**:
+  - Applied the smooth lerped elevation and scaling system to Level Editor toolbar items (obstacles, overlays, entities), Main Menu level cards, HUD turret selection icons, and Almanac catalog items.
+
+---
+
+## ⚡ Turret Upgrade & Progression Engine
+- **Strict Definition Registry**:
+  - Turrets without an `upgrades` array defined strictly do not have upgrade options; fallback efficiency upgrades are eliminated.
+  - Upgrade lookups check both global definitions and per-turret definition structures via `getUpgradeDefinition`.
+- **Debug Mode `RollTurretUpgrade`**:
+  - Replaces legacy reset buttons with a dedicated free upgrade roller in Debug Mode.
+  - Filters upgrade choices exclusively to currently attached turrets (falling back gracefully to unlocked turrets only if no turrets are currently attached).
+  - Renders and accepts interactive clicks seamlessly during active gameplay outside the Almanac.
+- **Rich Text Class & Element Icon Rendering (`drawRichText`)**:
+  - Supports embedded tags such as `<c_leaf>`, `<c_shell>`, `<c_shard>`, `<c_fuel>`, `<c_ice>`, `<shooter>`, `<miner>`, `<armor>`, `<explosive>`, and `<stall>` (as well as bracketed `[tag]` syntax).
+  - Embeds authentic pixel-art icons inline with automated word-wrapping and baseline alignment across modals and info panels.
+- **Almanac Upgrade History**:
+  - `TurretInfoPanel` lists active upgrades dynamically using their full descriptions (with inline icon replacements for pre-rolled conditional tags) instead of raw IDs.
+  - Active upgrades seamlessly modify turret instances in real-time via `recalculateAllStats` and `recalculateTurretStats`.
+
+- **Upgrade-in-Action Indicators & Visual Feedback**:
+  - **Stat Change Notifications**: Re-uses the damage number VFX pipeline with green/red floating popups (`spawnStatChangePopup`) indicating modified stats (e.g. `Atk Up/Down!`, `Mining Up/Down!`, `Fire Rate Up/Down!`, `Max Stamina Up/Down!`, `Move Speed Up/Down!`, `Range Up/Down!`).
+  - **Sequential Popup Queueing**: Multi-stat changes feature delayed frame scheduling (`delay: +14 frames`) to prevent text overlap and ensure clean visual clarity.
+  - **Neighbor Buff Particles (`NeighborBuffParticleVFX`)**: Turrets receiving proximity or conditional buffs from neighboring turrets emit subtle streaming buff particles from buffing neighbors toward the firing turret upon action execution.
+
+- **Tier 1 & Tier 2 Plant Upgrades Implementation**:
+  - **`t_pea` (Peashooter)**: Merge upgrades spawn Sun on both quick-merge (purchasing on top of existing turret) and drag-and-drop merge operations.
+  - **`t_wall` (Wall-nut)**: Upgrade 1 boosts player move speed, Upgrade 2 increases max health, Upgrade 3 redirects neighbor damage to the first found Wall-nut with absorption, Upgrade 4 spawns AOE explosion bullets (`b_wallnut_explosion`, dealing 100 AOE damage per stack) on death, and Upgrade 5 (`u_t_wall_5`) heals all active Wall-nuts (+50 HP) whenever any plant is placed/planted in play.
+  - **`t_mine` (Potato Mine)**: Upgrade 1 (`u_t_mine_1`) accurately applies +20 max stamina to the player stamina gauge and UI, Upgrade 2 reduces arming time and balances AOE damage, Upgrade 3 launches hovering floating mines (`b_floating_mine`) on merge, and Upgrade 4 (`u_t_mine_4`) scales AOE damage radius by +20% per neighboring `<c_leaf>` plant directly through bullet explosion evaluation.
+  - **`t_ice` (Iceberg Lettuce)**: Upgrade 1 boosts player stamina recharge rate (+25% per attached Iceberg), Upgrade 2 reduces arming time and increases freeze/stun duration, Upgrade 3 applies `c_hypnotized` condition alongside `c_stun` causing frozen enemies to be targeted and attacked by other enemies, and Upgrade 4 (`u_t_ice_4`) grants instant-arm charges and resets pulse cooldown timers on planting with smart targeting that avoids firing at already stunned enemies.
+  - **`t2_laser2` (Laser MK2)**: Upgrade 1 adds +3 player mining damage per attached unit, Upgrade 2 spawns +1 Sun for every 10 blocks mined by the turret instance, Upgrade 3 boosts damage by +50% while alone, Upgrade 4 boosts range by +20% per neighboring `[c_shard]`, and Upgrade 5 boosts damage by +20% per neighboring `[c_leaf]`.
+  - **`t2_wallaser` (Walling Laser)**: Upgrade 1 boosts player movement speed (+5% per attached unit), Upgrade 2 grants +150 initial starting health without modifying its max health ceiling, Upgrade 3 allows full-HP Walling Lasers to be merged onto the Player to heal +50 HP with a pulsing green visual hint when the player is missing $\ge 50$ HP, Upgrade 4 increases range by +20% per neighboring `[c_ice]`, and Upgrade 5 grants +100 Max Health to neighboring plants while at max health.
+  - **`t2_laserexplode` (Exploding Laser)**: Upgrade 1 adds +20 player max stamina per attached unit, Upgrade 2 increases range by +20% per neighboring `[c_shell]`, Upgrade 3 boosts explosion AOE damage by +50% per neighboring `[c_fuel]`, Upgrade 4 restores +3 stamina for every block destroyed by the turret instance, and Upgrade 5 overrides targeting to enemies only with -60% damage while preserving obstacle explosions.
+  - **`t2_heallaser` (Healing Laser)**: Upgrade 1 increases player stamina recharge rate (+25% per attached unit), Upgrade 2 increases healing pulse power by +50% with a chance to fling and spawn enemy pods (`FlungSpawnPodVFX`) on mined blocks, Upgrade 3 absorbs green essence particles (`spawnGreenEssenceVFX`) from destroyed plants into active Healing Lasers to trigger +2 healing pulses on arrival, Upgrade 4 increases range by +20% per neighboring `[c_leaf]`, and Upgrade 5 increases damage by +25% while charged (attached).
+  - **`t2_tall` (Tallnut)**: Upgrade 1 boosts player fire rate (+15% per attached unit), Upgrade 2 increases max health by +300, Upgrade 3 absorbs damage dealt to neighboring plants, Upgrade 4 triggers a 2-tile 150 damage explosion on death, and Upgrade 5 heals +50 HP to all Tallnuts whenever any plant is placed.
+  - **`t2_pulse` (Pulser)**:
+    - Upgrade 1 (`u_t2_pulse_1`): Player's range +10% for each Pulser attached, scaling both attacking and mining ranges. Hovering over the Player displays the player's active range circle.
+    - Upgrade 2 (`u_t2_pulse_2`): Max health +100 for every empty neighboring spot.
+    - Upgrade 3 (`u_t2_pulse_3`): Damage +5% for every new `[c_fuel]` plant placed in the field, properly multiplying both AOE damage and general damage.
+    - Upgrade 4 (`u_t2_pulse_4`): Pulsing radius +50%, fire rate -50% (custom-coded so `pulseTriggerRadius` becomes `GRID_SIZE * 3` directly instead of relying on `rangeMult`).
+    - Upgrade 5 (`u_t2_pulse_5`): Restores +4 stamina for every enemy killed by the Pulser (with flying stamina particles to the player).
+  - **`t2_icewall` (Icewall)**:
+    - Upgrade 1 (`u_t2_icewall_1`): Player's attack damage +4, range -15% for each Icewall attached.
+    - Upgrade 2 (`u_t2_icewall_2`): Aura radius +10% for every empty neighboring spot.
+    - Upgrade 3 (`u_t2_icewall_3`): Spawns +1 Sun whenever a `[c_shell]` or `[c_ice]` plant dies, dynamically flying `spawnGreenEssenseVfx` from the dying plant's location to the active Icewall upgrade holder where the Sun spawns upon arrival.
+    - Upgrade 4 (`u_t2_icewall_4`): Restores +50 HP to active Icewalls whenever an enemy dies within their aura radius.
+    - Upgrade 5 (`u_t2_icewall_5`): Absorbs damage dealt to neighboring plants.
+  - **`t2_minespawner` (Mine Launcher)**:
+    - Upgrade 1 (`u_t2_minespawner_1`): Player's attack damage +4, fire rate -15% for each Mine Launcher attached.
+    - Upgrade 2 (`u_t2_minespawner_2`): Spawns +1 Sun every time a hovering mine is launched.
+    - Upgrade 3 (`u_t2_minespawner_3`): Explosion radius +20% for every neighboring `[c_leaf]`.
+    - Upgrade 4 (`u_t2_minespawner_4`): Arming time -25%, Explosion Damage -50% (not stackable).
+    - Upgrade 5 (`u_t2_minespawner_5`): Launches +1 mine every time a neighboring plant dies, playing `spawnGreenEssenseVfx` from the plant's death spot to the launcher upon trigger.
+  - **`t2_torchwood` (Torchwood)**:
+    - Upgrade 1 (`u_t2_torchwood_1`): Player's attack damage -2, fire rate +35% for each Torchwood attached.
+    - Upgrade 2 (`u_t2_torchwood_2`): Player's max stamina -20, aura buffs crossing bullets' damage by +2 per attached Torchwood (stamina clamps to 0 minimum without blocking placement; current stamina is properly reduced alongside max stamina).
+    - Upgrade 3 (`u_t2_torchwood_3`): Aura radius -50%, aura buffs crossing bullets' damage by +7 (not stackable).
+    - Upgrade 4 (`u_t2_torchwood_4`): Aura now deals damage to enemies, +5 damage per 0.5s (30 frames).
+    - Upgrade 5 (`u_t2_torchwood_5`): Neighboring `[c_leaf]` plants' range +10%.
+  - **`t2_stun` (Stunner)**:
+    - Upgrade 1 (`u_t2_stun_1`): Player's stamina recharge speed +30% for each Stunner attached.
+    - Upgrade 2 (`u_t2_stun_2`): Arming time -25%, Stun duration -20%.
+    - Upgrade 3 (`u_t2_stun_3`): Main jump attack hypnotizes the primary target for +6s (`c_hypnotized`). The lingering stun gas puddle (`gf_stun_gas`) only applies `c_stun` and `c_weakbody`, preventing unintentional mass hypnotize from ground features.
+    - Upgrade 4 (`u_t2_stun_4`): Instant-arm and attack +1 times upon planting.
+    - Upgrade 5 (`u_t2_stun_5`): Enemies now receive 2x damage while stunned by Stunner via `c_weakbody` (custom top-down particles and temporary 0.8x sprite scaling).
+  - **`t3_triplepea` (Tripeater)**:
+    - Upgrade 1 (`u_t3_triplepea_1`): Player's attack damage +4, for each Tripeater attached.
+    - Upgrade 2 (`u_t3_triplepea_2`): Fire rate -60%, damage +150% (not stackable).
+    - Upgrade 3 (`u_t3_triplepea_3`): Damage +100% for every 3 neighboring `[c_leaf]`.
+    - Upgrade 4 (`u_t3_triplepea_4`): Range +15% for every 2 neighboring `[c_shell]`.
+    - Upgrade 5 (`u_t3_triplepea_5`): Fire rate +30%, but neighboring `[c_shell]`'s max health -20%.
+  - **`t3_firepea2` (Firepea MK2)**:
+    - Upgrade 1 (`u_t3_firepea2_1`): Player's range +15%, for each Firepea MK2 attached.
+    - Upgrade 2 (`u_t3_firepea2_2`): Fire rate +150%, but deactivates neighboring `[c_ice]` (inflicts `c_inactive`, locking actions and dimming visuals). Not stackable.
+    - Upgrade 3 (`u_t3_firepea2_3`): Flame puddle radius +100% for every 2 neighboring `[c_shard]`.
+    - Upgrade 4 (`u_t3_firepea2_4`): Flame puddle damage +100% for every 2 neighboring `[c_fuel]`.
+    - Upgrade 5 (`u_t3_firepea2_5`): Range +10% for every neighboring `[c_ice]`.
+  - **`t3_bowling` (Bowling Bulb)**:
+    - Upgrade 1 (`u_t3_bowling_1`): Player's attack fire rate +35%, for each Bowling Bulb attached.
+    - Upgrade 2 (`u_t3_bowling_2`): Fire rate -50%, damage +100% (not stackable).
+    - Upgrade 3 (`u_t3_bowling_3`): Damage +15% for every neighboring `[c_shard]`.
+    - Upgrade 4 (`u_t3_bowling_4`): Range +15% for every neighboring `[c_fuel]`.
+    - Upgrade 5 (`u_t3_bowling_5`): Damage +100% and fire rate +50% while Charged, but stamina cost +3 (not stackable).
+- **Empty Neighbor Adjacency**:
+  - `getEmptyNeighborSlots` accurately detects available neighboring spots: for attached base units, the player core counts as 1 occupied spot out of 6 axial hex neighbors; for world turrets, empty adjacent tiles are evaluated out of 8 surrounding grid cells.
+- **Coordinate-Based Neighbor Adjacency**:
+  - Attached turret proximity is computed using exact axial hex coordinates (`(abs(dq) + abs(dq + dr) + abs(dr)) / 2 == 1`), eliminating transient floating-point position jitter and popup spam while the player is moving or turning.
+  - World turrets use deterministic tile Chebyshev distance (`max(|dx|, |dy|) <= 1`).
+
+---
+
+## 🔗 Visual Adjacency Links & Synergy Runes (`src/synergies.ts`)
+A dedicated, real-time visual synergy and feedback engine providing immediate readability for base formations and plant interactions:
+- **Element-Coded Active Conduits**:
+  - Automatically identifies all active neighborhood synergies across base attachments and world turrets (`getAllActiveSynergies`).
+  - Renders low-alpha ambient energy lines directly on the ground plane below plant sprites (`drawSynergySystem`), eliminating battlefield clutter:
+    - **`leaf`** (`[74, 222, 128]`): Vibrant emerald vines linking leaf providers (Peashooter, Repeater, Tripeater).
+    - **`shard`** (`[56, 189, 248]`): Prismatic cyan light-rails for shard neighbors.
+    - **`fuel`** (`[251, 146, 60]`): Magma orange conduits for fuel and Torchwood connections.
+    - **`ice`** (`[147, 197, 253]`): Frost-blue icy crystal tracks for ice neighbors.
+    - **`shell` / `absorb`** (`[234, 179, 8]` / `[250, 204, 21]`): Interlocking golden aegis links connecting Wallnuts/Tallnuts to protected units.
+    - **`cross_buff`** (`[52, 211, 153]`): Radiant emerald resonance beams emitted by full-HP Walling Lasers (+100 Max HP).
+    - **`suppression`** (`[244, 63, 94]`): Dark crimson/rose siphon vines for parasitic links (Tripeater shell drain) and thermal freeze suppression (Firepea MK2 deactivating Ice).
+    - **`electric`** (`[103, 232, 249]`): High-frequency electric chain links between all Teslas within 10 tiles.
+- **Directional Energy Flow Motes**:
+  - Active links feature animated glowing energy sparks travelling continuously from the provider neighbor to the beneficiary plant (`lerp` at `(frames * 0.035) % 1`).
+- **Stepped Socket Runes**:
+  - For turrets with multi-unit threshold requirements (e.g., Tripeater requiring 3 leaves or 2 shells; Firepea MK2 requiring 2 shards or 2 fuels), a sleek micro-socket plate is rendered at the plant's base pedestal.
+  - Features discrete micro-pips (e.g. 1/3, 2/3 lit pips; unfulfilled slots remain dim grey sockets).
+  - Once fully satisfied (e.g. 3/3), the socket locks into an elemental halo with continuous rhythmic pulsing.
+- **Merge-Cost Standardized Synergy Speech Bubbles (`drawSynergySpeechBubble`, `drawSynergyOverlayPass`)**:
+  - **Standardized Text Size & Inline Class Icons**: All synergy text badges strictly adopt the exact font size (`textSize(6)`) and compact speech bubble silhouette of merging costs (`drawMergeBubble`), featuring a centered dark card, elemental accent border, downward-pointing bubble tail, and inline graphical class icons (`CLASS_ICON_MAP`: Shooter/Leaf, Miner/Shard, Armor/Shell, Explode/Fuel, Stall/Ice) instead of raw text tags like `<c_leaf>`.
+  - **Directional Giver & Receiver Syntax**:
+    - **Hover Inspection (Giver `stat ->`)**: While hovering over an attached turret, buff and nerf source neighbors display a trailing arrow indicating they are the giver transmitting that effect (e.g. `dmg+10% ->`, `+100 hp ->`, `<c_leaf> 1/3 ->`, `-20% hp ->`, `freeze lock ->`).
+    - **Placement Ghost Preview (Receiver `-> stat`)**: While selecting and dragging a turret over candidate spots, would-be-affected neighbors display a leading arrow indicating they are the receiver of the prospective stat change (e.g. `-> dmg+100%`, `-> <c_leaf> 2/3`, `-> range+10%`, `-> -20% hp`).
+  - **Damage Absorption Distinction (`protector ->` vs `-> protected`)**:
+    - Units providing damage absorption (Wall-nut, Tallnut, Icewall) are clearly labeled as `protector ->`.
+    - Beneficiary units receiving damage absorption are labeled as `-> protected`.
+  - **Comprehensive Buff & Nerf Coverage**: Extends indicators to include both positive buffs (`dmg+20%`, `range+15%`, `+100 hp`, `protected`) and negative nerfs / suppression (`-20% hp` shell drain, `freeze lock` ice deactivation, negative stat trade-offs) styled with dedicated crimson alert cards.
+  - **Focused Hovered Spot Stat Preview & Strict Deduplication**:
+    - **Single Hovered Spot Only**: Instead of displaying synergy speech bubbles simultaneously across all available spots on the board (which caused visual clutter and duplicate stats to be shown everywhere), the synergy indicator **ONLY** renders on the currently hovered snap spot (`bestSnap`). Spots that are not currently under the cursor remain clean.
+    - **Stat Deduplication**: Evaluates incoming buffs through strict unique sets (`Array.from(new Set(buffs))`) ensuring identical bonuses or multiple condition triggers never produce duplicate stat entries in the speech bubble (e.g. preventing repeated entries like `dmg+20%, dmg+20%`).
+  - **Would-Be-Affected Neighbor Overlays**: When hovering a picked turret over a candidate snap position, compact speech bubbles appear directly over each surrounding neighbor that would be affected by the placement (e.g. Tripeater displaying `-> dmg+100%` upon completing 3 leaves, or neighbor shells displaying `-> -20% hp`).
+  - **Hover Buff & Nerf Sources Inspection (Individual Contributions & Group Progression)**:
+    - In standard gameplay, hovering over any attached turret displays speech bubbles on top of every neighbor interacting with it.
+    - **Individual Contributed Amount**: Displays each participant's individual contributed amount rather than the aggregated sum (e.g. three +10% contributors display `dmg+10% ->` on each rather than `+30% ->`).
+    - **Group Requirement Progression**: When participants contribute to a multi-unit group requirement (e.g. `u_t3_triplepea_3` for every 3 `<c_leaf>`), the first shows `<c_leaf> 1/3 ->`, the second shows `<c_leaf> 2/3 ->`, and the completing participant shows the unlocked group bonus (e.g. `dmg+100% ->`).
+  - **Comprehensive Symmetrical Stat Receiver Previews (`getEffectsOnNeighborsWhenPlacedAt`)**:
+    - **Bidirectional Delta Calculation**: When picking up a turret and hovering it over candidates:
+      - **Hovering at Own Spot**: Triggers zero changes (`isOwnSnap`). Neither origin slot nor current neighbors display any badges.
+      - **Hovering at a New Spot**:
+        - **New Neighbors (`+N%`)**: Neighbors gaining adjacency to the prospective candidate display positive incoming modifiers in emerald/elemental cards (e.g. `-> dmg+20%`, `-> range+10%`, `-> protected`, `-> +100 hp`).
+        - **Old Neighbors (`-N%`)**: Neighbors losing adjacency to the turret as it moves away display crimson deduction cards showing lost stats (e.g. `-> dmg-20%`, `-> range-10%`, `-> unprotected`, `-> -100 hp`).
+        - **Persisting Neighbors**: Turrets adjacent to both origin and destination slots experience zero net change and display no indicators.
+    - **Complete Stat Coverage**: Evaluates every stat modification in the system including `neighbor_count` (dmg, fire rate, range, aoe radius/dmg, puddle area/dmg, health add/mult), stepped threshold groups (unlocked vs dropped), `neighbor_type`, `empty_neighbor_count`, `alone`, random class rolls, cross-buffs (+100 HP max health, +10% leaf range), damage protection (`protected` / `unprotected`), and suppression tradeoffs (`-20% hp`, `freeze lock`).
+  - **Turret Merge Cost Priority**: Synergy speech bubbles render on the exact same overlay layer as `turretMergeCost`. When both a merge candidate and synergy preview are present at the same coordinate, the synergy bubble is cleanly suppressed to prioritize `turretMergeCost`.
+  - **Own-Slot Indicator Suppression**: When picking up or moving an attached or world turret, all placement slot indicators (selection circles/rectangles) and incoming synergy speech bubbles are cleanly removed from the turret's own origin slot (`isOwnSlot`), while seamlessly retaining smooth magnetic snap-back behavior.
+  - **Accurate Hex-Axial Placement Neighbor Resolution**:
+    - Uses exact hex-axial conversion (`getHexAxial` / `matchedSpot`) instead of approximate cartesian scaling, guaranteeing that neighbor detection strictly aligns with actual adjacent hex cells.
+    - Excludes the dragged turret instance from neighbor lookups and filters out static re-applications (preventing redundant previews on existing neighbors whose stats don't change).
+    - Requires explicit upgrade activation (e.g. `u_t_wall_3`, `u_t2_tall_3`, `u_t2_icewall_5`) before displaying `-> protected` absorption indicators.
+- **Moving Turret Collision Immunity (`isCollidable`, `isMoving`)**:
+  - Turrets in motion (following the player movement trail, relocating, repositioning, or jumping) are non-collidable:
+    - **Obstacle Smoothing**: Moving attached turrets glide cleanly without snagging or colliding into world blocks.
+    - **Combat Immunity**: Hostile enemy pathfinding, body collisions, melee strikes, bullet direct hits, and shield interceptions cleanly bypass moving or dragged turrets until they settle into stationary formation.
+
+---
+
+## 🔄 Turret Swap & Damage Number Visual QOL Systems
+
+### 1. Non-Mergeable Turret Position Swapping
+- **Direct Position Exchange**: Selecting (picking up or dragging) an attached or world turret instance and hovering it over another placed, non-mergeable turret allows the player to swap their positions directly:
+  - **Attached ↔ Attached**: Directly exchanges their hex-axial coordinates `(q, r)` and physical offsets, preserving base connectivity.
+  - **World ↔ World**: Directly exchanges their world grid coordinates `(gx, gy)`.
+  - **Attached ↔ World**: Seamlessly converts the attached turret into a world turret at `(gx, gy)` and the world turret into an attached turret at `(q, r)`, preserving health, max HP, ingredients, active status conditions, angle, and retargeting active VFX.
+- **Visual "SWAP" Hint Bubble**: When hovering over a valid swap target, the target turret displays a small styled badge (`SWAP`) with a downward pointing indicator tail, subtle drop shadow, and crisp blue accent border.
+- **Merge & Synergy Precedence**: Mergeable pairs continue to prioritize the standard tier merge preview; synergy buff overlays on the candidate spot are cleanly suppressed while hovering a swap candidate to keep the "SWAP" hint bubble distinct and legible.
+
+### 2. Damage Number VFX Stacking & Scale Pulse
+- **15-Frame Stacking Window**: Consecutive damage dealt to the same target (enemy, player, or turret) within 15 frames stacks into a single `DamageNumberVFX` showing the cumulative total damage value.
+- **Dynamic Target Following**: Damage numbers dynamically track and follow their target (enemies, player, or turrets) as they move across the world, maintaining their relative spawn offset while stacking and scaling.
+- **10% Scale Pulse on Update**: Each time new damage is stacked onto the active damage number, it triggers a 10% scale pulse (scaling up to 1.10x from its center and smoothly settling back to 1.00x over ~6 frames).
+- **Post-Combo Fadeout**: If no new damage calls occur for the target within 15 frames, stacking closes and the final total damage number fades out over its remaining lifetime. Any subsequent hit spawns a fresh number.
+
+---
+
+## ⚡ Combat Mechanics, Conditions & Shield Systems (v2migrate Updates)
+
+### 1. Weakbody & Inactive Conditions (`balanceConditions.ts`)
+- **Weakbody (`c_weakbody`)**:
+  - Enemies afflicted with `c_weakbody` take double damage (`damageTakenMultiplier: 2.0`).
+  - Styled with distinct purple/magenta visual flashes `[200, 100, 255]` and status aura VFX (`condition_weakbody`).
+- **Inactive Status (`c_inactive`)**:
+  - Explicit condition disabling turret combat operations (`turretDisabled: true`).
+  - Distinct visual tint `tint(130, 130, 150)` with alpha dampening to clearly represent powered-down or inactive state.
+
+### 2. Turret Shield Interception & Dynamic Targeting
+- **Shield Projectile Interception**:
+  - Hostile enemy bullets are dynamically intercepted by active turret shields (such as Holonut shield bubbles) before reaching core hull blocks or player attachments.
+  - Intercepted projectiles trigger shield impact SFX and damage absorbing effects without harming underlying turrets.
+- **Enemy Shield Threat Prioritization**:
+  - Non-hypnotized enemy pathfinding prioritizes engaging shield-bearing turrets when their protective barriers block direct pathing to the player base.
+
+### 3. Dynamic Stat Modifiers & Upgrade Hook Integration
+- **Dynamic Bullet & AOE Scaling**:
+  - Projectile calculations now factor in source entity active stats for knockback multipliers (`knockbackMult`), AOE damage & radius scaling (`aoeRadiusMult`), puddle dimensions (`puddleRadiusMult`), and condition durations (`stunDurationMult`).
+- **Attached Turret Lifecycle Integration**:
+  - Moving attached turrets ignore terrain block collisions during motion to avoid catching on corners.
+  - Turret planting and repositioning reliably triggers upgrade lifecycle hooks (`onPlant`, `recalculateAllStats`).
+- **Progression Type Contract**:
+  - `AlmanacProgressionConfig` strictly defines `UnlockCost?: Array<Record<string, number>>`, aligning type definitions with level configuration JSONs and dynamic unlock button controls.
+
+---
+
+## 🆙 Player Upgrade System & Almanac Config Revamp
+
+### 1. New Player Upgrade: Stamina Recovery Rate (`staminaRecoveryRate`)
+- **Core Progression Track**:
+  - **Values**: `[+0%, +25%, +50%, +75%, +100%, +125%, +150%]` (`[0, 0.25, 0.50, 0.75, 1.00, 1.25, 1.50]`).
+  - **Elixir Costs**: `[10, 20, 35, 60, 90, 120]`.
+  - **Icon**: `img_icon_stamina`.
+  - **Mechanic**: Multiplies player stamina passive regeneration rate while resting (stationary for >= 1 second after last stamina spent). Directly factors into `this.stamina = Math.min(this.maxStamina, this.stamina + (2 / 6) * Math.max(0.1, rechargeMult))` in `class/player.ts`.
+  - **Popups**: Integrated into `recalculateAllStats` with dedicated `Stam Rec` stat popup indicators.
+
+### 2. In-Run Card Visibility Toggle (`SHOW: ON` / `SHOW: OFF`)
+- **Card Visibility Control**:
+  - Each upgrade card in the Level Editor's `PlayerUpgradeConfig` features a tactile 3D toggle button (`SHOW: ON` / `SHOW: OFF`).
+  - When toggled `OFF`, the upgrade card is completely hidden from the player's in-game Almanac upgrade matrix during the run.
+  - **Base Stat Preservation**: The first tier (`values[0]`) is always applied automatically to the player entity (even when the upgrade card is hidden/unpurchasable). Custom level stat overrides to tier 0 continue to apply seamlessly.
+- **Default Toggled States**:
+  - `damageMultAdd` (`DamageMultiplier`) and `clickHoldBoost` (`ChargeAttackBoost`) are toggled **OFF** by default.
+  - Core mobility, capacity, and stamina upgrades (`turretAttachCapacity`, `sunBankCapacity`, `magnetRadius`, `movementSpeed`, `maxStamina`, `staminaRecoveryRate`) are toggled **ON** by default.
+  - In gameplay, active cards neatly divide into symmetrical left and right columns around the central commander.
+
+### 3. LevelEditor AlmanacConfig UI Revamp (`uiComponents` Alignment)
+- **PlayerUpgradeConfig (`playerUpgradesPanel.ts`)**:
+  - Restyled to strictly match `LevelConfig`'s design tokens:
+    - Main container: deep navy card `[16, 20, 38, 240]` with 20px rounded corners.
+    - Section header: `[22, 28, 54]` card with `0, 220, 255` cyan title and `160, 185, 220` subtitle.
+    - Tactile header buttons: `SET ALL TO 1 LEVEL` (`drawYellowButton`) and `RESET ALL DEFAULTS` (`drawPurpleButton`).
+    - Upgrade cards: 2-column scrollable grid with standardized 24px input fields, Consolas monospace font (`9.5px`), placeholder hints, focus cyan border (`1.5px`), text selection highlights (`[0, 120, 200, 150]`), and blinking cyan cursor.
+    - Pure-canvas text inputs eliminating external DOM overlays for smooth rendering and consistent mouse drag/highlight physics.
+- **SkillTreeConfigPanel (`skillTreeConfigPanel.ts`)**:
+  - Fully revamped to match `LevelConfig` card style:
+    - Navy background card `[22, 28, 54]` with cyan title `"SKILL TREE GENERATOR CONFIG"`.
+    - Standardized 24px text input fields with Consolas monospace typography for `TurretUnlockNodes`, `TurretUpgradeNodes`, and `LootNodes`.
+    - Integrated tactile 3D action buttons: `REGENERATE TREE` (`drawCyanButton`) and `RESET TO DEFAULT` (`drawDarkButton`).
+    - Full keyboard navigation: `Enter` to commit & regenerate, `Escape` to blur, `Tab` to cycle between fields, and standard arrow/selection editing.
+
+### 4. Advanced LevelWinCondition System & Damage Number Enhancements
+- **DamageNumberVFX Higher Spawn Offset**: Damage numbers spawn slightly higher above targets (`y - 22`) and dynamically track target movement with a 10% scale pulse.
+- **LevelWinCondition Requirements**: Comprehensive level victory conditions configured via LevelConfig and tracked during runtime:
+  - `NightsToPass`: Cleared when passing defined nights; stops global enemy spawning after target night budget while custom spawners remain active.
+  - `EnemyBudgetValueToKill`: Cleared upon accumulating enough enemy kill costs.
+  - `CollectResource`: Multi-resource collection requirements.
+  - `HuntEnemy`: Enemy type kill accumulation requirements (supports `"any"`).
+  - `BreakObstacle`: Obstacle/overlay mining requirements (supports `"any"`).
+  - `DestroyAllEnemySpawners`: Default win condition when all enemy spawners are destroyed.
+  - Entity `WinCondition` flags: Combined requirements with entity/block win condition flags.
+- **Win Condition Arrow Hint**: When fewer than 4 win condition entities or enemy spawners remain in the level, a directional arrow hint with no distance limit renders on the overlay UI pointing towards the nearest target.
+- **Intuitive Win Conditions UI & Export/Import Serialization**:
+  - Replaced raw text inputs with interactive chip selectors, count adjustment step buttons (`[-]` / `[+]` / `[✕]`), and custom numeric fields for `CollectResource`, `HuntEnemy`, and `BreakObstacle`.
+  - Added dedicated toggle button for `Destroy All Spawners` (`ON` / `OFF`) alongside `Nights To Pass` and `Enemy Kill Budget` controls.
+  - Fully integrated win conditions into LevelEditor `serializeLevelLayout()`, `restoreLevelFromCache()`, `saveLevelLayout()`, `addImportedLevel()`, and `startLevel('editor_playtest')` so all win conditions are seamlessly cached and preserved when entering and exiting TestPlay.
+  - Live HUD objective tracker displays active requirements (e.g. `Survive Night 3/3`, `Kill Budget: 45/100`, `SUN: 12/20`, `Hunt Any: 8/20`, `Break Dirt: 4/10`).
 
 
 

@@ -5,7 +5,7 @@ import { enemyTypes } from '../balanceEnemies';
 import { bulletTypes } from '../balanceBullets';
 import { GRID_SIZE } from '../constants';
 import { BugSplatVFX, GiantDeathVFX, Explosion, FireworkVFX, DamageNumberVFX, drawPersistentDeathVisual } from '../vfx/index';
-import { drawYellowButton, drawCyanButton, drawPurpleButton, drawDarkButton } from '../uiComponents';
+import { drawYellowButton, drawCyanButton, drawPurpleButton, drawDarkButton, applyHoverTransform } from '../uiComponents';
 import { soundEngine } from '../src/audio/soundEngine';
 
 declare const push: any;
@@ -489,6 +489,8 @@ export function drawMainMenu() {
     const isCleared = state.clearedLevels && state.clearedLevels.has(level.id);
 
     push();
+    applyHoverTransform(`mm_level_${level.id}`, cx + cardW / 2, cy + cardH / 2, isHovered, { elevation: 3.5, scale: 0.025 });
+
     // Card Drop Shadow
     noStroke();
     fill(0, 0, 0, 120);

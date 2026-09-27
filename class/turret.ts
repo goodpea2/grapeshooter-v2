@@ -10,7 +10,7 @@ import { MuzzleFlash, BlockDebris, ConditionVFX, spawnConditionVFX, FirstStrikeV
 import { Bullet } from './bullet';
 import { SunLoot } from './loot';
 import { spawnLootAt } from '../economy';
-import { triggerUpgradeHook, recalculateTurretStats, getNeighbors } from '../src/upgrades';
+import { triggerUpgradeHook, recalculateTurretStats, getNeighbors, getUpgradeDefinition, getTurretClasses } from '../src/upgrades';
 import { Enemy } from './enemy';
 import { drawTurret, drawTurretUI } from '../visualTurrets';
 import { TurretAction } from './turretAction';
@@ -34,6 +34,18 @@ declare const width: any;
 declare const height: any;
 declare const color: any;
 
+export function isEnemyObstacle(b: any): boolean {
+  if (!b || b.isMined || b.gx === undefined) return false;
+  const oCfg = b.overlay ? overlayTypes[b.overlay] : null;
+  return !!(
+    oCfg?.isEnemy ||
+    oCfg?.isEnemySpawner ||
+    b.config?.isEnemy ||
+    b.customSpawnerConfig ||
+    (b.overlay && (b.overlay.startsWith('ov_spawner') || b.overlay.startsWith('spawner_')))
+  );
+}
+
 export abstract class Turret {
   uid: string;
   type: string;
@@ -43,6 +55,7 @@ export abstract class Turret {
   health: number;
   maxHealth: number;
   size: number;
+  lastObstacleScanFrame: number = 0;
   recoil: number = 0;
   actionTimers: Map<string, number> = new Map();
   actionSteps: Map<string, number> = new Map();
@@ -94,6 +107,10 @@ export abstract class Turret {
   farmElixirCount: number = 0;
   farmHarvestHp: number = 0;
 
+  // Upgrade & buff tracking
+  instantArmCharges: number = 0;
+  buffingNeighbors: any[] = [];
+
   // Seed tracking
   growthProgress: number = 0;
   baseIngredients: string[] = []; // T1 components tracking
@@ -127,7 +144,14 @@ export abstract class Turret {
     this.config = turretTypes[type];
     this.size = this.config.size;
     this.maxHealth = this.config.maxHealth !== undefined ? this.config.maxHealth : this.config.health;
-    this.health = this.config.initialHealth !== undefined ? this.config.initialHealth : this.config.health;
+    const baseInitialHealth = this.config.initialHealth !== undefined ? this.config.initialHealth : this.config.health;
+    const upgIds = state.turretUpgrades[type] || [];
+    let initialAdd = 0;
+    for (const uId of upgIds) {
+      const upgDef = getUpgradeDefinition(uId, type);
+      if (upgDef?.modifiers?.initialHealthAdd) initialAdd += upgDef.modifiers.initialHealthAdd;
+    }
+    this.health = Math.min(this.maxHealth, baseInitialHealth + initialAdd);
     this.targetScanTimer = floor(random(TurretMinScanRate));
     
     // Initialize base ingredients for T1, T2, and T3 turrets
@@ -186,7 +210,11 @@ export abstract class Turret {
 
   // Custom logic hooks
   customInit() {}
-  customUpdate() {}
+  customUpdate() {
+    if (this.config.customUpdate) {
+      this.config.customUpdate.call(this);
+    }
+  }
   customOnActionComplete(actionType: string) {}
   customOnActionStep(actionType: string, step: number) {}
   customOnActionExecute(actionType: string) {}
@@ -230,7 +258,8 @@ export abstract class Turret {
 
     if (amount > 0) {
       const wPos = this.getWorldPos();
-      state.vfx.push(spawnDamageNumber(wPos.x, wPos.y, amount, [80, 255, 120]));
+      const dmgVfx = spawnDamageNumber(wPos.x, wPos.y, amount, [80, 255, 120], this);
+      if (dmgVfx) state.vfx.push(dmgVfx);
     }
   }
 
@@ -284,6 +313,24 @@ export abstract class Turret {
     if ((this.isRelocating || this.jumpPhase !== null) && !this.config.isActiveWhileMoving) {
       return false;
     }
+    return true;
+  }
+
+  isMoving(): boolean {
+    if (this.isRelocating || this.jumpPhase !== null) return true;
+    if (state.draggedTurretInstance === this) return true;
+    const v = (this as any).vel;
+    if (v && typeof v.magSq === 'function' && v.magSq() > 0.04) return true;
+    if (this.isAttachedToPlayer && this.isAttachedToPlayer()) {
+      if (!state.isStationary) return true;
+      if ((this as any).isFollowingTrail) return true;
+    }
+    return false;
+  }
+
+  isCollidable(): boolean {
+    if (this.health <= 0 || this.isDying) return false;
+    if (this.isMoving()) return false;
     return true;
   }
 
@@ -349,6 +396,10 @@ export abstract class Turret {
     this.shieldImpactAngles = [];
 
     const isChargedNow = this.isCharged();
+    if ((this as any).lastChargedState !== isChargedNow) {
+      (this as any).lastChargedState = isChargedNow;
+      recalculateTurretStats(this);
+    }
     const hasWhileChargedDeclared = !!(
       (this.config.actionTypeWhileCharged && this.config.actionTypeWhileCharged.length > 0) ||
       this.config.actionConfigWhileCharged
@@ -358,6 +409,18 @@ export abstract class Turret {
       this.applyCondition('c_raged_visualonly', 4);
     } else {
       this.conditions.delete('c_raged_visualonly');
+    }
+
+    // u_t3_firepea2_2: Firepea MK2 deactivates neighboring c_ice
+    if (this.type === 't3_firepea2' && (state.turretUpgrades?.['t3_firepea2'] || []).includes('u_t3_firepea2_2')) {
+      const neighbors = getNeighbors(this);
+      for (const n of neighbors) {
+        if (!n || n.health <= 0 || n.isDying) continue;
+        const classes = getTurretClasses(n.type);
+        if (classes.includes('c_ice') || classes.includes('ice') || n.type.includes('ice')) {
+          n.applyCondition('c_inactive', 2);
+        }
+      }
     }
 
     this.actions = isChargedNow ? this.actionsCharged : this.actionsNormal;
@@ -412,17 +475,18 @@ export abstract class Turret {
   }
 
   protected updateActions(wPos: any) {
-    const powered = this.isPowered();
+    const isInactive = this.conditions.has('c_inactive');
+    const powered = this.isPowered() && !isInactive;
     const isRetracted = !state.isStationary && !this.config.isActiveWhileMoving && this.isAttachedToPlayer();
-    const targetAlpha = isRetracted ? 127 : (this.isWaterlogged ? 100 : 255);
+    const targetAlpha = isRetracted ? 127 : ((this.isWaterlogged || isInactive) ? 100 : 255);
     this.alpha = lerp(this.alpha, targetAlpha, 0.1);
     this.recoil = (this.recoil || 0) * 0.85;
 
     const isWorldPlaced = !this.isAttachedToPlayer();
-    const shouldBeSpecialActive = powered && (state.isStationary || isWorldPlaced) && !this.isWaterlogged && !this.isFrosted;
+    const shouldBeSpecialActive = powered && (state.isStationary || isWorldPlaced) && !this.isWaterlogged && !this.isFrosted && !isInactive;
     this.specialActivityLevel = lerp(this.specialActivityLevel, shouldBeSpecialActive ? 1 : 0, 0.1);
 
-    if (!powered || isRetracted || this.isFrosted) return;
+    if (!powered || isRetracted || this.isFrosted || isInactive) return;
     
     // Growth turrets can still grow while waterlogged (water speeds them up)
     const isGrowthTurret = this.config.actionType.includes('growth');
@@ -492,14 +556,15 @@ export abstract class Turret {
 
     // Damage absorption logic
     const myUpgrades = state.turretUpgrades[this.type] || [];
-    if (!myUpgrades.includes('u_absorb_neighbor_dmg')) {
+    const hasAbsorb = myUpgrades.includes('u_t_wall_3') || myUpgrades.includes('u_absorb_neighbor_dmg') || myUpgrades.includes('u_t2_tall_3') || myUpgrades.includes('u_t2_icewall_5') || (this.activeStats && this.activeStats.absorbNeighborDamage);
+    if (!hasAbsorb) {
       const neighbors = getNeighbors(this);
-      const absorbers = neighbors.filter(n => (state.turretUpgrades[n.type] || []).includes('u_absorb_neighbor_dmg'));
-      if (absorbers.length > 0) {
-        const sharedDmg = dmg / absorbers.length;
-        for (const absorber of absorbers) {
-          absorber.takeDamage(sharedDmg, source);
-        }
+      const absorber = neighbors.find(n => {
+        const nUpg = state.turretUpgrades[n.type] || [];
+        return n.health > 0 && (nUpg.includes('u_t_wall_3') || nUpg.includes('u_absorb_neighbor_dmg') || nUpg.includes('u_t2_tall_3') || nUpg.includes('u_t2_icewall_5') || (n.activeStats && n.activeStats.absorbNeighborDamage));
+      });
+      if (absorber) {
+        absorber.takeDamage(dmg, source);
         return false; 
       }
     }
@@ -541,8 +606,8 @@ export abstract class Turret {
     this.flashType = 'damage';
     this.hurtAnimTimer = 10;
     const wPos = this.getWorldPos();
-    state.vfx.push(spawnDamageNumber(wPos.x, wPos.y, dmg, [255, 100, 100]));
-    soundEngine.playSFXGroup('turret_bitten_softbody');
+    const dmgVfx = spawnDamageNumber(wPos.x, wPos.y, dmg, [255, 100, 100], this);
+    if (dmgVfx) state.vfx.push(dmgVfx);
 
     if (this.health <= 0) {
       soundEngine.playSFX('turret_eaten');
@@ -700,8 +765,30 @@ export abstract class Turret {
     return this.getFireRateMultiplier();
   }
 
+  getEffectiveRange(): number {
+    let maxRange = 0;
+    for (const action of this.actions) {
+      if (action.getRange) {
+        maxRange = Math.max(maxRange, action.getRange());
+      }
+    }
+
+    if (maxRange === 0) {
+      const act = this.config?.actionConfig || (this as any).actionConfig || {};
+      maxRange = (
+        this.activeStats?.shootRange || this.activeStats?.range ||
+        act.shootRange || act.beamMaxLength ||
+        act.pulseTriggerRadius || act.triggerRadius ||
+        act.attractRange || act.aoeRadius ||
+        act.shieldRadius || act.buffRadius || 0
+      );
+    }
+
+    return maxRange * (this.activeStats?.rangeMult || 1.0);
+  }
+
   public findTarget() {
-    const tTypes = this.config.targetType || []; 
+    const tTypes = (this.activeStats?.targetTypeOverride || this.config.targetType) || []; 
     const wPos = this.getWorldPos();
     const tCfg = this.config.targetConfig || {}; 
     
@@ -737,7 +824,44 @@ export abstract class Turret {
           : (this.target.health !== undefined 
               ? this.target.health > 0 
               : (!this.target.isMined && this.target.config?.isValidTarget !== false && (!this.target.overlay || overlayTypes[this.target.overlay]?.isValidTarget !== false)));
-        if (valid && dSq <= rangeSq && (anyActionNoLOS || state.world.checkLOS(wPos.x, wPos.y, tCenter.x, tCenter.y))) return;
+        if (valid && dSq <= rangeSq && (anyActionNoLOS || state.world.checkLOS(wPos.x, wPos.y, tCenter.x, tCenter.y))) {
+          // If attacking an isEnemy obstacle (e.g. spawner), re-scan every 3 seconds (180 frames)
+          // so turrets don't get stuck attacking high-HP spawners and ignore actual enemies in front of them
+          if (isEnemyObstacle(this.target)) {
+            if (state.frames - this.lastObstacleScanFrame >= 180) {
+              this.lastObstacleScanFrame = state.frames;
+              let hasMobileEnemy = false;
+              if (state.spatialGrid) {
+                state.spatialGrid.queryCircleEnemies(wPos.x, wPos.y, range, (e: any) => {
+                  if (hasMobileEnemy) return;
+                  if (e.conditions?.has('c_hypnotized') || e.isAirborne || e.isDying || e.health <= 0) return;
+                  const edSq = (wPos.x - e.pos.x) ** 2 + (wPos.y - e.pos.y) ** 2;
+                  if (edSq <= rangeSq && (anyActionNoLOS || state.world.checkLOS(wPos.x, wPos.y, e.pos.x, e.pos.y))) {
+                    hasMobileEnemy = true;
+                  }
+                });
+              } else if (state.enemies) {
+                for (const e of state.enemies) {
+                  if (e.conditions?.has('c_hypnotized') || e.isAirborne || e.isDying || e.health <= 0) continue;
+                  const edSq = (wPos.x - e.pos.x) ** 2 + (wPos.y - e.pos.y) ** 2;
+                  if (edSq <= rangeSq && (anyActionNoLOS || state.world.checkLOS(wPos.x, wPos.y, e.pos.x, e.pos.y))) {
+                    hasMobileEnemy = true;
+                    break;
+                  }
+                }
+              }
+              if (hasMobileEnemy) {
+                this.target = null;
+              } else {
+                return;
+              }
+            } else {
+              return;
+            }
+          } else {
+            return;
+          }
+        }
       }
       this.target = null;
     }
@@ -785,10 +909,8 @@ export abstract class Turret {
       state.world.chunks.forEach((chunk: any) => {
         const cw = CHUNK_SIZE * GRID_SIZE; const dx = (chunk.cx * cw + cw/2) - wPos.x; const dy = (chunk.cy * cw + cw/2) - wPos.y;
         if (dx*dx + dy*dy > (range + cw)**2) return;
-        chunk.overlayBlocks.forEach((b: any) => {
-           if (b.isMined || !b.overlay) return;
-           const oCfg = overlayTypes[b.overlay];
-           if (oCfg?.isEnemy) {
+        chunk.overlayBlocks?.forEach((b: any) => {
+           if (isEnemyObstacle(b)) {
               const bx = b.pos.x + GRID_SIZE/2; const by = b.pos.y + GRID_SIZE/2;
               const dSq = (wPos.x - bx)**2 + (wPos.y - by)**2;
               if (dSq <= rangeSq) candidates.push({ e: b, dSq });
@@ -797,8 +919,15 @@ export abstract class Turret {
       });
 
       if (candidates.length > 0) {
-        if (tCfg.enemyPriority === 'highestHealth') candidates.sort((a,b) => b.e.health - a.e.health);
-        else if (tCfg.enemyPriority === 'random') {
+        candidates.sort((a, b) => {
+          const aIsObs = isEnemyObstacle(a.e);
+          const bIsObs = isEnemyObstacle(b.e);
+          if (aIsObs !== bIsObs) return aIsObs ? 1 : -1;
+          if (tCfg.enemyPriority === 'highestHealth') return b.e.health - a.e.health;
+          return a.dSq - b.dSq;
+        });
+
+        if (tCfg.enemyPriority === 'random') {
             const chosen = candidates[floor(random(candidates.length))];
             const tc = chosen.e.getWorldPos ? chosen.e.getWorldPos() : (chosen.e.gx !== undefined ? createVector(chosen.e.gx * GRID_SIZE + GRID_SIZE / 2, chosen.e.gy * GRID_SIZE + GRID_SIZE / 2) : chosen.e.pos);
             if (tc && (anyActionNoLOS || state.world.checkLOS(wPos.x, wPos.y, tc.x, tc.y))) { 
@@ -806,7 +935,7 @@ export abstract class Turret {
               if (!anyActionRotationLock) this.angle = atan2(tc.y - wPos.y, tc.x - wPos.x); 
               return; 
             }
-        } else candidates.sort((a, b) => a.dSq - b.dSq);
+        }
         
         for (const cand of candidates) {
           const tc = cand.e.getWorldPos ? cand.e.getWorldPos() : (cand.e.gx !== undefined ? createVector(cand.e.gx * GRID_SIZE + GRID_SIZE/2, cand.e.gy * GRID_SIZE + GRID_SIZE/2) : cand.e.pos);
@@ -869,11 +998,41 @@ export abstract class Turret {
 
   protected findAllTargetsWithin(range: number) {
     const wPos = this.getWorldPos();
-    return state.enemies.filter((e: any) => {
-      if (e.health <= 0 || e.isDying || e.isAirborne) return false;
-      const dSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
-      return dSq < (range + 10)**2 && state.world.checkLOS(wPos.x, wPos.y, e.pos.x, e.pos.y);
-    });
+    const rangeSq = (range + 10) ** 2;
+    const results: any[] = [];
+
+    // 1. Mobile enemies first
+    if (state.enemies) {
+      for (const e of state.enemies) {
+        if (e.health <= 0 || e.isDying || e.isAirborne || e.conditions?.has('c_hypnotized')) continue;
+        const dSq = (wPos.x - e.pos.x) ** 2 + (wPos.y - e.pos.y) ** 2;
+        if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, e.pos.x, e.pos.y)) {
+          results.push(e);
+        }
+      }
+    }
+
+    // 2. Enemy spawner obstacles next
+    if (state.world && state.world.chunks) {
+      state.world.chunks.forEach((chunk: any) => {
+        const cw = CHUNK_SIZE * GRID_SIZE;
+        const dx = (chunk.cx * cw + cw / 2) - wPos.x;
+        const dy = (chunk.cy * cw + cw / 2) - wPos.y;
+        if (dx * dx + dy * dy > (range + cw) ** 2) return;
+        chunk.overlayBlocks?.forEach((b: any) => {
+          if (isEnemyObstacle(b)) {
+            const bx = b.pos.x + GRID_SIZE / 2;
+            const by = b.pos.y + GRID_SIZE / 2;
+            const dSq = (wPos.x - bx) ** 2 + (wPos.y - by) ** 2;
+            if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, bx, by)) {
+              results.push(b);
+            }
+          }
+        });
+      });
+    }
+
+    return results;
   }
 
   protected distToSegmentSq(p: any, v: any, w: any) {

@@ -5,6 +5,7 @@ import { lootTypes, LootType } from '../balanceLootTable';
 import { getPlayerUpgradeStat } from '../src/playerUpgrades';
 import { turretTypes } from '../balanceTurrets';
 import { createWorldTurret, restoreTurretData } from './turret/TurretRegistry';
+import { triggerUpgradeHook, recalculateAllStats } from '../src/upgrades';
 import { spawnExplosion } from '../vfx';
 import { ObjectPool } from './pool';
 
@@ -251,6 +252,8 @@ export class TurretLoot extends LootEntity {
       state.world.addTurret(newTurret);
       state.totalTurretsAcquired++;
       state.vfx.push(spawnExplosion(worldX, worldY, 40, color(100, 255, 200)));
+      triggerUpgradeHook('onPlant', newTurret, { isAttached: false, pos: newTurret.getWorldPos() });
+      recalculateAllStats();
       return true;
     }
     return false;

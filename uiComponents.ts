@@ -32,9 +32,42 @@ declare const TOP: any;
 declare const CORNER: any;
 declare const mouseIsPressed: any;
 declare const textFont: any;
+declare const push: any;
+declare const pop: any;
+declare const translate: any;
+declare const scale: any;
 
 export const UI_FONT_INPUT = 'Consolas, monospace';
-export const UI_FONT_DEFAULT = 'sans-serif';
+export const UI_FONT_DEFAULT = 'Viga';
+
+const uiComponentHoverAnims = new Map<string, number>();
+
+export function resetUIComponentAnimations() {
+  uiComponentHoverAnims.clear();
+}
+
+export function applyHoverTransform(
+  id: string,
+  cx: number,
+  cy: number,
+  isHovered: boolean,
+  options: { elevation?: number; scale?: number; speed?: number } = {}
+): number {
+  const { elevation = 3.5, scale: maxScale = 0.03, speed = 0.35 } = options;
+  const targetHover = isHovered ? 1.0 : 0.0;
+  let hoverFactor = uiComponentHoverAnims.get(id) || 0;
+  hoverFactor += (targetHover - hoverFactor) * speed;
+  if (Math.abs(hoverFactor - targetHover) < 0.005) hoverFactor = targetHover;
+  uiComponentHoverAnims.set(id, hoverFactor);
+
+  if (hoverFactor > 0.001) {
+    translate(cx, cy);
+    translate(0, -elevation * hoverFactor);
+    scale(1.0 + maxScale * hoverFactor);
+    translate(-cx, -cy);
+  }
+  return hoverFactor;
+}
 
 export function withInputFont<T>(renderFn: () => T): T {
   try {
@@ -81,9 +114,29 @@ export function registerUIHitbox(hitbox: Omit<UIHitbox, 'layer'> & { layer?: num
   });
 }
 
+export function isAnyModalOpen(): boolean {
+  return !!(
+    state.isAlmanacOpen ||
+    state.showUnlockPopup ||
+    state.turretUnlockChoiceModal ||
+    state.showPauseMenu ||
+    state.upgradeSelection ||
+    state.levelEditor?.editingSpawnerModal ||
+    state.levelEditor?.editingPaygateModal ||
+    state.levelEditor?.editingSunModal ||
+    state.levelEditor?.editingTextSign ||
+    state.activeNPC ||
+    state.isGameOver
+  );
+}
+
 export function getHitUIElement(mx: number = mouseX, my: number = mouseY): UIHitbox | null {
+  const modalOpen = isAnyModalOpen();
   const sorted = [...activeHitboxes].sort((a, b) => b.layer - a.layer);
   for (const box of sorted) {
+    if (modalOpen && box.layer < 100) {
+      continue;
+    }
     if (mx >= box.x && mx <= box.x + box.w && my >= box.y && my <= box.y + box.h) {
       return box;
     }
@@ -318,6 +371,23 @@ export function drawButton(
   const pressOffset = isPressed ? depth3D : 0;
   const currentDepth = depth3D - pressOffset;
 
+  // Target hover animation: raised up & 1.1x scale with smooth quick lerp transition
+  const targetHover = (!disabled && isHovered) ? 1.0 : 0.0;
+  let hoverFactor = uiComponentHoverAnims.get(id) || 0;
+  hoverFactor += (targetHover - hoverFactor) * 0.35;
+  if (Math.abs(hoverFactor - targetHover) < 0.005) hoverFactor = targetHover;
+  uiComponentHoverAnims.set(id, hoverFactor);
+
+  push();
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  translate(cx, cy);
+  if (hoverFactor > 0.001) {
+    translate(0, -4.5 * hoverFactor);
+    scale(1.0 + 0.1 * hoverFactor);
+  }
+  translate(-cx, -cy);
+
   rectMode(CORNER);
 
   // 1. Black Drop Shadow
@@ -387,6 +457,8 @@ export function drawButton(
     text(label, textX, centerY + 1);
   }
 
+  pop();
+
   return { isHovered, isHit: isHovered, isPressed };
 }
 
@@ -439,6 +511,23 @@ export function drawCloseButton(
 
   const pressOffset = isPressed ? 2 : 0;
 
+  // Target hover animation: raised up & 1.1x scale with smooth quick lerp transition
+  const targetHover = isHovered ? 1.0 : 0.0;
+  let hoverFactor = uiComponentHoverAnims.get(id) || 0;
+  hoverFactor += (targetHover - hoverFactor) * 0.35;
+  if (Math.abs(hoverFactor - targetHover) < 0.005) hoverFactor = targetHover;
+  uiComponentHoverAnims.set(id, hoverFactor);
+
+  push();
+  const centerBtnX = x + size / 2;
+  const centerBtnY = y + size / 2;
+  translate(centerBtnX, centerBtnY);
+  if (hoverFactor > 0.001) {
+    translate(0, -3.5 * hoverFactor);
+    scale(1.0 + 0.1 * hoverFactor);
+  }
+  translate(-centerBtnX, -centerBtnY);
+
   // Shadow
   noStroke();
   fill(...color.black(220));
@@ -472,6 +561,8 @@ export function drawCloseButton(
   line(cx - r, cy - r, cx + r, cy + r);
   line(cx + r, cy - r, cx - r, cy + r);
   noStroke();
+
+  pop();
 }
 
 export const CloseButton = drawCloseButton;
@@ -571,6 +662,7 @@ export function drawCard(
     borderColor?: ColorRGBA;
     strokeColor?: ColorRGBA;
     borderWidth?: number;
+    skipTransform?: boolean;
     onClick?: () => void;
     id?: string;
     layer?: number;
@@ -584,6 +676,7 @@ export function drawCard(
     borderColor,
     strokeColor,
     borderWidth = 2,
+    skipTransform = false,
     onClick,
     id = `card_${Math.round(x)}_${Math.round(y)}`,
     layer
@@ -603,6 +696,24 @@ export function drawCard(
     });
   }
 
+  const targetHover = (isHoverable && isHovered) ? 1.0 : 0.0;
+  let hoverFactor = uiComponentHoverAnims.get(id) || 0;
+  hoverFactor += (targetHover - hoverFactor) * 0.35;
+  if (Math.abs(hoverFactor - targetHover) < 0.005) hoverFactor = targetHover;
+  uiComponentHoverAnims.set(id, hoverFactor);
+
+  push();
+  if (!skipTransform) {
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    translate(cx, cy);
+    if (hoverFactor > 0.001) {
+      translate(0, -3.5 * hoverFactor);
+      scale(1.0 + 0.03 * hoverFactor);
+    }
+    translate(-cx, -cy);
+  }
+
   rectMode(CORNER);
   if (isSelected) {
     stroke(...color.veryLightYellow());
@@ -620,6 +731,8 @@ export function drawCard(
   fill(...bgColor);
   rect(x, y, w, h, radius);
   noStroke();
+
+  pop();
 
   return { isHovered };
 }
@@ -830,4 +943,282 @@ export function drawInputField(
   }
 
   if (typeof textFont === 'function') textFont(UI_FONT_DEFAULT);
+}
+
+// ==========================================
+// TREE NODE UI COMPONENTS (Skill & Unlock Nodes)
+// ==========================================
+
+export function drawUpwardArrowIcon(cx: number, cy: number, s: number, strokeColor: ColorRGBA = [255, 255, 255, 255]) {
+  push();
+  translate(cx, cy);
+  strokeWeight(2.5);
+  stroke(...strokeColor);
+  line(0, s * 0.7, 0, -s * 0.7);
+  line(0, -s * 0.7, -s * 0.5, -s * 0.1);
+  line(0, -s * 0.7, s * 0.5, -s * 0.1);
+  noStroke();
+  pop();
+}
+
+export function drawFadedEdgeGradients(
+  w: number,
+  h: number,
+  fadeSize: number = 36,
+  bgRgba: string = 'rgba(15, 18, 35, 0.95)'
+) {
+  const ctx = (window as any).drawingContext as CanvasRenderingContext2D;
+  if (!ctx) return;
+
+  // Top Fade
+  const topGrad = ctx.createLinearGradient(0, 0, 0, fadeSize);
+  topGrad.addColorStop(0, bgRgba);
+  topGrad.addColorStop(1, 'rgba(15, 18, 35, 0)');
+  ctx.fillStyle = topGrad;
+  ctx.fillRect(0, 0, w, fadeSize);
+
+  // Bottom Fade
+  const btmGrad = ctx.createLinearGradient(0, h, 0, h - fadeSize);
+  btmGrad.addColorStop(0, bgRgba);
+  btmGrad.addColorStop(1, 'rgba(15, 18, 35, 0)');
+  ctx.fillStyle = btmGrad;
+  ctx.fillRect(0, h - fadeSize, w, fadeSize);
+
+  // Left Fade
+  const leftGrad = ctx.createLinearGradient(0, 0, fadeSize, 0);
+  leftGrad.addColorStop(0, bgRgba);
+  leftGrad.addColorStop(1, 'rgba(15, 18, 35, 0)');
+  ctx.fillStyle = leftGrad;
+  ctx.fillRect(0, 0, fadeSize, h);
+
+  // Right Fade
+  const rightGrad = ctx.createLinearGradient(w, 0, w - fadeSize, 0);
+  rightGrad.addColorStop(0, bgRgba);
+  rightGrad.addColorStop(1, 'rgba(15, 18, 35, 0)');
+  ctx.fillStyle = rightGrad;
+  ctx.fillRect(w - fadeSize, 0, fadeSize, h);
+}
+
+export function drawTreeNodeConfirmationButton(
+  cx: number,
+  cy: number,
+  size: number,
+  cost: number,
+  isHovered: boolean,
+  hoverFactor: number = 0
+) {
+  push();
+  translate(cx, cy);
+  noStroke();
+
+  // Drop Shadow
+  fill(...color.black(180));
+  circle(0, 5, size);
+
+  // 3D Base
+  fill(62, 18, 92);
+  circle(0, 2, size);
+
+  // Face
+  fill(isHovered ? [155, 55, 225] : [130, 42, 192]);
+  circle(0, -4, size);
+
+  // Static outline ONLY when hovering (no pulse)
+  if (hoverFactor > 0.02) {
+    noFill();
+    stroke(225, 140, 255, 255 * hoverFactor);
+    strokeWeight(2.5);
+    circle(0, -2, size);
+    noStroke();
+  }
+
+  // Button Content (Raisin Cost or FREE)
+  if (cost === 0) {
+    fill(...color.white());
+    textAlign(CENTER, CENTER);
+    textSize(13);
+    textStyle(BOLD);
+    text('FREE', 0, -2);
+  } else {
+    const raisinIcon = state.assets['img_icon_raisin'];
+    if (raisinIcon) {
+      imageMode(CENTER);
+      image(raisinIcon, -9, -2, 18, 18);
+    }
+    fill(...color.yellow());
+    textAlign(CENTER, CENTER);
+    textSize(15);
+    textStyle(BOLD);
+    text(`${cost}`, 10, -2);
+  }
+  pop();
+}
+
+export function drawTreeNodeDisc(
+  cx: number,
+  cy: number,
+  size: number,
+  variant: 'unlocked' | 'available' | 'locked',
+  isHovered: boolean,
+  hoverFactor: number = 0
+) {
+  push();
+  translate(cx, cy);
+  noStroke();
+
+  if (variant === 'unlocked') {
+    // Shadow
+    fill(...color.black(180));
+    circle(0, 5, size);
+
+    // 3D Base
+    fill(180, 95, 10);
+    circle(0, 2, size);
+
+    // Face
+    fill(255, 185, 30);
+    circle(0, -2, size);
+
+    // Static Highlight Ring on hover
+    if (hoverFactor > 0.02) {
+      noFill();
+      stroke(...color.white(255 * hoverFactor));
+      strokeWeight(2.5);
+      circle(0, -2, size + 3);
+      noStroke();
+    }
+  } else if (variant === 'available') {
+    // Shadow
+    fill(...color.black(180));
+    circle(0, 5, size);
+
+    // 3D Base
+    fill(25, 38, 80);
+    circle(0, 2, size);
+
+    // Face
+    fill(isHovered ? [55, 80, 155] : [42, 60, 120]);
+    circle(0, -2, size);
+
+    // Static outline ONLY when hovering
+    if (hoverFactor > 0.02) {
+      noFill();
+      stroke(120, 210, 255, 255 * hoverFactor);
+      strokeWeight(2.5);
+      circle(0, -2, size);
+      noStroke();
+    }
+  } else {
+    // Locked / Fog Disc
+    fill(...color.black(130));
+    circle(0, 4, size);
+
+    fill(24, 26, 36);
+    circle(0, 1, size);
+
+    fill(42, 45, 58);
+    circle(0, -2, size);
+  }
+
+  pop();
+}
+
+export function drawTreeNodeTooltipCard(
+  x: number,
+  y: number,
+  title: string,
+  desc: string,
+  iconSlotRender?: (iconCx: number, iconCy: number) => void,
+  options: { boxW?: number; boxH?: number; iconRadius?: number } = {}
+) {
+  push();
+  const boxW = options.boxW || 250;
+  const boxH = options.boxH || 75;
+  let tx = x + 12;
+  let ty = y + 12;
+  if (tx + boxW > width) tx = x - boxW - 12;
+  if (ty + boxH > height) ty = y - boxH - 12;
+
+  // Shadow
+  noStroke();
+  fill(0, 80);
+  rect(tx + 3, ty + 3, boxW, boxH, 20);
+
+  // Main Background matching UITurretTooltip
+  fill(27, 31, 57);
+  stroke(54, 62, 114);
+  strokeWeight(3);
+  rect(tx, ty, boxW, boxH, 20);
+
+  const hasIcon = !!iconSlotRender;
+  const contentStartX = hasIcon ? tx + 60 : tx + 20;
+
+  if (hasIcon) {
+    // Icon Slot
+    fill(20, 23, 42);
+    noStroke();
+    const iconR = options.iconRadius || 38;
+    circle(tx + 32, ty + boxH / 2, iconR);
+    iconSlotRender(tx + 32, ty + boxH / 2);
+  }
+
+  // Title
+  textAlign(LEFT, TOP);
+  noStroke();
+  fill(255);
+  textSize(14);
+  textStyle(BOLD);
+  text(title, contentStartX, ty + (hasIcon ? 16 : 12));
+
+  // Description
+  fill(200, 200, 210);
+  textSize(10.5);
+  textStyle(NORMAL);
+  text(desc, contentStartX, ty + (hasIcon ? 38 : 32), boxW - (contentStartX - tx) - 12);
+
+  pop();
+}
+
+export interface HexTreeNodeRenderOptions {
+  id: string;
+  size: number;
+  isUnlocked: boolean;
+  isAvailable: boolean;
+  isSelected: boolean;
+  isHovered: boolean;
+  hoverFactor: number;
+  cost: number;
+  contentRender?: () => void;
+}
+
+export function drawHexTreeNode(
+  nx: number,
+  ny: number,
+  options: HexTreeNodeRenderOptions
+) {
+  push();
+  translate(nx, ny);
+
+  const hoverFactor = options.hoverFactor || 0;
+  const currentLift = -4.5 * hoverFactor;
+  const currentScale = 1.0 + 0.1 * hoverFactor;
+  translate(0, currentLift);
+  scale(currentScale);
+
+  const size = options.size;
+
+  if (options.isSelected && options.isAvailable && !options.isUnlocked) {
+    drawTreeNodeConfirmationButton(0, 0, size, options.cost, options.isHovered, hoverFactor);
+    pop();
+    return;
+  }
+
+  const variant = options.isUnlocked ? 'unlocked' : options.isAvailable ? 'available' : 'locked';
+  drawTreeNodeDisc(0, 0, size, variant, options.isHovered, hoverFactor);
+
+  if (options.contentRender) {
+    options.contentRender();
+  }
+
+  pop();
 }

@@ -778,10 +778,10 @@ export class WorldManager {
     text(`Spawn Radius: ${spawnRad}px`, bcx, bcy + spawnRad + 4);
 
     // 3. Stats Tooltip Card
-    const tipW = isLiquid ? 230 : 190;
-    const tipH = isLiquid ? 116 : 66;
+    const tipW = isLiquid ? 230 : 200;
+    const tipH = isLiquid ? 116 : 88;
     const tx = bcx + 15;
-    const ty = bcy - (isLiquid ? 72 : 40);
+    const ty = bcy - (isLiquid ? 72 : 50);
 
     fill(0, 225);
     stroke(255, 100);
@@ -830,7 +830,10 @@ export class WorldManager {
 
       info = `Type: ${spName}\nHourly Budget: ${hourlyRate} (${isNight ? 'Night' : 'Day'})\nAccumulated: ${poolValue}\nSpawned: ${spent} / ${selfDestructMax}\nTrigger Radius: ${trigRad}\nSpawn Radius: ${spawnRad}px\nCached: [${cachedStr}]`;
     } else {
-      info = `Type: ${spName}\nSpawn Radius: ${spawnRad}px\nCached: [${cachedStr}]`;
+      const budget = b.customSpawnerConfig?.budget !== undefined ? b.customSpawnerConfig.budget : (b.spawnerBudget || sCfg?.budget || 60);
+      const curHealth = Math.round(b.health);
+      const maxH = Math.round(b.maxHealth);
+      info = `Type: ${spName}\nHealth: ${curHealth}/${maxH}\nBudget: ${budget}\nSpawn Radius: ${spawnRad}px\nCached: [${cachedStr}]`;
     }
 
     text(info, tx + 7, ty + 6, tipW - 14, tipH - 10);

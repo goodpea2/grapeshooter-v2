@@ -213,6 +213,21 @@ export function drawGameOver() {
     pop();
   }
   
+  // Combat Statistics Summary Box
+  const cStats = state.combatStats || { totalDamageDealt: 0, turretKills: 0, shotsFired: 0 };
+  push();
+  fill(...color.veryDarkBlue(p * 200));
+  stroke(...color.blue(p * 150));
+  strokeWeight(2);
+  rectMode(CENTER);
+  rect(0, MODAL_H / 2 - 115, MODAL_W - 60, 42, 10);
+  noStroke();
+  textAlign(CENTER, CENTER);
+  textSize(12);
+  fill(...color.lightYellow(p * 255));
+  text(`⚔️ BATTLE REPORT — Total Dmg: ${Math.round(cStats.totalDamageDealt || 0)} | Shots: ${cStats.shotsFired || 0} | Kills: ${cStats.turretKills || 0}`, 0, MODAL_H / 2 - 115);
+  pop();
+  
   // Return Button
   const isPlaytest = !!state.isEditorPlaytest;
   const btnText = isPlaytest ? "RETURN TO EDITOR" : "MAIN MENU";

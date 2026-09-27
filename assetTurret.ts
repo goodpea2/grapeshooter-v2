@@ -265,14 +265,18 @@ export function drawTurretSprite(t: any) {
         }
     }
 
-    // HEAL / DAMAGE FLASH / RAGED CONDITION TINT (Requires Tint)
+    // HEAL / DAMAGE FLASH / RAGED / INACTIVE CONDITION TINT (Requires Tint)
     const isRaged = t.conditions?.has('c_raged') || t.conditions?.has('c_raged_visualonly');
+    const isInactive = t.conditions?.has('c_inactive');
     if (t.flashTimer > 0) {
       if (t.flashType === 'heal') tint(100, 255, 100, t.alpha);
       else tint(255, 100, 100, t.alpha);
       useTint = true;
     } else if (isRaged) {
       tint(255, 100 + sin(state.frames * 0.4) * 100, 200, t.alpha);
+      useTint = true;
+    } else if (isInactive) {
+      tint(130, 130, 150, Math.min(t.alpha, 140));
       useTint = true;
     }
 

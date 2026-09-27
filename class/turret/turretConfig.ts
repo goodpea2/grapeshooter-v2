@@ -42,4 +42,5 @@ export interface TurretConfig {
   actionConfigWhileCharged?: any;
   whileCharged?: any;
   getActions?: (turret: Turret) => TurretAction[];
+  upgrades?: any[];
 }

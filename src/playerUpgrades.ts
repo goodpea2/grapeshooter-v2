@@ -72,6 +72,16 @@ export const DEFAULT_PLAYER_UPGRADE_CONFIGS: Record<string, PlayerUpgradeTrackCo
     costs: [5, 10, 20, 35, 60, 100],
     costType: 'elixir'
   },
+  staminaRecoveryRate: {
+    id: 'staminaRecoveryRate',
+    name: 'Stamina Recovery Rate',
+    description: 'Increases stamina recovery rate while resting',
+    icon: 'img_icon_stamina',
+    statFormat: (val: number) => `+${Math.round(val * 100)}%`,
+    values: [0, 0.25, 0.50, 0.75, 1.00, 1.25, 1.50],
+    costs: [10, 20, 35, 60, 90, 120],
+    costType: 'elixir'
+  },
   clickHoldBoost: {
     id: 'clickHoldBoost',
     name: 'Charge Attack Boost',
@@ -95,12 +105,75 @@ export const DEFAULT_PLAYER_UPGRADE_CONFIGS: Record<string, PlayerUpgradeTrackCo
 };
 
 /**
+ * Normalizes upgrade keys across canonical camelCase and PascalCase aliases.
+ */
+export function getCanonicalUpgradeKey(key: string): string {
+  if (!key) return key;
+  const lower = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const map: Record<string, string> = {
+    damagemultiplier: 'damageMultAdd',
+    damagemultadd: 'damageMultAdd',
+    chargeattackboost: 'clickHoldBoost',
+    clickholdboost: 'clickHoldBoost',
+    staminarecoveryrate: 'staminaRecoveryRate',
+    staminarecovery: 'staminaRecoveryRate',
+    attachcapacity: 'turretAttachCapacity',
+    turretattachcapacity: 'turretAttachCapacity',
+    sunbankcapacity: 'sunBankCapacity',
+    magnetradius: 'magnetRadius',
+    movementspeed: 'movementSpeed',
+    maxstamina: 'maxStamina'
+  };
+  return map[lower] || key;
+}
+
+/**
+ * Set of player upgrades that are toggled OFF by default (hidden from run card display).
+ * The first level's stats are still applied accordingly.
+ */
+export const DEFAULT_DISABLED_UPGRADES = new Set<string>([
+  'damageMultAdd',
+  'clickHoldBoost'
+]);
+
+/**
+ * Checks whether an upgrade track should be displayed as a purchase card in the current level.
+ */
+export function isPlayerUpgradeEnabled(upgradeKey: string): boolean {
+  const canonicalKey = getCanonicalUpgradeKey(upgradeKey);
+  const isDefaultDisabled = DEFAULT_DISABLED_UPGRADES.has(canonicalKey);
+
+  // 1. Live Level Editor override
+  if (state.currentScreen === 'level_editor' || state.isEditorPlaytest) {
+    const editorOverride = state.levelEditorPlayerUpgrades?.[canonicalKey]
+      || state.levelEditorPlayerUpgrades?.[upgradeKey];
+    if (editorOverride && editorOverride.enabled !== undefined) {
+      return !!editorOverride.enabled;
+    }
+  }
+
+  // 2. Current level layout data
+  const layout = state.currentLevelLayoutData;
+  const levelOverride = layout?.playerUpgrades?.[canonicalKey]
+     || layout?.PlayerUpgrades?.[canonicalKey]
+     || layout?.playerUpgrades?.[upgradeKey]
+     || layout?.PlayerUpgrades?.[upgradeKey];
+
+  if (levelOverride && levelOverride.enabled !== undefined) {
+    return !!levelOverride.enabled;
+  }
+
+  return !isDefaultDisabled;
+}
+
+/**
  * Resolves player upgrade track configuration, merging default values with any LevelData overrides.
  */
 export function getPlayerUpgradeConfig(upgradeKey: string): PlayerUpgradeTrackConfig {
-  const base = DEFAULT_PLAYER_UPGRADE_CONFIGS[upgradeKey] || {
-    id: upgradeKey,
-    name: upgradeKey,
+  const canonicalKey = getCanonicalUpgradeKey(upgradeKey);
+  const base = DEFAULT_PLAYER_UPGRADE_CONFIGS[canonicalKey] || DEFAULT_PLAYER_UPGRADE_CONFIGS[upgradeKey] || {
+    id: canonicalKey,
+    name: canonicalKey,
     description: '',
     icon: 'img_basic',
     statFormat: (v: number) => `${v}`,
@@ -113,7 +186,7 @@ export function getPlayerUpgradeConfig(upgradeKey: string): PlayerUpgradeTrackCo
 
   // In Level Editor or during an active Editor Playtest, use the editor's live overrides
   if (state.currentScreen === 'level_editor' || state.isEditorPlaytest) {
-    const editorOverride = state.levelEditorPlayerUpgrades?.[upgradeKey];
+    const editorOverride = state.levelEditorPlayerUpgrades?.[canonicalKey] || state.levelEditorPlayerUpgrades?.[upgradeKey];
     if (editorOverride && (editorOverride.values?.length || editorOverride.costs?.length)) {
       levelOverrides = editorOverride;
     }
@@ -121,7 +194,9 @@ export function getPlayerUpgradeConfig(upgradeKey: string): PlayerUpgradeTrackCo
 
   // When loading/playing a level from LevelList or standard play, use the level's own playerUpgrades
   if (!levelOverrides) {
-    levelOverrides = state.currentLevelLayoutData?.playerUpgrades?.[upgradeKey] 
+    levelOverrides = state.currentLevelLayoutData?.playerUpgrades?.[canonicalKey] 
+       || state.currentLevelLayoutData?.PlayerUpgrades?.[canonicalKey]
+       || state.currentLevelLayoutData?.playerUpgrades?.[upgradeKey] 
        || state.currentLevelLayoutData?.PlayerUpgrades?.[upgradeKey];
   }
 
@@ -139,6 +214,7 @@ export function getPlayerUpgradeConfig(upgradeKey: string): PlayerUpgradeTrackCo
  * Returns current player upgrade level index (0 = initial base tier).
  */
 export function getPlayerUpgradeLevel(upgradeKey: string): number {
+  const canonicalKey = getCanonicalUpgradeKey(upgradeKey);
   if (!state.playerUpgrades) {
     state.playerUpgrades = {
       turretAttachCapacity: 0,
@@ -146,11 +222,12 @@ export function getPlayerUpgradeLevel(upgradeKey: string): number {
       magnetRadius: 0,
       damageMultAdd: 0,
       maxStamina: 0,
+      staminaRecoveryRate: 0,
       clickHoldBoost: 0,
       movementSpeed: 0
     };
   }
-  return state.playerUpgrades[upgradeKey] || 0;
+  return state.playerUpgrades[canonicalKey] ?? state.playerUpgrades[upgradeKey] ?? 0;
 }
 
 /**
@@ -225,6 +302,7 @@ export function resetPlayerUpgrades() {
     magnetRadius: 0,
     damageMultAdd: 0,
     maxStamina: 0,
+    staminaRecoveryRate: 0,
     clickHoldBoost: 0,
     movementSpeed: 0
   };

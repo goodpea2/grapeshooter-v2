@@ -292,7 +292,7 @@ export function handleInlineTextSignPress(mWorldX: number, mWorldY: number): boo
     const textStartX = bcx - fullTextW / 2;
     const relX = mWorldX - textStartX;
     const idx = getCharIndexAtX(currentText, relX, (s) => textWidth(s));
-    if (typeof textFont === 'function') textFont('sans-serif');
+    if (typeof textFont === 'function') textFont('Viga');
 
     textSignEditor.textState.cursor = idx;
     textSignEditor.textState.selStart = idx;
@@ -300,7 +300,7 @@ export function handleInlineTextSignPress(mWorldX: number, mWorldY: number): boo
     textSignEditor.textState.isDragging = true;
     return true;
   }
-  if (typeof textFont === 'function') textFont('sans-serif');
+  if (typeof textFont === 'function') textFont('Viga');
 
   // Absorb press inside or near editor
   return true;
@@ -376,7 +376,7 @@ export function handleInlineTextSignDrag(mWorldX: number, mWorldY: number): bool
   const textStartX = bcx - fullTextW / 2;
   const relX = mWorldX - textStartX;
   const idx = getCharIndexAtX(currentText, relX, (s) => textWidth(s));
-  if (typeof textFont === 'function') textFont('sans-serif');
+  if (typeof textFont === 'function') textFont('Viga');
 
   textSignEditor.textState.cursor = idx;
   textSignEditor.textState.selEnd = idx;

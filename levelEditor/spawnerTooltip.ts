@@ -9,6 +9,8 @@ import {
   CloseButton,
   drawGreenButton,
   drawRedButton,
+  drawYellowButton,
+  drawModalFrame,
   drawButton,
   registerUIHitbox
 } from '../uiComponents';
@@ -42,16 +44,24 @@ declare const floor: any;
 declare const constrain: any;
 
 export function isMouseOverSpawnerTooltip(topBarH: number, paletteH: number): boolean {
+  if (!state.levelEditor.editingSpawnerModal || !state.levelEditor.toolbarSpawnerTooltip) return false;
+  return true;
+}
+
+export function closeSpawnerModal() {
+  state.levelEditor.editingSpawnerModal = false;
+  state.levelEditor.toolbarSpawnerTooltip = null;
+  state.levelEditor.activeSpawnerInput = null;
+  state.levelEditor.isWorldDragActive = false;
+}
+
+export function saveSpawnerModal() {
   const tip = state.levelEditor.toolbarSpawnerTooltip;
-  if (!tip) return false;
-
-  const isLiquid = tip.isLiquid || tip.key === 'l_spawner' || tip.key.startsWith('l_spawner') || !!liquidTypes[tip.key];
-  const tipW = 290;
-  const tipH = isLiquid ? 490 : 410;
-  const tipX = width - tipW - 15;
-  const tipY = constrain(height - paletteH - tipH - 10, topBarH + 10, height - tipH - 10);
-
-  return mouseX >= tipX && mouseX <= tipX + tipW && mouseY >= tipY && mouseY <= tipY + tipH;
+  if (tip && state.levelEditor.activeSpawnerInput) {
+    applySpawnerInputBuffer(tip, state.levelEditor.activeSpawnerInput);
+  }
+  syncToolbarSpawnerTooltipToPrefab();
+  closeSpawnerModal();
 }
 
 export function openToolbarSpawnerTooltip(key: string, customBlock?: any) {
@@ -85,24 +95,22 @@ export function openToolbarSpawnerTooltip(key: string, customBlock?: any) {
   };
 }
 
+export function openSpawnerModal(key: string, customBlock?: any) {
+  openToolbarSpawnerTooltip(key, customBlock);
+  state.levelEditor.editingSpawnerModal = true;
+  state.levelEditor.activeSpawnerInput = null;
+}
+
 export function syncToolbarSpawnerTooltipToPrefab() {
   const tip = state.levelEditor.toolbarSpawnerTooltip;
   if (!tip || !tip.key) return;
 
   // 1. Two-way binding: If editing an in-world block instance, update that specific block only!
   if (tip.targetBlock) {
-    if (!tip.targetBlock.customSpawnerConfig) {
-      tip.targetBlock.customSpawnerConfig = {};
-    }
-    tip.targetBlock.customSpawnerConfig = JSON.parse(JSON.stringify(tip.config));
-    tip.targetBlock.customSpawnerConfig.name = tip.name;
-    if (tip.config.budget !== undefined) {
-      tip.targetBlock.spawnerBudget = tip.config.budget;
-    }
-    if (tip.config.health !== undefined && !tip.targetBlock.liquidType) {
-      tip.targetBlock.health = tip.config.health;
-      tip.targetBlock.maxHealth = tip.config.health;
-    }
+    tip.targetBlock.setCustomSpawnerConfig({
+      ...tip.config,
+      name: tip.name
+    });
     const cx = Math.floor(tip.targetBlock.gx / CHUNK_SIZE);
     const cy = Math.floor(tip.targetBlock.gy / CHUNK_SIZE);
     state.world?.dirtyChunkAndNeighbors(cx, cy);
@@ -172,26 +180,21 @@ export function syncToolbarSpawnerTooltipToPrefab() {
   }
 }
 
-export function drawWorldHoverSpawnerTooltip(blk: any, oCfg: any, topBarH: number, paletteH: number) {
-  const isLiquid = blk.liquidType === 'l_spawner' || (blk.liquidType && !!liquidTypes[blk.liquidType]?.isEnemySpawner) || (!!blk.customSpawnerConfig && !!blk.liquidType);
-  const spCfg = blk.customSpawnerConfig || oCfg?.enemySpawnConfig || {};
-  const spName = blk.customSpawnerConfig?.name || oCfg?.name || (isLiquid ? 'Ground Spawner' : 'Spawner');
+export function drawHoverSpawnerTooltipFromConfig(
+  spName: string,
+  spCfg: any,
+  isLiquid: boolean,
+  tipX: number,
+  tipY: number
+) {
   const enemyTypesList: string[] = spCfg.enemyTypeKey || ['e_basic'];
   const spawnRad = spCfg.spawnRadius !== undefined ? spCfg.spawnRadius : 120;
 
-  const screenPos = {
-    x: (blk.pos.x + GRID_SIZE / 2) - state.cameraPos.x + width / 2,
-    y: (blk.pos.y + GRID_SIZE / 2) - state.cameraPos.y + height / 2
-  };
-
   const tipW = isLiquid ? 250 : 230;
   const tipH = isLiquid ? 260 : 185;
-  let tipX = screenPos.x + GRID_SIZE + 10;
-  if (tipX + tipW > width - 15) {
-    tipX = screenPos.x - tipW - GRID_SIZE - 10;
-  }
+
   tipX = constrain(tipX, 15, width - tipW - 15);
-  let tipY = constrain(screenPos.y - 30, topBarH + 10, height - paletteH - tipH - 10);
+  tipY = constrain(tipY, 15, height - tipH - 15);
 
   push();
   // Container Card
@@ -263,8 +266,8 @@ export function drawWorldHoverSpawnerTooltip(blk: any, oCfg: any, topBarH: numbe
     renderStatRow("Follow Mult", `x${mult.toFixed(2)}`);
     renderStatRow("Self Destruct", selfDestruct > 0 ? `${selfDestruct} limit` : 'Never');
   } else {
-    const budget = spCfg.budget !== undefined ? spCfg.budget : (blk.spawnerBudget || 60);
-    const health = blk.health || oCfg?.minHealth || spCfg.health || 300;
+    const budget = spCfg.budget !== undefined ? spCfg.budget : 60;
+    const health = spCfg.minHealth || spCfg.health || 300;
 
     renderStatRow("Health", `${health}`);
     renderStatRow("Budget", `${budget}`);
@@ -306,42 +309,49 @@ export function drawWorldHoverSpawnerTooltip(blk: any, oCfg: any, topBarH: numbe
   pop();
 }
 
-export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
+export function drawWorldHoverSpawnerTooltip(blk: any, oCfg: any, topBarH: number, paletteH: number) {
+  const isLiquid = blk.liquidType === 'l_spawner' || (blk.liquidType && !!liquidTypes[blk.liquidType]?.isEnemySpawner) || (!!blk.customSpawnerConfig && !!blk.liquidType);
+  const spCfg = blk.customSpawnerConfig || oCfg?.enemySpawnConfig || {};
+  const spName = blk.customSpawnerConfig?.name || oCfg?.name || (isLiquid ? 'Ground Spawner' : 'Spawner');
+
+  const screenPos = {
+    x: (blk.pos.x + GRID_SIZE / 2) - state.cameraPos.x + width / 2,
+    y: (blk.pos.y + GRID_SIZE / 2) - state.cameraPos.y + height / 2
+  };
+
+  const tipW = isLiquid ? 250 : 230;
+  let tipX = screenPos.x + GRID_SIZE + 10;
+  if (tipX + tipW > width - 15) {
+    tipX = screenPos.x - tipW - GRID_SIZE - 10;
+  }
+  let tipY = screenPos.y - 30;
+
+  drawHoverSpawnerTooltipFromConfig(spName, spCfg, isLiquid, tipX, tipY);
+}
+
+export function drawSpawnerModal() {
   const tip = state.levelEditor.toolbarSpawnerTooltip;
-  if (!tip) return;
+  if (!tip || !state.levelEditor.editingSpawnerModal) return;
 
   const isLiquid = tip.isLiquid || tip.key === 'l_spawner' || tip.key.startsWith('l_spawner') || !!liquidTypes[tip.key];
-  const tipW = 290;
-  const tipH = isLiquid ? 440 : 340;
-  const tipX = width - tipW - 15;
-  const tipY = constrain(height - paletteH - tipH - 10, topBarH + 10, height - tipH - 10);
+  const modalW = 390;
+  const modalH = isLiquid ? 530 : 440;
+  const tipW = modalW;
+  const tipX = Math.round((width - modalW) / 2);
+  const tipY = Math.round((height - modalH) / 2);
   const cfg = tip.config;
-  const layer = 120;
+  const layer = 140;
 
   push();
-  // Container Box using drawCard
-  drawCard(tipX, tipY, tipW, tipH, {
-    radius: 16,
+  drawModalFrame(tipX, tipY, modalW, modalH, {
+    title: isLiquid ? 'GROUND SPAWNER CONFIG' : 'SPAWNER PREFAB CONFIG',
+    onClose: () => closeSpawnerModal(),
+    radius: 18,
     layer,
-    bgColor: [15, 18, 35, 250],
-    borderColor: [54, 62, 114, 255]
+    dimAlpha: 180
   });
 
-  // Header Title
-  fill(...color.yellow());
-  textAlign(LEFT, CENTER);
-  textSize(11.5);
-  textStyle(BOLD);
-  text("SPAWNER PREFAB CONFIG", tipX + 12, tipY + 18);
-
-  // CloseButton [X]
-  CloseButton(tipX + tipW - 32, tipY + 8, 24, () => {
-    state.levelEditor.toolbarSpawnerTooltip = null;
-    state.levelEditor.activeSpawnerInput = null;
-    state.levelEditor.isWorldDragActive = false;
-  }, { layer: layer + 10, id: 'sp_close_btn' });
-
-  let curY = tipY + 36;
+  let curY = tipY + 38;
 
   // 1. Spawner Name Editable Input Row
   fill(...color.lightBlue(220));
@@ -375,17 +385,17 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
   if (typeof textFont === 'function') textFont('Consolas, monospace');
   const blink = (isNameFocus && floor(((window as any).frameCount || 0) / 30) % 2 === 0) ? '|' : '';
   text(nameVal + blink, nameBoxX + 8, curY + nameBoxH / 2);
-  if (typeof textFont === 'function') textFont('sans-serif');
+  if (typeof textFont === 'function') textFont('Viga');
 
   curY += 28;
 
   // 2. Prefab Action Buttons (Add Prefab / Remove Prefab) using drawGreenButton and drawRedButton
   const halfBtnW = (tipW - 28) / 2;
-  const btnH = 22;
+  const prefabActionBtnH = 22;
 
   // [+ Add Prefab]
   const addBtnX = tipX + 10;
-  drawGreenButton(addBtnX, curY, halfBtnW, btnH, '+ Add Prefab', {
+  drawGreenButton(addBtnX, curY, halfBtnW, prefabActionBtnH, '+ Add Prefab', {
     id: 'sp_btn_add_prefab',
     layer: layer + 5,
     fontSize: 9,
@@ -416,8 +426,13 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
           budget: cfg.budget ?? 60,
           enemyTypeKey: [...(cfg.enemyTypeKey || ['e_basic'])],
           spawnRadius: cfg.spawnRadius ?? 120,
+          spawnTriggerRadius: cfg.spawnTriggerRadius ?? 200,
+          spawnInterval: cfg.spawnInterval ?? 60,
           minHealth: cfg.minHealth ?? cfg.health ?? 300,
-          health: cfg.minHealth ?? cfg.health ?? 300
+          health: cfg.minHealth ?? cfg.health ?? 300,
+          ...(cfg.hourlySpawnConfig ? {
+            hourlySpawnConfig: JSON.parse(JSON.stringify(cfg.hourlySpawnConfig))
+          } : {})
         }
       };
       if (!state.levelEditor.customSpawnerPrefabs) state.levelEditor.customSpawnerPrefabs = [];
@@ -470,7 +485,7 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
   // [- Remove Prefab]
   const remBtnX = tipX + 10 + halfBtnW + 8;
   const isCustomPrefab = (tip.key && (overlayTypes[tip.key]?.isCustomPrefab || liquidTypes[tip.key]?.isCustomPrefab)) || (state.levelEditor.customSpawnerPrefabs && state.levelEditor.customSpawnerPrefabs.some((p: any) => p.id === tip.key));
-  drawRedButton(remBtnX, curY, halfBtnW, btnH, '- Remove Prefab', {
+  drawRedButton(remBtnX, curY, halfBtnW, prefabActionBtnH, '- Remove Prefab', {
     id: 'sp_btn_rem_prefab',
     layer: layer + 5,
     fontSize: 9,
@@ -538,7 +553,6 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
       depth3D: 1,
       onClick: () => {
         onMinus();
-        syncToolbarSpawnerTooltipToPrefab();
         state.levelEditor.activeSpawnerInput = null;
       }
     });
@@ -602,7 +616,7 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
     if (typeof textFont === 'function') textFont('Consolas, monospace');
     const cursor = (isFieldFocus && floor(((window as any).frameCount || 0) / 30) % 2 === 0) ? '|' : '';
     text(activeBuf + cursor, inputX + 5, curY + btnSize / 2);
-    if (typeof textFont === 'function') textFont('sans-serif');
+    if (typeof textFont === 'function') textFont('Viga');
 
     // [+] Button
     const plusX = inputX + valBoxW + 4;
@@ -614,7 +628,6 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
       depth3D: 1,
       onClick: () => {
         onPlus();
-        syncToolbarSpawnerTooltipToPrefab();
         state.levelEditor.activeSpawnerInput = null;
       }
     });
@@ -835,7 +848,6 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
         } else {
           cfg.enemyTypeKey.push(choice.key);
         }
-        syncToolbarSpawnerTooltipToPrefab();
         state.levelEditor.activeSpawnerInput = null;
       }
     });
@@ -843,16 +855,70 @@ export function drawToolbarSpawnerTooltip(topBarH: number, paletteH: number) {
     chipX += chipW + 4;
   }
 
+  // 5. Bottom Action Buttons: [Discard] and [SAVE]
+  const btnW = 120;
+  const btnH = 32;
+  const bottomY = tipY + modalH - btnH - 14;
+  const btnDiscX = tipX + 30;
+  const btnSaveX = tipX + modalW - 30 - btnW;
+
+  drawRedButton(btnDiscX, bottomY, btnW, btnH, 'Discard', {
+    id: 'sp_btn_discard',
+    layer: layer + 10,
+    fontSize: 12,
+    radius: 8,
+    depth3D: 2,
+    onClick: () => {
+      closeSpawnerModal();
+    }
+  });
+
+  drawYellowButton(btnSaveX, bottomY, btnW, btnH, 'SAVE', {
+    id: 'sp_btn_save',
+    layer: layer + 10,
+    fontSize: 12,
+    radius: 8,
+    depth3D: 2,
+    onClick: () => {
+      saveSpawnerModal();
+    }
+  });
+
   textStyle(NORMAL);
   pop();
 }
 
+export const drawToolbarSpawnerTooltip = drawSpawnerModal;
+
 export function handleSpawnerKeyInput(keyStr: string, keyCodeNum: number, event?: any): boolean {
-  if (state.currentScreen !== 'level_editor' || !state.levelEditor.activeSpawnerInput || !state.levelEditor.toolbarSpawnerTooltip) {
+  if (state.currentScreen !== 'level_editor' || !state.levelEditor.editingSpawnerModal || !state.levelEditor.toolbarSpawnerTooltip) {
     return false;
   }
   const activeInput = state.levelEditor.activeSpawnerInput;
   const tip = state.levelEditor.toolbarSpawnerTooltip;
+
+  // Escape: Close & Discard or Defocus
+  if (keyCodeNum === 27) {
+    if (activeInput) {
+      state.levelEditor.activeSpawnerInput = null;
+    } else {
+      closeSpawnerModal();
+    }
+    return true;
+  }
+
+  // Enter: Commit Input or Save
+  if (keyCodeNum === 13) {
+    if (activeInput) {
+      applySpawnerInputBuffer(tip, activeInput);
+      state.levelEditor.activeSpawnerInput = null;
+    } else {
+      saveSpawnerModal();
+    }
+    return true;
+  }
+
+  if (!activeInput) return false;
 
   let buf = activeInput.textBuffer || '';
   let cursor = activeInput.cursor !== undefined ? activeInput.cursor : buf.length;
@@ -861,14 +927,7 @@ export function handleSpawnerKeyInput(keyStr: string, keyCodeNum: number, event?
 
   const minSel = Math.min(sStart, sEnd);
   const maxSel = Math.max(sStart, sEnd);
-  const hasSelection = minSel < maxSel;
-
-  // Enter or Escape: Commit & Defocus
-  if (keyCodeNum === 13 || keyCodeNum === 27) {
-    applySpawnerInputBuffer(tip, activeInput);
-    state.levelEditor.activeSpawnerInput = null;
-    return true;
-  }
+  const hasSelection = minSel !== maxSel;
 
   // Ctrl+A / Cmd+A: Select All
   if ((event?.ctrlKey || event?.metaKey) && (keyStr === 'a' || keyStr === 'A' || keyCodeNum === 65)) {
@@ -1060,25 +1119,10 @@ function applySpawnerInputBuffer(tip: any, activeInput: { field: string; textBuf
       }
     }
   }
-  syncToolbarSpawnerTooltipToPrefab();
 }
 
 export function handleToolbarSpawnerTooltipClick(topBarH: number, paletteH: number): boolean {
-  const tip = state.levelEditor.toolbarSpawnerTooltip;
-  if (!tip) return false;
-
-  const isLiquid = tip.isLiquid || tip.key === 'l_spawner' || tip.key.startsWith('l_spawner') || !!liquidTypes[tip.key];
-  const tipW = 290;
-  const tipH = isLiquid ? 440 : 340;
-  const tipX = width - tipW - 15;
-  const tipY = constrain(height - paletteH - tipH - 10, topBarH + 10, height - tipH - 10);
-
-  // Check if click is inside tooltip bounds
-  if (mouseX < tipX || mouseX > tipX + tipW || mouseY < tipY || mouseY > tipY + tipH) {
-    return false;
-  }
-
-  // Click is inside tooltip; strictly prevent canvas world drag
+  if (!state.levelEditor.editingSpawnerModal || !state.levelEditor.toolbarSpawnerTooltip) return false;
   state.levelEditor.isWorldDragActive = false;
   return true;
 }

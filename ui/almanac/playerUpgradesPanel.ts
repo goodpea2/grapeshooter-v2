@@ -1,23 +1,26 @@
 import { state } from '../../state';
 import { 
   DEFAULT_PLAYER_UPGRADE_CONFIGS, 
+  DEFAULT_DISABLED_UPGRADES,
   getPlayerUpgradeInfo, 
-  purchasePlayerUpgrade 
+  getPlayerUpgradeStat,
+  isPlayerUpgradeEnabled,
+  purchasePlayerUpgrade,
+  getCanonicalUpgradeKey
 } from '../../src/playerUpgrades';
-import { drawCard, drawButton, registerUIHitbox } from '../../uiComponents';
+import { drawCard, drawButton, drawYellowButton, drawPurpleButton, registerUIHitbox } from '../../uiComponents';
 import { color } from '../../uiColors';
-import { attachDOMInput, removeDOMInput } from '../domInput';
+import { soundEngine } from '../../src/audio/soundEngine';
 
 declare const push: any;
 declare const pop: any;
 declare const translate: any;
 declare const fill: any;
-declare const noFill: any;
 declare const stroke: any;
 declare const noStroke: any;
 declare const strokeWeight: any;
 declare const rect: any;
-declare const rectMode: any;
+declare const line: any;
 declare const textAlign: any;
 declare const textSize: any;
 declare const textFont: any;
@@ -33,23 +36,20 @@ declare const mouseY: any;
 declare const mouseIsPressed: any;
 declare const image: any;
 declare const imageMode: any;
-declare const tint: any;
-declare const noTint: any;
-declare const floor: any;
-declare const frameCount: any;
 declare const ellipse: any;
 declare const sin: any;
-declare const scale: any;
+declare const frameCount: any;
 declare const constrain: any;
 declare const drawingContext: any;
 
 export const UPGRADE_KEYS = [
   'turretAttachCapacity',
   'sunBankCapacity',
-  'damageMultAdd',
   'magnetRadius',
   'movementSpeed',
   'maxStamina',
+  'staminaRecoveryRate',
+  'damageMultAdd',
   'clickHoldBoost'
 ];
 
@@ -58,6 +58,7 @@ export interface EditorPlayerUpgradeEntry {
   costStr: string;
   values?: number[];
   costs?: number[];
+  enabled?: boolean;
 }
 
 export function handlePlayerUpgradesScroll(delta: number): boolean {
@@ -80,33 +81,36 @@ export function initLevelEditorPlayerUpgradesFromData(layoutData?: any) {
     state.levelEditorPlayerUpgrades = {};
   }
 
-  if (layoutData !== undefined) {
-    for (const key of UPGRADE_KEYS) {
-      const raw = layoutData?.[key];
-      if (raw) {
-        const statStr = Array.isArray(raw.values) ? raw.values.join(', ') : (raw.values != null ? String(raw.values) : '');
-        const costStr = Array.isArray(raw.costs) ? raw.costs.join(', ') : (raw.costs != null ? String(raw.costs) : '');
-        state.levelEditorPlayerUpgrades[key] = {
-          statStr,
-          costStr,
-          values: Array.isArray(raw.values) && raw.values.length > 0 ? [...raw.values] : undefined,
-          costs: Array.isArray(raw.costs) && raw.costs.length > 0 ? [...raw.costs] : undefined
-        };
-      } else {
-        state.levelEditorPlayerUpgrades[key] = {
-          statStr: '',
-          costStr: '',
-          values: undefined,
-          costs: undefined
-        };
+  const source = layoutData !== undefined ? layoutData : (state.currentLevelLayoutData || {});
+
+  for (const key of UPGRADE_KEYS) {
+    const canonical = getCanonicalUpgradeKey(key);
+    const raw = source?.[key] || source?.[canonical]
+      || source?.playerUpgrades?.[key] || source?.playerUpgrades?.[canonical]
+      || source?.PlayerUpgrades?.[key] || source?.PlayerUpgrades?.[canonical];
+
+    const isDefaultDisabled = DEFAULT_DISABLED_UPGRADES.has(key) || DEFAULT_DISABLED_UPGRADES.has(canonical);
+    let enabled = !isDefaultDisabled;
+
+    if (raw) {
+      const statStr = Array.isArray(raw.values) ? raw.values.join(', ') : (raw.values != null ? String(raw.values) : '');
+      const costStr = Array.isArray(raw.costs) ? raw.costs.join(', ') : (raw.costs != null ? String(raw.costs) : '');
+      if (raw.enabled !== undefined) {
+        enabled = !!raw.enabled;
       }
-    }
-  } else {
-    for (const key of UPGRADE_KEYS) {
+      state.levelEditorPlayerUpgrades[key] = {
+        statStr,
+        costStr,
+        enabled,
+        values: Array.isArray(raw.values) && raw.values.length > 0 ? [...raw.values] : undefined,
+        costs: Array.isArray(raw.costs) && raw.costs.length > 0 ? [...raw.costs] : undefined
+      };
+    } else {
       if (!state.levelEditorPlayerUpgrades[key]) {
         state.levelEditorPlayerUpgrades[key] = {
           statStr: '',
           costStr: '',
+          enabled,
           values: undefined,
           costs: undefined
         };
@@ -123,7 +127,7 @@ export function parseAndSyncPlayerUpgrade(key: string) {
   const entry = state.levelEditorPlayerUpgrades[key];
   if (!entry) return;
 
-  const statClean = entry.statStr.replace(/[\[\]"']/g, '').trim();
+  const statClean = (entry.statStr || '').replace(/[\[\]"']/g, '').trim();
   if (statClean.length > 0) {
     const tokens = statClean.split(',').map((s: string) => s.trim().replace(/%/g, '')).filter((s: string) => s.length > 0);
     const nums = tokens.map((s: string) => parseFloat(s)).filter((n: number) => !isNaN(n));
@@ -132,7 +136,7 @@ export function parseAndSyncPlayerUpgrade(key: string) {
     entry.values = undefined;
   }
 
-  const costClean = entry.costStr.replace(/[\[\]"']/g, '').trim();
+  const costClean = (entry.costStr || '').replace(/[\[\]"']/g, '').trim();
   if (costClean.length > 0) {
     const tokens = costClean.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
     const nums = tokens.map((s: string) => parseFloat(s)).filter((n: number) => !isNaN(n));
@@ -155,12 +159,19 @@ export function serializeLevelEditorPlayerUpgrades(): Record<string, any> | unde
     if (entry) {
       parseAndSyncPlayerUpgrade(key);
       const out: any = {};
+      const isDefaultDisabled = DEFAULT_DISABLED_UPGRADES.has(key);
+      const isExplicitlyToggled = entry.enabled !== undefined && entry.enabled !== !isDefaultDisabled;
+
       if (entry.values && entry.values.length > 0) {
         out.values = [...entry.values];
         hasAny = true;
       }
       if (entry.costs && entry.costs.length > 0) {
         out.costs = [...entry.costs];
+        hasAny = true;
+      }
+      if (entry.enabled !== undefined) {
+        out.enabled = entry.enabled;
         hasAny = true;
       }
       if (Object.keys(out).length > 0) {
@@ -187,9 +198,10 @@ export function drawPlayerUpgradesPanel(x: number, y: number, w: number, h: numb
 
 /**
  * Normal Gameplay Mode: Clean layout with Title, Floating Player in Center, and Scrollable 2-Column Upgrade Cards.
+ * Filters cards to only those enabled in the level. Unshown upgrades still have their first level stat applied.
  */
 function drawGameplayUpgradesPanel(w: number, h: number, globalPanelX: number, globalPanelY: number) {
-  // Title (Top Center) - exactly "Player Upgrades"
+  // Title (Top Center)
   fill(...color.yellow());
   textAlign(CENTER, CENTER);
   textSize(22);
@@ -209,15 +221,18 @@ function drawGameplayUpgradesPanel(w: number, h: number, globalPanelX: number, g
 
   const visibleH = h - topY - 14;
 
+  // Filter to only enabled upgrades
+  const visibleKeys = UPGRADE_KEYS.filter(k => isPlayerUpgradeEnabled(k));
+
   const leftKeys: string[] = [];
   const rightKeys: string[] = [];
-  for (let i = 0; i < UPGRADE_KEYS.length; i++) {
-    if (i % 2 === 0) leftKeys.push(UPGRADE_KEYS[i]);
-    else rightKeys.push(UPGRADE_KEYS[i]);
+  for (let i = 0; i < visibleKeys.length; i++) {
+    if (i % 2 === 0) leftKeys.push(visibleKeys[i]);
+    else rightKeys.push(visibleKeys[i]);
   }
 
   const rowCount = Math.max(leftKeys.length, rightKeys.length);
-  const totalContentH = rowCount * cardH + (rowCount - 1) * cardGapY;
+  const totalContentH = rowCount * cardH + Math.max(0, rowCount - 1) * cardGapY;
   const maxScroll = Math.min(0, visibleH - totalContentH);
   state.playerUpgradesMaxScroll = maxScroll;
 
@@ -237,7 +252,7 @@ function drawGameplayUpgradesPanel(w: number, h: number, globalPanelX: number, g
   state.playerUpgradesScrollY = (state.playerUpgradesScrollY || 0) + (state.playerUpgradesScrollVelocity || 0);
   state.playerUpgradesScrollY = constrain(state.playerUpgradesScrollY, maxScroll, 0);
 
-  // 1. Draw Center Player (fixed in center, no stats box)
+  // 1. Draw Center Player (fixed in center)
   drawCenterPlayer(centerX, topY, centerW, visibleH);
 
   // 2. Draw Clipped Scrollable Cards
@@ -309,7 +324,7 @@ function drawCenterPlayer(cx: number, cy: number, cw: number, ch: number) {
 }
 
 /**
- * Draws an upgrade card using modular components and design tokens matching image.png.
+ * Draws a gameplay upgrade card using modular components and design tokens.
  */
 function drawGameplayUpgradeCard(
   cx: number, cy: number, cw: number, ch: number, 
@@ -445,48 +460,57 @@ function drawGameplayUpgradeCard(
 }
 
 /**
- * Level Editor Mode: Editable strings for Stats and Costs.
+ * Level Editor Mode: Revamped to strictly match LevelConfig UI styling.
+ * Re-uses dark navy background, cyan section headers, consistent 24px input fields,
+ * Consolas monospace font, blinking cyan cursor, and an On/Off toggle button per upgrade card.
  */
 function drawEditorUpgradesPanel(w: number, h: number, globalPanelX: number, globalPanelY: number) {
   initLevelEditorPlayerUpgradesFromData();
 
-  // Header Banner - moved higher with compact styling
-  const bannerX = 20;
+  // Main Background Card matching LevelConfig
+  fill(16, 20, 38, 240);
+  noStroke();
+  rect(0, 0, w, h, 20);
+
+  // Header Banner Card matching LevelConfig Section Card style
+  const bannerX = 14;
   const bannerY = 8;
-  const bannerW = w - 40;
-  const bannerH = 32;
+  const bannerW = w - 28;
+  const bannerH = 40;
 
   push();
-  fill(12, 15, 30, 230);
-  stroke(100, 70, 180);
-  strokeWeight(1.5);
-  rect(bannerX, bannerY, bannerW, bannerH, 8);
+  fill(22, 28, 54);
+  stroke(40, 52, 95);
+  strokeWeight(1);
+  rect(bannerX, bannerY, bannerW, bannerH, 10);
   noStroke();
 
-  fill(255, 230, 120);
-  textAlign(LEFT, CENTER);
+  // Title in Cyan (matching LevelConfig)
+  fill(0, 220, 255);
+  textAlign(LEFT, TOP);
   textSize(11.5);
-  text("PLAYER UPGRADE CONFIG: Edit Stats & Costs (blank = default)", bannerX + 12, bannerY + bannerH / 2);
+  text("PLAYER UPGRADE CONFIG", bannerX + 12, bannerY + 7);
 
-  // "SET ALL TO 1 LEVEL" button in header
-  const set1LevelW = 135;
-  const set1LevelH = 22;
-  const resetAllW = 140;
-  const resetAllH = 22;
-  const resetAllX = bannerW - resetAllW - 6;
-  const set1LevelX = resetAllX - set1LevelW - 8;
-  const btnY = (bannerH - 22) / 2;
+  // Subtitle / Help note
+  fill(160, 185, 220);
+  textSize(8.5);
+  // Header Action Buttons using uiComponents
+  const btnSetW = 125;
+  const btnResetW = 125;
+  const btnActionH = 24;
+  const btnActionY = bannerY + 8;
+  const btnResetX = bannerX + bannerW - btnResetW - 10;
+  const btnSetX = btnResetX - btnSetW - 8;
 
-  drawButton(bannerX + set1LevelX, bannerY + btnY, set1LevelW, set1LevelH, "SET ALL TO 1 LEVEL", {
+  drawYellowButton(btnSetX, btnActionY, btnSetW, btnActionH, "SET ALL TO 1 LEVEL", {
     id: 'btn_set_all_1level_upgrades',
-    variant: 'yellow',
-    fontSize: 9.5,
+    fontSize: 9,
     radius: 6,
     depth3D: 2,
-    hitboxX: globalPanelX + bannerX + set1LevelX,
-    hitboxY: globalPanelY + bannerY + btnY,
+    layer: 110,
+    hitboxX: globalPanelX + btnSetX,
+    hitboxY: globalPanelY + btnActionY,
     onClick: () => {
-      removeDOMInput();
       for (const key of UPGRADE_KEYS) {
         const defaultCfg = DEFAULT_PLAYER_UPGRADE_CONFIGS[key];
         if (defaultCfg && state.levelEditorPlayerUpgrades[key]) {
@@ -502,21 +526,21 @@ function drawEditorUpgradesPanel(w: number, h: number, globalPanelX: number, glo
     }
   });
 
-  // "RESET ALL DEFAULTS" button in header
-  drawButton(bannerX + resetAllX, bannerY + btnY, resetAllW, resetAllH, "RESET ALL TO DEFAULT", {
+  drawPurpleButton(btnResetX, btnActionY, btnResetW, btnActionH, "RESET ALL DEFAULTS", {
     id: 'btn_reset_all_upgrades',
-    variant: 'purple',
-    fontSize: 9.5,
+    fontSize: 9,
     radius: 6,
     depth3D: 2,
-    hitboxX: globalPanelX + bannerX + resetAllX,
-    hitboxY: globalPanelY + bannerY + btnY,
+    layer: 110,
+    hitboxX: globalPanelX + btnResetX,
+    hitboxY: globalPanelY + btnActionY,
     onClick: () => {
-      removeDOMInput();
       for (const key of UPGRADE_KEYS) {
         if (state.levelEditorPlayerUpgrades[key]) {
+          const isDefaultDisabled = DEFAULT_DISABLED_UPGRADES.has(key);
           state.levelEditorPlayerUpgrades[key].statStr = '';
           state.levelEditorPlayerUpgrades[key].costStr = '';
+          state.levelEditorPlayerUpgrades[key].enabled = !isDefaultDisabled;
           state.levelEditorPlayerUpgrades[key].values = undefined;
           state.levelEditorPlayerUpgrades[key].costs = undefined;
         }
@@ -527,17 +551,17 @@ function drawEditorUpgradesPanel(w: number, h: number, globalPanelX: number, glo
 
   pop();
 
-  // 2-Column Grid layout for editable upgrade cards - moved higher and scrollable
-  const gridStartX = 20;
-  const gridStartY = 46;
+  // Scrollable 2-Column Grid
+  const gridStartX = 14;
+  const gridStartY = 54;
   const cardGap = 8;
-  const gridW = w - 40;
+  const gridW = w - 28;
   const cardW = (gridW - cardGap) / 2;
-  const cardH = 94;
+  const cardH = 98;
 
   const totalRows = Math.ceil(UPGRADE_KEYS.length / 2);
-  const contentH = totalRows * (cardH + cardGap);
-  const viewportH = h - gridStartY - 8;
+  const contentH = totalRows * cardH + Math.max(0, totalRows - 1) * cardGap;
+  const viewportH = h - gridStartY - 10;
   const maxScroll = Math.min(0, viewportH - contentH);
 
   // Smooth scroll velocity integration
@@ -557,7 +581,7 @@ function drawEditorUpgradesPanel(w: number, h: number, globalPanelX: number, glo
 
   const scrollY = state.editorPlayerUpgradesScrollY || 0;
 
-  // Clip content area so cards scroll cleanly inside container
+  // Clip content area
   const dc = (window as any).drawingContext;
   if (dc) {
     dc.save();
@@ -576,7 +600,7 @@ function drawEditorUpgradesPanel(w: number, h: number, globalPanelX: number, glo
     const cardX = gridStartX + col * (cardW + cardGap);
     const cardY = gridStartY + row * (cardH + cardGap);
 
-    if (cardY + scrollY + cardH >= gridStartY - 20 && cardY + scrollY <= gridStartY + viewportH + 20) {
+    if (cardY + scrollY + cardH >= gridStartY - 30 && cardY + scrollY <= gridStartY + viewportH + 30) {
       drawEditorUpgradeCard(cardX, cardY, cardW, cardH, key, globalPanelX, globalPanelY, scrollY);
     }
   }
@@ -600,12 +624,16 @@ function drawEditorUpgradesPanel(w: number, h: number, globalPanelX: number, glo
     fill(25, 30, 60, 180);
     noStroke();
     rect(sbX, gridStartY, sbW, sbTrackH, 3);
-    fill(120, 160, 255, 220);
+    fill(0, 220, 255, 200);
     rect(sbX, thumbY, sbW, thumbH, 3);
     pop();
   }
 }
 
+/**
+ * Draws a single upgrade config card in the LevelEditor Almanac.
+ * Styled matching LevelConfig's UI cards, titles, input boxes, hitboxes, and buttons.
+ */
 function drawEditorUpgradeCard(
   cx: number, cy: number, cw: number, ch: number,
   key: string, globalPanelX: number, globalPanelY: number,
@@ -615,116 +643,209 @@ function drawEditorUpgradeCard(
   const editorEntry = (state.levelEditorPlayerUpgrades && state.levelEditorPlayerUpgrades[key]) || {
     statStr: '',
     costStr: '',
+    enabled: !DEFAULT_DISABLED_UPGRADES.has(key),
     values: undefined,
     costs: undefined
   };
 
-  const hasCustom = (editorEntry.statStr && editorEntry.statStr.trim().length > 0) ||
-                    (editorEntry.costStr && editorEntry.costStr.trim().length > 0);
-
+  const isEnabled = editorEntry.enabled !== undefined ? editorEntry.enabled : !DEFAULT_DISABLED_UPGRADES.has(key);
   const cardGlobalX = globalPanelX + cx;
   const cardGlobalY = globalPanelY + cy + scrollY;
+
+  const isCardHov = mouseX >= cardGlobalX && mouseX <= cardGlobalX + cw &&
+                    mouseY >= cardGlobalY && mouseY <= cardGlobalY + ch;
 
   push();
   translate(cx, cy);
 
-  // Card background
-  fill(20, 24, 48);
-  stroke(hasCustom ? [90, 80, 140] : [45, 52, 95]);
-  strokeWeight(hasCustom ? 2 : 1.5);
-  rect(0, 0, cw, ch, 8);
+  // Card background matching LevelConfig section cards
+  fill(22, 28, 54);
+  stroke(isCardHov ? [70, 95, 145] : (isEnabled ? [40, 52, 95] : [32, 38, 65]));
+  strokeWeight(1);
+  rect(0, 0, cw, ch, 10);
 
   // Header: Icon + Title
-  const iconSize = 22;
+  const iconSize = 20;
   const iconX = 10;
-  const iconY = 8;
+  const iconY = 7;
 
   fill(12, 14, 28);
   noStroke();
-  rect(iconX, iconY, iconSize, iconSize, 5);
+  rect(iconX, iconY, iconSize, iconSize, 4);
 
   const asset = state.assets[defaultCfg?.icon] || state.assets['img_basic'];
   if (asset) {
     imageMode(CENTER);
-    image(asset, iconX + iconSize / 2, iconY + iconSize / 2, 18, 18);
+    image(asset, iconX + iconSize / 2, iconY + iconSize / 2, 16, 16);
   }
 
-  fill(255);
+  // Upgrade Title (in Cyan, matching LevelConfig titles)
+  fill(isEnabled ? [0, 220, 255] : [140, 160, 185]);
   textAlign(LEFT, CENTER);
-  textSize(11.5);
+  textSize(11);
+  noStroke();
   text(defaultCfg?.name || key, iconX + iconSize + 8, iconY + iconSize / 2);
 
-  // Line 1: StatLevel
+  // ON / OFF Toggle Button (Top Right of Card)
+  const btnW = 68;
+  const btnH = 20;
+  const btnX = cw - btnW - 10;
+  const btnY = 7;
+
+  drawButton(btnX, btnY, btnW, btnH, isEnabled ? "SHOWN" : "HIDDEN", {
+    id: `btn_toggle_upgrade_${key}`,
+    variant: isEnabled ? 'green' : 'red',
+    fontSize: 8.5,
+    radius: 5,
+    depth3D: 2,
+    layer: 110,
+    hitboxX: cardGlobalX + btnX,
+    hitboxY: cardGlobalY + btnY,
+    onClick: () => {
+      editorEntry.enabled = !isEnabled;
+      soundEngine.playSFX('btn_click');
+    }
+  });
+
+  // Row 1: StatLevel Input (matches LevelConfig renderTextInput)
   const labelX = 10;
-  const statRowY = 36;
-  const fieldH = 22;
-  const labelW = 75;
-  const fieldX = labelX + labelW;
-  const fieldW = cw - fieldX - 10;
+  const row1Y = 32;
+  const fieldH = 24;
+  const fieldW = cw - 20;
 
-  fill(180, 195, 230);
-  textAlign(LEFT, CENTER);
-  textSize(10.5);
-  text("StatLevel:", labelX, statRowY + fieldH / 2);
+  renderConfigTextInput(
+    labelX, row1Y, fieldW, fieldH,
+    "Stats",
+    key, 'stat',
+    editorEntry.statStr || '',
+    defaultCfg?.values?.join(', ') || '',
+    cardGlobalX, cardGlobalY
+  );
 
-  const isStatActive = state.activePlayerUpgradeInput?.key === key && state.activePlayerUpgradeInput?.field === 'stat';
-  const isStatHov = mouseX >= cardGlobalX + fieldX && mouseX <= cardGlobalX + fieldX + fieldW &&
-                    mouseY >= cardGlobalY + statRowY && mouseY <= cardGlobalY + statRowY + fieldH;
+  // Row 2: UpgradeCost Input (matches LevelConfig renderTextInput)
+  const row2Y = 64;
+  renderConfigTextInput(
+    labelX, row2Y, fieldW, fieldH,
+    "Costs",
+    key, 'cost',
+    editorEntry.costStr || '',
+    defaultCfg?.costs?.join(', ') || '',
+    cardGlobalX, cardGlobalY
+  );
 
-  fill(isStatActive ? [10, 13, 26] : (isStatHov ? [16, 20, 42] : [13, 16, 34]));
-  stroke(isStatActive ? [80, 200, 255] : (isStatHov ? [80, 100, 160] : [45, 55, 95]));
-  strokeWeight(isStatActive ? 2 : 1);
-  rect(fieldX, statRowY, fieldW, fieldH, 4);
+  pop();
+}
+
+/**
+ * Standardized LevelConfig text input renderer with Consolas font, selection highlight,
+ * blinking cyan cursor, and matching borders.
+ */
+function renderConfigTextInput(
+  x: number, y: number, w: number, h: number,
+  label: string,
+  key: string,
+  field: 'stat' | 'cost',
+  value: string,
+  placeholder: string,
+  cardGlobalX: number,
+  cardGlobalY: number
+) {
+  const gX = cardGlobalX + x;
+  const gY = cardGlobalY + y;
+
+  const isFocused = state.activePlayerUpgradeInput?.key === key && state.activePlayerUpgradeInput?.field === field;
+  const isHov = mouseX >= gX && mouseX <= gX + w && mouseY >= gY && mouseY <= gY + h;
+
+  const isMousePressed = !!(window as any).mouseIsPressed;
+  if (isFocused && isMousePressed && state.activePlayerUpgradeInput?.isDragging) {
+    const activeBuf = state.activePlayerUpgradeInput.textBuffer || '';
+    const approxCharW = 5.8;
+    const relX = mouseX - (gX + 8);
+    const dragIdx = Math.max(0, Math.min(activeBuf.length, Math.round(relX / approxCharW)));
+    state.activePlayerUpgradeInput.selectionEnd = dragIdx;
+    state.activePlayerUpgradeInput.cursor = dragIdx;
+  }
+
+  // Label
+  push();
+  fill(160, 185, 220);
+  textAlign(LEFT, BOTTOM);
+  textSize(8.5);
   noStroke();
+  text(label, x, y - 2);
 
-  const statStr = editorEntry.statStr || '';
-  textSize(10.5);
+  // Box background & border
+  fill(...(isFocused ? [12, 16, 32, 250] : (isHov ? [20, 28, 50, 240] : [12, 16, 32, 230])));
+  if (isFocused) {
+    stroke(0, 220, 255);
+    strokeWeight(1.5);
+  } else if (isHov) {
+    stroke(70, 95, 145);
+    strokeWeight(1);
+  } else {
+    stroke(32, 42, 75);
+    strokeWeight(1);
+  }
+  rect(x, y, w, h, 6);
+
+  // Text rendering in Consolas monospace font
+  const displayBuf = isFocused ? (state.activePlayerUpgradeInput?.textBuffer ?? value) : value;
+  fill(255, 255, 255);
+  noStroke();
   textAlign(LEFT, CENTER);
+  textSize(9.5);
   if (typeof textFont === 'function') textFont('Consolas, monospace');
 
-  if (statStr.length > 0) {
-    fill(255);
-    text(statStr, fieldX + 8, statRowY + fieldH / 2);
+  const maxVisChars = Math.floor((w - 16) / 5.8);
+  let renderStr = displayBuf.length > 0 ? displayBuf : placeholder;
+
+  if (displayBuf.length === 0) {
+    fill(90, 105, 135); // Placeholder muted color
   } else {
-    const defaultStatStr = defaultCfg?.values?.join(', ') || '';
-    fill(90, 105, 135);
-    text(`${defaultStatStr}`, fieldX + 8, statRowY + fieldH / 2);
-  }
-  if (typeof textFont === 'function') textFont('sans-serif');
-
-  // Line 2: UpgradeCost
-  const costRowY = 64;
-
-  fill(180, 195, 230);
-  textAlign(LEFT, CENTER);
-  textSize(10.5);
-  text("UpgradeCost:", labelX, costRowY + fieldH / 2);
-
-  const isCostActive = state.activePlayerUpgradeInput?.key === key && state.activePlayerUpgradeInput?.field === 'cost';
-  const isCostHov = mouseX >= cardGlobalX + fieldX && mouseX <= cardGlobalX + fieldX + fieldW &&
-                    mouseY >= cardGlobalY + costRowY && mouseY <= cardGlobalY + costRowY + fieldH;
-
-  fill(isCostActive ? [10, 13, 26] : (isCostHov ? [16, 20, 42] : [13, 16, 34]));
-  stroke(isCostActive ? [80, 200, 255] : (isCostHov ? [80, 100, 160] : [45, 55, 95]));
-  strokeWeight(isCostActive ? 2 : 1);
-  rect(fieldX, costRowY, fieldW, fieldH, 4);
-  noStroke();
-
-  const costStr = editorEntry.costStr || '';
-  textSize(10.5);
-  textAlign(LEFT, CENTER);
-  if (typeof textFont === 'function') textFont('Consolas, monospace');
-
-  if (costStr.length > 0) {
     fill(255);
-    text(costStr, fieldX + 8, costRowY + fieldH / 2);
-  } else {
-    const defaultCostStr = defaultCfg?.costs?.join(', ') || '';
-    fill(90, 105, 135);
-    text(`${defaultCostStr}`, fieldX + 8, costRowY + fieldH / 2);
   }
-  if (typeof textFont === 'function') textFont('sans-serif');
 
+  if (renderStr.length > maxVisChars) {
+    renderStr = '...' + renderStr.substring(renderStr.length - maxVisChars + 3);
+  }
+
+  // Selection highlight
+  if (isFocused) {
+    const cursorIdx = state.activePlayerUpgradeInput?.cursor !== undefined ? state.activePlayerUpgradeInput.cursor : displayBuf.length;
+    const sStart = state.activePlayerUpgradeInput?.selectionStart !== undefined ? state.activePlayerUpgradeInput.selectionStart : cursorIdx;
+    const sEnd = state.activePlayerUpgradeInput?.selectionEnd !== undefined ? state.activePlayerUpgradeInput.selectionEnd : cursorIdx;
+    const minS = Math.min(sStart, sEnd);
+    const maxS = Math.max(sStart, sEnd);
+
+    if (minS !== maxS) {
+      const beforeSel = displayBuf.substring(0, minS);
+      const selPart = displayBuf.substring(minS, maxS);
+      const beforeW = (window as any).textWidth ? (window as any).textWidth(beforeSel) : beforeSel.length * 5.8;
+      const selW = (window as any).textWidth ? (window as any).textWidth(selPart) : selPart.length * 5.8;
+
+      push();
+      fill(0, 120, 200, 150);
+      noStroke();
+      rect(x + 8 + beforeW, y + 4, selW, h - 8, 2);
+      pop();
+    }
+  }
+
+  text(renderStr, x + 8, y + h / 2);
+
+  // Blinking cursor
+  if (isFocused) {
+    const cursorIdx = state.activePlayerUpgradeInput?.cursor !== undefined ? state.activePlayerUpgradeInput.cursor : displayBuf.length;
+    const beforeCursor = displayBuf.substring(0, cursorIdx);
+    const cursorW = (window as any).textWidth ? (window as any).textWidth(beforeCursor) : beforeCursor.length * 5.8;
+    if (Math.floor(Date.now() / 400) % 2 === 0) {
+      stroke(0, 220, 255);
+      strokeWeight(1.5);
+      line(x + 8 + cursorW, y + 5, x + 8 + cursorW, y + h - 5);
+    }
+  }
+
+  if (typeof textFont === 'function') textFont('Viga');
   pop();
 }
 
@@ -744,23 +865,74 @@ export function handlePlayerUpgradesClick(mx: number, my: number, modalX: number
   if (state.isAlmanacEditorMode) {
     initLevelEditorPlayerUpgradesFromData();
 
-    const gridStartX = 20;
-    const gridStartY = 46;
-    const cardGap = 8;
-    const gridW = panelW - 40;
-    const cardW = (gridW - cardGap) / 2;
-    const cardH = 94;
-    const scrollY = state.editorPlayerUpgradesScrollY || 0;
-    const viewportH = panelH - gridStartY - 8;
+    // 1. Header action buttons click check
+    const bannerX = 14;
+    const bannerY = 8;
+    const bannerW = panelW - 28;
+    const btnSetW = 125;
+    const btnResetW = 125;
+    const btnActionH = 24;
+    const btnActionY = bannerY + 8;
+    const btnResetX = bannerX + bannerW - btnResetW - 10;
+    const btnSetX = btnResetX - btnSetW - 8;
 
-    // Check if click is inside grid viewport
-    if (my < globalPanelY + gridStartY || my > globalPanelY + gridStartY + viewportH) {
-      removeDOMInput();
+    const setGX = globalPanelX + btnSetX;
+    const setGY = globalPanelY + btnActionY;
+    if (mx >= setGX && mx <= setGX + btnSetW && my >= setGY && my <= setGY + btnActionH) {
+      for (const key of UPGRADE_KEYS) {
+        const defaultCfg = DEFAULT_PLAYER_UPGRADE_CONFIGS[key];
+        if (defaultCfg && state.levelEditorPlayerUpgrades[key]) {
+          const firstVal = defaultCfg.values?.[0] !== undefined ? defaultCfg.values[0] : 0;
+          const firstCost = defaultCfg.costs?.[0] !== undefined ? defaultCfg.costs[0] : 0;
+          state.levelEditorPlayerUpgrades[key].statStr = String(firstVal);
+          state.levelEditorPlayerUpgrades[key].costStr = String(firstCost);
+          state.levelEditorPlayerUpgrades[key].values = [firstVal];
+          state.levelEditorPlayerUpgrades[key].costs = [firstCost];
+        }
+      }
       state.activePlayerUpgradeInput = null;
+      soundEngine.playSFX('btn_click');
       return true;
     }
 
-    let clickedInputField = false;
+    const resetGX = globalPanelX + btnResetX;
+    const resetGY = globalPanelY + btnActionY;
+    if (mx >= resetGX && mx <= resetGX + btnResetW && my >= resetGY && my <= resetGY + btnActionH) {
+      for (const key of UPGRADE_KEYS) {
+        if (state.levelEditorPlayerUpgrades[key]) {
+          const isDefaultDisabled = DEFAULT_DISABLED_UPGRADES.has(key);
+          state.levelEditorPlayerUpgrades[key].statStr = '';
+          state.levelEditorPlayerUpgrades[key].costStr = '';
+          state.levelEditorPlayerUpgrades[key].enabled = !isDefaultDisabled;
+          state.levelEditorPlayerUpgrades[key].values = undefined;
+          state.levelEditorPlayerUpgrades[key].costs = undefined;
+        }
+      }
+      state.activePlayerUpgradeInput = null;
+      soundEngine.playSFX('btn_click');
+      return true;
+    }
+
+    // 2. Grid items click check
+    const gridStartX = 14;
+    const gridStartY = 54;
+    const cardGap = 8;
+    const gridW = panelW - 28;
+    const cardW = (gridW - cardGap) / 2;
+    const cardH = 98;
+    const scrollY = state.editorPlayerUpgradesScrollY || 0;
+    const viewportH = panelH - gridStartY - 10;
+
+    // Check if click is inside grid viewport
+    if (my < globalPanelY + gridStartY || my > globalPanelY + gridStartY + viewportH) {
+      if (state.activePlayerUpgradeInput) {
+        commitActivePlayerUpgradeInput();
+        state.activePlayerUpgradeInput = null;
+      }
+      return true;
+    }
+
+    let clickedAny = false;
 
     for (let i = 0; i < UPGRADE_KEYS.length; i++) {
       const key = UPGRADE_KEYS[i];
@@ -772,41 +944,49 @@ export function handlePlayerUpgradesClick(mx: number, my: number, modalX: number
       const cardGX = globalPanelX + cardX;
       const cardGY = globalPanelY + cardY + scrollY;
 
-      const editorEntry = state.levelEditorPlayerUpgrades[key] || { statStr: '', costStr: '' };
-      const defaultCfg = DEFAULT_PLAYER_UPGRADE_CONFIGS[key];
+      const editorEntry = state.levelEditorPlayerUpgrades[key] || { statStr: '', costStr: '', enabled: !DEFAULT_DISABLED_UPGRADES.has(key) };
+      const isEnabled = editorEntry.enabled !== undefined ? editorEntry.enabled : !DEFAULT_DISABLED_UPGRADES.has(key);
 
-      const labelX = 10;
-      const labelW = 75;
-      const fieldX = labelX + labelW;
-      const fieldW = cardW - fieldX - 10;
-      const fieldH = 22;
+      // Check ON / OFF Toggle Button
+      const btnW = 68;
+      const btnH = 20;
+      const btnX = cardW - btnW - 10;
+      const btnY = 7;
+      const btnGX = cardGX + btnX;
+      const btnGY = cardGY + btnY;
+
+      if (mx >= btnGX && mx <= btnGX + btnW && my >= btnGY && my <= btnGY + btnH) {
+        editorEntry.enabled = !isEnabled;
+        soundEngine.playSFX('btn_click');
+        clickedAny = true;
+        return true;
+      }
 
       // Check Stat Input Box
-      const statRowY = 36;
+      const fieldX = 10;
+      const fieldW = cardW - 20;
+      const fieldH = 24;
+
+      const statRowY = 32;
       const statGX = cardGX + fieldX;
       const statGY = cardGY + statRowY;
       if (mx >= statGX && mx <= statGX + fieldW && my >= statGY && my <= statGY + fieldH) {
-        state.activePlayerUpgradeInput = { key, field: 'stat' };
-        attachDOMInput({
-          x: statGX,
-          y: statGY,
-          w: fieldW,
-          h: fieldH,
-          value: editorEntry.statStr || '',
-          placeholder: defaultCfg?.values?.join(', ') || '',
-          onChange: (val) => {
-            editorEntry.statStr = val;
-            parseAndSyncPlayerUpgrade(key);
-          },
-          onCommit: (val) => {
-            editorEntry.statStr = val;
-            parseAndSyncPlayerUpgrade(key);
-          },
-          onBlur: () => {
-            state.activePlayerUpgradeInput = null;
-          }
-        });
-        clickedInputField = true;
+        commitActivePlayerUpgradeInput();
+        const initialStr = editorEntry.statStr || '';
+        const approxCharW = 5.8;
+        const relX = mx - (statGX + 8);
+        const clickedIdx = Math.max(0, Math.min(initialStr.length, Math.round(relX / approxCharW)));
+
+        state.activePlayerUpgradeInput = {
+          key,
+          field: 'stat',
+          textBuffer: initialStr,
+          cursor: clickedIdx,
+          selectionStart: clickedIdx,
+          selectionEnd: clickedIdx,
+          isDragging: true
+        };
+        clickedAny = true;
         return true;
       }
 
@@ -815,40 +995,48 @@ export function handlePlayerUpgradesClick(mx: number, my: number, modalX: number
       const costGX = cardGX + fieldX;
       const costGY = cardGY + costRowY;
       if (mx >= costGX && mx <= costGX + fieldW && my >= costGY && my <= costGY + fieldH) {
-        state.activePlayerUpgradeInput = { key, field: 'cost' };
-        attachDOMInput({
-          x: costGX,
-          y: costGY,
-          w: fieldW,
-          h: fieldH,
-          value: editorEntry.costStr || '',
-          placeholder: defaultCfg?.costs?.join(', ') || '',
-          onChange: (val) => {
-            editorEntry.costStr = val;
-            parseAndSyncPlayerUpgrade(key);
-          },
-          onCommit: (val) => {
-            editorEntry.costStr = val;
-            parseAndSyncPlayerUpgrade(key);
-          },
-          onBlur: () => {
-            state.activePlayerUpgradeInput = null;
-          }
-        });
-        clickedInputField = true;
+        commitActivePlayerUpgradeInput();
+        const initialStr = editorEntry.costStr || '';
+        const approxCharW = 5.8;
+        const relX = mx - (costGX + 8);
+        const clickedIdx = Math.max(0, Math.min(initialStr.length, Math.round(relX / approxCharW)));
+
+        state.activePlayerUpgradeInput = {
+          key,
+          field: 'cost',
+          textBuffer: initialStr,
+          cursor: clickedIdx,
+          selectionStart: clickedIdx,
+          selectionEnd: clickedIdx,
+          isDragging: true
+        };
+        clickedAny = true;
         return true;
       }
     }
 
-    if (!clickedInputField) {
-      removeDOMInput();
+    if (!clickedAny && state.activePlayerUpgradeInput) {
+      commitActivePlayerUpgradeInput();
       state.activePlayerUpgradeInput = null;
     }
     return true;
   }
 
-  // Normal gameplay mode clicks are handled by immediate-mode hitboxes registered by drawButton.
   return true;
+}
+
+function commitActivePlayerUpgradeInput() {
+  if (!state.activePlayerUpgradeInput) return;
+  const { key, field, textBuffer } = state.activePlayerUpgradeInput;
+  if (!state.levelEditorPlayerUpgrades?.[key]) return;
+
+  const entry = state.levelEditorPlayerUpgrades[key];
+  if (field === 'stat') {
+    entry.statStr = textBuffer;
+  } else {
+    entry.costStr = textBuffer;
+  }
+  parseAndSyncPlayerUpgrade(key);
 }
 
 /**
@@ -878,58 +1066,67 @@ export function handlePlayerUpgradeKeyInput(inputKey: string, keyCode: number, e
 
   const { key: uKey, field } = state.activePlayerUpgradeInput;
   if (!state.levelEditorPlayerUpgrades[uKey]) {
-    state.levelEditorPlayerUpgrades[uKey] = { statStr: '', costStr: '', values: undefined, costs: undefined };
+    state.levelEditorPlayerUpgrades[uKey] = {
+      statStr: '',
+      costStr: '',
+      enabled: !DEFAULT_DISABLED_UPGRADES.has(uKey),
+      values: undefined,
+      costs: undefined
+    };
   }
 
-  const entry = state.levelEditorPlayerUpgrades[uKey];
-  const str = (field === 'stat' ? entry.statStr : entry.costStr) || '';
-
-  let cur = Math.max(0, Math.min(str.length, state.activePlayerUpgradeInput.cursor ?? str.length));
-  let sStart = Math.max(0, Math.min(str.length, state.activePlayerUpgradeInput.selectionStart ?? cur));
-  let sEnd = Math.max(0, Math.min(str.length, state.activePlayerUpgradeInput.selectionEnd ?? cur));
+  let buf = state.activePlayerUpgradeInput.textBuffer ?? (field === 'stat' ? state.levelEditorPlayerUpgrades[uKey].statStr : state.levelEditorPlayerUpgrades[uKey].costStr) ?? '';
+  let cur = Math.max(0, Math.min(buf.length, state.activePlayerUpgradeInput.cursor ?? buf.length));
+  let sStart = Math.max(0, Math.min(buf.length, state.activePlayerUpgradeInput.selectionStart ?? cur));
+  let sEnd = Math.max(0, Math.min(buf.length, state.activePlayerUpgradeInput.selectionEnd ?? cur));
   const selMin = Math.min(sStart, sEnd);
   const selMax = Math.max(sStart, sEnd);
   const hasSelection = selMin < selMax;
 
   if (keyCode === 27 || keyCode === 13) {
-    parseAndSyncPlayerUpgrade(uKey);
+    commitActivePlayerUpgradeInput();
     state.activePlayerUpgradeInput = null;
     return true;
   }
 
+  // Tab key cycles through fields
   if (keyCode === 9) {
-    parseAndSyncPlayerUpgrade(uKey);
+    commitActivePlayerUpgradeInput();
     const keyIdx = UPGRADE_KEYS.indexOf(uKey);
     if (field === 'stat') {
-      const nextStr = entry.costStr || '';
+      const nextBuf = state.levelEditorPlayerUpgrades[uKey]?.costStr || '';
       state.activePlayerUpgradeInput = {
         key: uKey,
         field: 'cost',
-        cursor: nextStr.length,
+        textBuffer: nextBuf,
+        cursor: nextBuf.length,
         selectionStart: 0,
-        selectionEnd: nextStr.length
+        selectionEnd: nextBuf.length
       };
     } else {
       const nextKey = UPGRADE_KEYS[(keyIdx + 1) % UPGRADE_KEYS.length];
-      const nextStr = state.levelEditorPlayerUpgrades[nextKey]?.statStr || '';
+      const nextBuf = state.levelEditorPlayerUpgrades[nextKey]?.statStr || '';
       state.activePlayerUpgradeInput = {
         key: nextKey,
         field: 'stat',
-        cursor: nextStr.length,
+        textBuffer: nextBuf,
+        cursor: nextBuf.length,
         selectionStart: 0,
-        selectionEnd: nextStr.length
+        selectionEnd: nextBuf.length
       };
     }
     return true;
   }
 
+  // Ctrl+A / Cmd+A
   if ((event?.ctrlKey || event?.metaKey) && (inputKey === 'a' || inputKey === 'A' || keyCode === 65)) {
     state.activePlayerUpgradeInput.selectionStart = 0;
-    state.activePlayerUpgradeInput.selectionEnd = str.length;
-    state.activePlayerUpgradeInput.cursor = str.length;
+    state.activePlayerUpgradeInput.selectionEnd = buf.length;
+    state.activePlayerUpgradeInput.cursor = buf.length;
     return true;
   }
 
+  // Left Arrow
   if (keyCode === 37) {
     if (event?.shiftKey) {
       const next = Math.max(0, sEnd - 1);
@@ -944,13 +1141,14 @@ export function handlePlayerUpgradeKeyInput(inputKey: string, keyCode: number, e
     return true;
   }
 
+  // Right Arrow
   if (keyCode === 39) {
     if (event?.shiftKey) {
-      const next = Math.min(str.length, sEnd + 1);
+      const next = Math.min(buf.length, sEnd + 1);
       state.activePlayerUpgradeInput.selectionEnd = next;
       state.activePlayerUpgradeInput.cursor = next;
     } else {
-      const target = hasSelection ? selMax : Math.min(str.length, cur + 1);
+      const target = hasSelection ? selMax : Math.min(buf.length, cur + 1);
       state.activePlayerUpgradeInput.cursor = target;
       state.activePlayerUpgradeInput.selectionStart = target;
       state.activePlayerUpgradeInput.selectionEnd = target;
@@ -958,91 +1156,55 @@ export function handlePlayerUpgradeKeyInput(inputKey: string, keyCode: number, e
     return true;
   }
 
-  if (keyCode === 36) {
-    if (event?.shiftKey) {
-      state.activePlayerUpgradeInput.selectionEnd = 0;
-      state.activePlayerUpgradeInput.cursor = 0;
-    } else {
-      state.activePlayerUpgradeInput.cursor = 0;
-      state.activePlayerUpgradeInput.selectionStart = 0;
-      state.activePlayerUpgradeInput.selectionEnd = 0;
-    }
-    return true;
-  }
-
-  if (keyCode === 35) {
-    if (event?.shiftKey) {
-      state.activePlayerUpgradeInput.selectionEnd = str.length;
-      state.activePlayerUpgradeInput.cursor = str.length;
-    } else {
-      state.activePlayerUpgradeInput.cursor = str.length;
-      state.activePlayerUpgradeInput.selectionStart = str.length;
-      state.activePlayerUpgradeInput.selectionEnd = str.length;
-    }
-    return true;
-  }
-
+  // Backspace
   if (keyCode === 8) {
-    let newStr = str;
-    let newCur = cur;
     if (hasSelection) {
-      newStr = str.slice(0, selMin) + str.slice(selMax);
-      newCur = selMin;
+      buf = buf.substring(0, selMin) + buf.substring(selMax);
+      cur = selMin;
     } else if (cur > 0) {
-      newStr = str.slice(0, cur - 1) + str.slice(cur);
-      newCur = cur - 1;
+      buf = buf.substring(0, cur - 1) + buf.substring(cur);
+      cur--;
     }
-    if (field === 'stat') entry.statStr = newStr;
-    else entry.costStr = newStr;
-
-    state.activePlayerUpgradeInput.cursor = newCur;
-    state.activePlayerUpgradeInput.selectionStart = newCur;
-    state.activePlayerUpgradeInput.selectionEnd = newCur;
-    parseAndSyncPlayerUpgrade(uKey);
+    state.activePlayerUpgradeInput.textBuffer = buf;
+    state.activePlayerUpgradeInput.cursor = cur;
+    state.activePlayerUpgradeInput.selectionStart = cur;
+    state.activePlayerUpgradeInput.selectionEnd = cur;
+    commitActivePlayerUpgradeInput();
     return true;
   }
 
+  // Delete
   if (keyCode === 46) {
-    let newStr = str;
-    let newCur = cur;
     if (hasSelection) {
-      newStr = str.slice(0, selMin) + str.slice(selMax);
-      newCur = selMin;
-    } else if (cur < str.length) {
-      newStr = str.slice(0, cur) + str.slice(cur + 1);
-      newCur = cur;
+      buf = buf.substring(0, selMin) + buf.substring(selMax);
+      cur = selMin;
+    } else if (cur < buf.length) {
+      buf = buf.substring(0, cur) + buf.substring(cur + 1);
     }
-    if (field === 'stat') entry.statStr = newStr;
-    else entry.costStr = newStr;
-
-    state.activePlayerUpgradeInput.cursor = newCur;
-    state.activePlayerUpgradeInput.selectionStart = newCur;
-    state.activePlayerUpgradeInput.selectionEnd = newCur;
-    parseAndSyncPlayerUpgrade(uKey);
+    state.activePlayerUpgradeInput.textBuffer = buf;
+    state.activePlayerUpgradeInput.cursor = cur;
+    state.activePlayerUpgradeInput.selectionStart = cur;
+    state.activePlayerUpgradeInput.selectionEnd = cur;
+    commitActivePlayerUpgradeInput();
     return true;
   }
 
+  // Printable characters (digits, comma, space, period, percent, minus)
   if (inputKey && inputKey.length === 1 && !event?.ctrlKey && !event?.metaKey) {
-    if (/^[0-9.,\s\-+%\/\[\]"']$/.test(inputKey)) {
-      let newStr = str;
-      let newCur = cur;
-      if (hasSelection) {
-        newStr = str.slice(0, selMin) + inputKey + str.slice(selMax);
-        newCur = selMin + 1;
-      } else {
-        newStr = str.slice(0, cur) + inputKey + str.slice(cur);
-        newCur = cur + 1;
-      }
-      if (field === 'stat') entry.statStr = newStr;
-      else entry.costStr = newStr;
-
-      state.activePlayerUpgradeInput.cursor = newCur;
-      state.activePlayerUpgradeInput.selectionStart = newCur;
-      state.activePlayerUpgradeInput.selectionEnd = newCur;
-      parseAndSyncPlayerUpgrade(uKey);
-      return true;
+    if (hasSelection) {
+      buf = buf.substring(0, selMin) + inputKey + buf.substring(selMax);
+      cur = selMin + 1;
+    } else {
+      buf = buf.substring(0, cur) + inputKey + buf.substring(cur);
+      cur++;
     }
+    state.activePlayerUpgradeInput.textBuffer = buf;
+    state.activePlayerUpgradeInput.cursor = cur;
+    state.activePlayerUpgradeInput.selectionStart = cur;
+    state.activePlayerUpgradeInput.selectionEnd = cur;
+    commitActivePlayerUpgradeInput();
+    return true;
   }
 
-  return true;
+  return false;
 }

@@ -206,9 +206,7 @@ export function drawBatchedBullets(bullets: any[], vp: any) {
 
   // 2. Render Arc Bullets Pass (Shadows first, then elevated bodies)
   if (arcBullets.length > 0) {
-    // Ground shadows batch
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-    ctx.beginPath();
+    // Ground shadows batch (rendered individually or with proper arc closing to avoid glitchy triangle artifacts from overlapping compound paths)
     for (const b of arcBullets) {
       const travelTime = b.config.highArcConfig.arcTravelTime || 60;
       const progress = 1.0 - (b.life / travelTime);
@@ -217,9 +215,13 @@ export function drawBatchedBullets(bullets: any[], vp: any) {
       const bSize = b.config.bulletSize || 8;
       const rx = (bSize * 1.5 * shadowScale) || 8;
       const ry = (bSize * 0.75 * shadowScale) || 4;
+      const shadowAlpha = 0.2 * (1.0 - arcVisualOffset * 0.4);
+
+      ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+      ctx.beginPath();
       ctx.ellipse(b.pos.x, b.pos.y, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
     }
-    ctx.fill();
 
     // Elevated bodies
     for (const b of arcBullets) {

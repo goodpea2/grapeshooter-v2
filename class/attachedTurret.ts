@@ -12,6 +12,7 @@ import { Enemy } from './enemy';
 import { drawTurret, drawTurretUI } from '../visualTurrets';
 import { TURRET_RECIPES } from '../dictionaryTurretMerging';
 import { requestFlungSpawn } from '../lvDemo';
+import { isEnemyObstacle } from './turret';
 
 declare const p5: any;
 declare const createVector: any;
@@ -33,6 +34,8 @@ declare const line: any;
 declare const stroke: any;
 declare const strokeWeight: any;
 
+import { createAttachedTurret } from './turret/TurretRegistry';
+import { triggerUpgradeHook, recalculateAllStats } from '../src/upgrades';
 import { Turret } from './turret';
 
 export class AttachedTurret extends Turret {
@@ -258,28 +261,35 @@ export class AttachedTurret extends Turret {
     const nextX = this.pos.x + this.vel.x;
     const nextY = this.pos.y + this.vel.y;
     
-    // Collision-aware position update
-    if (!state.world.isBlockAt(nextX, this.pos.y)) {
+    // When moving, turrets are non-collidable with blocks so they follow smoothly
+    if (this.isMoving()) {
       this.pos.x = nextX;
-    } else {
-      this.vel.x *= -0.2;
-    }
-    
-    if (!state.world.isBlockAt(this.pos.x, nextY)) {
       this.pos.y = nextY;
     } else {
-      this.vel.y *= -0.2;
+      if (!state.world.isBlockAt(nextX, this.pos.y)) {
+        this.pos.x = nextX;
+      } else {
+        this.vel.x *= -0.2;
+      }
+      
+      if (!state.world.isBlockAt(this.pos.x, nextY)) {
+        this.pos.y = nextY;
+      } else {
+        this.vel.y *= -0.2;
+      }
     }
   }
 
   replaceWith(type: string) {
-    const newTurret = new AttachedTurret(type, this.parent, this.hq, this.hr);
+    const newTurret = createAttachedTurret(type, this.parent, this.hq, this.hr);
     newTurret.pos = this.pos.copy();
     newTurret.vel = this.vel.copy();
     const index = this.parent.attachments.indexOf(this);
     if (index !== -1) {
       this.parent.attachments[index] = newTurret;
     }
+    triggerUpgradeHook('onPlant', newTurret, { isAttached: true, pos: newTurret.getWorldPos() });
+    recalculateAllStats();
   }
 
   isPowered(): boolean {
@@ -447,10 +457,8 @@ export class AttachedTurret extends Turret {
       state.world.chunks.forEach((chunk: any) => {
         const cw = CHUNK_SIZE * GRID_SIZE; const dx = (chunk.cx * cw + cw/2) - wPos.x; const dy = (chunk.cy * cw + cw/2) - wPos.y;
         if (dx*dx + dy*dy > (range + cw)**2) return;
-        chunk.overlayBlocks.forEach((b: any) => {
-           if (b.isMined || !b.overlay) return;
-           const oCfg = overlayTypes[b.overlay];
-           if (oCfg?.isEnemy) {
+        chunk.overlayBlocks?.forEach((b: any) => {
+           if (isEnemyObstacle(b)) {
               const bx = b.pos.x + GRID_SIZE/2; const by = b.pos.y + GRID_SIZE/2;
               const dSq = (wPos.x - bx)**2 + (wPos.y - by)**2;
               if (dSq <= rangeSq && state.world.checkLOS(wPos.x, wPos.y, bx, by)) results.push(b);
@@ -471,6 +479,9 @@ export class AttachedTurret extends Turret {
       });
     }
     results.sort((a, b) => { 
+      const aIsObs = isEnemyObstacle(a) || a.gx !== undefined;
+      const bIsObs = isEnemyObstacle(b) || b.gx !== undefined;
+      if (aIsObs !== bIsObs) return aIsObs ? 1 : -1;
       const posA = a.getWorldPos ? a.getWorldPos() : (a.gx !== undefined ? createVector(a.gx * GRID_SIZE + GRID_SIZE/2, a.gy * GRID_SIZE + GRID_SIZE/2) : a.pos); 
       const posB = b.getWorldPos ? b.getWorldPos() : (b.gx !== undefined ? createVector(b.gx * GRID_SIZE + GRID_SIZE/2, b.gy * GRID_SIZE + GRID_SIZE/2) : b.pos); 
       const dSqA = (wPos.x - posA.x)**2 + (wPos.y - posA.y)**2; 

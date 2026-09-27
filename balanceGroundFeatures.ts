@@ -15,7 +15,7 @@ export const groundFeatureTypes: any = {
     tickRate: 15,
     vfxType: 'fire_puddle',
     color: [255, 100, 50],
-    appliedCondition: [{ type: 'c_burning', duration: 60, damageConfig: { enemy: 5, turret: 1, player: 1 } }]
+    appliedCondition: [{ type: 'c_burning', duration: 60, damageConfig: { enemy: 5, turret: 0, player: 0 } }]
   },
   gf_fire_firepeat3: {
     name: 'T3 Fire Puddle',
@@ -30,11 +30,11 @@ export const groundFeatureTypes: any = {
     tickRate: 15,
     vfxType: 'fire_puddle',
     color: [255, 120, 0],
-    appliedCondition: [{ type: 'c_burning', duration: 60, damageConfig: { enemy: 5, turret: 1, player: 1 } }]
+    appliedCondition: [{ type: 'c_burning', duration: 60, damageConfig: { enemy: 5, turret: 0, player: 0 } }]
   },
   gf_fire_flamethrower: {
     name: 'Flamethrower Fire',
-    life: 60,
+    life: 180,
     radius: 20,
     damageConfig: {
       enemy: 0,

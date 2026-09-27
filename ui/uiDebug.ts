@@ -21,10 +21,12 @@ import { uiComponentsShowcase } from './uiComponentsShowcase';
 import { drawButton, drawDarkButton, drawGreenButton, drawCyanButton, drawRedButton, registerUIHitbox } from '../uiComponents';
 import { poolRegistry } from '../class/pool';
 import { soundEngine } from '../src/audio/soundEngine';
+import { generateUpgradeOptions } from './almanac/turretUnlockTree';
 
 // p5.js global variable declarations
 declare const floor: any;
 declare const frameRate: any;
+declare const frameCount: any;
 declare const push: any;
 declare const pop: any;
 declare const fill: any;
@@ -478,9 +480,19 @@ export function drawDebugPanel(spawnFromBudget: Function) {
           if (!state.unlockedTurrets.includes(key)) state.unlockedTurrets.push(key);
         });
       }, grid: true },
-      { l: "RESET UPGRADES", a: () => {
-        state.turretUpgrades = {};
-        recalculateAllStats();
+      { l: "RollTurretUpgrade", a: () => {
+        let options = generateUpgradeOptions(true);
+        if (options.length === 0) {
+          options = generateUpgradeOptions(false);
+        }
+        if (options.length > 0) {
+          state.turretUnlockChoiceModal = {
+            type: 'upgrade',
+            nodeId: 'debug_node',
+            options,
+            openedAtFrame: typeof frameCount !== 'undefined' ? frameCount : (state.frames || 0)
+          };
+        }
       }, grid: true },
       { l: "Turret Gizmo", v: state.debugGizmosTurrets, a: () => state.debugGizmosTurrets = !state.debugGizmosTurrets, type: 'toggle', grid: true },
       { l: "DrawTurretPath", v: state.debugDrawTurretPath, a: () => state.debugDrawTurretPath = !state.debugDrawTurretPath, type: 'toggle', grid: true },

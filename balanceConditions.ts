@@ -33,6 +33,11 @@ export const conditionTypes: any = {
       override: ['c_chilled', 'c_burning', 'c_stun']
     }
   },
+  c_inactive: {
+    name: 'Inactive',
+    conditionVfx: '',
+    turretDisabled: true
+  },
   c_raged: {
     name: 'Raged',
     conditionVfx: 'condition_raged',
@@ -68,5 +73,11 @@ export const conditionTypes: any = {
     conditionVfx: 'condition_fireRateUp',
     firerateBoost: 0.25,
     visualFlashColor: [255, 230, 80]
+  },
+  c_weakbody: {
+    name: 'Weakbody',
+    conditionVfx: 'condition_weakbody',
+    damageTakenMultiplier: 2.0,
+    visualFlashColor: [200, 100, 255]
   }
 };

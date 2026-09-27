@@ -123,3 +123,17 @@ export function spawnGreenEssenceVFX(startX: number, startY: number, targetX: nu
   state.vfx.push(vfx);
   return vfx;
 }
+
+export function spawnGreenEssenseVfx(startX: number, startY: number, target: any, onArrival?: () => void): GreenEssenceVFX {
+  let tx = startX;
+  let ty = startY;
+  let targetTurret = undefined;
+  if (target && typeof target === 'object') {
+    targetTurret = target;
+    const p = target.getWorldPos ? target.getWorldPos() : (target.pos || target);
+    tx = p.x ?? startX;
+    ty = p.y ?? startY;
+  }
+  return spawnGreenEssenceVFX(startX, startY, tx, ty, onArrival, targetTurret);
+}
+

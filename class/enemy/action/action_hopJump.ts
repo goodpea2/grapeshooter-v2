@@ -77,27 +77,65 @@ export class ActionHopJump extends EnemyAction {
     // Resting phase
     this.restTimer--;
     if (this.restTimer <= 0) {
-      // Find closest target between player and active turrets
-      let targetPos = playerPos;
-      let minDist = dist(enemy.pos.x, enemy.pos.y, playerPos.x, playerPos.y);
+      const isHypnotized = enemy.conditions.has('c_hypnotized');
+      let targetPos: any = null;
 
-      const targetTurrets: any[] = [];
-      if (Array.isArray(turrets)) {
-        targetTurrets.push(...turrets);
-      } else if (state.player?.attachments && Array.isArray(state.player.attachments)) {
-        targetTurrets.push(...state.player.attachments);
-      }
-
-      for (const t of targetTurrets) {
-        if (!t || t.health <= 0) continue;
-        const tw = t.getWorldPos ? t.getWorldPos() : t.pos;
-        if (!tw) continue;
-        const td = dist(enemy.pos.x, enemy.pos.y, tw.x, tw.y);
-        if (td < minDist) {
-          minDist = td;
-          targetPos = tw;
+      if (enemy.target && !enemy.target.isDying && (enemy.target.health === undefined || enemy.target.health > 0) && !enemy.target.isMined) {
+        if (typeof enemy.target.getWorldPos === 'function') {
+          targetPos = enemy.target.getWorldPos();
+        } else if (enemy.target.pos) {
+          targetPos = {
+            x: enemy.target.pos.x + (enemy.target.overlay ? GRID_SIZE / 2 : 0),
+            y: enemy.target.pos.y + (enemy.target.overlay ? GRID_SIZE / 2 : 0)
+          };
+        } else {
+          targetPos = enemy.target;
         }
       }
+
+      if (!targetPos) {
+        if (isHypnotized) {
+          // If hypnotized with no hostile targets, hop away from player
+          if (state.player) {
+            const dx = enemy.pos.x - state.player.pos.x;
+            const dy = enemy.pos.y - state.player.pos.y;
+            const len = Math.hypot(dx, dy) || 1;
+            targetPos = {
+              x: enemy.pos.x + (dx / len) * (this.maxHopTiles * GRID_SIZE),
+              y: enemy.pos.y + (dy / len) * (this.maxHopTiles * GRID_SIZE)
+            };
+          }
+        } else {
+          // Find closest target between player and active turrets
+          targetPos = playerPos;
+          let minDist = dist(enemy.pos.x, enemy.pos.y, playerPos.x, playerPos.y);
+
+          const targetTurrets: any[] = [];
+          if (Array.isArray(turrets)) {
+            targetTurrets.push(...turrets);
+          } else if (state.player?.attachments && Array.isArray(state.player.attachments)) {
+            targetTurrets.push(...state.player.attachments);
+          }
+
+          for (const t of targetTurrets) {
+            if (!t || t.health <= 0) continue;
+            const tw = t.getWorldPos ? t.getWorldPos() : t.pos;
+            if (!tw) continue;
+            const td = dist(enemy.pos.x, enemy.pos.y, tw.x, tw.y);
+            if (td < minDist) {
+              minDist = td;
+              targetPos = tw;
+            }
+          }
+        }
+      }
+
+      if (!targetPos) {
+        this.restTimer = this.rollRestFrames();
+        return;
+      }
+
+      const minDist = dist(enemy.pos.x, enemy.pos.y, targetPos.x, targetPos.y);
 
       // Calculate hop trajectory towards target
       const ang = atan2(targetPos.y - enemy.pos.y, targetPos.x - enemy.pos.x);
@@ -133,13 +171,14 @@ export class ActionHopJump extends EnemyAction {
     const enemy = this.enemy;
     const bulletKey = this.landingBulletKey || 'b_hopper_slam';
 
-    // Spawn landing impact bullet (deals 5 damage, 2 tiles AOE to player, turrets, and obstacles)
+    // Spawn landing impact bullet (deals damage in an AOE)
     const b = Bullet.create(enemy.pos.x, enemy.pos.y, enemy.pos.x, enemy.pos.y, bulletKey, 'none', enemy);
     b.life = 0;
     if (enemy.conditions.has('c_hypnotized')) {
-      b.damageTargets = ['enemy', 'obstacle'];
+      b.damageTargets = ['enemy', 'obstacle', 'icecube'];
       state.bullets.push(b);
     } else {
+      b.damageTargets = ['player', 'turret', 'obstacle', 'icecube'];
       state.enemyBullets.push(b);
     }
     b.explode();

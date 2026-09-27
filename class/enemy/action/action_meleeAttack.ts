@@ -3,6 +3,7 @@ import { state } from '../../../state';
 import { AttachedTurret } from '../../attachedTurret';
 import { WorldTurret } from '../../worldTurret';
 import { spawnHitSpark, spawnExplosion } from '../../../vfx/index';
+import { soundEngine } from '../../../src/audio/soundEngine';
 
 declare const p5: any;
 declare const sin: any;
@@ -133,7 +134,12 @@ export class ActionMeleeAttack extends EnemyAction {
     const strikeRange = enemy.size * 0.5 + targetRadius + 20;
 
     if (distToStrike < strikeRange) {
+      if (enemy.target.isCollidable && !enemy.target.isCollidable()) return;
+      const isTurretTarget = enemy.target instanceof AttachedTurret || enemy.target instanceof WorldTurret || (enemy.target.type !== undefined && enemy.target.isAttachedToPlayer !== undefined);
       enemy.target.takeDamage(enemy.actionConfig.damage);
+      if (isTurretTarget) {
+        soundEngine.playSFXGroup('turret_bitten_softbody');
+      }
       if (state.frames % 5 === 0) state.vfx.push(spawnHitSpark(strikePos.x, strikePos.y, [255, 50, 50]));
 
       if (enemy.type === 'e_giant' || enemy.type === 'e_shooting_giant' || enemy.type === 'e_snowthrower_giant') {

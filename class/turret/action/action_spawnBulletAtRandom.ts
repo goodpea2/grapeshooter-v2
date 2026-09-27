@@ -2,6 +2,7 @@
 import { state } from '../../../state';
 import { TurretAction } from '../../turretAction';
 import { Bullet } from '../../bullet';
+import { spawnLootAt } from '../../../economy';
 
 declare const random: any;
 declare const floor: any;
@@ -15,7 +16,8 @@ export class ActionSpawnBulletAtRandom extends TurretAction {
     const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const type = 'spawnBulletAtRandom';
     let lastFire = this.turret.actionTimers.get(type) || 0;
-    const fireRate = config.spawnBulletAtRandom?.cooldown || 60;
+    const armingMult = 1 + (this.turret.activeStats?.armingTimeMult || this.turret.stats?.armingTimeMult || 0);
+    const fireRate = (config.spawnBulletAtRandom?.cooldown || 60) * Math.max(0.1, armingMult);
     return state.frames - lastFire >= fireRate;
   }
 
@@ -66,6 +68,12 @@ export class ActionSpawnBulletAtRandom extends TurretAction {
       let b = Bullet.create(wPos.x, wPos.y, tx, ty, sbc.bulletKey, 'none', this.turret); 
       (b as any).targetPos = createVector(tx, ty);
       state.bullets.push(b);
+      if (this.turret.type === 't2_minespawner' && (state.turretUpgrades?.['t2_minespawner'] || []).includes('u_t2_minespawner_2')) {
+        const count = (state.turretUpgrades?.['t2_minespawner'] || []).filter((id: string) => id === 'u_t2_minespawner_2').length;
+        for (let i = 0; i < Math.max(1, count); i++) {
+          spawnLootAt(wPos.x, wPos.y, 'sun');
+        }
+      }
       if (this.turret.isCharged && this.turret.isCharged()) {
         const stamCost = config.staminaCostPerBulletSpawned || config.StaminaCostPerBulletSpawned || 0;
         if (stamCost > 0 && state.player) {

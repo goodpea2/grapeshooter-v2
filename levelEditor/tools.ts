@@ -185,7 +185,7 @@ export function placeSelectedItem(mWorldX: number, mWorldY: number) {
         const minHealth = activeConfig.minHealth !== undefined ? activeConfig.minHealth : (activeConfig.health !== undefined ? activeConfig.health : (oCfg?.minHealth ?? 300));
         const obstacleHealth = block.config?.health || block.health || 0;
         const finalHealth = Math.max(minHealth, obstacleHealth);
-        block.customSpawnerConfig = {
+        block.setCustomSpawnerConfig({
           name: activeName,
           budget: activeConfig.budget !== undefined ? activeConfig.budget : (block.spawnerBudget || 60),
           enemyTypeKey: activeConfig.enemyTypeKey ? [...activeConfig.enemyTypeKey] : ['e_basic'],
@@ -193,11 +193,9 @@ export function placeSelectedItem(mWorldX: number, mWorldY: number) {
           spawnTriggerRadius: activeConfig.spawnTriggerRadius !== undefined ? activeConfig.spawnTriggerRadius : 200,
           spawnInterval: activeConfig.spawnInterval !== undefined ? activeConfig.spawnInterval : 60,
           minHealth: minHealth,
-          health: finalHealth
-        };
-        block.spawnerBudget = block.customSpawnerConfig.budget;
-        block.health = finalHealth;
-        block.maxHealth = finalHealth;
+          health: finalHealth,
+          ...(activeConfig.hourlySpawnConfig ? { hourlySpawnConfig: JSON.parse(JSON.stringify(activeConfig.hourlySpawnConfig)) } : {})
+        });
       }
 
       if (key === 'sunGenerator') {
@@ -258,7 +256,7 @@ export function placeSelectedItem(mWorldX: number, mWorldY: number) {
       const copiedCfg = state.levelEditor.copiedSpawnerConfig;
       const activeConfig = copiedCfg ? copiedCfg : ((tip && (tip.key === key || tip.targetBlock)) ? tip.config : (lCfg?.enemySpawnConfig || {}));
       const activeName = copiedCfg?.name || ((tip && (tip.key === key || tip.targetBlock)) ? tip.name : (lCfg?.name || 'Ground Spawner'));
-      block.customSpawnerConfig = {
+      block.setCustomSpawnerConfig({
         name: activeName,
         enemyTypeKey: activeConfig.enemyTypeKey ? [...activeConfig.enemyTypeKey] : ['e_basic'],
         spawnRadius: activeConfig.spawnRadius !== undefined ? activeConfig.spawnRadius : 120,
@@ -271,7 +269,7 @@ export function placeSelectedItem(mWorldX: number, mWorldY: number) {
           hourlyBudgetMultiplierForFollowingDay: 1.25,
           selfDestructAfterBudgetSpawned: 0
         }
-      };
+      });
       block.lastSpawnTime = state.frames + Math.floor(Math.random() * (block.customSpawnerConfig.spawnInterval || 60));
     }
     const cx = floor(gx / CHUNK_SIZE);

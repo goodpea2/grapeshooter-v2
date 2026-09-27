@@ -5,6 +5,7 @@ import { TYPE_MAP, drawTurretSprite } from '../../assetTurret';
 import { CLASS_ICON_MAP } from '../UITurretTooltip';
 import { TURRET_RECIPES } from '../../dictionaryTurretMerging';
 import { AlmanacProgression, getActiveAlmanacProgression, getTurretProgressionState, cycleTurretProgressionState } from '../../lvDemo';
+import { applyHoverTransform } from '../../uiComponents';
 
 declare const push: any;
 declare const pop: any;
@@ -51,14 +52,13 @@ export function drawTurretList(x: number, y: number, w: number, h: number, modal
       turretTypes[k].tier > 0 || turretTypes[k].isSpecial
     );
   } else {
-    const banned = new Set(prog.BannedTurrets || []);
     const validTurrets = new Set([
       ...(prog.StartingTurret || []),
       ...(prog.UnlockedByDiscoverTurret || []),
       ...(prog.LockedTurret || []).map((t: any) => typeof t === 'string' ? t : t.type)
     ]);
     turrets = Object.keys(turretTypes).filter(k => 
-      (turretTypes[k].tier > 0 || turretTypes[k].isSpecial) && validTurrets.has(k) && !banned.has(k)
+      (turretTypes[k].tier > 0 || turretTypes[k].isSpecial) && validTurrets.has(k)
     );
   }
   
@@ -188,6 +188,7 @@ function drawTurretGridItem(x: number, y: number, key: string, parentX: number, 
 
   push();
   translate(x, y);
+  applyHoverTransform(`almanac_turret_${key}`, 0, 0, hov, { elevation: 4.0, scale: 0.04 });
 
   // Podium with depth and shadow
   push();
@@ -350,14 +351,13 @@ export function getTurretY(targetKey: string): number {
       turretTypes[k].tier > 0 || turretTypes[k].isSpecial
     );
   } else {
-    const banned = new Set(prog.BannedTurrets || []);
     const validTurrets = new Set([
       ...(prog.StartingTurret || []),
       ...(prog.UnlockedByDiscoverTurret || []),
       ...(prog.LockedTurret || []).map((t: any) => typeof t === 'string' ? t : t.type)
     ]);
     turrets = Object.keys(turretTypes).filter(k => 
-      (turretTypes[k].tier > 0 || turretTypes[k].isSpecial) && validTurrets.has(k) && !banned.has(k)
+      (turretTypes[k].tier > 0 || turretTypes[k].isSpecial) && validTurrets.has(k)
     );
   }
   

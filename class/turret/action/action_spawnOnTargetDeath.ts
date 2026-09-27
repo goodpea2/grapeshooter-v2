@@ -2,6 +2,7 @@
 import { state } from '../../../state';
 import { TurretAction } from '../../turretAction';
 import { Bullet } from '../../bullet';
+import { GRID_SIZE } from '../../../constants';
 
 declare const createVector: any;
 declare const random: any;
@@ -31,14 +32,14 @@ export class ActionSpawnOnTargetDeath extends TurretAction {
     if (target && (target.gx !== undefined || target.isMined !== undefined || target.overlay !== undefined)) {
       return;
     }
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig();
     const vConfig = config.spawnOnTargetDeathConfig;
     if (!vConfig) return;
     this.spawnBullets(target, vConfig);
   }
 
   onTargetMined(target: any, context?: any) {
-    const config = this.turret.config.actionConfig;
+    const config = this.turret.getActiveActionConfig();
     const vConfig = config.spawnOnTargetDeathConfig;
     if (!vConfig || !vConfig.triggerOnMine) return;
     this.spawnBullets(target, vConfig);
@@ -50,7 +51,7 @@ export class ActionSpawnOnTargetDeath extends TurretAction {
     }
 
     const wPos = this.turret.getWorldPos();
-    const tc = target.getWorldPos ? target.getWorldPos() : (target.gx !== undefined ? createVector(target.gx * 40 + 20, target.gy * 40 + 20) : (target.pos ? target.pos.copy() : null));
+    const tc = target.getWorldPos ? target.getWorldPos() : (target.gx !== undefined ? createVector(target.gx * GRID_SIZE + GRID_SIZE / 2, target.gy * GRID_SIZE + GRID_SIZE / 2) : (target.pos ? target.pos.copy() : null));
     if (!tc) return;
 
     const spawnAt = vConfig.spawnAt === 'turret' ? wPos : tc;

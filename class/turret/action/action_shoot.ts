@@ -2,7 +2,7 @@
 import { state } from '../../../state';
 import { TurretAction } from '../../turretAction';
 import { Bullet } from '../../bullet';
-import { MuzzleFlash } from '../../../vfx/index';
+import { MuzzleFlash, spawnNeighborBuffParticle } from '../../../vfx/index';
 import { triggerUpgradeHook } from '../../../src/upgrades';
 import { conditionTypes } from '../../../balanceConditions';
 import { soundEngine } from '../../../src/audio/soundEngine';
@@ -96,12 +96,22 @@ export class ActionShoot extends TurretAction {
       this.turret.angle = targetAngle;
     }
 
+    if (this.turret.buffingNeighbors && this.turret.buffingNeighbors.length > 0) {
+      for (const n of this.turret.buffingNeighbors) {
+        if (n && n.getWorldPos) {
+          const np = n.getWorldPos();
+          state.vfx.push(spawnNeighborBuffParticle(np.x, np.y, wPos.x, wPos.y));
+        }
+      }
+    }
+
     const { bulletsToSpawn } = this.getFireRateInfo();
     const bulletCount = config.shootBulletCount || 1;
     const totalBullets = bulletsToSpawn * bulletCount;
+    const totalInaccuracy = (config.inaccuracy || 0) + (this.turret.stats?.inaccuracyAdd || this.turret.activeStats?.inaccuracyAdd || 0);
     
     for (let i = 0; i < totalBullets; i++) {
-      let sa = this.turret.angle + (config.inaccuracy ? random(-radians(config.inaccuracy), radians(config.inaccuracy)) : 0);
+      let sa = this.turret.angle + (totalInaccuracy ? random(-radians(totalInaccuracy), radians(totalInaccuracy)) : 0);
       let startX = wPos.x;
       let startY = wPos.y;
       let targetX = wPos.x + cos(sa) * 500;
@@ -126,7 +136,13 @@ export class ActionShoot extends TurretAction {
     }
 
     if (this.turret.isCharged && this.turret.isCharged()) {
-      const stamCost = config.staminaCostPerBulletSpawned || config.StaminaCostPerBulletSpawned || 0;
+      let stamCost = config.staminaCostPerBulletSpawned || config.StaminaCostPerBulletSpawned || 0;
+      if (this.turret.activeStats?.staminaCostAdd) {
+        stamCost += this.turret.activeStats.staminaCostAdd;
+      }
+      if ((state.turretUpgrades?.['t3_bowling'] || []).includes('u_t3_bowling_5') && this.turret.type === 't3_bowling') {
+        stamCost += 3;
+      }
       if (stamCost > 0 && state.player) {
         state.player.spendStamina(stamCost * totalBullets, this.turret);
       }

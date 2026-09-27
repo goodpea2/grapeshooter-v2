@@ -50,6 +50,7 @@ export abstract class TurretAction {
   }
 
   isLocked(): boolean {
+    if (this.turret.conditions?.has('c_inactive')) return true;
     return this.turret.isActionLocked(this.tags);
   }
 

@@ -4,6 +4,7 @@ import { TurretAction } from '../../turretAction';
 import { Bullet } from '../../bullet';
 import { triggerUpgradeHook } from '../../../src/upgrades';
 import { GRID_SIZE } from '../../../constants';
+import { spawnNeighborBuffParticle } from '../../../vfx/index';
 
 declare const p5: any;
 declare const sin: any;
@@ -25,13 +26,15 @@ export class ActionPulse extends TurretAction {
   isReady(): boolean {
     if (this.isLocked()) return false;
     if (this.turret.jumpPhase !== null || this.turret.jumpFrames > 0) return false;
+    if ((this.turret.instantArmCharges || 0) > 0) return true;
     const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
     const type = 'pulse';
     let lastFire = this.turret.actionTimers.get(type) || 0;
-    const fireRate = config.pulseCooldown || 60;
+    const armingMult = 1 + (this.turret.stats?.armingTimeMult || this.turret.activeStats?.armingTimeMult || 0);
+    const fireRate = (config.pulseCooldown || 60) * Math.max(0.1, armingMult);
     const applyFR = config.pulseAppliedFireRateMultiplier ?? false;
     const frMultiplier = applyFR ? (this.turret.getFireRateMultiplier ? this.turret.getFireRateMultiplier() : (this.turret.fireRateMultiplier || 1.0)) : 1.0;
-    const effectiveCooldown = fireRate / frMultiplier;
+    const effectiveCooldown = Math.max(1, fireRate / frMultiplier);
     return state.frames - lastFire >= effectiveCooldown;
   }
 
@@ -42,7 +45,12 @@ export class ActionPulse extends TurretAction {
 
   getRange(): number {
     const config = this.turret.getActiveActionConfig ? this.turret.getActiveActionConfig() : this.turret.config.actionConfig;
-    return (config.pulseTriggerRadius || 0) * (this.turret.stats?.rangeMult || 1);
+    let baseRadius = config.pulseTriggerRadius || 0;
+    if (this.turret.type === 't2_pulse' && (state.turretUpgrades?.['t2_pulse'] || []).includes('u_t2_pulse_4')) {
+      baseRadius = GRID_SIZE * 3;
+      return baseRadius;
+    }
+    return baseRadius * (this.turret.stats?.rangeMult || 1);
   }
 
   needsLOS(): boolean {
@@ -70,7 +78,12 @@ export class ActionPulse extends TurretAction {
         let validTarget = false;
         const target = this.turret.target;
         if (!isIndestructibleEntity(target)) {
-          if (triggerBy.includes('enemy') && (target.health !== undefined && !target.isMined)) validTarget = true;
+          if (triggerBy.includes('enemy') && (target.health !== undefined && !target.isMined)) {
+            validTarget = true;
+            if (this.turret.type === 't_ice' && target.conditions?.has('c_stun')) {
+              validTarget = false;
+            }
+          }
           if (triggerBy.includes('obstacle') && (target.isMined !== undefined || target.type?.startsWith('o_') || target.overlay !== undefined)) validTarget = true;
           if (triggerBy.includes('turret') && target.actions !== undefined) validTarget = true;
         }
@@ -85,6 +98,7 @@ export class ActionPulse extends TurretAction {
         if (state.spatialGrid) {
           state.spatialGrid.queryCircleEnemies(wPos.x, wPos.y, triggerRadius, (e: any) => {
             if (e.conditions?.has('c_hypnotized')) return;
+            if (this.turret.type === 't_ice' && e.conditions?.has('c_stun')) return;
             if (isIndestructibleEntity(e)) return;
             triggered = true;
             if (!tCenter) tCenter = e.pos.copy ? e.pos.copy() : createVector(e.pos.x, e.pos.y);
@@ -93,6 +107,7 @@ export class ActionPulse extends TurretAction {
         } else {
           for (const e of state.enemies) {
             if (e.health > 0 && !e.isDying && !e.conditions?.has('c_hypnotized')) {
+              if (this.turret.type === 't_ice' && e.conditions?.has('c_stun')) continue;
               if (isIndestructibleEntity(e)) continue;
               const edSq = (wPos.x - e.pos.x)**2 + (wPos.y - e.pos.y)**2;
               if (edSq <= triggerRadiusSq) {
@@ -132,6 +147,20 @@ export class ActionPulse extends TurretAction {
     if (config.pulseTriggerAlways) triggered = true;
     
     if (triggered) {
+      // Spawn neighbor buff particles if turret has active buffing neighbors
+      if (this.turret.buffingNeighbors && this.turret.buffingNeighbors.length > 0) {
+        for (const n of this.turret.buffingNeighbors) {
+          if (n && n.getWorldPos) {
+            const np = n.getWorldPos();
+            state.vfx.push(spawnNeighborBuffParticle(np.x, np.y, wPos.x, wPos.y));
+          }
+        }
+      }
+
+      if ((this.turret.instantArmCharges || 0) > 0) {
+        this.turret.instantArmCharges--;
+      }
+
       if (config.pulseTurretJumpAtTriggerSource && tCenter) {
         this.turret.jumpPhase = 'toTarget';
         this.turret.jumpTargetPos = tCenter.copy();
@@ -219,6 +248,15 @@ export class ActionPulse extends TurretAction {
       if (distRemaining <= runSpeed) {
         // Reached the target or the target's last position
         this.turret.jumpCurrentPos = targetPos.copy();
+
+        // Main attack: If u_t2_stun_3 is active, hypnotize the target entity
+        if (targetEntity && targetEntity.health > 0 && !targetEntity.isDying) {
+          if ((state.turretUpgrades?.['t2_stun'] || []).includes('u_t2_stun_3') || this.turret.activeStats?.hypnotizeDuration) {
+            if (targetEntity.applyCondition) {
+              targetEntity.applyCondition('c_hypnotized', this.turret.activeStats?.hypnotizeDuration || 360);
+            }
+          }
+        }
 
         // Release pulse at target location
         if (config.pulseBulletTypeKey) {

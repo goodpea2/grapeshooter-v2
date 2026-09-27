@@ -57,6 +57,17 @@ declare const arc: any;
 export class Block {
   gx: number; gy: number; pos: any; type: string; config: any; overlay: string | null = null;
   isMined: boolean = false; damageGlow: number = 0; health: number; maxHealth: number;
+  markMined() {
+    if (!this.isMined) {
+      this.isMined = true;
+      if (!state.accumulatedBreakObstacle) state.accumulatedBreakObstacle = {};
+      state.accumulatedBreakObstacle[this.type] = (state.accumulatedBreakObstacle[this.type] || 0) + 1;
+      if (this.overlay) {
+        state.accumulatedBreakObstacle[this.overlay] = (state.accumulatedBreakObstacle[this.overlay] || 0) + 1;
+      }
+      state.accumulatedBreakObstacle['any'] = (state.accumulatedBreakObstacle['any'] || 0) + 1;
+    }
+  }
   biome: number = 0; feature: string | null = null;
   sunBits: { x: number, y: number, s: number }[] = [];
   liquidType: string | null = null;
@@ -68,6 +79,7 @@ export class Block {
   lastHourlyBudgetFrame?: number;
   customSpawnerConfig?: any = null;
   paygateConfig?: { resource: string, amount: number, spent: number };
+  customBreakCost?: number;
   customText?: string;
   turretCooldown: number = 0;
   turretStep: number = 0;
@@ -109,6 +121,10 @@ export class Block {
     else if (fn > 0.72 && biome < 3) this.feature = 'flower';
     else if (fn > 0.75) this.feature = 'crystal';
     else if (fn > 0.72) this.feature = 'rubble';
+  }
+
+  getWorldPos() {
+    return createVector(this.gx * GRID_SIZE + GRID_SIZE / 2, this.gy * GRID_SIZE + GRID_SIZE / 2);
   }
 
   setOverlay(overlayKey: string | null) {
@@ -175,15 +191,78 @@ export class Block {
   }
 
   /**
+   * Applies custom spawner configuration to this block and synchronously reinitializes its cached spawn list.
+   */
+  setCustomSpawnerConfig(cfg: any) {
+    if (!cfg) {
+      this.customSpawnerConfig = null;
+      return;
+    }
+    const isLiquid = this.liquidType === 'l_spawner' || (this.liquidType && !!liquidTypes[this.liquidType]?.isEnemySpawner) || (!!cfg && !!this.liquidType);
+    if (isLiquid) {
+      const minHealth = cfg.minHealth !== undefined ? cfg.minHealth : (cfg.health || 300);
+      this.customSpawnerConfig = {
+        ...(cfg.name ? { name: cfg.name } : {}),
+        enemyTypeKey: Array.isArray(cfg.enemyTypeKey) && cfg.enemyTypeKey.length > 0 ? [...cfg.enemyTypeKey] : ['e_basic'],
+        spawnRadius: cfg.spawnRadius !== undefined ? cfg.spawnRadius : 120,
+        spawnTriggerRadius: cfg.spawnTriggerRadius !== undefined ? cfg.spawnTriggerRadius : 200,
+        spawnInterval: cfg.spawnInterval !== undefined ? cfg.spawnInterval : 60,
+        minHealth: minHealth,
+        health: minHealth,
+        hourlySpawnConfig: cfg.hourlySpawnConfig ? {
+          ...cfg.hourlySpawnConfig,
+          enabled: cfg.hourlySpawnConfig.enabled !== false
+        } : {
+          enabled: true,
+          hourlyDaytimeBudget: [10, 20, 30],
+          hourlyNighttimeBudget: [30, 50, 80],
+          hourlyBudgetMultiplierForFollowingDay: 1.25,
+          selfDestructAfterBudgetSpawned: 0
+        }
+      };
+      this.health = minHealth;
+      this.maxHealth = minHealth;
+      this.cachedSpawnList = [];
+      this.hourlySpawnBudgetAccrued = 0;
+      this.totalBudgetSpawned = 0;
+      this.lastHourlyProcessedHour = undefined;
+    } else {
+      const minHealth = cfg.minHealth !== undefined ? cfg.minHealth : (cfg.health || 300);
+      const obstacleHealth = this.config?.health || this.health || 0;
+      const finalHealth = Math.max(minHealth, obstacleHealth);
+      const budget = cfg.budget !== undefined ? cfg.budget : (this.spawnerBudget || 60);
+      this.customSpawnerConfig = {
+        ...(cfg.name ? { name: cfg.name } : {}),
+        budget: budget,
+        enemyTypeKey: Array.isArray(cfg.enemyTypeKey) && cfg.enemyTypeKey.length > 0 ? [...cfg.enemyTypeKey] : ['e_basic'],
+        spawnRadius: cfg.spawnRadius !== undefined ? cfg.spawnRadius : 120,
+        spawnTriggerRadius: cfg.spawnTriggerRadius !== undefined ? cfg.spawnTriggerRadius : 200,
+        spawnInterval: cfg.spawnInterval !== undefined ? cfg.spawnInterval : 60,
+        minHealth: minHealth,
+        health: finalHealth,
+        ...(cfg.hourlySpawnConfig ? { hourlySpawnConfig: JSON.parse(JSON.stringify(cfg.hourlySpawnConfig)) } : {})
+      };
+      this.spawnerBudget = budget;
+      this.health = finalHealth;
+      this.maxHealth = finalHealth;
+      this.initCachedSpawnList(this.customSpawnerConfig);
+    }
+  }
+
+  /**
    * Caches the list of enemies that will be spawned by ov_spawner upon taking damage.
    */
   initCachedSpawnList(sCfg: any) {
     this.cachedSpawnList = [];
     this.enemiesSpawnedFromDamage = 0;
     let budget = sCfg.budget !== undefined ? sCfg.budget : (this.spawnerBudget || 60);
+    this.spawnerBudget = budget;
+    if (this.customSpawnerConfig) {
+      this.customSpawnerConfig.budget = budget;
+    }
     const eTypes = (sCfg.enemyTypeKey && sCfg.enemyTypeKey.length > 0) ? sCfg.enemyTypeKey : ['e_basic'];
 
-    let safety = 100;
+    let safety = Math.max(500, Math.ceil(budget / 5));
     while (budget > 0 && safety > 0) {
       safety--;
       const affordable = eTypes.filter((k: string) => enemyTypes[k] && enemyTypes[k].cost <= budget);
@@ -461,7 +540,7 @@ export class Block {
       this.lastSpawnTime = state.frames + floor(random(sCfg.spawnInterval || 60));
     }
 
-    const isHourly = !!sCfg.hourlySpawnConfig?.enabled;
+    const isHourly = !!sCfg.hourlySpawnConfig && sCfg.hourlySpawnConfig.enabled !== false;
 
     if (isHourly) {
       const hCfg = sCfg.hourlySpawnConfig || {};
@@ -931,7 +1010,7 @@ export class Block {
       }
       const cfg = this.sunGeneratorConfig;
       if (cfg.sunsDropped >= cfg.maxSun) {
-        this.isMined = true;
+        this.markMined();
         state.world.dirtyBlock(this.gx, this.gy);
         return true;
       }
@@ -969,7 +1048,7 @@ export class Block {
       }
 
       if (cfg.sunsDropped >= cfg.maxSun) {
-        this.isMined = true;
+        this.markMined();
         state.world.dirtyBlock(this.gx, this.gy);
         flowField.markDirty();
         state.needsTargetReScan = true;
@@ -993,7 +1072,8 @@ export class Block {
           this.initCachedSpawnList(sCfg);
         }
         if (this.initialCachedSpawnCount > 0 && this.cachedSpawnList && this.cachedSpawnList.length > 0) {
-          const dmgRatio = Math.min(1.0, Math.max(0.0, (this.maxHealth - this.health) / this.maxHealth));
+          const maxH = Math.max(1, this.maxHealth);
+          const dmgRatio = Math.min(1.0, Math.max(0.0, (maxH - this.health) / maxH));
           const targetSpawnCount = Math.floor(dmgRatio * this.initialCachedSpawnCount);
           while (this.enemiesSpawnedFromDamage < targetSpawnCount && this.cachedSpawnList.length > 0) {
             const nextEnemy = this.cachedSpawnList.shift()!;
@@ -1006,14 +1086,14 @@ export class Block {
 
     if (this.health <= 0) {
       this.health = 0;
-      this.isMined = true;
+      this.markMined();
       soundEngine.playSFXGroup('block_death');
       
       // Trigger Hooks
       if (source) {
-        triggerUpgradeHook('onMine', source, { target: this, targetType: 'block', typeName: this.overlay || this.type });
+        triggerUpgradeHook('onMine', source, { target: this, targetType: 'block', typeName: this.overlay || this.type, blockKilled: true, pos: { x: this.pos.x + GRID_SIZE/2, y: this.pos.y + GRID_SIZE/2 } });
         if (source.onTargetMined) {
-          source.onTargetMined(this, { target: this, targetType: 'block', typeName: this.overlay || this.type, blockKilled: true });
+          source.onTargetMined(this, { target: this, targetType: 'block', typeName: this.overlay || this.type, blockKilled: true, pos: { x: this.pos.x + GRID_SIZE/2, y: this.pos.y + GRID_SIZE/2 } });
         }
       }
 

@@ -93,8 +93,8 @@ export class FirePuddleVFX {
         if (e.p.y < -this.radius) e.p.y = this.radius;
     }
 
-    // Persistant spark spawning loop
-    if (this.life > 15 && random() < 0.25 && this.sparks.length < 20) {
+    // Persistant spark spawning loop (capped per tile)
+    if (this.life > 15 && random() < 0.25 && this.sparks.length < 16) {
         this.sparks.push({
             p: createVector(this.pos.x + random(-this.radius*0.7, this.radius*0.7), this.pos.y + random(-this.radius*0.3, this.radius*0.3)),
             v: createVector(random(-0.5, 0.5), random(-1.5, -3.5)),
@@ -168,4 +168,66 @@ export function spawnFirePuddleVFX(x: number, y: number, radius: number = 30, du
   const vfx = firePuddlePool.get();
   vfx.reset(x, y, radius, duration);
   return vfx;
+}
+
+// --- Tile-based Fire Puddle VFX Registry ---
+// Ensures only 1 fire puddle VFX exists per grid tile, limiting spark and visual stacking
+const tileFirePuddleMap = new Map<string, FirePuddleVFX>();
+
+export function getOrCreateTileFirePuddleVFX(
+  tileKey: string,
+  centerX: number,
+  centerY: number,
+  radius: number = 30,
+  duration: number = 60
+): FirePuddleVFX {
+  const existing = tileFirePuddleMap.get(tileKey);
+  if (existing) {
+    if (duration > existing.life) {
+      existing.life = duration;
+      existing.duration = Math.max(existing.duration, duration);
+    }
+    if (radius > existing.radius) {
+      existing.radius = radius;
+    }
+    return existing;
+  }
+  const vfx = firePuddlePool.get();
+  vfx.reset(centerX, centerY, radius, duration);
+  tileFirePuddleMap.set(tileKey, vfx);
+  return vfx;
+}
+
+export function updateTileFirePuddles(): void {
+  for (const [key, vfx] of tileFirePuddleMap.entries()) {
+    vfx.update();
+    if (vfx.isDone()) {
+      tileFirePuddleMap.delete(key);
+      firePuddlePool.release(vfx);
+    }
+  }
+}
+
+export function displayTileFirePuddles(vp?: any): void {
+  for (const vfx of tileFirePuddleMap.values()) {
+    if (vp && vp.maxX !== undefined) {
+      const pad = vfx.radius * 3;
+      if (
+        vfx.pos.x < vp.minX - pad ||
+        vfx.pos.x > vp.maxX + pad ||
+        vfx.pos.y < vp.minY - pad ||
+        vfx.pos.y > vp.maxY + pad
+      ) {
+        continue;
+      }
+    }
+    vfx.display();
+  }
+}
+
+export function clearTileFirePuddles(): void {
+  for (const vfx of tileFirePuddleMap.values()) {
+    firePuddlePool.release(vfx);
+  }
+  tileFirePuddleMap.clear();
 }

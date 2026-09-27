@@ -5,6 +5,7 @@ import { bulletTypes } from '../balanceBullets';
 import { overlayTypes } from '../balanceObstacles';
 import { Explosion, MuzzleFlash, HitSpark, FireworkVFX, spawnHitSpark, spawnExplosion, spawnFireworkVFX } from '../vfx';
 import { GroundFeature } from './groundFeature';
+import { groundFeatureTypes } from '../balanceGroundFeatures';
 import { Player } from './player';
 import { Enemy } from './enemy';
 import { drawBullet } from '../visualBullets';
@@ -182,6 +183,34 @@ export class Bullet {
     if (this.config.spawnGroundFeaturePerFrame > 0 && state.frames % this.config.spawnGroundFeaturePerFrame === 0) {
        this.spawnFeatures(this.config.spawnGroundFeatureOnContact);
     }
+
+    // Check Turret Shield Interception: Hostile enemy bullets can be blocked by turret shields (like Holonut shield)
+    if (!this.config.highArcConfig && (this.damageTargets.includes('turret') || this.source instanceof Enemy)) {
+      const allTurrets = [...state.player.attachments, ...state.world.getAllTurrets()];
+      for (const t of allTurrets) {
+        if (!t || t.health <= 0 || t.isDying || t.isWaterlogged || t.isFrosted) continue;
+        if (t.isCollidable && !t.isCollidable()) continue;
+        const hasShield = t.config.actionType?.includes('shield') || (t.activeStats?.shieldRadius > 0) || t.config.actionConfig?.shieldRadius;
+        if (!hasShield) continue;
+
+        const twPos = t.getWorldPos();
+        const sRad = t.activeStats?.shieldRadius || t.config.actionConfig?.shieldRadius || (GRID_SIZE * 2.8);
+        const edx = this.pos.x - twPos.x;
+        const edy = this.pos.y - twPos.y;
+        const dSq = edx * edx + edy * edy;
+        if (dSq <= sRad * sRad) {
+          t.takeDamage(this.dmg, this.source);
+          (t as any).shieldImpactAngles = (t as any).shieldImpactAngles || [];
+          (t as any).shieldImpactAngles.push(Math.atan2(this.pos.y - twPos.y, this.pos.x - twPos.x));
+          state.vfx.push(spawnHitSpark(this.pos.x, this.pos.y, [100, 200, 255]));
+          this.handleCollision();
+          if (this.life <= 0) {
+            this.checkLifetimeExplode();
+            return;
+          }
+        }
+      }
+    }
     
     if (this.damageTargets.includes('icecube')) {
       const allTurrets = [...state.player.attachments, ...state.world.getAllTurrets()];
@@ -289,7 +318,8 @@ export class Bullet {
           // Direct Knockback
           if (this.config.knockBackStrength) {
              const dir = p5.Vector.sub(e.pos, this.prevPos).normalize();
-             const strength = this.config.knockBackStrength / Math.max(0.2, (e.size / 30));
+             const kbMult = 1 + (this.source?.activeStats?.knockbackMult || this.source?.stats?.knockbackMult || 0);
+             const strength = (this.config.knockBackStrength * kbMult) / Math.max(0.2, (e.size / 30));
              e.kbVel.add(dir.mult(strength));
              if (this.config.knockBackDuration) {
                 e.kbTimer = Math.max(e.kbTimer || 0, this.config.knockBackDuration);
@@ -321,6 +351,7 @@ export class Bullet {
     if (this.damageTargets.includes('turret')) {
       const allTurrets = [...state.player.attachments, ...state.world.getAllTurrets()];
       for (let a of allTurrets) {
+        if (a.isCollidable && !a.isCollidable()) continue;
         if (!this.hitTargets.has(a.uid)) {
           const awPos = a.getWorldPos();
           const dSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
@@ -413,11 +444,43 @@ export class Bullet {
     if (!target.applyCondition) return;
     if (this.config.appliedConditions) {
       for (const cond of this.config.appliedConditions) {
-        target.applyCondition(cond.type, cond.duration, cond);
+        let dur = cond.duration;
+        if (cond.type === 'c_stun' && this.source?.activeStats?.stunDurationMult) {
+          dur *= (1 + this.source.activeStats.stunDurationMult);
+        }
+        if (cond.type === 'c_chilled' && this.source?.activeStats?.chillDurationMult) {
+          dur *= (1 + this.source.activeStats.chillDurationMult);
+        }
+        target.applyCondition(cond.type, Math.max(1, Math.round(dur)), cond);
       }
     }
-    if (this.config.stunDuration > 0) target.applyCondition('c_stun', this.config.stunDuration);
-    if (this.config.slowDuration > 0) target.applyCondition('c_chilled', this.config.slowDuration);
+    if (this.config.stunDuration > 0) {
+      let dur = this.config.stunDuration;
+      if (this.source?.activeStats?.stunDurationMult) {
+        dur *= (1 + this.source.activeStats.stunDurationMult);
+      }
+      target.applyCondition('c_stun', Math.max(1, Math.round(dur)));
+    }
+    if (this.config.slowDuration > 0) {
+      let dur = this.config.slowDuration;
+      if (this.source?.activeStats?.chillDurationMult) {
+        dur *= (1 + this.source.activeStats.chillDurationMult);
+      }
+      target.applyCondition('c_chilled', Math.max(1, Math.round(dur)));
+    }
+    // Check hypnotize modifier from t_ice upgrade 3 or t2_stun upgrade 3
+    if (this.source?.activeStats?.hypnotizeDuration || (state.turretUpgrades[this.source?.type] || []).includes('u_t_ice_3') || (state.turretUpgrades[this.source?.type] || []).includes('u_t2_stun_3')) {
+      const hypDur = this.source?.activeStats?.hypnotizeDuration || 360;
+      target.applyCondition('c_hypnotized', hypDur);
+    }
+    // Check weakbody modifier from t2_stun upgrade 5
+    if (this.source?.type === 't2_stun' && (state.turretUpgrades?.['t2_stun'] || []).includes('u_t2_stun_5')) {
+      let dur = this.config.stunDuration || 120;
+      if (this.source?.activeStats?.stunDurationMult) {
+        dur *= (1 + this.source.activeStats.stunDurationMult);
+      }
+      target.applyCondition('c_weakbody', Math.max(1, Math.round(dur)));
+    }
   }
   spawnFeatures(keys: string[] | null) {
     const list = (keys && keys.length > 0) ? keys : (this.config.spawnGroundFeatureKeys || []);
@@ -432,14 +495,22 @@ export class Bullet {
             let r = random(this.config.spawnGroundFeatureInRadius); 
             sx += cos(ang)*r; sy += sin(ang)*r; 
         }
-        state.groundFeatures.push(new GroundFeature(sx, sy, gfKey));
+        const radiusMult = 1 + (this.source?.activeStats?.puddleRadiusMult || this.source?.stats?.puddleRadiusMult || 0);
+        const baseRadius = (groundFeatureTypes[gfKey]?.radius || 30) * radiusMult;
+        const gf = new GroundFeature(sx, sy, gfKey, baseRadius);
+        gf.source = this.source;
+        state.groundFeatures.push(gf);
     }
   }
 
   getLerpedAoeDamage(d: number, aoe: any) {
     if (!aoe) return 0;
-    const radii = aoe.aoeRadiusGradient || [];
-    const damages = aoe.aoeDamageGradient || [];
+    const radiusScale = 1 + (this.source?.activeStats?.aoeRadiusMult || 0);
+    const rawRadii = aoe.aoeRadiusGradient || [];
+    const radii = rawRadii.map((r: number) => r * Math.max(0.1, radiusScale));
+    const rawDamages = aoe.aoeDamageGradient || [];
+    const dmgMult = (1 + (this.source?.activeStats?.aoeDamageMult || 0)) * (this.source?.activeStats?.damageMult ?? 1.0);
+    const damages = rawDamages.map((dmg: number) => dmg * Math.max(0, dmgMult));
     if (radii.length === 0 || damages.length === 0) return 0;
     const maxR = radii[radii.length - 1];
     
@@ -469,7 +540,9 @@ export class Bullet {
     }
 
     const aoe = this.config.aoeConfig;
-    const radii = (aoe && aoe.aoeRadiusGradient && aoe.aoeRadiusGradient.length > 0) ? aoe.aoeRadiusGradient : [GRID_SIZE * 1.5];
+    const radiusScale = 1 + (this.source?.activeStats?.aoeRadiusMult || 0);
+    const rawRadii = (aoe && aoe.aoeRadiusGradient && aoe.aoeRadiusGradient.length > 0) ? aoe.aoeRadiusGradient : [GRID_SIZE * 1.5];
+    const radii = rawRadii.map((r: number) => r * Math.max(0.1, radiusScale));
     const maxR = radii[radii.length - 1] || 10;
     
     if (this.config.bulletDeathVfx === 'v_goldengrape_firework') {
@@ -504,7 +577,8 @@ export class Bullet {
             // AOE Knockback
             if (aoe.aoeKnockbackStrength) {
                const dir = p5.Vector.sub(e.pos, this.pos).normalize();
-               const strength = (aoe.aoeKnockbackStrength * (1 - d/maxR)) / Math.max(0.2, (e.size / 30));
+               const kbMult = 1 + (this.source?.activeStats?.knockbackMult || this.source?.stats?.knockbackMult || 0);
+               const strength = (aoe.aoeKnockbackStrength * kbMult * (1 - d/maxR)) / Math.max(0.2, (e.size / 30));
                e.kbVel.add(dir.mult(strength));
                if (this.config.knockBackDuration) {
                   e.kbTimer = Math.max(e.kbTimer || 0, this.config.knockBackDuration);
@@ -529,7 +603,8 @@ export class Bullet {
             // AOE Knockback
             if (aoe.aoeKnockbackStrength) {
                const dir = p5.Vector.sub(e.pos, this.pos).normalize();
-               const strength = (aoe.aoeKnockbackStrength * (1 - d/maxR)) / Math.max(0.2, (e.size / 30));
+               const kbMult = 1 + (this.source?.activeStats?.knockbackMult || this.source?.stats?.knockbackMult || 0);
+               const strength = (aoe.aoeKnockbackStrength * kbMult * (1 - d/maxR)) / Math.max(0.2, (e.size / 30));
                e.kbVel.add(dir.mult(strength));
                if (this.config.knockBackDuration) {
                   e.kbTimer = Math.max(e.kbTimer || 0, this.config.knockBackDuration);
@@ -551,19 +626,30 @@ export class Bullet {
       if (pdSq < maxR*maxR) {
         const d = Math.sqrt(pdSq);
         const lerpDmg = this.getLerpedAoeDamage(d, aoe);
-        if (lerpDmg > 0) state.player.takeDamage(lerpDmg);
+        const mult = aoe.aoePlayerDamageMultiplier !== undefined ? aoe.aoePlayerDamageMultiplier : 1.0;
+        if (lerpDmg > 0 && mult > 0) state.player.takeDamage(lerpDmg * mult);
       }
     }
 
     if (this.damageTargets.includes('turret')) {
       const allTurrets = [...state.player.attachments, ...state.world.getAllTurrets()];
+      const mult = aoe.aoeTurretDamageMultiplier !== undefined ? aoe.aoeTurretDamageMultiplier : 1.0;
+      const frostAmt = aoe.aoeFrostAmount !== undefined ? aoe.aoeFrostAmount : this.config.frostAmount;
       for (let a of allTurrets) {
+        if (a.isCollidable && !a.isCollidable()) continue;
         const awPos = a.getWorldPos();
         let adSq = (this.pos.x - awPos.x)**2 + (this.pos.y - awPos.y)**2;
         if (adSq < maxR*maxR) {
           const d = Math.sqrt(adSq);
           const lerpDmg = this.getLerpedAoeDamage(d, aoe);
-          if (lerpDmg !== 0) a.takeDamage(lerpDmg);
+          if (lerpDmg !== 0 && mult > 0) a.takeDamage(lerpDmg * mult);
+          if (frostAmt && !a.isFrosted) {
+            a.frostLevel = Math.min(1, (a.frostLevel || 0) + frostAmt);
+            if (a.frostLevel >= 1) {
+              a.isFrosted = true;
+              a.iceCubeHealth = 100;
+            }
+          }
         }
       }
     }

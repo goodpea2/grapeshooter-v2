@@ -109,12 +109,13 @@ export class ActionLaunchAlly extends EnemyAction {
     // Find nearest eligible ally within 4 tiles
     let bestAlly: any = null;
     let closestDistSq = Infinity;
+    const isLauncherHypnotized = enemy.conditions.has('c_hypnotized');
 
     for (const other of state.enemies) {
       if (other === enemy || other.isDying || other.isAirborne) continue;
       if (other.leader) continue; // In a leader chain
       if (other.type === 'e_launcher') continue; // Don't launch other launchers
-      if (other.conditions.has('c_hypnotized')) continue;
+      if (!isLauncherHypnotized && other.conditions.has('c_hypnotized')) continue;
       if (other.collaboratingWith) continue; // Already collaborating
 
       const cost = enemyTypes[other.type]?.cost ?? 0;
@@ -157,9 +158,10 @@ export class ActionLaunchAlly extends EnemyAction {
   updateApproaching(): void {
     const enemy = this.enemy;
     const ally = this.callingAlly;
+    const isLauncherHypnotized = enemy.conditions.has('c_hypnotized');
 
     // Validate collaborator still exists and is healthy
-    if (!ally || ally.isDying || ally.health <= 0 || ally.isAirborne || ally.conditions.has('c_hypnotized')) {
+    if (!ally || ally.isDying || ally.health <= 0 || ally.isAirborne || (!isLauncherHypnotized && ally.conditions.has('c_hypnotized'))) {
       this.cancelCollab();
       this.launchTimer = 30;
       this.phase = 'idle';
@@ -209,9 +211,10 @@ export class ActionLaunchAlly extends EnemyAction {
   updateWindup(): void {
     const enemy = this.enemy;
     const ally = this.callingAlly;
+    const isLauncherHypnotized = enemy.conditions.has('c_hypnotized');
 
     // Validate collaborator
-    if (!ally || ally.isDying || ally.health <= 0 || ally.isAirborne || ally.conditions.has('c_hypnotized')) {
+    if (!ally || ally.isDying || ally.health <= 0 || ally.isAirborne || (!isLauncherHypnotized && ally.conditions.has('c_hypnotized'))) {
       this.cancelCollab();
       this.launchTimer = 30;
       this.phase = 'idle';
@@ -244,14 +247,34 @@ export class ActionLaunchAlly extends EnemyAction {
       return;
     }
 
-    // Target landing spot: 75% distance from ally towards the player
-    let targetX = state.player ? state.player.pos.x : enemy.pos.x;
-    let targetY = state.player ? state.player.pos.y : enemy.pos.y;
+    const isLauncherHypnotized = enemy.conditions.has('c_hypnotized');
+    let landX: number;
+    let landY: number;
 
-    const toPlayerX = targetX - ally.pos.x;
-    const toPlayerY = targetY - ally.pos.y;
-    const landX = ally.pos.x + toPlayerX * this.launchDistanceRatio;
-    const landY = ally.pos.y + toPlayerY * this.launchDistanceRatio;
+    if (isLauncherHypnotized) {
+      // Under c_hypnotized, launch ally AWAY from the player with 2.0 launchDistanceRatio
+      const playerPos = state.player ? state.player.pos : enemy.pos;
+      const awayX = ally.pos.x - playerPos.x;
+      const awayY = ally.pos.y - playerPos.y;
+      const awayDist = Math.hypot(awayX, awayY);
+      const ratio = 2.0;
+      if (awayDist > 0.01) {
+        landX = ally.pos.x + awayX * ratio;
+        landY = ally.pos.y + awayY * ratio;
+      } else {
+        landX = ally.pos.x + (enemy.pos.x - playerPos.x || GRID_SIZE * 3) * ratio;
+        landY = ally.pos.y + (enemy.pos.y - playerPos.y || 0) * ratio;
+      }
+    } else {
+      // Target landing spot: 75% distance from ally towards the player
+      let targetX = state.player ? state.player.pos.x : enemy.pos.x;
+      let targetY = state.player ? state.player.pos.y : enemy.pos.y;
+
+      const toPlayerX = targetX - ally.pos.x;
+      const toPlayerY = targetY - ally.pos.y;
+      landX = ally.pos.x + toPlayerX * this.launchDistanceRatio;
+      landY = ally.pos.y + toPlayerY * this.launchDistanceRatio;
+    }
 
     // Launch ally into airborne trajectory
     if (typeof ally.launchIntoAir === 'function') {

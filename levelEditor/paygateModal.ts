@@ -283,7 +283,7 @@ export function drawPayGateCostModal() {
     noStroke();
   }
 
-  if (typeof textFont === 'function') textFont('sans-serif');
+  if (typeof textFont === 'function') textFont('Viga');
 
   // 4. Action Buttons (Discard & SAVE) using uiComponents
   const btnW = 130;
@@ -350,7 +350,7 @@ export function handlePayGateCostModalPress(): boolean {
     const textStartX = (amtBoxX + amtBoxW / 2) - fullTextW / 2;
     const relX = mouseX - textStartX;
     const idx = getCharIndexAtX(amtText, relX, (s) => textWidth(s));
-    if (typeof textFont === 'function') textFont('sans-serif');
+    if (typeof textFont === 'function') textFont('Viga');
 
     paygateModal.amountState.cursor = idx;
     paygateModal.amountState.selStart = idx;
@@ -404,7 +404,7 @@ export function handlePayGateCostModalDrag(): boolean {
   const textStartX = (amtBoxX + amtBoxW / 2) - fullTextW / 2;
   const relX = mouseX - textStartX;
   const idx = getCharIndexAtX(amtText, relX, (s) => textWidth(s));
-  if (typeof textFont === 'function') textFont('sans-serif');
+  if (typeof textFont === 'function') textFont('Viga');
 
   paygateModal.amountState.cursor = idx;
   paygateModal.amountState.selEnd = idx;

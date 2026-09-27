@@ -26,5 +26,12 @@ export const t2_torchwood: TurretConfig = {
     } 
   },
   targetType: [], 
-  targetConfig: {}
+  targetConfig: {},
+  upgrades: [
+    { id: 'u_t2_torchwood_1', description: "Player's attack damage -2, fire rate +35% for each Torchwood attached", modifiers: { playerAttackAdd: -2, playerFirerateAdd: 0.35 } },
+    { id: 'u_t2_torchwood_2', description: "Player's max stamina -20, aura buffs crossing bullets' damage by +2", modifiers: { playerStaminaAdd: -20, playerMaxStaminaAdd: -20 } },
+    { id: 'u_t2_torchwood_3', stackable: false, description: "Aura radius -50%, aura buffs crossing bullet's damage by +7", modifiers: { rangeMult: -0.5 } },
+    { id: 'u_t2_torchwood_4', stackable: false, description: "Aura now deals damage to enemies, +5 damage per 0.5s" },
+    { id: 'u_t2_torchwood_5', description: "Neighboring [c_leaf]'s range +10%" }
+  ]
 };

@@ -452,9 +452,16 @@ export function drawNewTurretTooltip(t: any, x: number, y: number, isPreview: bo
         fill(140, 150, 180);
         text(stat.label, sx, sy);
         
+        let statVal = stat.value;
+        if (stat.label && stat.label.toLowerCase() === 'health' && !isPreview && typeof t.health === 'number') {
+            const curHp = Math.max(0, Math.ceil(t.health));
+            const maxHp = Math.ceil(t.maxHealth || t.config?.health || t.health);
+            statVal = `${curHp} / ${maxHp}`;
+        }
+
         textAlign(RIGHT, TOP);
         fill(255);
-        text(stat.value, sx + colOff - 20, sy);
+        text(statVal, sx + colOff - 20, sy);
     }
 
     // Ingredient Icons (Lower and Smaller)

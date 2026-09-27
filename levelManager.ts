@@ -2,17 +2,20 @@ import { state } from './state';
 import { WorldManager, Block } from './world';
 import { Player, GroundFeature, NPCEntity, Enemy, LootEntity, TurretLoot, spawnLootEntity } from './entities';
 import { GRID_SIZE, CHUNK_SIZE, HOUR_FRAMES } from './constants';
-import { customStartingHour, AlmanacProgression, getActiveAlmanacProgression } from './lvDemo';
+import { customStartingHour, AlmanacProgression, getActiveAlmanacProgression, buildExportAlmanacProgression, worldGenConfig } from './lvDemo';
 import { createWorldTurret } from './class/turret/TurretRegistry';
 import { createEnemy } from './class/enemy/EnemyRegistry';
 import { obstacleTypes, overlayTypes } from './balanceObstacles';
 import { liquidTypes } from './balanceLiquids';
 import { resetPlayerUpgrades } from './src/playerUpgrades';
 import { serializeLevelEditorPlayerUpgrades } from './ui/almanac/playerUpgradesPanel';
+import { resetTurretUnlockTreeState, initTurretUnlockTree } from './ui/almanac/turretUnlockTree';
+import { resetUIComponentAnimations } from './uiComponents';
 
 declare const floor: any;
 
-import { serializeLevelEditorLevelConfig } from './ui/almanac/levelConfigPanel';
+import { serializeLevelEditorLevelConfig, formatGlobalEnemySpawnConfig } from './ui/almanac/levelConfigPanel';
+import { DEFAULT_DAYTIME_WEIGHTS } from './ui/almanac/levelConfig/types';
 import { soundEngine } from './src/audio/soundEngine';
 
 export interface LevelConfig {
@@ -27,8 +30,12 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
   {
     id: 'sbw',
     name: 'Sandbox World',
-    tag: 'Dev',
-    description: 'Full world for testing.'
+    tag: 'Sandbox',
+    description: 'Full world for testing with updated global enemy spawn config.',
+    customLayoutData: {
+      enableWorldGen: true,
+      globalEnemySpawnConfig: DEFAULT_DAYTIME_WEIGHTS
+    }
   },
   {
     id: 'mpty',
@@ -157,6 +164,22 @@ export function triggerImportLevelJson(onLoaded?: (data: any, cfg: LevelConfig) 
   input.click();
 }
 
+export function syncWorldSeed(seed?: number): number {
+  const s = seed !== undefined ? seed : (state.worldSeed || 2026);
+  state.worldSeed = s;
+  if (typeof (window as any).noiseSeed === 'function') {
+    try { (window as any).noiseSeed(s); } catch (e) {}
+  }
+  if (typeof (window as any).randomSeed === 'function') {
+    try { (window as any).randomSeed(s); } catch (e) {}
+  }
+  worldGenConfig.noiseOffsetBlocks = 10000 + (s % 50000);
+  worldGenConfig.noiseOffsetLakes = 20000 + ((s * 7) % 50000);
+  worldGenConfig.noiseOffsetRivers = 30000 + ((s * 13) % 50000);
+  worldGenConfig.noiseOffsetClumping = 40000 + ((s * 19) % 50000);
+  return s;
+}
+
 export function startLevel(levelId: string, customLayoutData?: any) {
   state.currentLevelId = levelId;
   state.currentScreen = 'game';
@@ -166,12 +189,29 @@ export function startLevel(levelId: string, customLayoutData?: any) {
   const layout = customLayoutData || levelConfig?.customLayoutData;
   state.currentLevelLayoutData = layout || null;
 
+  // Determine if worldGen is enabled
+  const isWorldGen = layout?.useWorldGen === true || layout?.enableWorldGen === true || (layout?.useWorldGen !== false && layout?.enableWorldGen !== false && (levelId === 'sbw' || levelConfig?.customLayoutData?.enableWorldGen === true || levelConfig?.customLayoutData?.useWorldGen === true));
+
+  // Synchronize world seed across the whole system: generate a fresh random seed for worldGen levels, or use explicit layout seed
+  let activeSeed: number;
+  if (typeof layout?.worldSeed === 'number') {
+    activeSeed = layout.worldSeed;
+  } else if (typeof layout?.seed === 'number') {
+    activeSeed = layout.seed;
+  } else if (isWorldGen) {
+    activeSeed = Math.floor(Math.random() * 10000000) + 1;
+  } else {
+    activeSeed = 2026;
+  }
+  syncWorldSeed(activeSeed);
+
   // Clear dynamic game objects
   state.bullets = [];
   state.enemyBullets = [];
   state.enemies = [];
   state.npcs = [];
   state.groundFeatures = [];
+  GroundFeature.clearTileFireVfx();
   state.vfx = [];
   state.uiVfx = [];
   state.trails = [];
@@ -226,8 +266,19 @@ export function startLevel(levelId: string, customLayoutData?: any) {
   state.previewWorldSnap = null;
   state.turretOverlayAnimation = null;
   state.turretMergeOverlay = null;
+
+  // Reset Turret Unlock Tree state and all active tree VFX
+  resetTurretUnlockTreeState();
+  resetUIComponentAnimations();
+
+  // Reset level cache and editor inputs
+  state.almanacEditorToggledKeys = new Set();
+  state.levelEditorAlmanacProgression = null;
+  state.levelEditorPlayerUpgrades = null;
+  state.levelEditorLevelConfig = null;
   state.activePlayerUpgradeInput = null;
   state.activeLevelConfigInput = null;
+
   state.touchInputVec = { x: 0, y: 0 };
   state.touchStartPos = null;
   state.isTouchingUI = false;
@@ -280,6 +331,9 @@ export function startLevel(levelId: string, customLayoutData?: any) {
   state.upgradeData = {};
   state.turretLastUsed = {};
 
+  // Re-initialize turret unlock tree cleanly with active level progression & seed
+  initTurretUnlockTree(activeSeed);
+
   // Reset time and budget
   state.frames = customStartingHour * HOUR_FRAMES;
   state.lastNightTriggered = 0;
@@ -293,6 +347,10 @@ export function startLevel(levelId: string, customLayoutData?: any) {
   state.totalElixirLootCollected = 0;
   state.totalSoilLootCollected = 0;
   state.totalTurretsAcquired = 0;
+  state.accumulatedEnemyBudgetKilled = 0;
+  state.accumulatedCollectedResources = {};
+  state.accumulatedHuntEnemy = {};
+  state.accumulatedBreakObstacle = {};
 
   // Reset world exploration tracking
   state.exploredChunks = new Set();
@@ -309,6 +367,11 @@ export function startLevel(levelId: string, customLayoutData?: any) {
   state.player = new Player(spawnX, spawnY);
   state.cameraPos = { x: spawnX, y: spawnY };
 
+  // Restore Custom Spawner Prefabs if provided (MUST run before deserializing blocks)
+  if (layout?.customSpawnerPrefabs && Array.isArray(layout.customSpawnerPrefabs)) {
+    restoreCustomSpawnerPrefabs(layout.customSpawnerPrefabs);
+  }
+
   // If loading custom layout data
   if (layout && layout.chunks) {
     for (const chunkData of layout.chunks) {
@@ -316,9 +379,7 @@ export function startLevel(levelId: string, customLayoutData?: any) {
       const cy = chunkData.cy;
       const chunk = state.world.getChunk(cx, cy);
       
-      if (chunkData.blocks) {
-        deserializeChunkBlocks(chunk, chunkData.blocks);
-      }
+      deserializeChunk(chunk, chunkData);
 
       if (chunkData.turrets) {
         deserializeChunkTurrets(chunk, chunkData.turrets);
@@ -350,11 +411,6 @@ export function startLevel(levelId: string, customLayoutData?: any) {
 
   // Load Spawn Area Tiles if provided
   deserializeSpawnAreaTiles(state.world, layout?.spawnAreaTiles);
-
-  // Restore Custom Spawner Prefabs if provided
-  if (layout?.customSpawnerPrefabs && Array.isArray(layout.customSpawnerPrefabs)) {
-    restoreCustomSpawnerPrefabs(layout.customSpawnerPrefabs);
-  }
 
   if (state.world) {
     state.world.rebuildPayGateGroups();
@@ -410,20 +466,14 @@ export function deserializeSpawnAreaTiles(world: WorldManager | null | undefined
 
   for (const item of spawnAreaTilesData) {
     if (!item) continue;
-    if (Array.isArray(item)) {
-      if (item.length >= 3) {
-        // v2 span format: [startGx, spanLen, gy]
-        const startGx = item[0];
-        const spanLen = Math.max(1, item[1]);
-        const gy = item[2];
-        for (let i = 0; i < spanLen; i++) {
-          world.spawnAreaSet.add(`${startGx + i},${gy}`);
-        }
-      } else if (item.length === 2) {
-        world.spawnAreaSet.add(`${item[0]},${item[1]}`);
+    if (Array.isArray(item) && item.length >= 3) {
+      // Standard v2 span format: [startGx, spanLen, gy]
+      const startGx = item[0];
+      const spanLen = Math.max(1, item[1]);
+      const gy = item[2];
+      for (let i = 0; i < spanLen; i++) {
+        world.spawnAreaSet.add(`${startGx + i},${gy}`);
       }
-    } else if (typeof item === 'string') {
-      world.spawnAreaSet.add(item);
     }
   }
 }
@@ -460,37 +510,19 @@ export function deserializeLevelEnemies(enemiesData: any[] | undefined | null): 
   if (!enemiesData || !Array.isArray(enemiesData)) return;
 
   for (const item of enemiesData) {
-    if (!item) continue;
+    if (!item || !Array.isArray(item.pos)) continue;
 
-    // Grouped format: { type: 'e_basic', pos: [[x1, y1], [x2, y2]], isWinCondition?: boolean }
-    if (Array.isArray(item.pos)) {
-      const type = item.type || 'e_basic';
-      const isWin = !!item.isWinCondition || !!item.winConditionTagIfDeclared;
-      
-      if (item.pos.length > 0 && Array.isArray(item.pos[0])) {
-        for (const pt of item.pos) {
-          if (Array.isArray(pt) && pt.length >= 2) {
-            const enemy = createEnemy(pt[0], pt[1], type);
-            enemy.neverDespawn = true;
-            if (isWin) enemy.isWinCondition = true;
-            state.enemies.push(enemy);
-          }
-        }
-      } else if (item.pos.length >= 2 && typeof item.pos[0] === 'number') {
-        const enemy = createEnemy(item.pos[0], item.pos[1], type);
+    // Grouped format matching export: { type: 'e_basic', pos: [[x1, y1], [x2, y2]], isWinCondition?: boolean }
+    const type = item.type || 'e_basic';
+    const isWin = !!item.isWinCondition;
+    
+    for (const pt of item.pos) {
+      if (Array.isArray(pt) && pt.length >= 2) {
+        const enemy = createEnemy(pt[0], pt[1], type);
         enemy.neverDespawn = true;
         if (isWin) enemy.isWinCondition = true;
         state.enemies.push(enemy);
       }
-    } 
-    // Legacy individual format: { x: 100, y: 200, type: 'e_basic', isWinCondition?: boolean }
-    else if (typeof item.x === 'number' && typeof item.y === 'number') {
-      const enemy = createEnemy(item.x, item.y, item.type || 'e_basic');
-      enemy.neverDespawn = true;
-      if (item.isWinCondition || item.winConditionTagIfDeclared) {
-        enemy.isWinCondition = true;
-      }
-      state.enemies.push(enemy);
     }
   }
 }
@@ -541,7 +573,7 @@ export function restoreCustomSpawnerPrefabs(prefabs: any[]): void {
       } else {
         overlayTypes[p.id] = {
           name: p.name || 'Custom Spawner',
-          minHealth: p.config.health || 300,
+          minHealth: p.config.minHealth !== undefined ? p.config.minHealth : (p.config.health || 300),
           isEnemy: true,
           isEnemySpawner: true,
           danger: 3,
@@ -552,7 +584,12 @@ export function restoreCustomSpawnerPrefabs(prefabs: any[]): void {
             budget: p.config.budget !== undefined ? p.config.budget : 60,
             enemyTypeKey: Array.isArray(p.config.enemyTypeKey) ? [...p.config.enemyTypeKey] : ['e_basic'],
             spawnRadius: p.config.spawnRadius !== undefined ? p.config.spawnRadius : 120,
-            health: p.config.health || 300
+            spawnTriggerRadius: p.config.spawnTriggerRadius !== undefined ? p.config.spawnTriggerRadius : 200,
+            spawnInterval: p.config.spawnInterval !== undefined ? p.config.spawnInterval : 60,
+            health: p.config.health || p.config.minHealth || 300,
+            ...(p.config.hourlySpawnConfig ? {
+              hourlySpawnConfig: JSON.parse(JSON.stringify(p.config.hourlySpawnConfig))
+            } : {})
           },
           assetImgConfig: { idleAssetImg: ['img_spawner_a'], randomRotation: true, randomFlip: true },
           lootConfigOnDeath: 'lc_spawner',
@@ -563,103 +600,175 @@ export function restoreCustomSpawnerPrefabs(prefabs: any[]): void {
   }
 }
 
-export function serializeChunkBlocks(blocks: Block[]): any[] {
-  const activeBlocks = (blocks || []).filter(b => !b.isMined || b.overlay || b.liquidType);
-  if (activeBlocks.length === 0) return [];
-
-  // Group blocks by identical properties
-  const groups = new Map<string, { props: any, coords: { gx: number, gy: number }[] }>();
-
-  for (const b of activeBlocks) {
-    const defConfig = obstacleTypes[b.type] || obstacleTypes['o_dirt'];
-    const oCfg = b.overlay ? overlayTypes[b.overlay] : null;
-    let defHealth = defConfig ? defConfig.health : 60;
-    if (oCfg?.minHealth !== undefined && oCfg.minHealth > 0) {
-      defHealth = Math.max(defHealth, oCfg.minHealth);
-    }
-    const defSpawnerBudget = oCfg?.enemySpawnConfig ? oCfg.enemySpawnConfig.budget : 0;
-
-    const overlay = b.overlay || null;
-    const liquidType = b.liquidType || null;
-    const isMined = !!b.isMined;
-    const hasCustomHealth = b.health !== defHealth || b.maxHealth !== defHealth;
-    const customHealth = hasCustomHealth ? b.health : undefined;
-    const customMaxHealth = (hasCustomHealth && b.maxHealth !== b.health) ? b.maxHealth : undefined;
-    const customSpawnerBudget = (b.spawnerBudget !== defSpawnerBudget && b.spawnerBudget > 0) ? b.spawnerBudget : undefined;
-    const isWinCondition = !!b.isWinCondition;
-    const biome = b.biome ? b.biome : undefined;
-    
-    let customSpawnerConfig: any = undefined;
-    if (b.customSpawnerConfig) {
-      const isLiquid = b.liquidType === 'l_spawner' || (b.liquidType && !!liquidTypes[b.liquidType]?.isEnemySpawner) || (!!b.customSpawnerConfig && !!b.liquidType);
-      if (isLiquid) {
-        customSpawnerConfig = {
-          ...(b.customSpawnerConfig.name ? { name: b.customSpawnerConfig.name } : {}),
-          enemyTypeKey: Array.isArray(b.customSpawnerConfig.enemyTypeKey) ? [...b.customSpawnerConfig.enemyTypeKey] : ['e_basic'],
-          spawnRadius: b.customSpawnerConfig.spawnRadius !== undefined ? b.customSpawnerConfig.spawnRadius : 120,
-          spawnTriggerRadius: b.customSpawnerConfig.spawnTriggerRadius !== undefined ? b.customSpawnerConfig.spawnTriggerRadius : 200,
-          spawnInterval: b.customSpawnerConfig.spawnInterval !== undefined ? b.customSpawnerConfig.spawnInterval : 60,
-          ...(b.customSpawnerConfig.hourlySpawnConfig ? {
-            hourlySpawnConfig: {
-              enabled: b.customSpawnerConfig.hourlySpawnConfig.enabled !== false,
-              hourlyDaytimeBudget: Array.isArray(b.customSpawnerConfig.hourlySpawnConfig.hourlyDaytimeBudget) ? [...b.customSpawnerConfig.hourlySpawnConfig.hourlyDaytimeBudget] : [10, 20, 30],
-              hourlyNighttimeBudget: Array.isArray(b.customSpawnerConfig.hourlySpawnConfig.hourlyNighttimeBudget) ? [...b.customSpawnerConfig.hourlySpawnConfig.hourlyNighttimeBudget] : [30, 50, 80],
-              hourlyBudgetMultiplierForFollowingDay: b.customSpawnerConfig.hourlySpawnConfig.hourlyBudgetMultiplierForFollowingDay !== undefined ? b.customSpawnerConfig.hourlySpawnConfig.hourlyBudgetMultiplierForFollowingDay : 1.25,
-              selfDestructAfterBudgetSpawned: b.customSpawnerConfig.hourlySpawnConfig.selfDestructAfterBudgetSpawned !== undefined ? b.customSpawnerConfig.hourlySpawnConfig.selfDestructAfterBudgetSpawned : 0
-            }
-          } : {})
-        };
-      } else {
-        const minHealth = b.customSpawnerConfig.minHealth !== undefined ? b.customSpawnerConfig.minHealth : (b.customSpawnerConfig.health || 300);
-        customSpawnerConfig = {
-          ...(b.customSpawnerConfig.name ? { name: b.customSpawnerConfig.name } : {}),
-          budget: b.customSpawnerConfig.budget !== undefined ? b.customSpawnerConfig.budget : (b.spawnerBudget || 60),
-          enemyTypeKey: Array.isArray(b.customSpawnerConfig.enemyTypeKey) ? [...b.customSpawnerConfig.enemyTypeKey] : ['e_basic'],
-          spawnRadius: b.customSpawnerConfig.spawnRadius !== undefined ? b.customSpawnerConfig.spawnRadius : 120,
-          minHealth: minHealth,
-          health: b.customSpawnerConfig.health || b.maxHealth || minHealth
-        };
-      }
-    }
-    const customText = (b.overlay === 'ov_textsign' || b.customText) ? (b.customText || 'Hint') : undefined;
-    const paygateConfig = (b.type === 'o_paygate' || b.paygateConfig) ? {
-      resource: b.paygateConfig?.resource || 'soil',
-      amount: b.paygateConfig?.amount !== undefined ? b.paygateConfig.amount : 10,
-      spent: b.paygateConfig?.spent || 0
-    } : undefined;
-    const sunGeneratorConfig = b.sunGeneratorConfig ? {
-      damagePerSun: b.sunGeneratorConfig.damagePerSun,
-      maxSun: b.sunGeneratorConfig.maxSun,
-      accumulatedDamage: b.sunGeneratorConfig.accumulatedDamage || 0,
-      sunsDropped: b.sunGeneratorConfig.sunsDropped || 0
-    } : undefined;
-
-    const props: any = { type: b.type };
-    if (overlay) props.overlay = overlay;
-    if (liquidType) props.liquidType = liquidType;
-    if (isMined) props.isMined = true;
-    if (isWinCondition) props.isWinCondition = true;
-    if (customHealth !== undefined) props.health = customHealth;
-    if (customMaxHealth !== undefined) props.maxHealth = customMaxHealth;
-    if (customSpawnerBudget !== undefined) props.spawnerBudget = customSpawnerBudget;
-    if (customSpawnerConfig !== undefined) props.customSpawnerConfig = customSpawnerConfig;
-    if (customText !== undefined) props.customText = customText;
-    if (paygateConfig !== undefined) props.paygateConfig = paygateConfig;
-    if (sunGeneratorConfig !== undefined) props.sunGeneratorConfig = sunGeneratorConfig;
-    if (biome !== undefined) props.biome = biome;
-
-    const groupKey = JSON.stringify(props);
-    if (!groups.has(groupKey)) {
-      groups.set(groupKey, { props, coords: [] });
-    }
-    groups.get(groupKey)!.coords.push({ gx: b.gx, gy: b.gy });
+export function resolveSpawnerId(b: Block, isLiquid: boolean, prefabsMap?: Map<string, any>): string {
+  if (!isLiquid && b.overlay && b.overlay.startsWith('ov_spawner_p_')) {
+    return b.overlay;
+  }
+  if (isLiquid && b.liquidType && b.liquidType.startsWith('l_spawner_p_')) {
+    return b.liquidType;
   }
 
-  const result: any[] = [];
+  const name = b.customSpawnerConfig?.name || (isLiquid ? 'Ground Spawner' : 'Custom Spawner');
+  const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  const defaultPid = isLiquid ? ('l_spawner_p_' + cleanName) : ('ov_spawner_p_' + cleanName);
 
-  for (const { props, coords } of groups.values()) {
+  if (prefabsMap?.has(defaultPid)) {
+    return defaultPid;
+  }
+
+  if (prefabsMap) {
+    for (const p of prefabsMap.values()) {
+      if (p.isLiquid === isLiquid && p.name === name) {
+        return p.id;
+      }
+    }
+  }
+
+  return defaultPid;
+}
+
+export function findSpawnerPrefabConfig(id: string): any {
+  if (state.levelEditor?.customSpawnerPrefabs) {
+    const p = state.levelEditor.customSpawnerPrefabs.find((pr: any) => pr.id === id);
+    if (p) return p.config;
+  }
+  if (state.currentLevelLayoutData?.customSpawnerPrefabs) {
+    const p = state.currentLevelLayoutData.customSpawnerPrefabs.find((pr: any) => pr.id === id);
+    if (p) return p.config;
+  }
+  return null;
+}
+
+export function cleanCustomSpawnerExportConfig(rawConfig: any, isLiquid: boolean): any {
+  const cfg = rawConfig || {};
+  if (isLiquid) {
+    const rawHourly = cfg.hourlySpawnConfig || {};
+    const hourlySpawnConfig: any = {
+      hourlyDaytimeBudget: Array.isArray(rawHourly.hourlyDaytimeBudget)
+        ? [...rawHourly.hourlyDaytimeBudget]
+        : (typeof rawHourly.hourlyDaytimeBudget === 'number' ? [rawHourly.hourlyDaytimeBudget] : [10, 20, 30]),
+      hourlyNighttimeBudget: Array.isArray(rawHourly.hourlyNighttimeBudget)
+        ? [...rawHourly.hourlyNighttimeBudget]
+        : (typeof rawHourly.hourlyNighttimeBudget === 'number' ? [rawHourly.hourlyNighttimeBudget] : [30, 50, 80]),
+      hourlyBudgetMultiplierForFollowingDay: rawHourly.hourlyBudgetMultiplierForFollowingDay !== undefined
+        ? rawHourly.hourlyBudgetMultiplierForFollowingDay
+        : 1.25,
+      selfDestructAfterBudgetSpawned: rawHourly.selfDestructAfterBudgetSpawned !== undefined
+        ? rawHourly.selfDestructAfterBudgetSpawned
+        : 0
+    };
+
+    return {
+      hourlySpawnConfig,
+      minHealth: cfg.minHealth ?? cfg.health ?? 300,
+      spawnRadius: cfg.spawnRadius !== undefined ? cfg.spawnRadius : 120,
+      spawnTriggerRadius: cfg.spawnTriggerRadius !== undefined ? cfg.spawnTriggerRadius : 200,
+      spawnInterval: cfg.spawnInterval !== undefined ? cfg.spawnInterval : 60,
+      enemyTypeKey: Array.isArray(cfg.enemyTypeKey) && cfg.enemyTypeKey.length > 0
+        ? [...cfg.enemyTypeKey]
+        : ['e_basic']
+    };
+  } else {
+    return {
+      budget: cfg.budget !== undefined ? cfg.budget : 60,
+      minHealth: cfg.minHealth ?? cfg.health ?? 300,
+      spawnRadius: cfg.spawnRadius !== undefined ? cfg.spawnRadius : 120,
+      enemyTypeKey: Array.isArray(cfg.enemyTypeKey) && cfg.enemyTypeKey.length > 0
+        ? [...cfg.enemyTypeKey]
+        : ['e_basic']
+    };
+  }
+}
+
+export function buildPrefabsMap(): Map<string, any> {
+  const prefabsMap = new Map<string, any>();
+  if (state.levelEditor?.customSpawnerPrefabs && state.levelEditor.customSpawnerPrefabs.length > 0) {
+    for (const p of state.levelEditor.customSpawnerPrefabs) {
+      const isLiquid = !!(p.isLiquid || p.category === 'liquids' || (p.id && p.id.startsWith('l_spawner')));
+      prefabsMap.set(p.id, {
+        id: p.id,
+        name: p.name || (isLiquid ? 'Ground Spawner' : 'Custom Spawner'),
+        category: isLiquid ? 'liquids' : 'overlays',
+        isLiquid: isLiquid,
+        config: cleanCustomSpawnerExportConfig(p.config, isLiquid)
+      });
+    }
+  }
+  if (state.world && state.world.chunks) {
+    state.world.chunks.forEach((chunk: any) => {
+      for (const blk of (chunk.blocks || [])) {
+        if (blk.customSpawnerConfig) {
+          const name = blk.customSpawnerConfig.name || (blk.liquidType ? 'Ground Spawner' : 'Custom Spawner');
+          const isLiquid = !!blk.liquidType;
+          const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+          const pid = (blk.overlay && blk.overlay.startsWith('ov_spawner_p_')) ? blk.overlay :
+            (blk.liquidType && blk.liquidType.startsWith('l_spawner_p_')) ? blk.liquidType :
+            (isLiquid ? ('l_spawner_p_' + cleanName) : ('ov_spawner_p_' + cleanName));
+          if (!prefabsMap.has(pid)) {
+            prefabsMap.set(pid, {
+              id: pid,
+              name: name,
+              category: isLiquid ? 'liquids' : 'overlays',
+              isLiquid: isLiquid,
+              config: cleanCustomSpawnerExportConfig(blk.customSpawnerConfig, isLiquid)
+            });
+          }
+        }
+      }
+    });
+  }
+  return prefabsMap;
+}
+
+export function serializeChunkLayers(blocks: Block[], prefabsMap?: Map<string, any>): { obstacles: any[], overlays: any[] } {
+  if (!blocks || blocks.length === 0) {
+    return { obstacles: [], overlays: [] };
+  }
+
+  // 1. Serialize Obstacles (unmined blocks with type)
+  const obstacleGroups = new Map<string, { props: any, coords: { gx: number, gy: number }[] }>();
+
+  for (const b of blocks) {
+    if (b.isMined || !b.type) continue;
+
+    const defConfig = obstacleTypes[b.type] || obstacleTypes['o_dirt'];
+    const defHealth = defConfig ? defConfig.health : 60;
+    const hasCustomHealth = b.health !== defHealth || b.maxHealth !== defHealth;
+
+    const props: any = { obstacleType: b.type };
+    if (hasCustomHealth) props.health = b.health;
+    if (hasCustomHealth && b.maxHealth !== b.health) props.maxHealth = b.maxHealth;
+    if (b.isWinCondition) props.isWinCondition = true;
+    if (b.customBreakCost !== undefined) props.customBreakCost = b.customBreakCost;
+    if (b.paygateConfig) {
+      props.paygateConfig = {
+        resource: b.paygateConfig.resource || 'soil',
+        amount: b.paygateConfig.amount !== undefined ? b.paygateConfig.amount : 10,
+        spent: b.paygateConfig.spent || 0
+      };
+    } else if (b.type === 'o_paygate') {
+      props.paygateConfig = { resource: 'soil', amount: 10, spent: 0 };
+    }
+    if (b.sunGeneratorConfig) {
+      props.sunGeneratorConfig = {
+        damagePerSun: b.sunGeneratorConfig.damagePerSun,
+        maxSun: b.sunGeneratorConfig.maxSun,
+        accumulatedDamage: b.sunGeneratorConfig.accumulatedDamage || 0,
+        sunsDropped: b.sunGeneratorConfig.sunsDropped || 0
+      };
+    }
+    if (b.biome !== undefined && b.biome !== 0) props.biome = b.biome;
+
+    const key = JSON.stringify(props);
+    if (!obstacleGroups.has(key)) {
+      obstacleGroups.set(key, { props, coords: [] });
+    }
+    obstacleGroups.get(key)!.coords.push({ gx: b.gx, gy: b.gy });
+  }
+
+  const obstacles: any[] = [];
+  for (const { props, coords } of obstacleGroups.values()) {
     coords.sort((a, b) => (a.gy !== b.gy ? a.gy - b.gy : a.gx - b.gx));
-
     const spans: [number, number, number][] = [];
     let startGx = coords[0].gx;
     let len = 1;
@@ -677,109 +786,146 @@ export function serializeChunkBlocks(blocks: Block[]): any[] {
       }
     }
     spans.push([startGx, len, currentGy]);
-
-    result.push({
+    obstacles.push({
       ...props,
       pos: spans
     });
   }
 
-  return result;
+  // 2. Serialize Overlays and Spawners
+  const overlayGroups = new Map<string, { props: any, coords: { gx: number, gy: number }[] }>();
+
+  for (const b of blocks) {
+    if (!b.overlay && !b.liquidType) continue;
+
+    const isLiquidSpawner = !!(b.liquidType && (b.liquidType.startsWith('l_spawner') || liquidTypes[b.liquidType]?.isEnemySpawner || (b.customSpawnerConfig && b.liquidType)));
+    const isOverlaySpawner = !!(b.overlay && (b.overlay.startsWith('ov_spawner') || overlayTypes[b.overlay]?.isEnemySpawner || (b.customSpawnerConfig && !b.liquidType)));
+
+    if (isOverlaySpawner) {
+      const spawnerId = resolveSpawnerId(b, false, prefabsMap);
+      const props: any = { customSpawnerId: spawnerId };
+      if (b.isWinCondition) props.isWinCondition = true;
+
+      const key = JSON.stringify(props);
+      if (!overlayGroups.has(key)) {
+        overlayGroups.set(key, { props, coords: [] });
+      }
+      overlayGroups.get(key)!.coords.push({ gx: b.gx, gy: b.gy });
+    } else if (isLiquidSpawner) {
+      const groundId = resolveSpawnerId(b, true, prefabsMap);
+      const props: any = { customGroundSpawnerId: groundId };
+      if (b.isWinCondition) props.isWinCondition = true;
+
+      const key = JSON.stringify(props);
+      if (!overlayGroups.has(key)) {
+        overlayGroups.set(key, { props, coords: [] });
+      }
+      overlayGroups.get(key)!.coords.push({ gx: b.gx, gy: b.gy });
+    } else {
+      // Non-spawner overlay or liquid
+      if (b.overlay) {
+        const props: any = { overlayType: b.overlay };
+        if (b.overlay === 'ov_textsign' || b.customText) {
+          props.customText = b.customText || 'Hint';
+        }
+        if (b.isWinCondition) props.isWinCondition = true;
+
+        const key = JSON.stringify(props);
+        if (!overlayGroups.has(key)) {
+          overlayGroups.set(key, { props, coords: [] });
+        }
+        overlayGroups.get(key)!.coords.push({ gx: b.gx, gy: b.gy });
+      }
+      if (b.liquidType) {
+        const props: any = { liquidType: b.liquidType };
+        const key = JSON.stringify(props);
+        if (!overlayGroups.has(key)) {
+          overlayGroups.set(key, { props, coords: [] });
+        }
+        overlayGroups.get(key)!.coords.push({ gx: b.gx, gy: b.gy });
+      }
+    }
+  }
+
+  const overlays: any[] = [];
+  for (const { props, coords } of overlayGroups.values()) {
+    coords.sort((a, b) => (a.gy !== b.gy ? a.gy - b.gy : a.gx - b.gx));
+    const spans: [number, number, number][] = [];
+    let startGx = coords[0].gx;
+    let len = 1;
+    let currentGy = coords[0].gy;
+
+    for (let i = 1; i < coords.length; i++) {
+      const pt = coords[i];
+      if (pt.gy === currentGy && pt.gx === startGx + len) {
+        len++;
+      } else {
+        spans.push([startGx, len, currentGy]);
+        startGx = pt.gx;
+        len = 1;
+        currentGy = pt.gy;
+      }
+    }
+    spans.push([startGx, len, currentGy]);
+    overlays.push({
+      ...props,
+      pos: spans
+    });
+  }
+
+  return { obstacles, overlays };
 }
 
-export function deserializeChunkBlocks(chunk: any, blocksData: any[]): void {
+export function serializeChunkBlocks(blocks: Block[]): any[] {
+  const { obstacles, overlays } = serializeChunkLayers(blocks);
+  return [...obstacles, ...overlays];
+}
+
+export function deserializeChunk(chunk: any, chunkData: any): void {
   chunk.blocks = [];
   chunk.blockMap.clear();
 
-  if (!blocksData || !Array.isArray(blocksData)) return;
+  if (!chunkData) return;
 
-  for (const item of blocksData) {
-    if (!item) continue;
+  const obstacles = chunkData.obstacles;
+  const overlays = chunkData.overlays;
 
-    if (item.pos && Array.isArray(item.pos)) {
-      // Compressed v2 span format
+  // 1. Process Obstacles layer
+  if (obstacles && Array.isArray(obstacles)) {
+    for (const item of obstacles) {
+      if (!item || !item.pos || !Array.isArray(item.pos)) continue;
+      const obsType = item.obstacleType || item.type || 'o_dirt';
+
       for (const span of item.pos) {
-        if (!Array.isArray(span)) continue;
-        let startGx: number;
-        let spanLen: number;
-        let gy: number;
-
-        if (span.length >= 3) {
-          startGx = span[0];
-          spanLen = span[1];
-          gy = span[2];
-        } else if (span.length === 2) {
-          startGx = span[0];
-          spanLen = 1;
-          gy = span[1];
-        } else {
-          continue;
-        }
+        if (!Array.isArray(span) || span.length < 2) continue;
+        const startGx = span[0];
+        const spanLen = span.length >= 3 ? span[1] : 1;
+        const gy = span.length >= 3 ? span[2] : span[1];
 
         for (let i = 0; i < spanLen; i++) {
           const gx = startGx + i;
-          const blk = new Block(gx, gy, item.type || 'o_dirt', item.overlay || null, item.biome || 0, item.liquidType || null);
+          const blk = new Block(gx, gy, obsType, null, item.biome || 0, null);
           blk.isMined = !!item.isMined;
           if (item.isWinCondition) blk.isWinCondition = true;
-          if (item.customText !== undefined) {
-            blk.customText = item.customText;
-          } else if (item.overlay === 'ov_textsign') {
-            blk.customText = 'Hint';
-          }
+          if (item.customBreakCost !== undefined) blk.customBreakCost = item.customBreakCost;
           if (item.paygateConfig) {
             blk.paygateConfig = {
               resource: item.paygateConfig.resource || 'soil',
               amount: item.paygateConfig.amount !== undefined ? item.paygateConfig.amount : 10,
               spent: item.paygateConfig.spent || 0
             };
-          } else if (item.type === 'o_paygate') {
+          } else if (obsType === 'o_paygate') {
             blk.paygateConfig = { resource: 'soil', amount: 10, spent: 0 };
           }
-          if (item.health !== undefined) blk.health = item.health;
-          if (item.maxHealth !== undefined) blk.maxHealth = item.maxHealth;
-          if (item.spawnerBudget !== undefined) blk.spawnerBudget = item.spawnerBudget;
           if (item.sunGeneratorConfig) {
             blk.sunGeneratorConfig = { ...item.sunGeneratorConfig };
           }
-          if (item.customSpawnerConfig) {
-            const isLiquid = item.liquidType === 'l_spawner' || (item.liquidType && !!liquidTypes[item.liquidType]?.isEnemySpawner) || (!!item.customSpawnerConfig && !!item.liquidType);
-            if (isLiquid) {
-              blk.customSpawnerConfig = {
-                ...(item.customSpawnerConfig.name ? { name: item.customSpawnerConfig.name } : {}),
-                enemyTypeKey: Array.isArray(item.customSpawnerConfig.enemyTypeKey) ? [...item.customSpawnerConfig.enemyTypeKey] : ['e_basic'],
-                spawnRadius: item.customSpawnerConfig.spawnRadius !== undefined ? item.customSpawnerConfig.spawnRadius : 120,
-                spawnTriggerRadius: item.customSpawnerConfig.spawnTriggerRadius !== undefined ? item.customSpawnerConfig.spawnTriggerRadius : 200,
-                spawnInterval: item.customSpawnerConfig.spawnInterval !== undefined ? item.customSpawnerConfig.spawnInterval : 60,
-                hourlySpawnConfig: item.customSpawnerConfig.hourlySpawnConfig ? {
-                  enabled: item.customSpawnerConfig.hourlySpawnConfig.enabled !== false,
-                  hourlyDaytimeBudget: Array.isArray(item.customSpawnerConfig.hourlySpawnConfig.hourlyDaytimeBudget) ? [...item.customSpawnerConfig.hourlySpawnConfig.hourlyDaytimeBudget] : [10, 20, 30],
-                  hourlyNighttimeBudget: Array.isArray(item.customSpawnerConfig.hourlySpawnConfig.hourlyNighttimeBudget) ? [...item.customSpawnerConfig.hourlySpawnConfig.hourlyNighttimeBudget] : [30, 50, 80],
-                  hourlyBudgetMultiplierForFollowingDay: item.customSpawnerConfig.hourlySpawnConfig.hourlyBudgetMultiplierForFollowingDay ?? 1.25,
-                  selfDestructAfterBudgetSpawned: item.customSpawnerConfig.hourlySpawnConfig.selfDestructAfterBudgetSpawned ?? 0
-                } : {
-                  enabled: true,
-                  hourlyDaytimeBudget: [10, 20, 30],
-                  hourlyNighttimeBudget: [30, 50, 80],
-                  hourlyBudgetMultiplierForFollowingDay: 1.25,
-                  selfDestructAfterBudgetSpawned: 0
-                }
-              };
-            } else {
-              const minHealth = item.customSpawnerConfig.minHealth !== undefined ? item.customSpawnerConfig.minHealth : (item.customSpawnerConfig.health || 300);
-              const obstacleHealth = blk.config?.health || blk.health || 0;
-              const finalHealth = Math.max(minHealth, obstacleHealth);
-              blk.customSpawnerConfig = {
-                ...(item.customSpawnerConfig.name ? { name: item.customSpawnerConfig.name } : {}),
-                budget: item.customSpawnerConfig.budget !== undefined ? item.customSpawnerConfig.budget : (item.spawnerBudget || 60),
-                enemyTypeKey: Array.isArray(item.customSpawnerConfig.enemyTypeKey) ? [...item.customSpawnerConfig.enemyTypeKey] : ['e_basic'],
-                spawnRadius: item.customSpawnerConfig.spawnRadius !== undefined ? item.customSpawnerConfig.spawnRadius : 120,
-                minHealth: minHealth,
-                health: finalHealth
-              };
-              blk.spawnerBudget = blk.customSpawnerConfig.budget;
-              blk.health = finalHealth;
-              blk.maxHealth = finalHealth;
-            }
+          if (item.health !== undefined) {
+            blk.health = item.health;
+            blk.maxHealth = item.maxHealth !== undefined ? item.maxHealth : item.health;
+          }
+          if (item.maxHealth !== undefined) {
+            blk.maxHealth = item.maxHealth;
           }
           chunk.blocks.push(blk);
           chunk.blockMap.set(`${gx},${gy}`, blk);
@@ -788,7 +934,91 @@ export function deserializeChunkBlocks(chunk: any, blocksData: any[]): void {
     }
   }
 
+  // 2. Process Overlays / Spawners layer
+  if (overlays && Array.isArray(overlays)) {
+    for (const item of overlays) {
+      if (!item || !item.pos || !Array.isArray(item.pos)) continue;
+
+      for (const span of item.pos) {
+        if (!Array.isArray(span) || span.length < 2) continue;
+        const startGx = span[0];
+        const spanLen = span.length >= 3 ? span[1] : 1;
+        const gy = span.length >= 3 ? span[2] : span[1];
+
+        for (let i = 0; i < spanLen; i++) {
+          const gx = startGx + i;
+          let blk = chunk.blockMap.get(`${gx},${gy}`);
+          if (!blk) {
+            blk = new Block(gx, gy, 'o_dirt', null, 0, null);
+            blk.isMined = true;
+            chunk.blocks.push(blk);
+            chunk.blockMap.set(`${gx},${gy}`, blk);
+          }
+
+          if (item.customSpawnerId) {
+            const spawnerId = item.customSpawnerId;
+            blk.setOverlay(spawnerId);
+            const oCfg = overlayTypes[spawnerId];
+            const pCfg = oCfg?.enemySpawnConfig || findSpawnerPrefabConfig(spawnerId);
+            const cfg = item.customSpawnerConfig || pCfg || {};
+            const budget = item.spawnerBudget !== undefined ? item.spawnerBudget : (cfg.budget ?? 60);
+            const minHealth = item.health !== undefined ? item.health : (cfg.minHealth ?? cfg.health ?? 300);
+            blk.setCustomSpawnerConfig({
+              ...cfg,
+              budget: budget,
+              minHealth: minHealth,
+              health: minHealth
+            });
+            if (item.isWinCondition) blk.isWinCondition = true;
+          } else if (item.customGroundSpawnerId) {
+            const groundId = item.customGroundSpawnerId;
+            blk.isMined = true;
+            blk.overlay = null;
+            blk.liquidType = groundId;
+            const lCfg = liquidTypes[groundId];
+            const pCfg = lCfg?.enemySpawnConfig || findSpawnerPrefabConfig(groundId);
+            const cfg = item.customSpawnerConfig || pCfg || {};
+            const rawHourly = cfg.hourlySpawnConfig || {};
+            blk.setCustomSpawnerConfig({
+              ...cfg,
+              hourlySpawnConfig: {
+                enabled: rawHourly.enabled !== false,
+                hourlyDaytimeBudget: Array.isArray(rawHourly.hourlyDaytimeBudget) ? [...rawHourly.hourlyDaytimeBudget] : [10, 20, 30],
+                hourlyNighttimeBudget: Array.isArray(rawHourly.hourlyNighttimeBudget) ? [...rawHourly.hourlyNighttimeBudget] : [30, 50, 80],
+                hourlyBudgetMultiplierForFollowingDay: rawHourly.hourlyBudgetMultiplierForFollowingDay ?? 1.25,
+                selfDestructAfterBudgetSpawned: rawHourly.selfDestructAfterBudgetSpawned ?? 0
+              }
+            });
+            blk.lastSpawnTime = state.frames + Math.floor(Math.random() * (blk.customSpawnerConfig?.spawnInterval || 60));
+            if (item.isWinCondition) blk.isWinCondition = true;
+          } else if (item.overlayType || item.overlay) {
+            const ov = item.overlayType || item.overlay;
+            blk.setOverlay(ov);
+            if (item.customText !== undefined) {
+              blk.customText = item.customText;
+            } else if (ov === 'ov_textsign') {
+              blk.customText = 'Hint';
+            }
+            if (item.isWinCondition) blk.isWinCondition = true;
+          } else if (item.liquidType) {
+            blk.liquidType = item.liquidType;
+            blk.isMined = true;
+            blk.overlay = null;
+          }
+        }
+      }
+    }
+  }
+
   chunk.rebuildOverlayList();
+}
+
+/**
+ * @deprecated Legacy monolithic block deserialization. The engine now strictly parses decoupled obstacles and overlays.
+ */
+export function deserializeChunkBlocks(chunk: any, blocksData: any[]): void {
+  console.warn('deserializeChunkBlocks is deprecated; chunks now strictly use decoupled { obstacles, overlays } format.');
+  deserializeChunk(chunk, { obstacles: blocksData });
 }
 
 export function serializeChunkTurrets(turrets: any[]): any[] {
@@ -843,28 +1073,13 @@ export function deserializeLevelLoots(world: any, lootsData: any[] | undefined |
   if (!world || !lootsData || !Array.isArray(lootsData)) return;
 
   for (const item of lootsData) {
-    if (!item) continue;
+    if (!item || !Array.isArray(item.pos)) continue;
     const type = item.lootType || item.type || 'sun';
 
-    if (Array.isArray(item.pos)) {
-      if (item.pos.length > 0 && Array.isArray(item.pos[0])) {
-        for (const pt of item.pos) {
-          if (Array.isArray(pt) && pt.length >= 2) {
-            const px = pt[0];
-            const py = pt[1];
-            const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
-            const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
-            const chunk = world.getChunk(cx, cy);
-            if (chunk) {
-              const loot = spawnLootEntity(px, py, type);
-              loot.neverDespawn = true;
-              chunk.loot.push(loot);
-            }
-          }
-        }
-      } else if (item.pos.length >= 2 && typeof item.pos[0] === 'number') {
-        const px = item.pos[0];
-        const py = item.pos[1];
+    for (const pt of item.pos) {
+      if (Array.isArray(pt) && pt.length >= 2) {
+        const px = pt[0];
+        const py = pt[1];
         const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
         const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
         const chunk = world.getChunk(cx, cy);
@@ -873,17 +1088,6 @@ export function deserializeLevelLoots(world: any, lootsData: any[] | undefined |
           loot.neverDespawn = true;
           chunk.loot.push(loot);
         }
-      }
-    } else if (typeof item.x === 'number' && typeof item.y === 'number') {
-      const px = item.x;
-      const py = item.y;
-      const cx = floor(px / (GRID_SIZE * CHUNK_SIZE));
-      const cy = floor(py / (GRID_SIZE * CHUNK_SIZE));
-      const chunk = world.getChunk(cx, cy);
-      if (chunk) {
-        const loot = spawnLootEntity(px, py, type);
-        loot.neverDespawn = true;
-        chunk.loot.push(loot);
       }
     }
   }
@@ -920,6 +1124,7 @@ export function saveLevelLayout(customName?: string, customDescription?: string)
 
   const prog = state.levelEditorAlmanacProgression || state.currentLevelLayoutData?.almanacProgression || state.currentLevelLayoutData?.AlmanacProgression || AlmanacProgression;
   const playerUpgrades = serializeLevelEditorPlayerUpgrades() || state.currentLevelLayoutData?.playerUpgrades || state.currentLevelLayoutData?.PlayerUpgrades;
+  const exportedProgression = buildExportAlmanacProgression(prog);
 
   const levelData: any = {
     version: 2,
@@ -928,16 +1133,7 @@ export function saveLevelLayout(customName?: string, customDescription?: string)
     levelDescription: levelDescription,
     tag: tag,
     enableWorldGen: state.currentLevelLayoutData?.enableWorldGen ?? (state.currentLevelId === 'sandbox' ? false : true),
-    almanacProgression: {
-      StartingTurret: [...(prog.StartingTurret || [])],
-      UnlockedByDiscoverTurret: [...(prog.UnlockedByDiscoverTurret || [])],
-      LockedTurret: [...(prog.LockedTurret || [])],
-      BannedTurrets: [...(prog.BannedTurrets || [])],
-      UnlockCost: [...(prog.UnlockCost || AlmanacProgression.UnlockCost || [])],
-      AllTurretCrafting: prog.AllTurretCrafting === true,
-      AllTurretUpgrade: prog.AllTurretUpgrade !== false,
-      CraftingCostOverride: [...(prog.CraftingCostOverride || AlmanacProgression.CraftingCostOverride || [])]
-    },
+    almanacProgression: exportedProgression,
     ...(playerUpgrades ? { playerUpgrades } : {}),
     ...(levelCfg.sunSpawnHourInterval !== undefined ? { sunSpawnHourInterval: levelCfg.sunSpawnHourInterval } : (state.currentLevelLayoutData?.sunSpawnHourInterval !== undefined ? { sunSpawnHourInterval: state.currentLevelLayoutData.sunSpawnHourInterval } : { sunSpawnHourInterval: 0.5 })),
     ...(levelCfg.customBudgetPerNight !== undefined ? { customBudgetPerNight: levelCfg.customBudgetPerNight } : (state.currentLevelLayoutData?.customBudgetPerNight ? { customBudgetPerNight: state.currentLevelLayoutData.customBudgetPerNight } : {})),
@@ -945,8 +1141,14 @@ export function saveLevelLayout(customName?: string, customDescription?: string)
     ...(levelCfg.hourlyBudgetPerNight !== undefined ? { hourlyBudgetPerNight: levelCfg.hourlyBudgetPerNight } : (state.currentLevelLayoutData?.hourlyBudgetPerNight ? { hourlyBudgetPerNight: state.currentLevelLayoutData.hourlyBudgetPerNight } : {})),
     ...(levelCfg.enabledCurrency !== undefined ? { enabledCurrency: levelCfg.enabledCurrency } : (state.currentLevelLayoutData?.enabledCurrency ? { enabledCurrency: state.currentLevelLayoutData.enabledCurrency } : {})),
     ...(levelCfg.startingResource !== undefined ? { startingResource: levelCfg.startingResource } : (state.currentLevelLayoutData?.startingResource ? { startingResource: state.currentLevelLayoutData.startingResource } : {})),
-    ...(levelCfg.globalEnemySpawnConfig !== undefined ? { globalEnemySpawnConfig: levelCfg.globalEnemySpawnConfig } : (state.currentLevelLayoutData?.globalEnemySpawnConfig ? { globalEnemySpawnConfig: state.currentLevelLayoutData.globalEnemySpawnConfig } : {})),
+    globalEnemySpawnConfig: formatGlobalEnemySpawnConfig(levelCfg.globalEnemySpawnConfig || state.currentLevelLayoutData?.globalEnemySpawnConfig || {}),
     ...(levelCfg.starRatingTargets !== undefined ? { starRatingTargets: levelCfg.starRatingTargets } : (state.currentLevelLayoutData?.starRatingTargets ? { starRatingTargets: state.currentLevelLayoutData.starRatingTargets } : {})),
+    ...(levelCfg.nightsToPass !== undefined ? { nightsToPass: levelCfg.nightsToPass } : (state.currentLevelLayoutData?.nightsToPass !== undefined ? { nightsToPass: state.currentLevelLayoutData.nightsToPass } : {})),
+    ...(levelCfg.enemyBudgetValueToKill !== undefined ? { enemyBudgetValueToKill: levelCfg.enemyBudgetValueToKill } : (state.currentLevelLayoutData?.enemyBudgetValueToKill !== undefined ? { enemyBudgetValueToKill: state.currentLevelLayoutData.enemyBudgetValueToKill } : {})),
+    ...(levelCfg.collectResource && Object.keys(levelCfg.collectResource).length > 0 ? { collectResource: levelCfg.collectResource } : (state.currentLevelLayoutData?.collectResource ? { collectResource: state.currentLevelLayoutData.collectResource } : {})),
+    ...(levelCfg.huntEnemy && Object.keys(levelCfg.huntEnemy).length > 0 ? { huntEnemy: levelCfg.huntEnemy } : (state.currentLevelLayoutData?.huntEnemy ? { huntEnemy: state.currentLevelLayoutData.huntEnemy } : {})),
+    ...(levelCfg.breakObstacle && Object.keys(levelCfg.breakObstacle).length > 0 ? { breakObstacle: levelCfg.breakObstacle } : (state.currentLevelLayoutData?.breakObstacle ? { breakObstacle: state.currentLevelLayoutData.breakObstacle } : {})),
+    destroyAllEnemySpawners: levelCfg.destroyAllEnemySpawners ?? state.currentLevelLayoutData?.destroyAllEnemySpawners ?? true,
     timestamp: new Date().toISOString(),
     playerSpawn: {
       x: state.player ? Math.round(state.player.pos.x) : 0,
@@ -955,18 +1157,26 @@ export function saveLevelLayout(customName?: string, customDescription?: string)
     chunks: []
   };
 
+  const prefabsMap = buildPrefabsMap();
+  if (prefabsMap.size > 0) {
+    levelData.customSpawnerPrefabs = Array.from(prefabsMap.values());
+  }
+
   if (state.world && state.world.chunks) {
     state.world.chunks.forEach((chunk: any) => {
-      const chunkData: any = {
-        cx: chunk.cx,
-        cy: chunk.cy,
-        localChunkLevel: chunk.localChunkLevel,
-        prefabId: chunk.prefabId,
-        blocks: serializeChunkBlocks(chunk.blocks),
-        turrets: serializeChunkTurrets(chunk.turrets)
-      };
+      const { obstacles, overlays } = serializeChunkLayers(chunk.blocks, prefabsMap);
+      const turrets = serializeChunkTurrets(chunk.turrets);
 
-      if (chunkData.blocks.length > 0 || chunkData.turrets.length > 0) {
+      if (obstacles.length > 0 || overlays.length > 0 || turrets.length > 0) {
+        const chunkData: any = {
+          cx: chunk.cx,
+          cy: chunk.cy,
+          localChunkLevel: chunk.localChunkLevel,
+          prefabId: chunk.prefabId
+        };
+        if (obstacles.length > 0) chunkData.obstacles = obstacles;
+        if (overlays.length > 0) chunkData.overlays = overlays;
+        if (turrets.length > 0) chunkData.turrets = turrets;
         levelData.chunks.push(chunkData);
       }
     });
@@ -991,10 +1201,6 @@ export function saveLevelLayout(customName?: string, customDescription?: string)
     levelData.spawnAreaTiles = serializeSpawnAreaTiles(state.world.spawnAreaSet);
   }
 
-  if (state.levelEditor?.customSpawnerPrefabs && state.levelEditor.customSpawnerPrefabs.length > 0) {
-    levelData.customSpawnerPrefabs = state.levelEditor.customSpawnerPrefabs;
-  }
-
   const jsonString = JSON.stringify(levelData, null, 2);
   const blob = new Blob([jsonString], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -1005,4 +1211,126 @@ export function saveLevelLayout(customName?: string, customDescription?: string)
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+export function getRemainingWinConditionEntitiesAndSpawners() {
+  const items: Array<{ x: number, y: number, label: string }> = [];
+  if (state.enemies) {
+    for (const e of state.enemies) {
+      if ((e.isWinCondition || (state.currentLevelLayoutData?.destroyAllEnemySpawners !== false && e.isEnemySpawner)) && e.health > 0 && !e.isDying) {
+        items.push({ x: e.pos.x, y: e.pos.y, label: 'Enemy' });
+      }
+    }
+  }
+  if (state.world && state.world.chunks) {
+    state.world.chunks.forEach((chunk: any) => {
+      for (const b of chunk.blocks) {
+        if (!b.isMined) {
+          const isSpawner = b.overlay?.startsWith('ov_spawner') || b.liquidType === 'l_spawner' || b.customSpawnerConfig || overlayTypes[b.overlay || '']?.isEnemySpawner;
+          if (b.isWinCondition || isSpawner) {
+            items.push({ x: b.pos.x + GRID_SIZE / 2, y: b.pos.y + GRID_SIZE / 2, label: isSpawner ? 'Spawner' : 'Target' });
+          }
+        }
+      }
+    });
+  }
+  return items;
+}
+
+export function evaluateWinConditions(): boolean {
+  if (state.isGameOver || (state.levelWonSequence && state.levelWonSequence.active)) return false;
+  const layout = state.currentLevelLayoutData || {};
+  
+  let allMet = true;
+
+  const winEnemies = (state.enemies || []).filter((e: any) => e.isWinCondition && e.health > 0 && !e.isDying);
+  let winBlocksCount = 0;
+  if (state.world && state.world.chunks) {
+    state.world.chunks.forEach((chunk: any) => {
+      for (const b of chunk.blocks) {
+        if (b.isWinCondition && !b.isMined) winBlocksCount++;
+      }
+    });
+  }
+  if (winEnemies.length > 0 || winBlocksCount > 0) {
+    allMet = false;
+  }
+
+  if (layout.nightsToPass !== undefined && layout.nightsToPass > 0) {
+    const totalHours = (state.frames / HOUR_FRAMES);
+    const day = Math.floor(totalHours / 24) + 1;
+    if (day <= layout.nightsToPass) {
+      allMet = false;
+    }
+  }
+
+  if (layout.enemyBudgetValueToKill !== undefined && layout.enemyBudgetValueToKill > 0) {
+    if ((state.accumulatedEnemyBudgetKilled || 0) < layout.enemyBudgetValueToKill) {
+      allMet = false;
+    }
+  }
+
+  if (layout.collectResource && typeof layout.collectResource === 'object') {
+    for (const [resType, reqAmt] of Object.entries(layout.collectResource as Record<string, number>)) {
+      const coll = state.accumulatedCollectedResources?.[resType] || (state as any)[resType + 'Currency'] || 0;
+      if (coll < reqAmt) {
+        allMet = false;
+        break;
+      }
+    }
+  }
+
+  if (layout.huntEnemy && typeof layout.huntEnemy === 'object') {
+    for (const [eType, reqAmt] of Object.entries(layout.huntEnemy as Record<string, number>)) {
+      const killed = state.accumulatedHuntEnemy?.[eType] || 0;
+      if (killed < reqAmt) {
+        allMet = false;
+        break;
+      }
+    }
+  }
+
+  if (layout.breakObstacle && typeof layout.breakObstacle === 'object') {
+    for (const [obsType, reqAmt] of Object.entries(layout.breakObstacle as Record<string, number>)) {
+      const mined = state.accumulatedBreakObstacle?.[obsType] || 0;
+      if (mined < reqAmt) {
+        allMet = false;
+        break;
+      }
+    }
+  }
+
+  const checkSpawners = layout.destroyAllEnemySpawners !== false;
+  if (checkSpawners) {
+    let spawnerCount = 0;
+    if (state.world && state.world.chunks) {
+      state.world.chunks.forEach((chunk: any) => {
+        for (const b of chunk.blocks) {
+          if (!b.isMined) {
+            const isSpawner = b.overlay?.startsWith('ov_spawner') || b.liquidType === 'l_spawner' || b.customSpawnerConfig || overlayTypes[b.overlay || '']?.isEnemySpawner;
+            if (isSpawner) spawnerCount++;
+          }
+        }
+      });
+    }
+    if (spawnerCount > 0) {
+      allMet = false;
+    }
+  }
+
+  if (winEnemies.length === 0 && winBlocksCount === 0 && !layout.nightsToPass && !layout.enemyBudgetValueToKill && !layout.collectResource && !layout.huntEnemy && !layout.breakObstacle) {
+    let spawnerCount = 0;
+    if (state.world && state.world.chunks) {
+      state.world.chunks.forEach((chunk: any) => {
+        for (const b of chunk.blocks) {
+          if (!b.isMined && (b.overlay?.startsWith('ov_spawner' ) || b.liquidType === 'l_spawner' || b.customSpawnerConfig || overlayTypes[b.overlay || '']?.isEnemySpawner)) {
+            spawnerCount++;
+          }
+        }
+      });
+    }
+    allMet = (spawnerCount === 0);
+  }
+
+  return allMet && state.player && state.player.health > 0;
 }

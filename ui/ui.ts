@@ -12,6 +12,8 @@ import { restoreLevelFromCache } from '../levelEditor';
 import { getPlayerUpgradeStat } from '../src/playerUpgrades';
 import { drawDarkButton } from '../uiComponents';
 import { soundEngine } from '../src/audio/soundEngine';
+import { getRemainingWinConditionEntitiesAndSpawners } from '../levelManager';
+import { overlayTypes } from '../balanceObstacles';
 
 declare const floor: any;
 declare const nf: any;
@@ -222,7 +224,7 @@ function drawStats(alpha: number) {
   fill(20, 15, 45, alpha * 0.4);
   rect(x + 30, y + 10, 115, 6, 3);
   // Fixed refilling bug by using ?? operator to ensure 0 health evaluates correctly
-  const hpRatio = (state.player?.health ?? 100) / (state.player?.maxHealth || 100);
+  const hpRatio = (state.player?.health ?? 300) / (state.player?.maxHealth || 300);
   fill(155, 255, 0, alpha);
   rect(x + 30, y + 10, 115 * hpRatio, 6, 3);
 
@@ -255,32 +257,13 @@ function drawStats(alpha: number) {
   rect(staminaX + 30, y + 10, innerStaminaBarW * stamRatio, 6, 3);
 
   // WinCondition Tracker Text next to stamina bar
-  const winConditionEnemies = (state.enemies || []).filter((e: any) => e.isWinCondition);
-  let winBlocksCount = 0;
-  if (state.world && state.world.chunks) {
-    state.world.chunks.forEach((chunk: any) => {
-      for (const b of chunk.blocks) {
-        if (b.isWinCondition && !b.isMined) {
-          winBlocksCount++;
-        }
-      }
-    });
-  }
-  const remainingEnemyCount = winConditionEnemies.filter((e: any) => e.health > 0 && !e.isDying).length;
-  if (remainingEnemyCount > 0 || winBlocksCount > 0) {
-    let txt = '';
-    if (remainingEnemyCount > 0 && winBlocksCount > 0) {
-      txt = `Defeat Grapes (${remainingEnemyCount}) & Break blocks (${winBlocksCount} left)`;
-    } else if (remainingEnemyCount > 0) {
-      txt = `Eliminate the marked Grapes (${remainingEnemyCount} left)`;
-    } else {
-      txt = `Break the marked blocks (${winBlocksCount} left)`;
-    }
+  const objText = getObjectiveTrackerText();
+  if (objText) {
     const trackerX = staminaX + staminaW + 15;
-    textSize(12);
-    fill(255);
+    textSize(11);
+    fill(255, 230, 100);
     textAlign(LEFT, CENTER);
-    text(txt, trackerX + 12, y + hpH / 2);
+    text(`🎯 ${objText}`, trackerX + 12, y + hpH / 2);
   }
   
   // Currency Row
@@ -681,6 +664,8 @@ export function drawUI(spawnFromBudget: Function) {
     }
   }
 
+  drawWinConditionArrowHint();
+
   if (hoveredTooltipData) {
     drawTurretTooltip(hoveredTooltipData, mouseX, mouseY);
   }
@@ -708,3 +693,145 @@ export function isMouseOverUI() {
 
   return false;
 }
+
+function drawWinConditionArrowHint() {
+  if (!state.player || state.isGameOver || state.isLevelCompleted) return;
+  const items = getRemainingWinConditionEntitiesAndSpawners();
+  if (items.length > 0 && items.length < 4) {
+    let nearest = items[0];
+    let minDist = dist(state.player.pos.x, state.player.pos.y, nearest.x, nearest.y);
+    for (let i = 1; i < items.length; i++) {
+      const d = dist(state.player.pos.x, state.player.pos.y, items[i].x, items[i].y);
+      if (d < minDist) {
+        minDist = d;
+        nearest = items[i];
+      }
+    }
+
+    const wPos = { x: nearest.x, y: nearest.y };
+    const pPos = state.player.pos;
+
+    const screenX = wPos.x - state.cameraPos.x + width / 2;
+    const screenY = wPos.y - state.cameraPos.y + height / 2;
+
+    const screenMargin = 40;
+    const maxDistX = width / 2 - screenMargin;
+    const maxDistY = height / 2 - screenMargin;
+
+    const dx = screenX - width / 2;
+    const dy = screenY - height / 2;
+    const distToTarget = dist(0, 0, dx, dy);
+
+    let indX, indY;
+    let isPointing = false;
+
+    const constraintScale = Math.min(1, maxDistX / Math.max(1, Math.abs(dx)), maxDistY / Math.max(1, Math.abs(dy)));
+
+    if (constraintScale < 1 || distToTarget > Math.min(width, height) / 2 - 40) {
+      indX = width / 2 + dx * constraintScale;
+      indY = height / 2 + dy * constraintScale;
+      isPointing = true;
+    } else {
+      indX = screenX;
+      indY = screenY;
+      isPointing = false;
+    }
+
+    push();
+    translate(indX, indY);
+
+    const pulse = 1.0 + 0.05 * sin(state.frames * 0.1);
+    scale(pulse);
+
+    rectMode(CENTER);
+    fill(30, 25, 60, 200);
+    stroke(255, 100, 100, 255);
+    strokeWeight(2);
+    rect(0, 0, 32, 32, 8);
+
+    fill(255, 100, 100);
+    noStroke();
+    textAlign(CENTER, CENTER);
+    textSize(16);
+    text("!", 0, 0);
+
+    if (isPointing) {
+      const angle = atan2(wPos.y - pPos.y, wPos.x - pPos.x);
+      rotate(angle);
+      fill(255, 100, 100);
+      triangle(22, 0, 15, -5, 15, 5);
+    }
+    pop();
+  }
+}
+
+function getObjectiveTrackerText(): string {
+  const layout = state.currentLevelLayoutData || {};
+  const parts: string[] = [];
+
+  const winEnemies = (state.enemies || []).filter((e: any) => e.isWinCondition && e.health > 0 && !e.isDying);
+  let winBlocksCount = 0;
+  let spawnerCount = 0;
+  if (state.world && state.world.chunks) {
+    state.world.chunks.forEach((chunk: any) => {
+      for (const b of chunk.blocks) {
+        if (!b.isMined) {
+          if (b.isWinCondition) winBlocksCount++;
+          const isSpawner = b.overlay?.startsWith('ov_spawner') || b.liquidType === 'l_spawner' || b.customSpawnerConfig || overlayTypes[b.overlay || '']?.isEnemySpawner;
+          if (isSpawner) spawnerCount++;
+        }
+      }
+    });
+  }
+
+  if (winEnemies.length > 0) parts.push(`Targets (${winEnemies.length})`);
+  if (winBlocksCount > 0) parts.push(`Marked Blocks (${winBlocksCount})`);
+
+  if (layout.nightsToPass && layout.nightsToPass > 0) {
+    const currentDay = Math.floor(state.frames / (24 * HOUR_FRAMES)) + 1;
+    parts.push(`Survive Night ${Math.min(layout.nightsToPass, currentDay)}/${layout.nightsToPass}`);
+  }
+
+  if (layout.enemyBudgetValueToKill && layout.enemyBudgetValueToKill > 0) {
+    const killed = Math.min(layout.enemyBudgetValueToKill, state.accumulatedEnemyBudgetKilled || 0);
+    parts.push(`Kill Budget: ${killed}/${layout.enemyBudgetValueToKill}`);
+  }
+
+  if (layout.collectResource && typeof layout.collectResource === 'object') {
+    for (const [resKey, req] of Object.entries(layout.collectResource as Record<string, number>)) {
+      if (req > 0) {
+        const cur = Math.min(req, state.accumulatedCollectedResources?.[resKey] || (state as any)[resKey + 'Currency'] || 0);
+        parts.push(`${resKey.toUpperCase()}: ${cur}/${req}`);
+      }
+    }
+  }
+
+  if (layout.huntEnemy && typeof layout.huntEnemy === 'object') {
+    for (const [eKey, req] of Object.entries(layout.huntEnemy as Record<string, number>)) {
+      if (req > 0) {
+        const cur = Math.min(req, state.accumulatedHuntEnemy?.[eKey] || 0);
+        const name = eKey === 'any' ? 'Any' : (eKey.replace(/^e_/, ''));
+        parts.push(`Hunt ${name}: ${cur}/${req}`);
+      }
+    }
+  }
+
+  if (layout.breakObstacle && typeof layout.breakObstacle === 'object') {
+    for (const [obsKey, req] of Object.entries(layout.breakObstacle as Record<string, number>)) {
+      if (req > 0) {
+        const cur = Math.min(req, state.accumulatedBreakObstacle?.[obsKey] || 0);
+        const name = obsKey === 'any' ? 'Any' : (obsKey.replace(/^(o_|ov_)/, ''));
+        parts.push(`Break ${name}: ${cur}/${req}`);
+      }
+    }
+  }
+
+  if (parts.length === 0 || layout.destroyAllEnemySpawners !== false) {
+    if (spawnerCount > 0) {
+      parts.push(`Destroy Spawners (${spawnerCount} left)`);
+    }
+  }
+
+  return parts.join(' • ');
+}
+

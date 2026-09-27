@@ -365,7 +365,7 @@ function renderSunInputRow(
     line(cursorX, numCenterY - 8, cursorX, numCenterY + 8);
     noStroke();
   }
-  if (typeof textFont === 'function') textFont('sans-serif');
+  if (typeof textFont === 'function') textFont('Viga');
 
   // Clickable hitbox for the editable number area
   registerUIHitbox({

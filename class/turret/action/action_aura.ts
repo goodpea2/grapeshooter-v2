@@ -37,16 +37,22 @@ export class ActionAura extends TurretAction {
     
     const cfg = config.auraConfig;
     if (!cfg) return;
-    const effectiveRadius = (cfg.radius || 0) * (this.turret.stats.rangeMult || 1);
+    const effectiveRadius = (cfg.radius || 0) * (this.turret.activeStats?.rangeMult || this.turret.stats?.rangeMult || 1);
     const auraRadiusSq = effectiveRadius * effectiveRadius;
 
     if (cfg.auraVfx === 'aura_frostfield') {
-      if (!state.vfx.some((v: any) => v instanceof FrostFieldAuraVFX && v.target === this.turret)) {
+      const v = state.vfx.find((v: any) => v instanceof FrostFieldAuraVFX && v.target === this.turret);
+      if (!v) {
         state.vfx.push(new FrostFieldAuraVFX(this.turret, effectiveRadius));
+      } else {
+        v.radius = effectiveRadius;
       }
     } else if (cfg.auraVfx === 'aura_torchwood') {
-      if (!state.vfx.some((v: any) => v instanceof TorchwoodAuraVFX && v.target === this.turret)) {
+      const v = state.vfx.find((v: any) => v instanceof TorchwoodAuraVFX && v.target === this.turret);
+      if (!v) {
         state.vfx.push(new TorchwoodAuraVFX(this.turret, effectiveRadius));
+      } else {
+        v.radius = effectiveRadius;
       }
     } else if (cfg.auraVfx === 'aura_speeder') {
       if (!state.vfx.some((v: any) => v instanceof SpeederAuraVFX && v.target === this.turret)) {
@@ -75,11 +81,36 @@ export class ActionAura extends TurretAction {
         }
       }
 
+      // Torchwood Upgrade 4: Aura deals 5 damage to enemies every 0.5s (30 frames)
+      if (this.turret.type === 't2_torchwood' && (state.turretUpgrades?.['t2_torchwood'] || []).includes('u_t2_torchwood_4')) {
+        if (state.frames % 30 === 0) {
+          for (let e of state.enemies) {
+            if (e.health > 0 && !e.isDying) {
+              const dx = e.pos.x - wPos.x;
+              const dy = e.pos.y - wPos.y;
+              if (dx * dx + dy * dy <= auraRadiusSq) {
+                e.takeDamage(5, { type: 'aura', source: this.turret });
+              }
+            }
+          }
+        }
+      }
+
       // 2. Projectile / Bullet Damage Buffing (e.g. Torchwood)
       if (cfg.boostsBulletConfig) {
         const bCfg = cfg.boostsBulletConfig;
         const allowedEmitters: string[] = bCfg.boostsBulletFromEmitter || ['turret', 'player'];
-        const dmgAdd = bCfg.damageAdd || 3;
+        let dmgAdd = bCfg.damageAdd || 3;
+        if (this.turret.type === 't2_torchwood') {
+          const upgs = state.turretUpgrades?.['t2_torchwood'] || [];
+          if (upgs.includes('u_t2_torchwood_2')) {
+            const attachedCount = (state.player?.attachments || []).filter((a: any) => a.type === 't2_torchwood').length;
+            dmgAdd += 2 * Math.max(1, attachedCount);
+          }
+          if (upgs.includes('u_t2_torchwood_3')) {
+            dmgAdd += 7;
+          }
+        }
 
         for (let b of state.bullets) {
           if (b.life <= 0) continue;
