@@ -6,8 +6,6 @@ import { Bullet } from '../../bullet';
 import { spawnGreenEssenseVfx } from '../../../vfx/GreenEssenceVFX';
 import { spawnLootAt } from '../../../economy';
 
-declare const random: any;
-declare const createVector: any;
 
 export const t2_minespawner: TurretConfig = {
   name: 'Mine Launcher', costs: { sun: 25 }, costAlmanac: { fuel: 8 }, drops: { fuel: 2 }, health: 100, color: [255, 20, 20], size: 22, tier: 2,

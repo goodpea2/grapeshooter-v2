@@ -3,7 +3,6 @@ import { paygateModal } from './paygateModal';
 import { sunGeneratorModal } from './sunGeneratorModal';
 import { textSignEditor } from './textsignEditor';
 
-declare const keyIsDown: any;
 
 export function updateLevelEditorCamera() {
   if (state.currentScreen !== 'level_editor') return;

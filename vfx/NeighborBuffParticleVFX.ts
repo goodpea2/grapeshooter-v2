@@ -1,18 +1,6 @@
 import { ObjectPool } from '../class/pool';
 import { state } from '../state';
 
-declare const p5: any;
-declare const createVector: any;
-declare const color: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const noStroke: any;
-declare const fill: any;
-declare const ellipse: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const line: any;
 
 export class NeighborBuffParticleVFX {
   fromX: number = 0;

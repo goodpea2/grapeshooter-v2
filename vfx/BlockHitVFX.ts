@@ -3,16 +3,6 @@ import { state } from '../state';
 import { GRID_SIZE } from '../constants';
 import { ObjectPool } from '../class/pool';
 
-declare const createVector: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const fill: any;
-declare const noStroke: any;
-declare const rect: any;
-declare const map: any;
-declare const CENTER: any;
-declare const rectMode: any;
 
 export class BlockHitVFX {
   pos: any; life: number = 10; maxLife: number = 10;

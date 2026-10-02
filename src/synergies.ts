@@ -5,31 +5,6 @@ import { turretTypes } from '../balanceTurrets';
 import { CLASS_ICON_MAP } from '../ui/richText';
 import { getHexAxial } from '../utils/hex';
 
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const stroke: any;
-declare const noStroke: any;
-declare const fill: any;
-declare const noFill: any;
-declare const strokeWeight: any;
-declare const line: any;
-declare const ellipse: any;
-declare const rect: any;
-declare const rectMode: any;
-declare const CENTER: any;
-declare const LEFT: any;
-declare const textSize: any;
-declare const textAlign: any;
-declare const text: any;
-declare const textWidth: any;
-declare const image: any;
-declare const imageMode: any;
-declare const sin: any;
-declare const lerp: any;
-declare const triangle: any;
-declare const dist: any;
-declare const drawingContext: any;
 
 export type SynergyClass =
   | 'leaf'

@@ -5,10 +5,6 @@ import { WorldTurret } from '../../worldTurret';
 import { spawnHitSpark, spawnExplosion } from '../../../vfx/index';
 import { soundEngine } from '../../../src/audio/soundEngine';
 
-declare const p5: any;
-declare const sin: any;
-declare const dist: any;
-declare const color: any;
 
 export class ActionMeleeAttack extends EnemyAction {
   tags = ['attack'];

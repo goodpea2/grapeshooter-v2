@@ -4,19 +4,6 @@ import { getPlayerUpgradeStat } from '../src/playerUpgrades';
 import { ObjectPool } from '../class/pool';
 import { soundEngine } from '../src/audio/soundEngine';
 
-declare const p5: any;
-declare const createVector: any;
-declare const lerp: any;
-declare const image: any;
-declare const imageMode: any;
-declare const CENTER: any;
-declare const tint: any;
-declare const noTint: any;
-declare const width: any;
-declare const height: any;
-declare const sin: any;
-declare const push: any;
-declare const pop: any;
 
 export class LootInFlightVFX {
   pos: any;

@@ -3,8 +3,6 @@ import { state } from '../../../state';
 import { TurretAction } from '../../turretAction';
 import { Bullet } from '../../bullet';
 
-declare const createVector: any;
-declare const random: any;
 
 export class ActionFirstStrike extends TurretAction {
   tags = ['attack', 'firstStrike'];

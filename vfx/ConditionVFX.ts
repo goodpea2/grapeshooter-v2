@@ -1,22 +1,6 @@
 import { state } from '../state';
 import { ObjectPool } from '../class/pool';
 
-declare const map: any;
-declare const sin: any;
-declare const cos: any;
-declare const TWO_PI: any;
-declare const random: any;
-declare const noStroke: any;
-declare const noFill: any;
-declare const fill: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const ellipse: any;
-declare const line: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const rotate: any;
 
 export class ConditionVFX {
   target: any;

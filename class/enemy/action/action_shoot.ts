@@ -4,12 +4,6 @@ import { spawnBullet } from '../../bullet';
 import { MuzzleFlash } from '../../../vfx/index';
 import { soundEngine } from '../../../src/audio/soundEngine';
 
-declare const cos: any;
-declare const sin: any;
-declare const atan2: any;
-declare const radians: any;
-declare const random: any;
-declare const color: any;
 
 export class ActionShoot extends EnemyAction {
   tags = ['attack', 'shoot'];

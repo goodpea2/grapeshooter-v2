@@ -6,9 +6,6 @@ import { triggerUpgradeHook } from '../../../src/upgrades';
 import { GRID_SIZE } from '../../../constants';
 import { spawnNeighborBuffParticle } from '../../../vfx/index';
 
-declare const p5: any;
-declare const sin: any;
-declare const createVector: any;
 
 function isIndestructibleEntity(ent: any): boolean {
   if (!ent) return false;

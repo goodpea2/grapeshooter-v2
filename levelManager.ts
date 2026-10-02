@@ -12,11 +12,11 @@ import { serializeLevelEditorPlayerUpgrades } from './ui/almanac/playerUpgradesP
 import { resetTurretUnlockTreeState, initTurretUnlockTree } from './ui/almanac/turretUnlockTree';
 import { resetUIComponentAnimations } from './uiComponents';
 
-declare const floor: any;
 
 import { serializeLevelEditorLevelConfig, formatGlobalEnemySpawnConfig } from './ui/almanac/levelConfigPanel';
 import { DEFAULT_DAYTIME_WEIGHTS } from './ui/almanac/levelConfig/types';
 import { soundEngine } from './src/audio/soundEngine';
+import { WORLD_GEN_CELLULAR_CONFIG } from './worldgen/cellTypes';
 
 export interface LevelConfig {
   id: string;
@@ -34,7 +34,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     description: 'Full world for testing with updated global enemy spawn config.',
     customLayoutData: {
       enableWorldGen: true,
-      globalEnemySpawnConfig: DEFAULT_DAYTIME_WEIGHTS
+      globalEnemySpawnConfig: DEFAULT_DAYTIME_WEIGHTS,
+      noWinCondition: true,
+      destroyAllEnemySpawners: false
     }
   },
   {
@@ -43,7 +45,9 @@ export const DEFAULT_LEVELS: LevelConfig[] = [
     tag: 'Dev',
     description: 'Empty ground for testing.',
     customLayoutData: {
-      enableWorldGen: false
+      enableWorldGen: false,
+      noWinCondition: true,
+      destroyAllEnemySpawners: false
     }
   }
 ];
@@ -167,6 +171,8 @@ export function triggerImportLevelJson(onLoaded?: (data: any, cfg: LevelConfig) 
 export function syncWorldSeed(seed?: number): number {
   const s = seed !== undefined ? seed : (state.worldSeed || 2026);
   state.worldSeed = s;
+  WORLD_GEN_CELLULAR_CONFIG.worldSeed = s;
+  state.worldPreviewNeedsUpdate = true;
   if (typeof (window as any).noiseSeed === 'function') {
     try { (window as any).noiseSeed(s); } catch (e) {}
   }
@@ -1214,6 +1220,16 @@ export function saveLevelLayout(customName?: string, customDescription?: string)
 }
 
 export function getRemainingWinConditionEntitiesAndSpawners() {
+  const layout = state.currentLevelLayoutData || {};
+  const isSandbox = state.currentLevelId === 'sandbox' || 
+                    state.currentLevelId === 'sbw' || 
+                    state.currentLevelId === 'mpty' || 
+                    state.currentLevelLayoutData?.tag?.toLowerCase() === 'sandbox' || 
+                    state.currentLevelLayoutData?.tag?.toLowerCase() === 'dev' || 
+                    layout.noWinCondition === true || 
+                    layout.disableWinCondition === true;
+  if (isSandbox) return [];
+
   const items: Array<{ x: number, y: number, label: string }> = [];
   if (state.enemies) {
     for (const e of state.enemies) {
@@ -1240,6 +1256,17 @@ export function getRemainingWinConditionEntitiesAndSpawners() {
 export function evaluateWinConditions(): boolean {
   if (state.isGameOver || (state.levelWonSequence && state.levelWonSequence.active)) return false;
   const layout = state.currentLevelLayoutData || {};
+  
+  const isSandbox = state.currentLevelId === 'sandbox' || 
+                    state.currentLevelId === 'sbw' || 
+                    state.currentLevelId === 'mpty' || 
+                    state.currentLevelLayoutData?.tag?.toLowerCase() === 'sandbox' || 
+                    state.currentLevelLayoutData?.tag?.toLowerCase() === 'dev' || 
+                    layout.noWinCondition === true || 
+                    layout.disableWinCondition === true;
+  if (isSandbox) {
+    return false;
+  }
   
   let allMet = true;
 

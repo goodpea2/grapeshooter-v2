@@ -9,36 +9,6 @@ import { triggerUpgradeHook, recalculateAllStats } from '../src/upgrades';
 import { spawnExplosion } from '../vfx';
 import { ObjectPool } from './pool';
 
-declare const p5: any;
-declare const createVector: any;
-declare const dist: any;
-declare const sin: any;
-declare const frameCount: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const noStroke: any;
-declare const color: any;
-declare const fill: any;
-declare const ellipse: any;
-declare const map: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const rectMode: any;
-declare const CENTER: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const random: any;
-declare const rect: any;
-declare const image: any;
-declare const imageMode: any;
-declare const rotate: any;
-declare const tint: any;
-declare const noTint: any;
-declare const width: any;
-declare const height: any;
-declare const abs: any;
 
 export class LootEntity {
   pos: any; 

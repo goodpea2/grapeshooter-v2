@@ -1,23 +1,6 @@
 import { state } from '../../../state';
 import { EditorLevelConfigData } from './types';
 
-declare const push: any;
-declare const pop: any;
-declare const fill: any;
-declare const noStroke: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const line: any;
-declare const rect: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const LEFT: any;
-declare const TOP: any;
-declare const CENTER: any;
-declare const BOTTOM: any;
-declare const mouseX: any;
-declare const mouseY: any;
 
 export function renderTextInput(
   x: number, y: number, w: number, h: number,

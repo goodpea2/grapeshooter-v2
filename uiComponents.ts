@@ -2,40 +2,6 @@ import { state } from './state';
 import { color, ColorRGBA } from './uiColors';
 import { soundEngine } from './src/audio/soundEngine';
 
-declare const mouseX: any;
-declare const mouseY: any;
-declare const width: any;
-declare const height: any;
-declare const fill: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const noStroke: any;
-declare const noFill: any;
-declare const text: any;
-declare const textSize: any;
-declare const textStyle: any;
-declare const textAlign: any;
-declare const textWidth: any;
-declare const rect: any;
-declare const line: any;
-declare const triangle: any;
-declare const circle: any;
-declare const image: any;
-declare const imageMode: any;
-declare const rectMode: any;
-declare const BOLD: any;
-declare const NORMAL: any;
-declare const CENTER: any;
-declare const LEFT: any;
-declare const RIGHT: any;
-declare const TOP: any;
-declare const CORNER: any;
-declare const mouseIsPressed: any;
-declare const textFont: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const scale: any;
 
 export const UI_FONT_INPUT = 'Consolas, monospace';
 export const UI_FONT_DEFAULT = 'Viga';
@@ -116,6 +82,7 @@ export function registerUIHitbox(hitbox: Omit<UIHitbox, 'layer'> & { layer?: num
 
 export function isAnyModalOpen(): boolean {
   return !!(
+    state.showWorldGenPreview ||
     state.isAlmanacOpen ||
     state.showUnlockPopup ||
     state.turretUnlockChoiceModal ||
@@ -128,6 +95,17 @@ export function isAnyModalOpen(): boolean {
     state.activeNPC ||
     state.isGameOver
   );
+}
+
+export function updateUIHoverState(mx: number = mouseX, my: number = mouseY) {
+  const topHit = getHitUIElement(mx, my);
+  const topId = (topHit && !topHit.disabled) ? topHit.id : null;
+  if (topId !== lastHoveredHitboxId) {
+    if (topId !== null) {
+      soundEngine.playSFX('levellist_hover');
+    }
+    lastHoveredHitboxId = topId;
+  }
 }
 
 export function getHitUIElement(mx: number = mouseX, my: number = mouseY): UIHitbox | null {
@@ -340,14 +318,12 @@ export function drawButton(
 
   const hitX = options.hitboxX !== undefined ? options.hitboxX : x;
   const hitY = options.hitboxY !== undefined ? options.hitboxY : y;
-  const isUnderMouse = !disabled && mouseX >= hitX && mouseX <= hitX + w && mouseY >= hitY && mouseY <= hitY + h;
+  const modalOpen = isAnyModalOpen();
+  const effectiveLayer = layer !== undefined ? layer : currentLayer;
+  const isOccludedByModal = modalOpen && effectiveLayer < 100;
+  const isUnderMouse = !disabled && !isOccludedByModal && mouseX >= hitX && mouseX <= hitX + w && mouseY >= hitY && mouseY <= hitY + h;
   const isHovered = isHoveredForce || isUnderMouse;
   const isPressed = !disabled && (isPressedForce || (pressedHitboxId === id && isUnderMouse && mouseIsDown()));
-
-  if (isUnderMouse && lastHoveredHitboxId !== id) {
-    lastHoveredHitboxId = id;
-    soundEngine.playSFX('levellist_hover');
-  }
 
   registerUIHitbox({
     id,
@@ -355,7 +331,7 @@ export function drawButton(
     y: hitY,
     w,
     h,
-    layer,
+    layer: effectiveLayer,
     disabled,
     onClick
   });

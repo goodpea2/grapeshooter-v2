@@ -4,41 +4,6 @@ import { restoreLevelFromCache } from '../levelEditor';
 import { drawCloseButton, drawGreenButton, drawCard } from '../uiComponents';
 import { color } from '../uiColors';
 
-declare const floor: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const fill: any;
-declare const noFill: any;
-declare const noStroke: any;
-declare const stroke: any;
-declare const rect: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const CENTER: any;
-declare const LEFT: any;
-declare const TOP: any;
-declare const width: any;
-declare const height: any;
-declare const dist: any;
-declare const lerp: any;
-declare const sin: any;
-declare const rectMode: any;
-declare const line: any;
-declare const image: any;
-declare const imageMode: any;
-declare const tint: any;
-declare const noTint: any;
-declare const strokeWeight: any;
-declare const scale: any;
-declare const ellipse: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const beginShape: any;
-declare const vertex: any;
-declare const endShape: any;
-declare const CLOSE: any;
 
 const MODAL_W = 600;
 const MODAL_H = 430;
@@ -212,21 +177,6 @@ export function drawGameOver() {
     text(item.val, 0, 40);
     pop();
   }
-  
-  // Combat Statistics Summary Box
-  const cStats = state.combatStats || { totalDamageDealt: 0, turretKills: 0, shotsFired: 0 };
-  push();
-  fill(...color.veryDarkBlue(p * 200));
-  stroke(...color.blue(p * 150));
-  strokeWeight(2);
-  rectMode(CENTER);
-  rect(0, MODAL_H / 2 - 115, MODAL_W - 60, 42, 10);
-  noStroke();
-  textAlign(CENTER, CENTER);
-  textSize(12);
-  fill(...color.lightYellow(p * 255));
-  text(`⚔️ BATTLE REPORT — Total Dmg: ${Math.round(cStats.totalDamageDealt || 0)} | Shots: ${cStats.shotsFired || 0} | Kills: ${cStats.turretKills || 0}`, 0, MODAL_H / 2 - 115);
-  pop();
   
   // Return Button
   const isPlaytest = !!state.isEditorPlaytest;

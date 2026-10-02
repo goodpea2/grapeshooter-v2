@@ -4,9 +4,6 @@ import { TurretAction } from '../../turretAction';
 import { Bullet } from '../../bullet';
 import { spawnLootAt } from '../../../economy';
 
-declare const random: any;
-declare const floor: any;
-declare const createVector: any;
 
 export class ActionSpawnBulletAtRandom extends TurretAction {
   tags = ['attack', 'projectile', 'random'];

@@ -1,6 +1,13 @@
 
 import { ROOM_PREFABS, RoomPrefab } from '../dictionaryRoomPrefab';
 
+// ==========================================
+// Boss / Danger Periodicity Constants (TUNE ME)
+// ==========================================
+export const BOSS_SPIKE_INTERVAL = 22; // Spike every N discovered chunks (~20-25 per design)
+export const BOSS_SPIKE_BOSS_WEIGHT_BOOST = 30; // Additional weight given to 'bos' during spike
+export const BOSS_SPIKE_TREASURE_WEIGHT_BOOST = 15; // Additional weight given to 'tre' during spike
+
 interface StepDefinition {
   notes: string;
   rooms: number;
@@ -95,7 +102,13 @@ export function generateRoomDirectorData(): string {
       targetTotalValue -= 15; 
       
       for (let r = 0; r < step.rooms; r++) {
-        const weights = step.weights;
+        const isSpikeRoom = ((chain.length + 1) % BOSS_SPIKE_INTERVAL) === 0;
+        const weights = { ...step.weights };
+        if (isSpikeRoom) {
+          weights.bos = (weights.bos || 0) + BOSS_SPIKE_BOSS_WEIGHT_BOOST;
+          weights.tre = (weights.tre || 0) + BOSS_SPIKE_TREASURE_WEIGHT_BOOST;
+        }
+
         const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
         let rand = Math.random() * totalWeight;
         let chosenCategory = Object.keys(weights)[0];

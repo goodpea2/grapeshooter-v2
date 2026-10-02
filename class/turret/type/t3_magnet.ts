@@ -6,9 +6,6 @@ import { state } from '../../../state';
 import { spawnLootInFlightVFX } from '../../../vfx/index';
 import { releaseLoot } from '../../loot';
 
-declare const width: any;
-declare const height: any;
-declare const p5: any;
 
 export class MagnetAttachedTurret extends AttachedTurret {
   collectedLootCount: number = 0;

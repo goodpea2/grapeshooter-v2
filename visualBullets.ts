@@ -1,21 +1,5 @@
 import { state } from './state';
 
-declare const push: any;
-declare const pop: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const line: any;
-declare const image: any;
-declare const imageMode: any;
-declare const CENTER: any;
-declare const translate: any;
-declare const rotate: any;
-declare const atan2: any;
-declare const sin: any;
-declare const PI: any;
-declare const fill: any;
-declare const noStroke: any;
-declare const ellipse: any;
 
 /**
  * Converts any bullet color format (Array [r,g,b], [r,g,b,a], hex, p5.Color, number)

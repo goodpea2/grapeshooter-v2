@@ -1,14 +1,6 @@
 import { EditorLevelConfigData } from './types';
 import { renderTextInput } from './generalPanel';
 
-declare const fill: any;
-declare const noStroke: any;
-declare const rect: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const LEFT: any;
-declare const TOP: any;
 
 export function drawSpawnsPanel(
   cardX: number, curY: number, cardW: number,

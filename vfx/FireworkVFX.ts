@@ -1,25 +1,6 @@
 import { state } from '../state';
 import { ObjectPool } from '../class/pool';
 
-declare const createVector: any;
-declare const color: any;
-declare const red: any;
-declare const green: any;
-declare const blue: any;
-declare const map: any;
-declare const random: any;
-declare const TWO_PI: any;
-declare const cos: any;
-declare const sin: any;
-declare const noStroke: any;
-declare const fill: any;
-declare const ellipse: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const frameCount: any;
-declare const floor: any;
-declare const drawingContext: any;
 
 export class FireworkVFX {
   pos: any;

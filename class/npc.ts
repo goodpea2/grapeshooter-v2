@@ -7,37 +7,6 @@ import { turretTypes } from '../balanceTurrets';
 import { LootEntity } from './loot';
 import { spawnLootAt } from '../economy';
 
-declare const p5: any;
-declare const createVector: any;
-declare const dist: any;
-declare const atan2: any;
-declare const floor: any;
-declare const frameCount: any;
-declare const random: any;
-declare const cos: any;
-declare const sin: any;
-declare const color: any;
-declare const TWO_PI: any;
-declare const PI: any;
-declare const HALF_PI: any;
-declare const abs: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const rotate: any;
-declare const scale: any;
-declare const image: any;
-declare const imageMode: any;
-declare const CENTER: any;
-declare const tint: any;
-declare const noTint: any;
-declare const width: any;
-declare const height: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const fill: any;
-declare const noStroke: any;
-declare const text: any;
 
 export class NPCEntity {
   pos: any;

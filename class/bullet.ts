@@ -14,18 +14,6 @@ import { getPlayerUpgradeStat } from '../src/playerUpgrades';
 import { ObjectPool } from './pool';
 import { soundEngine } from '../src/audio/soundEngine';
 
-declare const p5: any;
-declare const createVector: any;
-declare const dist: any;
-declare const floor: any;
-declare const color: any;
-declare const random: any;
-declare const cos: any;
-declare const sin: any;
-declare const TWO_PI: any;
-declare const lerp: any;
-declare const width: any;
-declare const height: any;
 
 export class Bullet {
   pos: any;

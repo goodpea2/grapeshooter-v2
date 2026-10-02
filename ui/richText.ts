@@ -2,18 +2,6 @@
 import { state } from '../state';
 import { TurretClass } from '../src/upgrades';
 
-declare const image: any;
-declare const text: any;
-declare const textWidth: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const fill: any;
-declare const LEFT: any;
-declare const CENTER: any;
-declare const imageMode: any;
 
 export const CLASS_ICON_MAP: Record<string, string> = {
   c_leaf: 'img_icon_class_shooter',

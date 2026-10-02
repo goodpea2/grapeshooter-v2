@@ -3,8 +3,6 @@ import { state } from '../../../state';
 import { TurretAction } from '../../turretAction';
 import { spawnLootAt } from '../../../economy';
 
-declare const floor: any;
-declare const random: any;
 
 export class ActionPassiveSun extends TurretAction {
   tags = ['economy', 'passive'];

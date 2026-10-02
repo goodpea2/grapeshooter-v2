@@ -11,11 +11,6 @@ import { ECONOMY_CONFIG, spawnLootAt } from './economy';
 import { Bullet } from './entities';
 import { soundEngine } from './src/audio/soundEngine';
 
-declare const random: any;
-declare const cos: any;
-declare const sin: any;
-declare const frameCount: any;
-declare const floor: any;
 
 export const customBudgetPerNight = [200, 600, 1500, 3000, 6000, 12000, 18000, 24000, 30000, 33000]; // default customBudgetPerNight
 export const defaultHourlyBudgetPerDay = [0];
@@ -246,19 +241,6 @@ function getWeightsForPeriod(key: string): number[] {
   });
 }
 
-const CHUNK_LEVEL_WEIGHTS: number[][] = [
-  [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // Lvl 1
-  [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // Lvl 2
-  [0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 1, 0.75, 0, 1, 0.25, 0.25, 0.25, 0, 0.25, 0.25, 0.25, 0.25], // Lvl 3
-  [0.25, 0.25, 0.25, 0.5, 0.5, 0.5, 1, 0.25, 0.5, 1, 0.75, 0.75, 0.75, 0.5, 0.75, 0.75, 0.75, 0.75], // Lvl 4
-  [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 5
-  [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 6
-  [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 7
-  [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 8
-  [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 9
-  [0, 0, 0, 0.5, 0.25, 0.25, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // Lvl 10
-];
-
 export const ENEMY_KEYS = Object.keys(enemyTypes);
 
 export function getWeightsForCurrentTime() {
@@ -282,18 +264,7 @@ export function getWeightsForCurrentTime() {
     dtWeights = getWeightsForPeriod(key);
   }
   
-  const enableWorldGen = state.currentLevelLayoutData?.enableWorldGen ?? (state.currentLevelId === 'sandbox' ? false : true);
-  
-  if (!enableWorldGen) {
-    // When enableWorldGen=false, set CHUNK_LEVEL_WEIGHTS of all enemies to 1
-    return dtWeights.map((w: number) => (w !== undefined ? w : 0) * 1);
-  }
-
-  const clIdx = Math.min(Math.max(0, state.currentChunkLevel - 1), CHUNK_LEVEL_WEIGHTS.length - 1);
-  const clWeights = CHUNK_LEVEL_WEIGHTS[clIdx] || Array(ENEMY_KEYS.length).fill(1);
-
-  // Multiply weights
-  return dtWeights.map((w: number, i: number) => (w !== undefined ? w : 0) * (clWeights[i] !== undefined ? clWeights[i] : 1));
+  return dtWeights;
 }
 
 export function isLegibleSpot(x: number, y: number): boolean {

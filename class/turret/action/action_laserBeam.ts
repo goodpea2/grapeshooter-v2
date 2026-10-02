@@ -6,9 +6,6 @@ import { Bullet } from '../../bullet';
 import { GRID_SIZE } from '../../../constants';
 import { soundEngine } from '../../../src/audio/soundEngine';
 
-declare const createVector: any;
-declare const random: any;
-declare const floor: any;
 
 export class ActionLaserBeam extends TurretAction {
   tags = ['attack', 'laser'];

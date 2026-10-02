@@ -1,19 +1,6 @@
 import { state } from '../state';
 import { ObjectPool } from '../class/pool';
 
-declare const p5: any;
-declare const createVector: any;
-declare const map: any;
-declare const random: any;
-declare const TWO_PI: any;
-declare const cos: any;
-declare const sin: any;
-declare const fill: any;
-declare const ellipse: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const frameCount: any;
 
 export class PoisonGasVFX {
   pos: any; radius: number = 50; life: number = 60; duration: number = 60;

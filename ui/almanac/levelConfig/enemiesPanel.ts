@@ -3,25 +3,6 @@ import { EditorLevelConfigData, SPAWN_CONFIG_PERIODS, getDynamicEnemyKeys, getSe
 import { ALL_ENEMY_TYPES_LIST } from '../../../levelEditor/types';
 import { drawButton } from '../../../uiComponents';
 
-declare const push: any;
-declare const pop: any;
-declare const fill: any;
-declare const noStroke: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const rect: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const textWidth: any;
-declare const LEFT: any;
-declare const TOP: any;
-declare const CENTER: any;
-declare const image: any;
-declare const imageMode: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const mouseIsPressed: any;
 
 export function drawEnemiesPanel(
   cardX: number, curY: number, cardW: number,

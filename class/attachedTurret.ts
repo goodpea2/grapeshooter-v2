@@ -14,25 +14,7 @@ import { TURRET_RECIPES } from '../dictionaryTurretMerging';
 import { requestFlungSpawn } from '../lvDemo';
 import { isEnemyObstacle } from './turret';
 
-declare const p5: any;
-declare const createVector: any;
-declare const dist: any;
-declare const atan2: any;
-declare const floor: any;
-declare const frameCount: any;
-declare const lerp: any;
-declare const random: any;
-declare const cos: any;
-declare const sin: any;
-declare const radians: any;
-declare const TWO_PI: any;
-declare const width: any;
-declare const height: any;
 // Added missing color declaration
-declare const color: any;
-declare const line: any;
-declare const stroke: any;
-declare const strokeWeight: any;
 
 import { createAttachedTurret } from './turret/TurretRegistry';
 import { triggerUpgradeHook, recalculateAllStats } from '../src/upgrades';

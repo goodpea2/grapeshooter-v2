@@ -1,21 +1,5 @@
 import { ObjectPool } from '../class/pool';
 
-declare const p5: any;
-declare const createVector: any;
-declare const random: any;
-declare const pow: any;
-declare const lerp: any;
-declare const map: any;
-declare const push: any;
-declare const pop: any;
-declare const scale: any;
-declare const translate: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const noStroke: any;
-declare const fill: any;
-declare const text: any;
-declare const CENTER: any;
 
 export class DamageNumberVFX {
   pos: any;

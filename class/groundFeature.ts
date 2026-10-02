@@ -19,19 +19,6 @@ import {
 } from '../vfx';
 import { requestSpawn, requestFlungSpawn } from '../lvDemo';
 
-declare const createVector: any;
-declare const dist: any;
-declare const floor: any;
-declare const random: any;
-declare const cos: any;
-declare const sin: any;
-declare const TWO_PI: any;
-declare const color: any;
-declare const push: any;
-declare const pop: any;
-declare const imageMode: any;
-declare const image: any;
-declare const CENTER: any;
 
 export class GroundFeature {
   pos: any;

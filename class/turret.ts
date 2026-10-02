@@ -18,21 +18,6 @@ import { TurretHub } from './turret/hub';
 import { soundEngine } from '../src/audio/soundEngine';
 import { eventBus } from '../src/events/eventBus';
 
-declare const p5: any;
-declare const createVector: any;
-declare const dist: any;
-declare const atan2: any;
-declare const floor: any;
-declare const frameCount: any;
-declare const lerp: any;
-declare const random: any;
-declare const cos: any;
-declare const sin: any;
-declare const radians: any;
-declare const TWO_PI: any;
-declare const width: any;
-declare const height: any;
-declare const color: any;
 
 export function isEnemyObstacle(b: any): boolean {
   if (!b || b.isMined || b.gx === undefined) return false;

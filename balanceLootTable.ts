@@ -236,6 +236,17 @@ export const lootTableTypes: Record<string, LootTableEntry[]> = {
   lt_wild_sunflower: [{ weight: 1, lootTypeKey: ['t_sunflower'], itemCount: [1, 1] }],
   lt_raisin_1: [{ weight: 1, lootTypeKey: ['raisin'], itemCount: [1, 1] }],
 
+  // --- Bushes & Ores ---
+  lt_bush_loot: [
+    { weight: 1, lootTypeKey: ['leaf'], itemCount: [1, 1] },
+    { weight: 10 }
+  ],
+  lt_ore_leaf: [{ weight: 1, lootTypeKey: ['leaf'], itemCount: [1, 1] }],
+  lt_ore_shard: [{ weight: 1, lootTypeKey: ['shard'], itemCount: [1, 1] }],
+  lt_ore_fuel: [{ weight: 1, lootTypeKey: ['fuel'], itemCount: [1, 1] }],
+  lt_ore_ice: [{ weight: 1, lootTypeKey: ['ice'], itemCount: [1, 1] }],
+  lt_ore_shell: [{ weight: 1, lootTypeKey: ['shell'], itemCount: [1, 1] }],
+
   // --- New: Crates and Pots ---
   lt_crate_loot: [
     { weight: 6, lootTypeKey: ['sun'], itemCount: [1, 2] },
@@ -306,6 +317,13 @@ export const lootConfigs: Record<string, ExternalLootConfigEntry[]> = {
   lc_sun_tiny: [{ lootTableTypeKey: 'lt_sun_node', lootTableRollCount: 1 }],
   lc_sun_ore: [{ lootTableTypeKey: 'lt_sun_node', lootTableRollCount: 3 }],
   lc_sun_clump: [{ lootTableTypeKey: 'lt_sun_node', lootTableRollCount: 10 }],
+  lc_sun_mine: [{ lootTableTypeKey: 'lt_sun_mine', lootTableRollCount: 1 }],
+  lc_ore_leaf: [{ lootTableTypeKey: 'lt_ore_leaf', lootTableRollCount: 1 }],
+  lc_ore_shard: [{ lootTableTypeKey: 'lt_ore_shard', lootTableRollCount: 1 }],
+  lc_ore_fuel: [{ lootTableTypeKey: 'lt_ore_fuel', lootTableRollCount: 1 }],
+  lc_ore_ice: [{ lootTableTypeKey: 'lt_ore_ice', lootTableRollCount: 1 }],
+  lc_ore_shell: [{ lootTableTypeKey: 'lt_ore_shell', lootTableRollCount: 1 }],
+  lc_ore_hard: [{ lootTableTypeKey: 'lt_ore_hard', lootTableRollCount: 1 }],
   lc_stray_crate: [{ lootTableTypeKey: 'lt_stray_crate', lootTableRollCount: 1 }],
   lc_wild_sunflower: [{ lootTableTypeKey: 'lt_wild_sunflower', lootTableRollCount: 1 }],
   lc_spawner: [{ lootTableTypeKey: 'lt_raisin_1', lootTableRollCount: 1 }],
@@ -365,6 +383,8 @@ export const lootConfigs: Record<string, ExternalLootConfigEntry[]> = {
 
   // Blocks
   o_dirt: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 5 }],
+  o_bush: [{ lootTableTypeKey: 'lt_bush_loot', lootTableRollCount: 1 }],
+  lc_bush: [{ lootTableTypeKey: 'lt_bush_loot', lootTableRollCount: 1 }],
   o_clay: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 6 }],
   o_stone: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 7 }],
   o_slate: [{ lootTableTypeKey: 'lt_soil_003', lootTableRollCount: 8 }],

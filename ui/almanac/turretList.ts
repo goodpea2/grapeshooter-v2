@@ -7,36 +7,6 @@ import { TURRET_RECIPES } from '../../dictionaryTurretMerging';
 import { AlmanacProgression, getActiveAlmanacProgression, getTurretProgressionState, cycleTurretProgressionState } from '../../lvDemo';
 import { applyHoverTransform } from '../../uiComponents';
 
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const fill: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const noStroke: any;
-declare const strokeWeight: any;
-declare const rect: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const LEFT: any;
-declare const TOP: any;
-declare const floor: any;
-declare const dist: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const mouseIsPressed: any;
-declare const rectMode: any;
-declare const imageMode: any;
-declare const image: any;
-declare const tint: any;
-declare const noTint: any;
-declare const CENTER: any;
-declare const map: any;
-declare const constrain: any;
-declare const frameCount: any;
-declare const scale: any;
-declare const sin: any;
 
 export function drawTurretList(x: number, y: number, w: number, h: number, modalX: number, modalY: number) {
   const itemW = 105;

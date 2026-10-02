@@ -8,48 +8,6 @@ import { BugSplatVFX, GiantDeathVFX, Explosion, FireworkVFX, DamageNumberVFX, dr
 import { drawYellowButton, drawCyanButton, drawPurpleButton, drawDarkButton, applyHoverTransform } from '../uiComponents';
 import { soundEngine } from '../src/audio/soundEngine';
 
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const rotate: any;
-declare const fill: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const noStroke: any;
-declare const rect: any;
-declare const ellipse: any;
-declare const line: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const LEFT: any;
-declare const CENTER: any;
-declare const RIGHT: any;
-declare const TOP: any;
-declare const BOTTOM: any;
-declare const CORNER: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const width: any;
-declare const height: any;
-declare const mouseIsPressed: any;
-declare const sin: any;
-declare const cos: any;
-declare const textWidth: any;
-declare const strokeWeight: any;
-declare const map: any;
-declare const constrain: any;
-declare const beginShape: any;
-declare const vertex: any;
-declare const endShape: any;
-declare const CLOSE: any;
-declare const lerp: any;
-declare const image: any;
-declare const imageMode: any;
-declare const tint: any;
-declare const noTint: any;
-declare const color: any;
-declare const random: any;
 
 interface MenuEnemy {
   x: number;

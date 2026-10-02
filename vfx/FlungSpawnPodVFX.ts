@@ -1,20 +1,6 @@
 import { state } from '../state';
 import { requestSpawn } from '../lvDemo';
 
-declare const createVector: any;
-declare const lerp: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const noStroke: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const fill: any;
-declare const ellipse: any;
-declare const sin: any;
-declare const cos: any;
-declare const TWO_PI: any;
-declare const frameCount: any;
 
 export class FlungSpawnPodVFX {
   pos: any;

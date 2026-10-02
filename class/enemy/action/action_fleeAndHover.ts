@@ -5,13 +5,6 @@ import { requestFlungSpawn } from '../../../lvDemo';
 import { lerpAngle } from '../../utils';
 import { state } from '../../../state';
 
-declare const dist: any;
-declare const atan2: any;
-declare const cos: any;
-declare const sin: any;
-declare const random: any;
-declare const TWO_PI: any;
-declare const createVector: any;
 
 export class ActionFleeAndHover extends EnemyAction {
   tags = ['movement', 'support'];

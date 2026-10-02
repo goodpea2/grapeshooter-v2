@@ -5,9 +5,6 @@ import { eventBus } from '../../../src/events/eventBus';
 import { lerpAngle } from '../../utils';
 import { spawnHitSpark } from '../../../vfx/index';
 
-declare const dist: any;
-declare const cos: any;
-declare const sin: any;
 
 export class ActionLeadRingFormation extends EnemyAction {
   tags = ['collab', 'leader', 'support'];

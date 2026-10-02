@@ -4,10 +4,6 @@ import { TurretAction } from '../../turretAction';
 import { MagicLinkVFX, SparkVFX } from '../../../vfx/index';
 import { Enemy } from '../../enemy';
 
-declare const floor: any;
-declare const random: any;
-declare const createVector: any;
-declare const color: any;
 
 export class ActionGenerateElectricChain extends TurretAction {
   tags = ['attack', 'electric'];

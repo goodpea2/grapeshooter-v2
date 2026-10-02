@@ -6,14 +6,6 @@ import { MuzzleFlash } from '../../../vfx/index';
 import { triggerUpgradeHook } from '../../../src/upgrades';
 import { conditionTypes } from '../../../balanceConditions';
 
-declare const createVector: any;
-declare const random: any;
-declare const floor: any;
-declare const atan2: any;
-declare const cos: any;
-declare const sin: any;
-declare const radians: any;
-declare const TWO_PI: any;
 
 export class ActionShootSpin extends TurretAction {
   tags = ['attack', 'projectile'];

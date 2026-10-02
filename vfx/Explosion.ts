@@ -1,19 +1,5 @@
 import { ObjectPool } from '../class/pool';
 
-declare const p5: any;
-declare const createVector: any;
-declare const pow: any;
-declare const map: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const noFill: any;
-declare const strokeWeight: any;
-declare const stroke: any;
-declare const ellipse: any;
-declare const noStroke: any;
-declare const fill: any;
-declare const max: any;
 
 export class Explosion {
   pos: any;

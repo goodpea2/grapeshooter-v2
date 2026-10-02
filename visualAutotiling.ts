@@ -2,7 +2,6 @@
 import { state } from './state';
 import { GRID_SIZE } from './constants';
 
-declare const noise: any;
 
 // Mapping for the 4x4 tileset provided by user
 // Index = (TL * 1) + (TR * 2) + (BL * 4) + (BR * 8)
@@ -27,13 +26,14 @@ export const BITMASK_MAP: Record<number, {x: number, y: number}> = {
 
 // Priority for rendering: Higher number = renders on top
 const MATERIAL_PRIORITY: Record<string, number> = {
-  'o_paygate': 7,
-  'o_barrier': 6,
-  'o_black': 1,
-  'o_slate': 2,
-  'o_stone': 3,
+  'o_paygate': 8,
+  'o_barrier': 7,
+  'o_bush': 6,
+  'o_dirt': 5,
   'o_clay': 4,
-  'o_dirt': 5
+  'o_stone': 3,
+  'o_slate': 2,
+  'o_black': 1
 };
 
 export function getBlockType(gx: number, gy: number) {
@@ -83,7 +83,10 @@ export function drawAutotile(pg: any, vx: number, vy: number, gx: number, gy: nu
 
     // Determine asset
     let assetKey = 'img_tileset_fallback';
-    if (mat === 'o_dirt') {
+    if (mat === 'o_bush') {
+      const nVal = noise((gx + 0.5) * 3, (gy + 0.5) * 3, 999);
+      assetKey = nVal > 0.5 ? 'img_tileset_bush_v2' : 'img_tileset_bush';
+    } else if (mat === 'o_dirt') {
       const nVal = noise((gx + 0.5) * 3, (gy + 0.5) * 3, 999); // do not change these params
       assetKey = nVal > 0.5 ? 'img_tileset_dirt_v2' : 'img_tileset_dirt';
     } else if (mat === 'o_clay') {

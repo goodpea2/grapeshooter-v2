@@ -3,9 +3,6 @@ import { state } from '../../../state';
 import { TurretAction } from '../../turretAction';
 import { Enemy } from '../../enemy';
 
-declare const floor: any;
-declare const random: any;
-declare const createVector: any;
 
 export class ActionShield extends TurretAction {
   tags = ['defense', 'shield'];

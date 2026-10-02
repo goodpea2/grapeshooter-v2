@@ -6,10 +6,6 @@ import { requestFlungSpawn } from '../../../lvDemo';
 import { GRID_SIZE } from '../../../constants';
 import { state } from '../../../state';
 
-declare const random: any;
-declare const cos: any;
-declare const sin: any;
-declare const TWO_PI: any;
 
 export class ClonerEnemy extends Enemy {
   constructor(x: number, y: number, typeKey: string = 'e_cloner') {

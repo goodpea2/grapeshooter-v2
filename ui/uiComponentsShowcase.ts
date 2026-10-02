@@ -20,17 +20,6 @@ import {
   handleRegisteredUIClick
 } from '../uiComponents';
 
-declare const width: any;
-declare const height: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const textStyle: any;
-declare const text: any;
-declare const fill: any;
-declare const noStroke: any;
-declare const BOLD: any;
-declare const NORMAL: any;
-declare const CENTER: any;
 
 export class UIComponentsShowcase {
   isOpen: boolean = false;

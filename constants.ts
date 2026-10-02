@@ -25,16 +25,16 @@ export const HUD_SAFEZONE = 16;
 
 export const WORLD_GEN_STATS: Record<string, { value: number, chance: number, budget?: number, dangerRange?: [number, number] }[]> = {
   sun: [
-    { value: 5, chance: 0.50 }, // Lvl 0
-    { value: 5, chance: 0.33 }, // Lvl 1
-    { value: 4, chance: 0.20 }, // Lvl 2
-    { value: 4, chance: 0.15 }, // Lvl 3
-    { value: 3, chance: 0.10 }, // Lvl 4
-    { value: 3, chance: 0.10 }, // Lvl 5
-    { value: 2, chance: 0.10 }, // Lvl 6
-    { value: 2, chance: 0.10 }, // Lvl 7
-    { value: 1, chance: 0.10 }, // Lvl 8
-    { value: 1, chance: 0.10 }, // Lvl 9
+    { value: 0, chance: 0.50 }, // Lvl 0
+    { value: 0, chance: 0.33 }, // Lvl 1
+    { value: 0, chance: 0.20 }, // Lvl 2
+    { value: 0, chance: 0.15 }, // Lvl 3
+    { value: 0, chance: 0.10 }, // Lvl 4
+    { value: 0, chance: 0.10 }, // Lvl 5
+    { value: 0, chance: 0.10 }, // Lvl 6
+    { value: 0, chance: 0.10 }, // Lvl 7
+    { value: 0, chance: 0.10 }, // Lvl 8
+    { value: 0, chance: 0.10 }, // Lvl 9
     { value: 0, chance: 0.10 }  // Lvl 10
   ],
   tnt: [
@@ -79,15 +79,15 @@ export const WORLD_GEN_STATS: Record<string, { value: number, chance: number, bu
   sniper: [
     { value: 0,    chance: 0.00 },
     { value: 0,    chance: 0.00 },
-    { value: 0.05, chance: 1.00 },
-    { value: 0.10, chance: 1.00 },
+    { value: 0.1, chance: 1.00 },
     { value: 0.15, chance: 1.00 },
-    { value: 0.20, chance: 1.00 },
-    { value: 0.30, chance: 1.00 },
-    { value: 0.40, chance: 0.50 },
-    { value: 0.50, chance: 0.50 },
-    { value: 0.75, chance: 0.25 },
-    { value: 1.00, chance: 0.25 }
+    { value: 0.2, chance: 0.10 },
+    { value: 0.3, chance: 0.10 },
+    { value: 0.4, chance: 0.10 },
+    { value: 0.5, chance: 0.10 },
+    { value: 0.75, chance: 0.10 },
+    { value: 1.0, chance: 0.10 },
+    { value: 2.0, chance: 0.10 }
   ],
   spawner: [
     { value: 0.1, chance: 0.50, budget: 30,  dangerRange: [1, 1] }, // Lvl 0

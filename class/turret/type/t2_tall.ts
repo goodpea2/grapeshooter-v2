@@ -5,7 +5,6 @@ import { spawnExplosion } from '../../../vfx/index';
 import { soundEngine } from '../../../src/audio/soundEngine';
 import { t_wall } from './t_wall';
 
-declare const dist: any;
 
 export const t2_tall: TurretConfig = {
   ...t_wall,

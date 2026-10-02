@@ -18,22 +18,10 @@ import { triggerUpgradeHook } from '../src/upgrades';
 import { soundEngine } from '../src/audio/soundEngine';
 import { eventBus } from '../src/events/eventBus';
 
-declare const p5: any;
-declare const createVector: any;
-declare const dist: any;
-declare const atan2: any;
-declare const floor: any;
-declare const constrain: any;
-declare const frameCount: any;
-declare const random: any;
-declare const cos: any;
-declare const sin: any;
-declare const color: any;
-declare const radians: any;
-declare const TWO_PI: any;
 
 export class Player {
   pos: any; prevPos: any; size = 30; attachments: AttachedTurret[] = []; health = 300; maxHealth = 300; speed = 3.0; flash = 0; autoTurretAngle = 0; autoTurretLastShot = 0; autoTurretRange = GRID_SIZE * 6; autoTurretFireRate = 22; recoil = 0; target: any = null;
+  runningDistance = 0;
   stamina = 100;
   maxStamina = 100;
   totalStaminaSpent = 0;
@@ -341,6 +329,9 @@ export class Player {
 
     // 4. Update Stationary State
     let vel = dist(this.pos.x, this.pos.y, this.prevPos.x, this.prevPos.y);
+    if (vel > 0.001) {
+      this.runningDistance += vel;
+    }
     const isActuallyStationary = (vel < 0.2);
     
     if (isActuallyStationary) {

@@ -1,12 +1,5 @@
 import { ObjectPool } from '../class/pool';
 
-declare const p5: any;
-declare const createVector: any;
-declare const random: any;
-declare const map: any;
-declare const noStroke: any;
-declare const fill: any;
-declare const ellipse: any;
 
 interface SparkParticle {
   x: number;

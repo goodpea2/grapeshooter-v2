@@ -7,15 +7,6 @@ import { triggerUpgradeHook } from '../../../src/upgrades';
 import { conditionTypes } from '../../../balanceConditions';
 import { soundEngine } from '../../../src/audio/soundEngine';
 
-declare const createVector: any;
-declare const random: any;
-declare const floor: any;
-declare const atan2: any;
-declare const cos: any;
-declare const sin: any;
-declare const radians: any;
-declare const TWO_PI: any;
-declare const lerp: any;
 
 export class ActionShoot extends TurretAction {
   tags = ['attack', 'projectile'];

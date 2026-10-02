@@ -4,24 +4,6 @@ import { renderTextInput } from './generalPanel';
 import { ALL_ENEMY_TYPES_LIST } from '../../../levelEditor/types';
 import { obstacleTypes, overlayTypes } from '../../../balanceObstacles';
 
-declare const push: any;
-declare const pop: any;
-declare const fill: any;
-declare const noFill: any;
-declare const noStroke: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const rect: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const image: any;
-declare const imageMode: any;
-declare const LEFT: any;
-declare const TOP: any;
-declare const CENTER: any;
-declare const mouseX: any;
-declare const mouseY: any;
 
 export const COMMON_OBSTACLE_TYPES = [
   { key: 'any', label: 'ANY OBSTACLE' },

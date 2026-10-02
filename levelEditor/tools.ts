@@ -12,8 +12,6 @@ import { createWorldTurret } from '../class/turret/TurretRegistry';
 import { createEnemy } from '../class/enemy/EnemyRegistry';
 import { spawnLootAt } from '../economy';
 
-declare const floor: any;
-declare const dist: any;
 
 export function isPointInPolygon(px: number, py: number, polygon: { x: number; y: number }[]): boolean {
   if (polygon.length < 3) return false;

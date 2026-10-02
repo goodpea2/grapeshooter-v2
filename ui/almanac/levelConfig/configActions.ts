@@ -3,7 +3,6 @@ import { EditorLevelConfigData, getDynamicEnemyKeys, DEFAULT_CUSTOM_BUDGET_PER_N
 import { handleEnemiesPanelClick } from './enemiesPanel';
 import { handleWinConditionsPanelClick, getWinConditionsPanelHeight } from './winConditionsPanel';
 
-declare const textWidth: any;
 const totalHeight = 1000;
 (window as any).totalHeight = totalHeight;
 

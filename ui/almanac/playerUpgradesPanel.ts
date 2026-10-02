@@ -12,35 +12,6 @@ import { drawCard, drawButton, drawYellowButton, drawPurpleButton, registerUIHit
 import { color } from '../../uiColors';
 import { soundEngine } from '../../src/audio/soundEngine';
 
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const fill: any;
-declare const stroke: any;
-declare const noStroke: any;
-declare const strokeWeight: any;
-declare const rect: any;
-declare const line: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const textFont: any;
-declare const text: any;
-declare const textWidth: any;
-declare const LEFT: any;
-declare const RIGHT: any;
-declare const CENTER: any;
-declare const TOP: any;
-declare const BOTTOM: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const mouseIsPressed: any;
-declare const image: any;
-declare const imageMode: any;
-declare const ellipse: any;
-declare const sin: any;
-declare const frameCount: any;
-declare const constrain: any;
-declare const drawingContext: any;
 
 export const UPGRADE_KEYS = [
   'turretAttachCapacity',
@@ -287,7 +258,7 @@ function drawGameplayUpgradesPanel(w: number, h: number, globalPanelX: number, g
   if (maxScroll < 0) {
     const scrollbarTrackH = visibleH - 20;
     const thumbH = Math.max(28, (visibleH / totalContentH) * scrollbarTrackH);
-    const scrollProgress = maxScroll === 0 ? 0 : state.playerUpgradesScrollY / maxScroll;
+    const scrollProgress = maxScroll === 0 ? 0 : (state.playerUpgradesScrollY || 0) / maxScroll;
     const thumbY = topY + 10 + scrollProgress * (scrollbarTrackH - thumbH);
     const thumbX = w - 10;
 

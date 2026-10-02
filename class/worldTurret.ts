@@ -9,18 +9,6 @@ import { Bullet } from './bullet';
 import { MuzzleFlash, MagicLinkVFX, SparkVFX, WeldingHitVFX, MergeVFX } from '../vfx/index';
 import { spawnLootAt } from '../economy';
 
-declare const createVector: any;
-declare const floor: any;
-declare const frameCount: any;
-declare const random: any;
-declare const cos: any;
-declare const sin: any;
-declare const atan2: any;
-declare const radians: any;
-declare const TWO_PI: any;
-declare const color: any;
-declare const lerp: any;
-declare const p5: any;
 
 export class WorldTurret extends Turret {
   gx: number;

@@ -70,12 +70,6 @@ import { initLevelEditorPlayerUpgradesFromData, serializeLevelEditorPlayerUpgrad
 import { initLevelEditorLevelConfig, serializeLevelEditorLevelConfig } from '../ui/almanac/levelConfigPanel';
 import { handleRegisteredUIClick } from '../uiComponents';
 
-declare const mouseX: any;
-declare const mouseY: any;
-declare const width: any;
-declare const height: any;
-declare const textSize: any;
-declare const textWidth: any;
 
 export function startLevelEditor() {
   state.currentScreen = 'level_editor';

@@ -4,8 +4,6 @@ import { LootEntity, TurretLoot, spawnLootEntity, spawnTurretLoot } from './enti
 import { lootTypes, lootTableTypes, lootConfigs, LootTableEntry, ExternalLootConfigEntry } from './balanceLootTable';
 import { turretTypes } from './balanceTurrets';
 
-declare const random: any;
-declare const floor: any;
 
 export const ECONOMY_CONFIG = {
   sunLootLifetime: HOUR_FRAMES*6,
@@ -18,6 +16,7 @@ export const ECONOMY_CONFIG = {
     sunTiny: 1,
     sunOre: 3,
     sunClump: 10,
+    sunMine: 30,
     enemyDrop: 1
   }
 };
@@ -122,7 +121,7 @@ export function spawnLootAt(x: number, y: number, key: string, configSource: any
         
         if (loot.config.type === 'currency') {
           if (loot.config.item === 'sun') {
-            state.sunSpawnedTotal += (loot.config.itemValue || 1);
+            state.sunSpawnedTotal += Number(loot.config.itemValue || 1);
           } else if (loot.config.item === 'raisin') {
             // No special stat tracking for raisin yet, but it's handled by LootEntity update
           }

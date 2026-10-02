@@ -8,11 +8,6 @@ import { spawnLootEntity } from '../../loot';
 import { triggerUpgradeHook } from '../../../src/upgrades';
 import { requestFlungSpawn } from '../../../lvDemo';
 
-declare const floor: any;
-declare const random: any;
-declare const atan2: any;
-declare const cos: any;
-declare const sin: any;
 
 export class ActionFarm extends TurretAction {
   tags = ['farm', 'passive'];

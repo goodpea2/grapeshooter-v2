@@ -1,21 +1,6 @@
 import { state } from '../state';
 import { ObjectPool } from '../class/pool';
 
-declare const random: any;
-declare const TWO_PI: any;
-declare const sin: any;
-declare const cos: any;
-declare const noStroke: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const fill: any;
-declare const noFill: any;
-declare const ellipse: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const width: any;
-declare const height: any;
 
 export class SpeederAuraVFX {
   target: any;

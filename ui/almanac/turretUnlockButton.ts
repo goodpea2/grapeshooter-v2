@@ -13,35 +13,6 @@ export function isTurretUnlockAvailable(): boolean {
   return true;
 }
 
-declare const dist: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const noStroke: any;
-declare const fill: any;
-declare const ellipse: any;
-declare const rectMode: any;
-declare const CENTER: any;
-declare const rect: any;
-declare const imageMode: any;
-declare const image: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const LEFT: any;
-declare const frameCount: any;
-declare const floor: any;
-declare const random: any;
-declare const sin: any;
-declare const scale: any;
-declare const tint: any;
-declare const noTint: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const mouseIsPressed: any;
 
 export function drawTurretUnlockButton(x: number, y: number, w: number, h: number, modalX: number, modalY: number) {
   if (!isTurretUnlockAvailable()) return;

@@ -6,9 +6,6 @@ import { MuzzleFlash } from '../../../vfx/index';
 import { triggerUpgradeHook } from '../../../src/upgrades';
 import { GRID_SIZE } from '../../../constants';
 
-declare const createVector: any;
-declare const atan2: any;
-declare const random: any;
 
 export class ActionLaunchMultiTarget extends TurretAction {
   tags = ['attack', 'projectile', 'artillery', 'multiTarget'];

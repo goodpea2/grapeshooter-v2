@@ -10,36 +10,6 @@ import { AlmanacProgression, getActiveAlmanacProgression } from '../../lvDemo';
 import { UPGRADE_COSTS, UPGRADES, TURRET_UPGRADE_POOLS, recalculateAllStats, getUpgradeDefinition } from '../../src/upgrades';
 import { drawRichText } from '../richText';
 
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const fill: any;
-declare const noStroke: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const rect: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const CENTER: any;
-declare const TOP: any;
-declare const LEFT: any;
-declare const RIGHT: any;
-declare const imageMode: any;
-declare const image: any;
-declare const rectMode: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const floor: any;
-declare const frameCount: any;
-declare const sin: any;
-declare const scale: any;
-declare const tint: any;
-declare const noTint: any;
-declare const constrain: any;
-declare const map: any;
-declare const ellipse: any;
-declare const mouseIsPressed: any;
 
 export function drawTurretInfoPanel(x: number, y: number, w: number, h: number, modalX: number, modalY: number) {
   const key = state.almanacSelectedTurret;

@@ -104,11 +104,11 @@ export const liquidTypes: any = {
       spawnInterval: 60,
       spawnIntervalConsumeBudget: true,
       hourlySpawnConfig: {
-        enabled: true,
-        hourlyDaytimeBudget: [10, 20, 30],
-        hourlyNighttimeBudget: [30, 50, 80],
-        hourlyBudgetMultiplierForFollowingDay: 1.25,
-        selfDestructAfterBudgetSpawned: 2000
+        enabled: false,
+        hourlyDaytimeBudget: [0],
+        hourlyNighttimeBudget: [0],
+        hourlyBudgetMultiplierForFollowingDay: 1.0,
+        selfDestructAfterBudgetSpawned: 60
       }
     }
   }

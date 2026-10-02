@@ -5,17 +5,6 @@ import { eventBus } from '../../../src/events/eventBus';
 import { soundEngine } from '../../../src/audio/soundEngine';
 import { spawnHitSpark, spawnDamageNumber } from '../../../vfx/index';
 
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const rotate: any;
-declare const stroke: any;
-declare const noFill: any;
-declare const strokeWeight: any;
-declare const arc: any;
-declare const atan2: any;
-declare const sin: any;
-declare const frameCount: any;
 
 export class ActionFrontShield extends EnemyAction {
   tags = ['defense', 'shield'];

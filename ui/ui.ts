@@ -2,7 +2,7 @@
 import { state } from '../state';
 import { HOUR_FRAMES, GRID_SIZE, VERSION, HUD_SAFEZONE } from '../constants';
 import { turretTypes } from '../balanceTurrets';
-import { drawDebugPanel, drawWorldGenPreview } from './uiDebug';
+import { drawDebugPanel } from './uiDebug';
 import { TYPE_MAP } from '../assetTurret';
 import { getLightLevel, customDayLightConfig } from '../lvDemo';
 import { drawNPCPanel } from './uiNpcShop';
@@ -15,56 +15,6 @@ import { soundEngine } from '../src/audio/soundEngine';
 import { getRemainingWinConditionEntitiesAndSpawners } from '../levelManager';
 import { overlayTypes } from '../balanceObstacles';
 
-declare const floor: any;
-declare const nf: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const fill: any;
-declare const noFill: any;
-declare const noStroke: any;
-declare const rect: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const LEFT: any;
-declare const RIGHT: any;
-declare const TOP: any;
-declare const CENTER: any;
-declare const CORNER: any;
-declare const BOTTOM: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const width: any;
-declare const height: any;
-declare const mouseIsPressed: any;
-declare const ellipse: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const dist: any;
-declare const map: any;
-declare const lerp: any;
-declare const PI: any;
-declare const HALF_PI: any;
-declare const TWO_PI: any;
-declare const arc: any;
-declare const sin: any;
-declare const cos: any;
-declare const rectMode: any;
-declare const line: any;
-declare const rotate: any;
-declare const image: any;
-declare const imageMode: any;
-declare const tint: any;
-declare const noTint: any;
-declare const beginShape: any;
-declare const vertex: any;
-declare const endShape: any;
-declare const scale: any;
-declare const atan2: any;
-declare const constrain: any;
-declare const triangle: any;
-declare const textWidth: any;
 
 export function getTime() {
   let totalHours = (state.frames / HOUR_FRAMES);
@@ -504,7 +454,6 @@ export function drawUI(spawnFromBudget: Function) {
 
     drawDebugPanel(spawnFromBudget);
     drawNPCPanel();
-    drawWorldGenPreview();
     drawFooter();
 
     // Night Warning
@@ -696,6 +645,16 @@ export function isMouseOverUI() {
 
 function drawWinConditionArrowHint() {
   if (!state.player || state.isGameOver || state.isLevelCompleted) return;
+  const layout = state.currentLevelLayoutData || {};
+  const isSandbox = state.currentLevelId === 'sandbox' || 
+                    state.currentLevelId === 'sbw' || 
+                    state.currentLevelId === 'mpty' || 
+                    state.currentLevelLayoutData?.tag?.toLowerCase() === 'sandbox' || 
+                    state.currentLevelLayoutData?.tag?.toLowerCase() === 'dev' || 
+                    layout.noWinCondition === true || 
+                    layout.disableWinCondition === true;
+  if (isSandbox) return;
+
   const items = getRemainingWinConditionEntitiesAndSpawners();
   if (items.length > 0 && items.length < 4) {
     let nearest = items[0];
@@ -711,10 +670,11 @@ function drawWinConditionArrowHint() {
     const wPos = { x: nearest.x, y: nearest.y };
     const pPos = state.player.pos;
 
-    const screenX = wPos.x - state.cameraPos.x + width / 2;
-    const screenY = wPos.y - state.cameraPos.y + height / 2;
+    const zoom = state.cameraZoom || 1.0;
+    const screenX = (wPos.x - state.cameraPos.x) * zoom + width / 2;
+    const screenY = (wPos.y - state.cameraPos.y) * zoom + height / 2;
 
-    const screenMargin = 40;
+    const screenMargin = 45;
     const maxDistX = width / 2 - screenMargin;
     const maxDistY = height / 2 - screenMargin;
 
@@ -723,50 +683,70 @@ function drawWinConditionArrowHint() {
     const distToTarget = dist(0, 0, dx, dy);
 
     let indX, indY;
-    let isPointing = false;
-
     const constraintScale = Math.min(1, maxDistX / Math.max(1, Math.abs(dx)), maxDistY / Math.max(1, Math.abs(dy)));
 
-    if (constraintScale < 1 || distToTarget > Math.min(width, height) / 2 - 40) {
+    if (constraintScale < 1 || distToTarget > Math.min(width, height) / 2 - 45) {
       indX = width / 2 + dx * constraintScale;
       indY = height / 2 + dy * constraintScale;
-      isPointing = true;
     } else {
       indX = screenX;
       indY = screenY;
-      isPointing = false;
     }
+
+    const angle = atan2(wPos.y - pPos.y, wPos.x - pPos.x);
 
     push();
     translate(indX, indY);
+    rotate(angle);
 
-    const pulse = 1.0 + 0.05 * sin(state.frames * 0.1);
+    const pulse = 1.0 + 0.08 * sin(state.frames * 0.15);
     scale(pulse);
 
-    rectMode(CENTER);
-    fill(30, 25, 60, 200);
-    stroke(255, 100, 100, 255);
-    strokeWeight(2);
-    rect(0, 0, 32, 32, 8);
-
-    fill(255, 100, 100);
+    // Drop shadow
     noStroke();
-    textAlign(CENTER, CENTER);
-    textSize(16);
-    text("!", 0, 0);
+    fill(0, 0, 0, 90);
+    beginShape();
+    vertex(16 + 2, 0 + 2);
+    vertex(-8 + 2, -10 + 2);
+    vertex(-4 + 2, -4 + 2);
+    vertex(-14 + 2, -4 + 2);
+    vertex(-14 + 2, 4 + 2);
+    vertex(-4 + 2, 4 + 2);
+    vertex(-8 + 2, 10 + 2);
+    endShape(CLOSE);
 
-    if (isPointing) {
-      const angle = atan2(wPos.y - pPos.y, wPos.x - pPos.x);
-      rotate(angle);
-      fill(255, 100, 100);
-      triangle(22, 0, 15, -5, 15, 5);
-    }
+    // Glowing vibrant directional arrow (no red square, no '!')
+    fill(255, 55, 75, 235);
+    stroke(255, 220, 230, 255);
+    strokeWeight(2.5);
+    strokeJoin(ROUND);
+    beginShape();
+    vertex(16, 0);
+    vertex(-8, -10);
+    vertex(-4, -4);
+    vertex(-14, -4);
+    vertex(-14, 4);
+    vertex(-4, 4);
+    vertex(-8, 10);
+    endShape(CLOSE);
+
     pop();
   }
 }
 
 function getObjectiveTrackerText(): string {
   const layout = state.currentLevelLayoutData || {};
+  const isSandbox = state.currentLevelId === 'sandbox' || 
+                    state.currentLevelId === 'sbw' || 
+                    state.currentLevelId === 'mpty' || 
+                    state.currentLevelLayoutData?.tag?.toLowerCase() === 'sandbox' || 
+                    state.currentLevelLayoutData?.tag?.toLowerCase() === 'dev' || 
+                    layout.noWinCondition === true || 
+                    layout.disableWinCondition === true;
+  if (isSandbox) {
+    return 'Sandbox Mode • Endless';
+  }
+
   const parts: string[] = [];
 
   const winEnemies = (state.enemies || []).filter((e: any) => e.isWinCondition && e.health > 0 && !e.isDying);

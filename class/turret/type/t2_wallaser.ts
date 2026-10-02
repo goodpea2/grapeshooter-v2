@@ -5,15 +5,6 @@ import { AttachedTurret } from '../../attachedTurret';
 import { WorldTurret } from '../../worldTurret';
 import { state } from '../../../state';
 
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const ellipse: any;
-declare const fill: any;
-declare const noStroke: any;
 
 export class WallaserAttachedTurret extends AttachedTurret {
   constructor(type: string, parent: any, hq: number, hr: number) {

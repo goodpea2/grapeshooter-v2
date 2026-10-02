@@ -3,33 +3,6 @@ import { ObjectPool } from '../class/pool';
 import { soundEngine } from '../src/audio/soundEngine';
 import { drawPersistentDeathVisual } from './Utils';
 
-declare const p5: any;
-declare const createVector: any;
-declare const color: any;
-declare const red: any;
-declare const green: any;
-declare const blue: any;
-declare const map: any;
-declare const lerp: any;
-declare const random: any;
-declare const TWO_PI: any;
-declare const cos: any;
-declare const sin: any;
-declare const noStroke: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const fill: any;
-declare const noFill: any;
-declare const beginShape: any;
-declare const endShape: any;
-declare const vertex: any;
-declare const ellipse: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const rotate: any;
-declare const scale: any;
-declare const CLOSE: any;
 
 function getRgb(c: any): [number, number, number] {
   if (Array.isArray(c)) {

@@ -10,32 +10,6 @@ import { drawTurretUnlockTreePanel, handleTurretUnlockTreeClick } from './turret
 import { drawSkillTreeConfigPanel, handleSkillTreeConfigClick } from './skillTreeConfigPanel';
 import { drawTurretUnlockChoiceModal, handleTurretUnlockChoiceModalClick } from './turretUnlockModal';
 
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const fill: any;
-declare const noStroke: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const rect: any;
-declare const width: any;
-declare const height: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const mouseIsPressed: any;
-declare const dist: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const CENTER: any;
-declare const LEFT: any;
-declare const imageMode: any;
-declare const image: any;
-declare const tint: any;
-declare const noTint: any;
-declare const floor: any;
-declare const ellipse: any;
-declare const textWidth: any;
 
 export function drawAlmanac() {
   if (!state.isAlmanacOpen) return;

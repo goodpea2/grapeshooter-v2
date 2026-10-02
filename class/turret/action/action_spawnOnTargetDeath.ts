@@ -4,9 +4,6 @@ import { TurretAction } from '../../turretAction';
 import { Bullet } from '../../bullet';
 import { GRID_SIZE } from '../../../constants';
 
-declare const createVector: any;
-declare const random: any;
-declare const floor: any;
 
 export class ActionSpawnOnTargetDeath extends TurretAction {
   tags = ['utility', 'reactive'];

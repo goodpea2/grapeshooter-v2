@@ -15,44 +15,6 @@ import { drawDecoration } from '../visualDecoration';
 import { flowField } from '../pathfinding';
 import { soundEngine } from '../src/audio/soundEngine';
 
-declare const createVector: any;
-declare const floor: any;
-declare const random: any;
-declare const constrain: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const rotate: any;
-declare const fill: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const rect: any;
-declare const noStroke: any;
-declare const ellipse: any;
-declare const triangle: any;
-declare const line: any;
-declare const strokeWeight: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const CENTER: any;
-declare const LEFT: any;
-declare const PI: any;
-declare const HALF_PI: any;
-declare const TWO_PI: any;
-declare const atan2: any;
-declare const radians: any;
-declare const image: any;
-declare const imageMode: any;
-declare const scale: any;
-declare const tint: any;
-declare const noTint: any;
-declare const sin: any;
-declare const cos: any;
-declare const color: any;
-declare const noise: any;
-declare const lerp: any;
-declare const text: any;
-declare const arc: any;
 
 export class Block {
   gx: number; gy: number; pos: any; type: string; config: any; overlay: string | null = null;
@@ -256,20 +218,26 @@ export class Block {
     this.cachedSpawnList = [];
     this.enemiesSpawnedFromDamage = 0;
     let budget = sCfg.budget !== undefined ? sCfg.budget : (this.spawnerBudget || 60);
-    this.spawnerBudget = budget;
-    if (this.customSpawnerConfig) {
-      this.customSpawnerConfig.budget = budget;
-    }
-    const eTypes = (sCfg.enemyTypeKey && sCfg.enemyTypeKey.length > 0) ? sCfg.enemyTypeKey : ['e_basic'];
+    const rawETypes = (sCfg.enemyTypeKey && sCfg.enemyTypeKey.length > 0) ? sCfg.enemyTypeKey : ['e_basic'];
+    const eTypes = rawETypes.filter((k: string) => enemyTypes[k] && enemyTypes[k].cost > 0 && !enemyTypes[k].excludeFromSpawnerPool && !enemyTypes[k].spawnWithCondition);
+    const validPool = eTypes.length > 0 ? eTypes : ['e_basic'];
 
     let safety = Math.max(500, Math.ceil(budget / 5));
     while (budget > 0 && safety > 0) {
       safety--;
-      const affordable = eTypes.filter((k: string) => enemyTypes[k] && enemyTypes[k].cost <= budget);
+      const affordable = validPool.filter((k: string) => enemyTypes[k] && enemyTypes[k].cost > 0 && enemyTypes[k].cost <= budget);
       if (affordable.length === 0) break;
       const eKey = affordable[floor(random(affordable.length))];
       this.cachedSpawnList.push(eKey);
       budget -= enemyTypes[eKey].cost;
+    }
+    const totalActualBudget = this.cachedSpawnList.reduce((sum, k) => sum + (enemyTypes[k]?.cost || 0), 0);
+    this.spawnerBudget = totalActualBudget;
+    if (this.customSpawnerConfig) {
+      this.customSpawnerConfig.budget = totalActualBudget;
+      if (this.customSpawnerConfig.hourlySpawnConfig?.selfDestructAfterBudgetSpawned) {
+        this.customSpawnerConfig.hourlySpawnConfig.selfDestructAfterBudgetSpawned = totalActualBudget;
+      }
     }
     this.initialCachedSpawnCount = this.cachedSpawnList.length;
   }
@@ -540,7 +508,65 @@ export class Block {
       this.lastSpawnTime = state.frames + floor(random(sCfg.spawnInterval || 60));
     }
 
+    const selfDestructTarget = sCfg?.hourlySpawnConfig?.selfDestructAfterBudgetSpawned ?? sCfg?.selfDestructAfterBudgetSpawned ?? (isLiquid ? (sCfg?.budget || this.spawnerBudget || 60) : 0);
+    const rawETypes = (sCfg.enemyTypeKey && sCfg.enemyTypeKey.length > 0) ? sCfg.enemyTypeKey : ['e_basic'];
+    const eTypes = rawETypes.filter((k: string) => enemyTypes[k] && enemyTypes[k].cost > 0 && !enemyTypes[k].excludeFromSpawnerPool && !enemyTypes[k].spawnWithCondition);
+    const validPool = eTypes.length > 0 ? eTypes : ['e_basic'];
+    
+    // Find the minimum cost among all possible enemies for this spawner
+    let minEnemyCost = Infinity;
+    for (const k of validPool) {
+      if (enemyTypes[k] && typeof enemyTypes[k].cost === 'number' && enemyTypes[k].cost > 0) {
+        minEnemyCost = Math.min(minEnemyCost, enemyTypes[k].cost);
+      }
+    }
+    if (minEnemyCost === Infinity || minEnemyCost <= 0) minEnemyCost = 10;
+
+    const triggerSelfDestruct = () => {
+      const cx = floor(this.gx / CHUNK_SIZE);
+      const cy = floor(this.gy / CHUNK_SIZE);
+      if (isLiquid) {
+        this.liquidType = null;
+      } else {
+        this.overlay = null;
+      }
+      this.customSpawnerConfig = null;
+      this.cachedSpawnList = [];
+      this.spawnerBudget = 0;
+      this.totalBudgetSpawned = 0;
+      state.world.dirtyChunkAndNeighbors(cx, cy);
+      state.vfx.push(new Explosion(this.pos.x + GRID_SIZE / 2, this.pos.y + GRID_SIZE / 2, 35));
+      state.vfx.push(new BlockDebris(this.pos.x + GRID_SIZE / 2, this.pos.y + GRID_SIZE / 2, isLiquid ? [140, 30, 180] : [180, 50, 180]));
+    };
+
     const isHourly = !!sCfg.hourlySpawnConfig && sCfg.hourlySpawnConfig.enabled !== false;
+
+    if (this.totalBudgetSpawned === undefined) {
+      this.totalBudgetSpawned = 0;
+    }
+    if (this.spawnerBudget === undefined) {
+      this.spawnerBudget = sCfg.budget !== undefined ? sCfg.budget : 60;
+    }
+
+    const currentSpawned = this.totalBudgetSpawned || 0;
+    const hasCachedList = Array.isArray(this.cachedSpawnList) && this.cachedSpawnList.length > 0;
+
+    // Check if self-destruct threshold or no-more-possible-spawn condition is already met
+    if (selfDestructTarget > 0) {
+      const budgetRemaining = selfDestructTarget - currentSpawned;
+      if (currentSpawned >= selfDestructTarget || (!hasCachedList && (!isHourly || budgetRemaining < minEnemyCost))) {
+        triggerSelfDestruct();
+        return;
+      }
+    }
+
+    if (!isHourly && !hasCachedList) {
+      const rem = selfDestructTarget > 0 ? (selfDestructTarget - currentSpawned) : (this.spawnerBudget || 0);
+      if (rem < minEnemyCost || (isLiquid && rem <= 0)) {
+        triggerSelfDestruct();
+        return;
+      }
+    }
 
     if (isHourly) {
       const hCfg = sCfg.hourlySpawnConfig || {};
@@ -572,7 +598,6 @@ export class Block {
       // 2. Hour change trigger: REFRESH cached enemies-that-will-be-spawned list
       const currentFloorHour = Math.floor(t.totalHours || 0);
       if (this.lastHourlyProcessedHour === undefined) {
-        // First initialization: process current hour immediately
         this.lastHourlyProcessedHour = currentFloorHour - 1;
       }
 
@@ -580,7 +605,6 @@ export class Block {
         const hoursPassed = Math.max(1, currentFloorHour - this.lastHourlyProcessedHour);
         this.lastHourlyProcessedHour = currentFloorHour;
 
-        // 1. Reset entire cached enemy pool and self-refund unspawned units' costs
         if (this.cachedSpawnList && this.cachedSpawnList.length > 0) {
           for (const k of this.cachedSpawnList) {
             if (enemyTypes[k]) {
@@ -590,15 +614,18 @@ export class Block {
           this.cachedSpawnList = [];
         }
 
-        // 2. Add newly accrued hourly budget for the hours passed
-        this.hourlySpawnBudgetAccrued = (this.hourlySpawnBudgetAccrued || 0) + (calculatedHourlyRate * hoursPassed);
+        let newHourlyBudget = calculatedHourlyRate * hoursPassed;
+        if (selfDestructTarget > 0) {
+          const remainingToSelfDestruct = Math.max(0, selfDestructTarget - (this.totalBudgetSpawned || 0));
+          newHourlyBudget = Math.min(newHourlyBudget, remainingToSelfDestruct);
+        }
 
-        // 3. Generate a brand new pool using total accumulated budget
+        this.hourlySpawnBudgetAccrued = (this.hourlySpawnBudgetAccrued || 0) + newHourlyBudget;
+
         this.cachedSpawnList = [];
-        const eTypes = (sCfg.enemyTypeKey && sCfg.enemyTypeKey.length > 0) ? sCfg.enemyTypeKey : ['e_basic'];
         let budgetLeft = this.hourlySpawnBudgetAccrued || 0;
         let safety = 200;
-        while (budgetLeft > 0 && safety > 0) {
+        while (budgetLeft >= minEnemyCost && safety > 0) {
           safety--;
           const affordable = eTypes.filter((k: string) => enemyTypes[k] && enemyTypes[k].cost <= budgetLeft);
           if (affordable.length === 0) break;
@@ -607,17 +634,21 @@ export class Block {
           budgetLeft -= enemyTypes[chosenKey].cost;
         }
         this.hourlySpawnBudgetAccrued = Math.max(0, budgetLeft);
+
+        if (selfDestructTarget > 0) {
+          const budgetRemaining = selfDestructTarget - (this.totalBudgetSpawned || 0);
+          if (budgetRemaining < minEnemyCost && (!this.cachedSpawnList || this.cachedSpawnList.length === 0)) {
+            triggerSelfDestruct();
+            return;
+          }
+        }
       }
 
-      if (this.totalBudgetSpawned === undefined) {
-        this.totalBudgetSpawned = 0;
-      }
-
-      // 3. Proximity trigger & spawn execution from cached list
+      // Proximity trigger check
       const rawTrig = sCfg.spawnTriggerRadius !== undefined ? sCfg.spawnTriggerRadius : 200;
       const trigRad = rawTrig < 0 ? -1 : Math.max(100, rawTrig);
-      const bcx = this.pos.x + GRID_SIZE/2;
-      const bcy = this.pos.y + GRID_SIZE/2;
+      const bcx = this.pos.x + GRID_SIZE / 2;
+      const bcy = this.pos.y + GRID_SIZE / 2;
 
       let isTriggered = false;
       if (trigRad < 0) {
@@ -659,20 +690,12 @@ export class Block {
                 this.lastSpawnTime = state.frames;
 
                 // Check self-destruct threshold
-                if (hCfg && hCfg.selfDestructAfterBudgetSpawned !== undefined && hCfg.selfDestructAfterBudgetSpawned > 0 && (this.totalBudgetSpawned || 0) >= hCfg.selfDestructAfterBudgetSpawned) {
-                  const cx = floor(this.gx / CHUNK_SIZE);
-                  const cy = floor(this.gy / CHUNK_SIZE);
-                  if (isLiquid) {
-                    this.liquidType = null;
-                  } else {
-                    this.overlay = null;
+                if (selfDestructTarget > 0) {
+                  const budgetRemaining = selfDestructTarget - (this.totalBudgetSpawned || 0);
+                  if (budgetRemaining < minEnemyCost && (!this.cachedSpawnList || this.cachedSpawnList.length === 0)) {
+                    triggerSelfDestruct();
+                    return;
                   }
-                  this.customSpawnerConfig = null;
-                  this.cachedSpawnList = [];
-                  state.world.dirtyChunkAndNeighbors(cx, cy);
-                  state.vfx.push(new Explosion(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, 35));
-                  state.vfx.push(new BlockDebris(this.pos.x + GRID_SIZE/2, this.pos.y + GRID_SIZE/2, isLiquid ? [140, 30, 180] : [180, 50, 180]));
-                  return;
                 }
               }
             }
@@ -680,24 +703,95 @@ export class Block {
         }
       }
     } else {
-      // Standard fixed budget mode
-      if (this.spawnerBudget === undefined) {
-        this.spawnerBudget = sCfg.budget !== undefined ? sCfg.budget : 60;
+      // Non-hourly / Fixed Budget mode (e.g. mon* and bos* rooms, or finite budget spawners)
+      const hasCachedEnemies = !!(this.cachedSpawnList && this.cachedSpawnList.length > 0);
+      const isBudgetDepleted = (this.spawnerBudget || 0) < minEnemyCost;
+      const isTargetReached = selfDestructTarget > 0 && (selfDestructTarget - (this.totalBudgetSpawned || 0) < minEnemyCost);
+
+      if (!hasCachedEnemies && (isBudgetDepleted || isTargetReached || (selfDestructTarget > 0 && (this.totalBudgetSpawned || 0) >= selfDestructTarget))) {
+        if (isLiquid || selfDestructTarget > 0) {
+          triggerSelfDestruct();
+          return;
+        }
       }
-      const dx = this.pos.x + GRID_SIZE/2 - state.player.pos.x;
-      const dy = this.pos.y + GRID_SIZE/2 - state.player.pos.y;
-      const dSq = dx*dx + dy*dy;
-      const trigRad = sCfg.spawnTriggerRadius > 0 ? sCfg.spawnTriggerRadius : 200;
-      if (sCfg.spawnTriggerRadius < 0 || dSq < trigRad * trigRad) {
-        if (state.frames - this.lastSpawnTime >= sCfg.spawnInterval) {
-          const eTypes = (sCfg.enemyTypeKey && sCfg.enemyTypeKey.length > 0) ? sCfg.enemyTypeKey : ['e_basic'];
-          const eKey = eTypes[floor(random(eTypes.length))];
-          const eCfg = enemyTypes[eKey];
-          if (eCfg && (!sCfg.spawnIntervalConsumeBudget || this.spawnerBudget >= eCfg.cost)) {
-            const success = this.spawnEnemyFromSpawner(eKey, sCfg);
-            if (success) {
-              if (sCfg.spawnIntervalConsumeBudget) this.spawnerBudget -= eCfg.cost;
-              this.lastSpawnTime = state.frames;
+
+      const rawTrig = sCfg.spawnTriggerRadius !== undefined ? sCfg.spawnTriggerRadius : 200;
+      const trigRad = rawTrig < 0 ? -1 : Math.max(100, rawTrig);
+      const bcx = this.pos.x + GRID_SIZE / 2;
+      const bcy = this.pos.y + GRID_SIZE / 2;
+
+      let isTriggered = false;
+      if (trigRad < 0) {
+        isTriggered = true;
+      } else {
+        const trigRadSq = trigRad * trigRad;
+        if (state.player) {
+          const pdx = bcx - state.player.pos.x;
+          const pdy = bcy - state.player.pos.y;
+          if (pdx * pdx + pdy * pdy <= trigRadSq) {
+            isTriggered = true;
+          }
+        }
+        if (!isTriggered && state.world) {
+          for (const t of state.world.getAllTurrets()) {
+            if (t && t.health > 0) {
+              const tdx = bcx - t.pos.x;
+              const tdy = bcy - t.pos.y;
+              if (tdx * tdx + tdy * tdy <= trigRadSq) {
+                isTriggered = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (isTriggered) {
+        const minInterval = sCfg.spawnInterval > 0 ? sCfg.spawnInterval : 60;
+        if (state.frames - this.lastSpawnTime >= minInterval) {
+          if (hasCachedEnemies) {
+            const nextEnemy = this.cachedSpawnList[0];
+            const eCfg = enemyTypes[nextEnemy];
+            if (eCfg) {
+              const success = this.spawnEnemyFromSpawner(nextEnemy, sCfg);
+              if (success) {
+                this.cachedSpawnList.shift();
+                this.totalBudgetSpawned = (this.totalBudgetSpawned || 0) + eCfg.cost;
+                this.spawnerBudget = Math.max(0, (this.spawnerBudget || 0) - eCfg.cost);
+                this.lastSpawnTime = state.frames;
+
+                const budgetRemaining = selfDestructTarget > 0 ? (selfDestructTarget - (this.totalBudgetSpawned || 0)) : (this.spawnerBudget || 0);
+                const outOfSpawns = (!this.cachedSpawnList || this.cachedSpawnList.length === 0) || budgetRemaining < minEnemyCost;
+                if (outOfSpawns && (isLiquid || selfDestructTarget > 0)) {
+                  triggerSelfDestruct();
+                  return;
+                }
+              }
+            }
+          } else {
+            const affordable = eTypes.filter((k: string) => enemyTypes[k] && enemyTypes[k].cost <= (this.spawnerBudget || 0));
+            if (affordable.length === 0) {
+              if (isLiquid || selfDestructTarget > 0) {
+                triggerSelfDestruct();
+                return;
+              }
+            } else {
+              const eKey = affordable[floor(random(affordable.length))];
+              const eCfg = enemyTypes[eKey];
+              if (eCfg) {
+                const success = this.spawnEnemyFromSpawner(eKey, sCfg);
+                if (success) {
+                  this.spawnerBudget = (this.spawnerBudget || 0) - eCfg.cost;
+                  this.totalBudgetSpawned = (this.totalBudgetSpawned || 0) + eCfg.cost;
+                  this.lastSpawnTime = state.frames;
+
+                  const budgetRemaining = selfDestructTarget > 0 ? (selfDestructTarget - (this.totalBudgetSpawned || 0)) : (this.spawnerBudget || 0);
+                  if (budgetRemaining < minEnemyCost && (isLiquid || selfDestructTarget > 0)) {
+                    triggerSelfDestruct();
+                    return;
+                  }
+                }
+              }
             }
           }
         }
@@ -1077,7 +1171,10 @@ export class Block {
           const targetSpawnCount = Math.floor(dmgRatio * this.initialCachedSpawnCount);
           while (this.enemiesSpawnedFromDamage < targetSpawnCount && this.cachedSpawnList.length > 0) {
             const nextEnemy = this.cachedSpawnList.shift()!;
+            const eCost = enemyTypes[nextEnemy]?.cost || 10;
             this.enemiesSpawnedFromDamage++;
+            this.totalBudgetSpawned = (this.totalBudgetSpawned || 0) + eCost;
+            this.spawnerBudget = Math.max(0, (this.spawnerBudget || 0) - eCost);
             this.spawnEnemyFromSpawner(nextEnemy, sCfg);
           }
         }
@@ -1120,7 +1217,10 @@ export class Block {
           if (sCfg) {
             while (this.cachedSpawnList.length > 0) {
               const nextEnemy = this.cachedSpawnList.shift()!;
+              const eCost = enemyTypes[nextEnemy]?.cost || 10;
               this.enemiesSpawnedFromDamage++;
+              this.totalBudgetSpawned = (this.totalBudgetSpawned || 0) + eCost;
+              this.spawnerBudget = Math.max(0, (this.spawnerBudget || 0) - eCost);
               this.spawnEnemyFromSpawner(nextEnemy, sCfg);
             }
           }

@@ -1,8 +1,9 @@
 
 import { HOUR_FRAMES, SPATIAL_HASH_CELL_SIZE } from './constants';
 import { customStartingHour, AlmanacProgression } from './lvDemo';
+import { GameState } from './types/state';
 
-export const state: any = {
+export const state: GameState = {
   currentScreen: 'main_menu', // 'main_menu' | 'game' | 'level_editor'
   currentLevelId: 'dev_test', // 'dev_test' | 'sandbox' | 'editor_custom'
   selectedLevelInMenu: 'dev_test',

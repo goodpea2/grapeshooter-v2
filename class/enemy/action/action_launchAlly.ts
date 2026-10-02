@@ -7,9 +7,6 @@ import { soundEngine } from '../../../src/audio/soundEngine';
 import { spawnHitSpark } from '../../../vfx/index';
 import { lerpAngle } from '../../utils';
 
-declare const p5: any;
-declare const createVector: any;
-declare const atan2: any;
 
 export class ActionLaunchAlly extends EnemyAction {
   tags = ['support', 'launch', 'collab'];

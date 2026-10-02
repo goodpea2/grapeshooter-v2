@@ -2,26 +2,6 @@ import { state } from '../../../state';
 import { ALL_CURRENCIES, EditorLevelConfigData } from './types';
 import { registerUIHitbox } from '../../../uiComponents';
 
-declare const push: any;
-declare const pop: any;
-declare const fill: any;
-declare const noStroke: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const rect: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const LEFT: any;
-declare const TOP: any;
-declare const CENTER: any;
-declare const image: any;
-declare const imageMode: any;
-declare const tint: any;
-declare const noTint: any;
-declare const ellipse: any;
-declare const mouseX: any;
-declare const mouseY: any;
 
 export function drawCurrencyPanel(
   cardX: number, curY: number, cardW: number,

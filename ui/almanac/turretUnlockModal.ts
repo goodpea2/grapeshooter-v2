@@ -8,36 +8,6 @@ import { triggerNodeUnlockVFX } from './turretUnlockTree';
 import { recalculateAllStats } from '../../src/upgrades';
 import { drawRichText } from '../richText';
 
-declare const width: any;
-declare const height: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const scale: any;
-declare const fill: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const noStroke: any;
-declare const strokeWeight: any;
-declare const rect: any;
-declare const ellipse: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const textStyle: any;
-declare const text: any;
-declare const imageMode: any;
-declare const image: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const mouseIsPressed: any;
-declare const frameCount: any;
-declare const constrain: any;
-declare const sin: any;
-declare const abs: any;
-declare const resetMatrix: any;
-declare const CENTER: any;
-declare const BOLD: any;
-declare const NORMAL: any;
 
 export function drawTurretUnlockChoiceModal() {
   const modal = state.turretUnlockChoiceModal;

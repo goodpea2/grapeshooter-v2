@@ -18,32 +18,6 @@ import {
   selectAllText
 } from './textEditUtils';
 
-declare const push: any;
-declare const pop: any;
-declare const fill: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const noStroke: any;
-declare const strokeWeight: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const textWidth: any;
-declare const textStyle: any;
-declare const textFont: any;
-declare const text: any;
-declare const rect: any;
-declare const triangle: any;
-declare const rectMode: any;
-declare const line: any;
-declare const CENTER: any;
-declare const LEFT: any;
-declare const BOLD: any;
-declare const NORMAL: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const width: any;
-declare const height: any;
-declare const frameCount: any;
 
 export interface TextSignEditState {
   block: any | null;

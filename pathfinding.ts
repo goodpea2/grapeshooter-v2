@@ -1,17 +1,6 @@
 import { state } from './state';
 import { GRID_SIZE } from './constants';
 
-declare const floor: any;
-declare const sqrt: any;
-declare const push: any;
-declare const pop: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const line: any;
-declare const fill: any;
-declare const noFill: any;
-declare const noStroke: any;
-declare const ellipse: any;
 
 const FIELD_RADIUS = 36; // 36 tiles in each direction (73x73 = 5,329 tiles, ~2336x2336 px)
 const FIELD_DIM = FIELD_RADIUS * 2 + 1;

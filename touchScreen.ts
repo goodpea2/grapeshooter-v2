@@ -2,16 +2,6 @@
 import { state } from './state';
 import { GRID_SIZE, PLAYER_DRAG_MIN_DISTANCE_TILES, PLAYER_DRAG_MAX_DISTANCE_TILES } from './constants';
 
-declare const createVector: any;
-declare const atan2: any;
-declare const dist: any;
-declare const width: any;
-declare const height: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const pmouseX: any;
-declare const pmouseY: any;
-declare const map: any;
 
 export function initTouchControls() {
   // We'll use these in index.tsx

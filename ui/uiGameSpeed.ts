@@ -98,35 +98,7 @@ export function detachAllTurrets() {
   state.needsTargetReScan = true;
 }
 
-declare const translate: any;
-declare const stroke: any;
-declare const strokeWeight: any;
 
-declare const p5: any;
-declare const width: any;
-declare const height: any;
-declare const push: any;
-declare const pop: any;
-declare const fill: any;
-declare const noStroke: any;
-declare const rect: any;
-declare const triangle: any;
-declare const text: any;
-declare const textSize: any;
-declare const textAlign: any;
-declare const RIGHT: any;
-declare const CENTER: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const dist: any;
-declare const frameCount: any;
-declare const sin: any;
-declare const lerp: any;
-declare const imageMode: any;
-declare const image: any;
-declare const map: any;
-declare const tint: any;
-declare const noTint: any;
 
 export function drawGameSpeedButtons() {
   const canAfford = state.raisinCurrency > 0;

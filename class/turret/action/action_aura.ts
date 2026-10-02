@@ -3,7 +3,6 @@ import { state } from '../../../state';
 import { TurretAction } from '../../turretAction';
 import { FrostFieldAuraVFX, TorchwoodAuraVFX, SpeederAuraVFX, spawnSpeederAuraVFX } from '../../../vfx/index';
 
-declare const floor: any;
 
 export class ActionAura extends TurretAction {
   tags = ['aura', 'passive'];

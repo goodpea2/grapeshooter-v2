@@ -1,21 +1,5 @@
 import { state } from '../state';
 
-declare const width: any;
-declare const height: any;
-declare const push: any;
-declare const pop: any;
-declare const fill: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const noStroke: any;
-declare const rect: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const CENTER: any;
-declare const color: any;
-declare const lerp: any;
 
 let animatedProgress = 0;
 

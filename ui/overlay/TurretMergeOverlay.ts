@@ -3,26 +3,6 @@ import { state } from '../../state';
 import { turretTypes } from '../../balanceTurrets';
 import { TYPE_MAP } from '../../assetTurret';
 
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const fill: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const noStroke: any;
-declare const strokeWeight: any;
-declare const rect: any;
-declare const ellipse: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const CENTER: any;
-declare const LEFT: any;
-declare const image: any;
-declare const imageMode: any;
-declare const textWidth: any;
-declare const sin: any;
-declare const frameCount: any;
 
 /**
  * Draws a bright yellow circle highlight behind a turret.
@@ -225,5 +205,3 @@ export function drawSwapBubble(x: number, y: number, alpha: number = 255) {
   pop();
 }
 
-declare const triangle: any;
-declare const rectMode: any;

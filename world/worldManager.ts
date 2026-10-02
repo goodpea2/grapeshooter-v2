@@ -17,30 +17,6 @@ import { Block } from './block';
 import { Chunk } from './chunk';
 import { PayGateGroup, PayGateGroupConfig } from './paygate';
 
-declare const dist: any;
-declare const floor: any;
-declare const random: any;
-declare const constrain: any;
-declare const push: any;
-declare const pop: any;
-declare const fill: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const rect: any;
-declare const noStroke: any;
-declare const ellipse: any;
-declare const sin: any;
-declare const strokeWeight: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const textWidth: any;
-declare const CENTER: any;
-declare const LEFT: any;
-declare const TOP: any;
-declare const BOTTOM: any;
-declare const text: any;
-declare const width: any;
-declare const height: any;
 
 export class WorldManager {
   chunks: Map<string, Chunk> = new Map();
@@ -91,7 +67,7 @@ export class WorldManager {
           state[potKey] -= amount;
         } else { bonusData[fk] = 0; }
       }
-      this.chunks.set(key, new Chunk(cx, cy, directorIdx, bonusData));
+      this.chunks.set(key, new Chunk(cx, cy, directorIdx ?? 0, bonusData));
       this.dirtyChunkAndNeighbors(cx, cy);
     }
     return this.chunks.get(key);
@@ -272,11 +248,6 @@ export class WorldManager {
   update(playerPos: any) {
     let pcx = floor(playerPos.x / (GRID_SIZE * CHUNK_SIZE)); let pcy = floor(playerPos.y / (GRID_SIZE * CHUNK_SIZE));
     const exploredKey = `${pcx},${pcy}`;
-    const currentChunk = this.getChunk(pcx, pcy);
-    if (currentChunk && currentChunk.roomEnemyBudget > 0 && !currentChunk.isRoomBudgetTriggered) {
-      spawnFromBudget(currentChunk.roomEnemyBudget);
-      currentChunk.isRoomBudgetTriggered = true;
-    }
     if (!state.exploredChunks.has(exploredKey)) { 
       state.exploredChunks.add(exploredKey); 
       const lv = floor(constrain(state.currentChunkLevel, 0, 10)); 

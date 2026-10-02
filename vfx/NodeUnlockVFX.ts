@@ -1,20 +1,5 @@
 import { ObjectPool } from '../class/pool';
 
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const rotate: any;
-declare const scale: any;
-declare const stroke: any;
-declare const noStroke: any;
-declare const strokeWeight: any;
-declare const fill: any;
-declare const noFill: any;
-declare const circle: any;
-declare const line: any;
-declare const cos: any;
-declare const sin: any;
-declare const random: any;
 
 export interface SparkParticle {
   x: number;

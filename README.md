@@ -1131,5 +1131,90 @@ A dedicated, real-time visual synergy and feedback engine providing immediate re
   - Fully integrated win conditions into LevelEditor `serializeLevelLayout()`, `restoreLevelFromCache()`, `saveLevelLayout()`, `addImportedLevel()`, and `startLevel('editor_playtest')` so all win conditions are seamlessly cached and preserved when entering and exiting TestPlay.
   - Live HUD objective tracker displays active requirements (e.g. `Survive Night 3/3`, `Kill Budget: 45/100`, `SUN: 12/20`, `Hunt Any: 8/20`, `Break Dirt: 4/10`).
 
+### 5. Architectural Modularization & Type Safety Hardening
+- **Consolidated Ambient p5.js Globals (`types/p5-globals.d.ts`)**:
+  - Unified all ambient p5.js functions, variables, and constants (`push`, `pop`, `translate`, `fill`, `stroke`, `sin`, `cos`, `createVector`, `blendMode`, `circle`, `rect`, etc.) into a single ambient declarations header.
+  - Eliminated repetitive per-file `declare const` blocks across all modules while maintaining flawless TypeScript compilation.
+- **Top-Level `GameState` Interface (`types/state.ts`)**:
+  - Added a lightweight, top-level interface for `state` in `state.ts` to safeguard against property access typos without over-engineering gameplay configurations or slowing down feature iteration.
+- **Modular `index.tsx` Extraction (Zero Logic Divergence)**:
+  - **`src/renderEffects.ts`**: Extracted environmental rendering passes (`drawGlobalLighting`, `drawVisibilityOverlay`, `drawDamageVignette`, `drawAllTurretConnections`).
+  - **`src/placementSystem.ts`**: Extracted placement logic (`executePlacement`, `autoPlaceTurret`) and merge/swap resolvers (`swapTurrets`, `canSwapTurrets`).
+  - **`src/inputHandlers.ts`**: Extracted all mouse, touch, and keyboard listener bodies (`handleMousePressed/Dragged/Released`, `handleKeyPressed/Typed/Released`, `handleWindowResized`, `handleMouseWheel`, `handleTouchStarted/Moved/EndedEvent`, and `registerWindowListeners` for blur/focus handling).
+  - **`index.tsx` Streamlining**:
+    - Centralized all top-level imports in a single top import block (including `recalculateAllStats`).
+    - Explicitly wires up all `(window as any).xxx` hooks in `index.tsx`.
+### 6. Sandbox Endless Mode, Refined Directional HUD Hints & Dynamic Running Animation
+- **Sandbox & Dev Endless Mode**:
+  - Configured default Sandbox (`sbw`) and Empty Dev (`mpty`) maps with `noWinCondition: true` and `destroyAllEnemySpawners: false`.
+  - `evaluateWinConditions()` and `getRemainingWinConditionEntitiesAndSpawners()` safely bypass win condition evaluation when in sandbox/dev modes, enabling continuous open-ended sandbox play without forced win overlays.
+  - HUD displays `'Sandbox Mode • Endless'` in sandbox mode.
+- **Minimalist Win Condition Directional Arrow Hint**:
+  - Removed the bulky red square container and `!` badge.
+  - Replaced with a clean, vibrant directional arrow on the overlay edge pointing toward the nearest remaining win condition entity or spawner when fewer than 4 remain in structured levels.
+  - Accounts for dynamic camera zoom and screen boundary margins with smooth pulsing scale.
+- **6-Frame Dynamic Player Running Animation & Configurable Hopping Trajectory**:
+  - Registered 6 full running frames (`img_player_front_right_run1` through `run6`) in `assets.ts`.
+  - Configured full 2-hop running cycle in `visualPlayer.ts` with dedicated tuning parameters in `PLAYER_ANIM_CONFIG`:
+    - `runCycleDistance`: Total world distance for a complete 6-frame run cycle (2 hops).
+    - `hopHeight`: Peak elevation reached at frames 2 & 5.
+    - `squashStretchAmp`: Dynamic soft-body compression and stretch factor.
+    - `offsetForRunningFrames`: Timing shift offset between sprite frame sequencing and vertical hopping position.
+    - `landingCurveDamper`: Shapes the descent into a flatter, cushioned landing curve at frames 3/4 & 6/1.
+    - `rotSwayAmp`: Subtle rhythmic body tilt per step stride.
+
+### 7. Multi-Layered Core-and-Shell Cellular Region Generation & Content Expansion
+- **Multi-Layered Concentric Core-and-Shell Cellular Engine (`worldgen/cellularNoise.ts`)**:
+  - Replaced flat noisy per-tile threshold rolls with continuous distance-to-nucleus gradient evaluation $r_{\text{eff}} \in [0.0, 1.0]$:
+    - **Air Corridor Band** ($r_{\text{eff}} < \text{airCutoff}$): Traversable open pathways between cells. Scaled per chunk level via `AIR_CUTOFF_PER_LEVEL` (0.48 down to 0.18) so corridors naturally tighten and terrain becomes denser deeper in the world.
+    - **Outer Shell Band** ($r_{\text{eff}} \ge \text{airCutoff}$): Base cell material (`o_bush` for Tree, `o_dirt` for Dirt, `o_clay` for Clay, `o_stone` for Stone, `l_water` for Lake). Tree Cells generate contiguous bush shells around their dirt mantles and leaf ore cores like all other cell types.
+    - **Inner Mantle Band** ($r_{\text{eff}} \ge \text{subPocketThreshold}$): Concentric geological transition material (`o_dirt`, `o_clay`, `o_stone`, `o_slate`, `l_ice`).
+    - **Nucleus Core Band** ($r_{\text{eff}} \ge \text{coreThreshold}$): Concentrated cell feature nodes (rich ore clumps like `sunMine`/`oreShard`, or danger-scaled enemy spawner hubs).
+  - **Independent Seed Offsets & Tier Override**:
+    - Each cell layer operates on its own deterministic seed offset (`seed + 0`, `seed + 100`, `seed + 200`, `seed + 300`, `seed + 400`) and supergrid scale.
+    - Evaluation proceeds in ascending tier order: **Tree $\to$ Dirt $\to$ Clay $\to$ Stone $\to$ Lake**. Higher-tier active cells override lower-tier cells beneath them, allowing multiple organic cell types to contact, intersect, and form composite geological formations.
+  - 100% pure mathematical function $f(\text{worldX}, \text{worldY}, \text{level}, \text{seed})$ ensuring deterministic lazy chunk generation, out-of-order creation, and LRU cache eviction consistency.
+- **Cell Layer Config Architecture (`worldgen/cellTypes.ts`)**:
+  - Defined `CELL_LAYERS` with per-layer seed offsets, supergrid sizes, concentric mantle/core thresholds, fill/transition materials, core feature tables, and level weight tables `levelWeights` (Lv0 to Lv10).
+- **Bush Obstacle Dual-Grid Tileset Integration**:
+  - Registered `img_tileset_bush` and `img_tileset_bush_v2` in `assets.ts`.
+  - Connected `o_bush` to dual-grid autotiling system in `visualAutotiling.ts` with priority 6.
+- **Revamped UIComponents-Powered WorldGen Preview (`ui/uiDebug.ts`)**:
+  - Completely redesigned WorldPreview modal following design architecture and using `UIComponents` exclusively (`drawButton`, `drawDarkButton`, `drawGreenButton`, `drawCyanButton`, `drawRedButton`, `setUILayer`).
+  - Live cellular rendering supporting all 5 concentric cell layers, mantles, core ores, spawner indicators, and chunk grid boundaries.
+  - Interactive parameter tweaking: Cell Scale / Sparsity, Air Corridor Cutoff per level, Core Feature Multiplier, Boundary Jitter, Random Seed generator, Level Bucket (0-10) selector, and scrollable Room Director chain with clipboard copy.
+  - Registered `state.showWorldGenPreview` with `isAnyModalOpen()` and centralized `updateUIHoverState()` dispatch, ensuring background debug hitboxes are occluded, eliminating double-render cycles, and preventing hover click repetitions.
+  - Exact 1:1 seed alignment and origin tile centering parity between in-game chunk generation and WorldPreview buffer rendering.
+- **New Obstacle & Resource Content Stubs**:
+  - Added `o_bush` obstacle (`health: 30`, `blocksLOS: false`, `lootConfigOnDeath: 'lc_bush'`).
+  - Added full suite of ore overlays: `oreLeaf`, `oreShard`, `oreFuel`, `oreIce`, `oreShell`, `oreHard`, and `sunMine`.
+  - Added corresponding drop entries and loot tables in `balanceLootTable.ts` and `economy.ts`.
+- **Boss / Danger RoomDirector Periodicity (`debug/roomDirectorGenerator.ts`)**:
+  - Integrated `BOSS_SPIKE_INTERVAL` (every ~22 discovered chunks) to dynamically boost weights of boss (`bos`) and high-tier treasure (`tre`) rooms atop loop step weighting.
+- **Cellular WorldGen Refactor & Concentric Ring Architecture (`worldgen/cellTypes.ts`, `worldgen/cellularNoise.ts`)**:
+  - Replaced legacy individual threshold variables with unified `ringThresholdConfig: CellRingThresholdConfig[]` per cell layer:
+    - Each ring defines `threshold`, `materials: string[]`, weighted `overlays: CellRingOverlayOption[]`, and `airRatio` (carves additional pathways within that specific ring).
+    - Material selection among multiple items is determined deterministically via secondary cellular noise hashing with equal probability.
+  - Replaced automatic progressive scale formulas with explicit `superGridSize: number[]` authored per level [Lv0..Lv10] for all 5 cell layers (`tree`, `dirt`, `clay`, `stone`, `lake`).
+  - Removed all duplicated parameters (`fillMaterial`, `subPocketMaterial`, `coreThreshold`, `subPocketThreshold`, `coreOreTypes`, `spawnerChance`, `oreChance`).
+  - **Dynamic Seed Initialization (`levelManager.ts`)**: Automatically rolls a fresh random world seed on every worldGen level initialization and syncs it across `WORLD_GEN_CELLULAR_CONFIG`, noise functions, and the debug world preview buffer.
+- **Distributed Monster & Boss Room Spawners (`world/chunk.ts`)**:
+  - Monster rooms (`mon*`) randomly generate **1 to 3** `l_spawner` liquid tiles.
+  - Boss rooms (`bos*`) randomly generate **4 to 8** `l_spawner` liquid tiles.
+  - Total rolled enemy budget is divided evenly across all spawners in the room.
+  - Spawners are positioned in a circular ring pattern around the room center using world-seed-based angle offsets.
+- **RoomPrefab Monster & Boss Room `l_spawner` Conversion & Self-Destruct Lifecycle (`world/chunk.ts`, `world/block.ts`, `balanceLiquids.ts`)**:
+  - When generating `mon*` and `bos*` room prefabs, rolls the budget `rolledBudget` from `cfg.enemySpawnerConfig.enemySpawnConfig.budget`.
+  - Spawns exactly **one** `l_spawner` liquid tile in the chunk center.
+  - Pre-populates a cached list of enemies worth `rolledBudget` in total, weighted using the current level's global enemy spawn config's current day weights (`getWeightsForCurrentTime()`).
+  - **Fixed Unbounded Spawning & 0-Cost Entity Loop (`balanceEnemies.ts`, `world/chunk.ts`, `world/block.ts`)**:
+    - `balanceEnemies.ts`: Flagged special/test entities (`e_hypnotest`, `e_friendly_armor2`, `e_dummyTarget`, `e_bomb_mainmenu`) with `excludeFromSpawnerPool: true`.
+    - `world/chunk.ts` & `world/block.ts`: Hardened enemy candidate and fallback filters to require `cost > 0 && !excludeFromSpawnerPool && !spawnWithCondition`. When budget has an indivisible remainder (e.g. 1 budget left), the spawner ends cache generation immediately rather than infinitely filling with 0-cost test entities.
+    - Set the spawner's target budget and self-destruct threshold to the exact sum of costs in the cached list (`totalCachedBudget`), ensuring exact 1:1 parity and instant self-destruction when the final unit is spawned.
+    - `balanceLiquids.ts`: Changed default `l_spawner` config to disable `hourlySpawnConfig` by default (`enabled: false`), preventing non-prefab or standalone ground spawners from continuously generating endless hourly budget.
+    - Synchronized budget accounting (`totalBudgetSpawned`, `spawnerBudget`) across periodic ticking, damage-based spawn rolls, and spawner death bursts.
+- **Clean Enemy Weights Multiplier (`lvDemo.ts`)**:
+  - Removed deprecated `CHUNK_LEVEL_WEIGHTS` constant and simplified `getWeightsForCurrentTime()` to return `dtWeights` directly.
+
 
 

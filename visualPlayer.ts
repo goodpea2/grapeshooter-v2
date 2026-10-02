@@ -2,28 +2,24 @@
 import { state } from './state';
 import { VISIBILITY_RADIUS, GRID_SIZE } from './constants';
 
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const rotate: any;
-declare const scale: any;
-declare const fill: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const noStroke: any;
-declare const ellipse: any;
-declare const strokeWeight: any;
-declare const rect: any;
-declare const sin: any;
-declare const frameCount: any;
-declare const image: any;
-declare const imageMode: any;
-declare const CENTER: any;
-declare const tint: any;
-declare const noTint: any;
-declare const abs: any;
-declare const PI: any;
-declare const HALF_PI: any;
+
+// ==========================================
+// Player Run Animation Tuning Parameters
+// ==========================================
+export const PLAYER_ANIM_CONFIG = {
+  // Total running distance (pixels) traveled for one full 6-frame cycle (2 complete hops)
+  runCycleDistance: 120, 
+  // Maximum hopping height (pixels) at the apex of each step
+  hopHeight: 5,
+  // Squash and stretch intensity during hopping
+  squashStretchAmp: 0.08,
+  // Normalized frame offset between sprite frame timing and hopping trajectory (-1.0 to 1.0)
+  offsetForRunningFrames: -0.2,
+  // Flattens the landing/trough curve relative to the launch apex (0.0 = symmetric sine, 0.5 = pronounced flat landing)
+  landingCurveDamper: 0.2,
+  // Subtle body rotational sway per hop
+  rotSwayAmp: 0.035
+};
 
 export function drawPlayer(p: any) {
   if (!p.pos) return;
@@ -54,6 +50,20 @@ export function drawPlayer(p: any) {
   let animScaleY = 1.0;
   let animRot = 0;
 
+  const runDist = p.runningDistance || 0;
+  const cycleDist = Math.max(10, PLAYER_ANIM_CONFIG.runCycleDistance);
+  const cycleProgress = (runDist % cycleDist) / cycleDist; // 0.0 to 1.0 (2 hops per cycle)
+  
+  // Progress within the current single hop (0.0 to 1.0, 2 hops per 6-frame cycle)
+  const hopProgress = (cycleProgress * 2) % 1.0;
+  const isSecondHop = cycleProgress >= 0.5;
+
+  // Determine the current running frame (1 through 6) with optional timing offset
+  const frameOffsetNorm = PLAYER_ANIM_CONFIG.offsetForRunningFrames || 0;
+  const frameCycleProgress = ((cycleProgress + frameOffsetNorm) % 1.0 + 1.0) % 1.0;
+  const runFrameIndex = Math.floor(frameCycleProgress * 6) % 6; // 0 to 5
+  const runFrameNum = runFrameIndex + 1; // 1 to 6
+
   // Idle / Breathe
   if (!isMoving) {
     const breatheRate = 0.08;
@@ -61,15 +71,32 @@ export function drawPlayer(p: any) {
     animScaleY = 1.0 + sin(frames * breatheRate) * breatheAmp;
     animScaleX = 1.0 / animScaleY;
   } 
-  // Moving / Hop
+  // Moving / Hop synced to running distance with damped landing curve
   else {
-    const hopSpeed = 0.2;
-    const hopHeight = 3; // Subtle
-    const hopVal = abs(sin(frames * hopSpeed));
-    animY = -hopVal * hopHeight;
-    animScaleY = 1.0 + (hopVal * 0.06) - 0.03;
+    // Calculate asymmetric hop trajectory (Frame 1/4 = takeoff, Frame 2/5 = crest, Frame 3/6 = landing)
+    // When landingCurveDamper > 0, the descent flattens out smoothly into the ground contact phase
+    let hopVal = 0;
+    if (hopProgress <= 0.5) {
+      // Ascending phase (0 -> 1)
+      const t = hopProgress / 0.5;
+      hopVal = sin(t * HALF_PI);
+    } else {
+      // Descending / landing phase (1 -> 0) with landing damper
+      const t = (hopProgress - 0.5) / 0.5;
+      const damper = Math.max(0, PLAYER_ANIM_CONFIG.landingCurveDamper);
+      // Cosine fall raised to (1 + damper * 1.5) produces a steeper descent that settles into a flatter landing trough
+      const baseFall = cos(t * HALF_PI);
+      hopVal = Math.pow(Math.max(0, baseFall), 1.0 + damper * 1.5);
+    }
+
+    const maxHopHeight = PLAYER_ANIM_CONFIG.hopHeight;
+    const squashAmp = PLAYER_ANIM_CONFIG.squashStretchAmp;
+    const swayAmp = PLAYER_ANIM_CONFIG.rotSwayAmp;
+
+    animY = -hopVal * maxHopHeight;
+    animScaleY = 1.0 + (hopVal * squashAmp) - (squashAmp * 0.4);
     animScaleX = 1.0 / animScaleY;
-    animRot = sin(frames * 0.12) * 0.05;
+    animRot = (isSecondHop ? -1 : 1) * (hopVal * swayAmp);
   }
 
   // Hurt Shaking
@@ -117,7 +144,13 @@ export function drawPlayer(p: any) {
     if (abs(dy) > 0.1) isBack = dy < 0;
   }
 
-  const spriteKey = isBack ? 'img_player_back_right' : 'img_player_front_right';
+  let spriteKey = isBack ? 'img_player_back_right' : 'img_player_front_right';
+  if (isMoving && !isBack) {
+    const runKey = `img_player_front_right_run${runFrameNum}`;
+    if (state.assets[runKey]) {
+      spriteKey = runKey;
+    }
+  }
   const sprite = state.assets[spriteKey];
 
   if (sprite) {

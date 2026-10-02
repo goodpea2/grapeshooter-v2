@@ -3,8 +3,6 @@ import { state } from '../../../state';
 import { TurretAction } from '../../turretAction';
 import { MergeVFX } from '../../../vfx/index';
 
-declare const floor: any;
-declare const random: any;
 
 export class ActionGrowth extends TurretAction {
   tags = ['growth', 'passive'];

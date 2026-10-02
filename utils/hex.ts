@@ -2,10 +2,6 @@
 import { HEX_DIST } from '../constants';
 import { state } from '../state';
 
-declare const sqrt: any;
-declare const round: any;
-declare const abs: any;
-declare const createVector: any;
 
 export function getHexAxial(x: number, y: number) {
   let q = (2/3 * x) / HEX_DIST; 

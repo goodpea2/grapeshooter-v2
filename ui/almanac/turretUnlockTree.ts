@@ -8,48 +8,6 @@ import { color } from '../../uiColors';
 import { soundEngine } from '../../src/audio/soundEngine';
 import { NodeUnlockVFX, spawnNodeUnlockVFX } from '../../vfx/NodeUnlockVFX';
 
-declare const width: any;
-declare const height: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const scale: any;
-declare const fill: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const noStroke: any;
-declare const strokeWeight: any;
-declare const rect: any;
-declare const ellipse: any;
-declare const circle: any;
-declare const line: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const textStyle: any;
-declare const text: any;
-declare const textWidth: any;
-declare const imageMode: any;
-declare const image: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const mouseIsPressed: any;
-declare const frameCount: any;
-declare const sin: any;
-declare const cos: any;
-declare const abs: any;
-declare const constrain: any;
-declare const map: any;
-declare const dist: any;
-declare const resetMatrix: any;
-declare const CENTER: any;
-declare const LEFT: any;
-declare const RIGHT: any;
-declare const TOP: any;
-declare const BOLD: any;
-declare const NORMAL: any;
-declare const tint: any;
-declare const noTint: any;
-declare const drawingContext: any;
 
 export type UnlockNodeType = 'turretUnlock' | 'turretUpgrade' | 'loot' | 'empty';
 
@@ -888,13 +846,13 @@ export function handleTurretUnlockTreeClick(
 }
 
 export function generateUpgradeOptions(fromAttachedOnly: boolean = false): any[] {
-  const attachedKeys = state.player?.attachments ? Array.from(new Set(state.player.attachments.map((a: any) => a.type))) : [];
+  const attachedKeys: string[] = state.player?.attachments ? Array.from(new Set(state.player.attachments.map((a: any) => String(a.type)))) : [];
   
-  let pool = fromAttachedOnly
+  let pool: string[] = (fromAttachedOnly
     ? (attachedKeys.length > 0 ? attachedKeys : (state.unlockedTurrets || ['t_pea']))
     : (state.unlockedTurrets && state.unlockedTurrets.length > 0
       ? [...state.unlockedTurrets]
-      : ['t_pea', 't_laser', 't_wall']);
+      : ['t_pea', 't_laser', 't_wall'])) as string[];
 
   // Filter pool strictly to turrets that have non-empty upgrades array defined
   const validPool = pool.filter((k: string) => {

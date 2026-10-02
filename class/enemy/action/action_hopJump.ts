@@ -5,13 +5,6 @@ import { spawnHitSpark, MuzzleFlash } from '../../../vfx/index';
 import { soundEngine } from '../../../src/audio/soundEngine';
 import { Bullet } from '../../bullet';
 
-declare const dist: any;
-declare const atan2: any;
-declare const cos: any;
-declare const sin: any;
-declare const color: any;
-declare const TWO_PI: any;
-declare const random: any;
 
 export class ActionHopJump extends EnemyAction {
   tags = ['movement'];

@@ -1,6 +1,12 @@
 
 export const ASSETS = {
   img_player_front_right: "https://i.ibb.co/S4YhXH19/player-front-right.png",
+  img_player_front_right_run1: "https://i.ibb.co/sdHfzBY4/player-front-right-run1.png",
+  img_player_front_right_run2: "https://i.ibb.co/DDsdbb2Y/player-front-right-run2.png",
+  img_player_front_right_run3: "https://i.ibb.co/prBmt278/player-front-right-run3.png",
+  img_player_front_right_run4: "https://i.ibb.co/KcxzWcbM/player-front-right-run4.png",
+  img_player_front_right_run5: "https://i.ibb.co/93ZgGLyc/player-front-right-run5.png",
+  img_player_front_right_run6: "https://i.ibb.co/KxfRcddq/player-front-right-run6.png",
   img_player_back_right: "https://i.ibb.co/SwVp44h3/player-back-right.png",
   img_armor1: "https://i.ibb.co/XZ7ZdVg3/e-armor1.png",
   img_armor2: "https://i.ibb.co/TB9Qdhkf/e-armor2.png",
@@ -262,12 +268,14 @@ export const ASSETS = {
   img_t_farm_mob_stage4: "https://i.ibb.co/k2sTckyd/t-farm-mob-stage3-front-right.png",
 
   // Tileset Assets
+  img_tileset_bush: "https://i.ibb.co/VWGXBSDJ/tileset-bush.png",
+  img_tileset_bush_v2: "https://i.ibb.co/35vnZ86T/tileset-bush-v2.png",
   img_tileset_dirt: "https://i.ibb.co/4gRpsVjq/tileset-dirt.png",
   img_tileset_dirt_v2: "https://i.ibb.co/DgknKSh5/tileset-dirt-v2.png",
   img_tileset_clay: "https://i.ibb.co/xqkNnCcy/tileset-clay.png",
   img_tileset_clay_v2: "https://i.ibb.co/FqVTmBxy/tileset-clay-v2.png",
-  img_tileset_stone: "https://i.ibb.co/d4nVZjCM/tileset-stone.png",
-  img_tileset_stone_v2: "https://i.ibb.co/WWvs8fT0/tileset-stone-v2.png",
+  img_tileset_stone: "https://i.ibb.co/ksWDFpZK/tileset-stone.png",
+  img_tileset_stone_v2: "https://i.ibb.co/Ng9V8ZHG/tileset-stone-v2.png",
   img_tileset_slate: "https://i.ibb.co/spKwcB1Y/tileset-slate.png",
   img_tileset_slate_v2: "https://i.ibb.co/S44v0W1M/tileset-slate-v2.png",
   img_tileset_black: "https://i.ibb.co/1fZ3DfjG/tileset-black.png",

@@ -2,25 +2,6 @@
 import { state } from './state';
 import { HEX_DIST } from './constants';
 
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const rotate: any;
-declare const scale: any;
-declare const image: any;
-declare const imageMode: any;
-declare const CENTER: any;
-declare const tint: any;
-declare const noTint: any;
-declare const abs: any;
-declare const PI: any;
-declare const HALF_PI: any;
-declare const TWO_PI: any;
-declare const cos: any;
-declare const sin: any;
-declare const map: any;
-declare const pow: any;
-declare const random: any;
 
 // Map turret logic IDs to asset keys
 export const TYPE_MAP: Record<string, string> = {

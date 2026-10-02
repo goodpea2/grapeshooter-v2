@@ -884,9 +884,3 @@ export function triggerUpgradeHook(hookType: 'onKill' | 'onMine' | 'onDeath' | '
   }
 }
 
-declare const dist: any;
-declare const atan2: any;
-declare const random: any;
-declare const PI: any;
-declare const cos: any;
-declare const sin: any;

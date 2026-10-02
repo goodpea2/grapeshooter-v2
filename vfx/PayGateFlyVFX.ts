@@ -1,23 +1,6 @@
 import { state } from '../state';
 import { ObjectPool } from '../class/pool';
 
-declare const createVector: any;
-declare const lerp: any;
-declare const image: any;
-declare const imageMode: any;
-declare const CENTER: any;
-declare const tint: any;
-declare const noTint: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const rotate: any;
-declare const noStroke: any;
-declare const fill: any;
-declare const ellipse: any;
-declare const sin: any;
-declare const cos: any;
-declare const TWO_PI: any;
 
 export class PayGateFlyVFX {
   pos: any;

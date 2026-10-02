@@ -10,6 +10,16 @@ export interface Obstacle {
 }
 export const obstacleTypes: any = {
   o_dirt: { name: 'Dirt', health: 60, color: [40, 180, 80], borderColor: [60, 220, 100], blocksLOS: true, lootConfigOnDeath: 'o_dirt' },
+  o_bush: { 
+    name: 'Bush', 
+    health: 15, 
+    color: [34, 139, 34], 
+    borderColor: [50, 205, 50], 
+    blocksLOS: false, 
+    lootConfigOnDeath: 'lc_bush', 
+    connectToOtherBlock: true, 
+    canCarryOverlay: true 
+  },
   o_clay: { name: 'Clay', health: 120, color: [220, 120, 60], borderColor: [255, 160, 100], blocksLOS: true, lootConfigOnDeath: 'o_clay'},
   o_stone: { name: 'Stone', health: 240, color: [80, 60, 200], borderColor: [120, 100, 255], blocksLOS: true, lootConfigOnDeath: 'o_stone' },
   o_slate: { name: 'Slate', health: 480, color: [40, 30, 80], borderColor: [70, 60, 140], blocksLOS: true, lootConfigOnDeath: 'o_slate' },
@@ -90,6 +100,66 @@ export const overlayTypes: any = {
     concealedSparkleVfx: 'v_sparkle_white',
     lootConfigOnDeath: 'lc_sun_clump',
     assetImgConfig: { idleAssetImg: ['img_sun_10_a'], randomRotation: true, randomFlip: true }
+  },
+  sunMine: {
+    name: 'Sun Mine',
+    minHealth: -1,
+    isValuable: true,
+    obstacleOverlayVfx: 'v_sun_clump',
+    isConcealedAlongWithObstacle: true,
+    concealedSparkleVfx: 'v_sparkle_white',
+    lootConfigOnDeath: 'lc_sun_mine',
+    assetImgConfig: { idleAssetImg: ['img_sun_10_a'], randomRotation: true, randomFlip: true }
+  },
+  oreLeaf: {
+    name: 'Leaf Ore',
+    minHealth: -1,
+    isValuable: true,
+    obstacleOverlayVfx: 'v_sun_tiny',
+    isConcealedAlongWithObstacle: true,
+    concealedSparkleVfx: 'v_sparkle_white',
+    lootConfigOnDeath: 'lc_ore_leaf',
+    assetImgConfig: { idleAssetImg: ['img_icon_leaf'], randomRotation: true, randomFlip: true }
+  },
+  oreShard: {
+    name: 'Shard Ore',
+    minHealth: -1,
+    isValuable: true,
+    obstacleOverlayVfx: 'v_sun_tiny',
+    isConcealedAlongWithObstacle: true,
+    concealedSparkleVfx: 'v_sparkle_white',
+    lootConfigOnDeath: 'lc_ore_shard',
+    assetImgConfig: { idleAssetImg: ['img_icon_shard'], randomRotation: true, randomFlip: true }
+  },
+  oreFuel: {
+    name: 'Fuel Ore',
+    minHealth: -1,
+    isValuable: true,
+    obstacleOverlayVfx: 'v_sun_tiny',
+    isConcealedAlongWithObstacle: true,
+    concealedSparkleVfx: 'v_sparkle_white',
+    lootConfigOnDeath: 'lc_ore_fuel',
+    assetImgConfig: { idleAssetImg: ['img_icon_fuel'], randomRotation: true, randomFlip: true }
+  },
+  oreIce: {
+    name: 'Ice Ore',
+    minHealth: -1,
+    isValuable: true,
+    obstacleOverlayVfx: 'v_sun_tiny',
+    isConcealedAlongWithObstacle: true,
+    concealedSparkleVfx: 'v_sparkle_white',
+    lootConfigOnDeath: 'lc_ore_ice',
+    assetImgConfig: { idleAssetImg: ['img_icon_ice'], randomRotation: true, randomFlip: true }
+  },
+  oreShell: {
+    name: 'Shell Ore',
+    minHealth: -1,
+    isValuable: true,
+    obstacleOverlayVfx: 'v_sun_tiny',
+    isConcealedAlongWithObstacle: true,
+    concealedSparkleVfx: 'v_sparkle_white',
+    lootConfigOnDeath: 'lc_ore_shell',
+    assetImgConfig: { idleAssetImg: ['img_icon_shell'], randomRotation: true, randomFlip: true }
   },
   ov_tnt: { 
     name: 'TNT', 

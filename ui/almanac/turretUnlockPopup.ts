@@ -11,30 +11,6 @@ import {
 import { color } from '../../uiColors';
 import { soundEngine } from '../../src/audio/soundEngine';
 
-declare const width: any;
-declare const height: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const scale: any;
-declare const frameCount: any;
-declare const sin: any;
-declare const fill: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const noStroke: any;
-declare const rect: any;
-declare const ellipse: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const textStyle: any;
-declare const text: any;
-declare const abs: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const NORMAL: any;
-declare const BOLD: any;
-declare const CENTER: any;
 
 function map(n: number, start1: number, stop1: number, start2: number, stop2: number) { 
   return ((n - start1) / (stop1 - start1)) * (stop2 - start2) + start2; 

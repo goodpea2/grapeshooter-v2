@@ -10,14 +10,6 @@ import { initLevelEditorLevelConfig } from './levelConfig/configActions';
 export { initLevelEditorLevelConfig, serializeLevelEditorLevelConfig, formatGlobalEnemySpawnConfig, handleLevelConfigClick, handleLevelConfigKeyInput, handleLevelConfigScroll, syncLevelConfigToLayoutData } from './levelConfig/configActions';
 import { ALL_ENEMY_TYPES_LIST } from '../../levelEditor/types';
 
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const fill: any;
-declare const noStroke: any;
-declare const rect: any;
-declare const constrain: any;
-declare const abs: any;
 
 export function drawLevelConfigPanel(
   panelX: number, panelY: number, panelW: number, panelH: number,

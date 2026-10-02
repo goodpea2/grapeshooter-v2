@@ -5,8 +5,6 @@ import { eventBus } from '../../../src/events/eventBus';
 import { lerpAngle } from '../../utils';
 import { spawnHitSpark } from '../../../vfx/index';
 
-declare const dist: any;
-declare const atan2: any;
 
 export class ActionLeadFormation extends EnemyAction {
   tags = ['collab', 'leader'];

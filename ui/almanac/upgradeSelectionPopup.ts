@@ -3,24 +3,6 @@ import { state } from '../../state';
 import { UPGRADES, recalculateAllStats } from '../../src/upgrades';
 import { drawRichText } from '../richText';
 
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const fill: any;
-declare const noStroke: any;
-declare const rect: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const CENTER: any;
-declare const TOP: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const mouseIsPressed: any;
-declare const rectMode: any;
-declare const width: any;
-declare const height: any;
-declare const dist: any;
 
 export function drawUpgradeSelectionPopup(modalW: number, modalH: number) {
   const sel = state.upgradeSelection;
@@ -126,5 +108,3 @@ function drawUpgradeCard(x: number, y: number, w: number, h: number, upgradeId: 
   pop();
 }
 
-declare const stroke: any;
-declare const strokeWeight: any;

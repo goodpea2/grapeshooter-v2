@@ -7,36 +7,6 @@ import { applyHoverTransform } from '../../uiComponents';
 
 let lastNotEnoughSoundFrame = -999;
 
-declare const dist: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const fill: any;
-declare const noStroke: any;
-declare const ellipse: any;
-declare const stroke: any;
-declare const strokeWeight: any;
-declare const arc: any;
-declare const HALF_PI: any;
-declare const TWO_PI: any;
-declare const rectMode: any;
-declare const rect: any;
-declare const image: any;
-declare const imageMode: any;
-declare const tint: any;
-declare const noTint: any;
-declare const CENTER: any;
-declare const textAlign: any;
-declare const LEFT: any;
-declare const textSize: any;
-declare const text: any;
-declare const scale: any;
-declare const noFill: any;
-declare const mouseIsPressed: any;
-declare const map: any;
-declare const textWidth: any;
 
 export function drawTurretIcon(tr: any, key: string, x: number, y: number, alpha: number, isInstance: boolean = false) {
   const size = 58;

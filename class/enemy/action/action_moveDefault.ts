@@ -4,9 +4,6 @@ import { GRID_SIZE, EnemyCollideRadiusCheck } from '../../../constants';
 import { flowFieldRegistry } from '../../../pathfinding';
 import { lerpAngle } from '../../utils';
 
-declare const createVector: any;
-declare const atan2: any;
-declare const random: any;
 
 export class ActionMoveDefault extends EnemyAction {
   tags = ['movement'];

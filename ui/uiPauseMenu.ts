@@ -11,19 +11,6 @@ import {
 } from '../uiComponents';
 import { soundEngine } from '../src/audio/soundEngine';
 
-declare const width: any;
-declare const height: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const textStyle: any;
-declare const fill: any;
-declare const noStroke: any;
-declare const text: any;
-declare const LEFT: any;
-declare const CENTER: any;
-declare const NORMAL: any;
-declare const windowWidth: any;
-declare const windowHeight: any;
 
 export function setGraphicQuality(quality: 'low' | 'high') {
   state.graphicQuality = quality;

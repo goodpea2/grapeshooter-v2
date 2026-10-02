@@ -18,72 +18,23 @@ import { ROOM_PREFABS } from '../dictionaryRoomPrefab';
 import { generateRoomDirectorData } from '../debug/roomDirectorGenerator';
 import { saveLevelLayout } from '../levelManager';
 import { uiComponentsShowcase } from './uiComponentsShowcase';
-import { drawButton, drawDarkButton, drawGreenButton, drawCyanButton, drawRedButton, registerUIHitbox } from '../uiComponents';
+import { drawButton, drawDarkButton, drawGreenButton, drawCyanButton, drawRedButton, registerUIHitbox, setUILayer } from '../uiComponents';
 import { poolRegistry } from '../class/pool';
 import { soundEngine } from '../src/audio/soundEngine';
 import { generateUpgradeOptions } from './almanac/turretUnlockTree';
+import { 
+  WORLD_GEN_CELLULAR_CONFIG, 
+  CELL_LAYERS, 
+  CELL_LAYER_MAP,
+  AIR_CUTOFF_PER_LEVEL,
+  CellLayerKey
+} from '../worldgen/cellTypes';
+import { getMultiLayerCellAt, getCellAt, hash2DFloat } from '../worldgen/cellularNoise';
 
 // p5.js global variable declarations
-declare const floor: any;
-declare const frameRate: any;
-declare const frameCount: any;
-declare const push: any;
-declare const pop: any;
-declare const fill: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const noStroke: any;
-declare const rect: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const text: any;
-declare const LEFT: any;
-declare const TOP: any;
-declare const RIGHT: any;
-declare const CENTER: any;
-declare const mouseX: any;
-declare const mouseY: any;
-declare const width: any;
-declare const height: any;
-declare const mouseIsPressed: any;
-declare const ellipse: any;
-declare const strokeWeight: any;
-declare const dist: any;
-declare const rectMode: any;
-declare const noise: any;
-declare const constrain: any;
-declare const map: any;
-declare const color: any;
-declare const createGraphics: any;
-declare const image: any;
-declare const textWidth: any;
-declare const line: any;
-declare const lerp: any;
-declare const BOTTOM: any;
-declare const textStyle: any;
-declare const NORMAL: any;
-
-export function drawSlider(x: number, y: number, w: number, label: string, val: number, min: number, max: number, key: string) {
-  push();
-  const h = 18;
-  fill(40); stroke(255, 50); rect(x, y, w, h, 4);
-  const handleX = x + map(val, min, max, 0, w);
-  fill(100, 255, 255); noStroke(); rect(handleX - 4, y, 8, h, 2);
-  
-  fill(255); textAlign(LEFT, CENTER); textSize(9);
-  text(label, x + 5, y + h / 2);
-  textAlign(RIGHT, CENTER);
-  text(val.toFixed(3), x + w - 5, y + h / 2);
-
-  if (mouseIsPressed && mouseX > x && mouseX < x + w && mouseY > y && mouseY < y + h) {
-    (worldGenConfig as any)[key] = constrain(map(mouseX, x, x + w, min, max), min, max);
-    state.worldPreviewNeedsUpdate = true;
-  }
-  pop();
-}
 
 function updateWorldPreviewBuffer() {
-  const tiles = 144; // Standardized to CHUNK_SIZE * 9 (144) to keep map multiplier rounded
+  const tiles = 144;
   const pixelSize = 3;
   const bufferSize = tiles * pixelSize; // 432x432
 
@@ -93,61 +44,102 @@ function updateWorldPreviewBuffer() {
   }
 
   const pg = state.worldPreviewBuffer;
+  pg.rectMode(CORNER);
+  pg.imageMode(CORNER);
   pg.noStroke();
-  pg.background(10, 10, 20);
+  pg.background(12, 14, 24);
 
   const lv = floor(constrain(state.currentChunkLevel, 0, 10));
-  const liquidW = LIQUID_WEIGHTS[lv];
-  const blockW = BLOCK_WEIGHTS[lv];
-  const totalBW = blockW.reduce((a: number, b: number) => a + b, 0);
+  const previewAtOrigin = (state as any).worldPreviewAtOrigin !== false;
+  const cx = previewAtOrigin ? 8 : floor((state.player?.pos?.x || 0) / GRID_SIZE);
+  const cy = previewAtOrigin ? 8 : floor((state.player?.pos?.y || 0) / GRID_SIZE);
+  const seed = WORLD_GEN_CELLULAR_CONFIG.worldSeed || 4242;
 
-  const cx = floor(state.player.pos.x / GRID_SIZE);
-  const cy = floor(state.player.pos.y / GRID_SIZE);
+  const halfTiles = floor(tiles / 2);
 
   for (let x = 0; x < tiles; x++) {
     for (let y = 0; y < tiles; y++) {
-      let gx = cx - floor(tiles / 2) + x;
-      let gy = cy - floor(tiles / 2) + y;
-      let ln = noise((gx + worldGenConfig.noiseOffsetLakes) * worldGenConfig.liquidNoiseScale, (gy + worldGenConfig.noiseOffsetLakes) * worldGenConfig.liquidNoiseScale);
-      let rn = noise((gx + worldGenConfig.noiseOffsetRivers) * worldGenConfig.riverNoiseScale, (gy + worldGenConfig.noiseOffsetRivers) * worldGenConfig.riverNoiseScale);
-      let isRiver = Math.abs(rn - 0.5) < worldGenConfig.riverThreshold;
-      let isLake = ln > worldGenConfig.lakeThreshold;
-      let liquid = null;
-      if (isLake || isRiver) {
-        let cln = noise((gx + worldGenConfig.noiseOffsetClumping) * worldGenConfig.liquidClumpScale, (gy + worldGenConfig.noiseOffsetClumping) * worldGenConfig.liquidClumpScale);
-        let totalLW = liquidW.reduce((a: number, b: number) => a + b, 0);
-        if (totalLW > 0) {
-          let r = cln * totalLW; let sum = 0;
-          for (let i = 0; i < LIQUID_KEYS.length; i++) { sum += liquidW[i]; if (r <= sum) { liquid = LIQUID_KEYS[i]; break; } }
-        }
+      const gx = cx - halfTiles + x;
+      const gy = cy - halfTiles + y;
+
+      // Check spawn clear radius at origin (chunk 0,0 center at 8,8)
+      if (gx >= 0 && gx < 16 && gy >= 0 && gy < 16 && dist(gx, gy, 8, 8) < worldGenConfig.spawnClearRadius) {
+        continue;
       }
-      let blockKey = null;
-      if (!liquid) {
-        let n = noise((gx + worldGenConfig.noiseOffsetBlocks) * worldGenConfig.blockNoiseScale, (gy + worldGenConfig.noiseOffsetBlocks) * worldGenConfig.blockNoiseScale);
-        if (n > worldGenConfig.blockThreshold) {
-          let bn = noise((gx + worldGenConfig.noiseOffsetBlocks) * 0.25, (gy + worldGenConfig.noiseOffsetBlocks) * 0.25, 200);
-          let r = bn * totalBW; let sum = 0;
-          const BLOCK_KEYS = ['o_dirt', 'o_clay', 'o_stone', 'o_slate', 'o_black'];
-          for (let i = 0; i < BLOCK_KEYS.length; i++) { sum += blockW[i]; if (r <= sum) { blockKey = BLOCK_KEYS[i]; break; } }
-          if (!blockKey) blockKey = 'o_dirt';
+
+      const cellInfo = getMultiLayerCellAt(gx, gy, lv, seed);
+
+      if (cellInfo.isLiquid && cellInfo.material) {
+        // Lake / Ice Liquid Cell
+        if (cellInfo.material === 'l_ice') {
+          pg.fill(160, 205, 255); // Ice mantle/core
+        } else {
+          pg.fill(35, 95, 225); // Water body
         }
-      }
-      if (blockKey) { 
-        const c = obstacleTypes[blockKey].color; 
-        pg.fill(c[0], c[1], c[2]); 
-        pg.rect(x * pixelSize, y * pixelSize, pixelSize, pixelSize); 
-      } 
-      else if (liquid) { 
-        const c = liquidTypes[liquid].color; 
-        pg.fill(c[0], c[1], c[2]); 
-        pg.rect(x * pixelSize, y * pixelSize, pixelSize, pixelSize); 
+        pg.rect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+
+        // Shoreline / Shell / Lake Core overlay indicator
+        if (cellInfo.overlay) {
+          if (overlayTypes[cellInfo.overlay]?.isEnemySpawner) {
+            pg.fill(225, 45, 240); // Spawner purple
+          } else {
+            pg.fill(240, 210, 160); // Shell / ice mineral
+          }
+          pg.rect(x * pixelSize + 0.5, y * pixelSize + 0.5, pixelSize - 1, pixelSize - 1);
+        }
+      } else if (cellInfo.hasSolidTile && cellInfo.material) {
+        // Solid Cell (Tree / Dirt / Clay / Stone)
+        const colorCfg = obstacleTypes[cellInfo.material]?.color || [60, 180, 80];
+        pg.fill(colorCfg[0], colorCfg[1], colorCfg[2]);
+        pg.rect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+
+        // Core Nucleus Feature Overlays
+        if (cellInfo.overlay) {
+          if (overlayTypes[cellInfo.overlay]?.isEnemySpawner) {
+            pg.fill(225, 45, 240); // Core Spawner purple
+            pg.rect(x * pixelSize, y * pixelSize, pixelSize, pixelSize);
+          } else {
+            pg.fill(255, 225, 70); // Core Sparkling Gold Ore
+            pg.rect(x * pixelSize + 0.5, y * pixelSize + 0.5, pixelSize - 1, pixelSize - 1);
+          }
+        }
       }
     }
   }
-  // Player center marker
-  pg.fill(255);
-  pg.ellipse(bufferSize / 2, bufferSize / 2, 6);
-  
+
+  // Draw Chunk Boundary Grid overlay on the preview with proper modulo
+  pg.stroke(255, 255, 255, 30);
+  pg.strokeWeight(1);
+  const startGX = cx - halfTiles;
+  const startGY = cy - halfTiles;
+  for (let x = 0; x <= tiles; x++) {
+    const gx = startGX + x;
+    const mod = ((gx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+    if (mod === 0) {
+      const px = x * pixelSize;
+      pg.line(px, 0, px, bufferSize);
+    }
+  }
+  for (let y = 0; y <= tiles; y++) {
+    const gy = startGY + y;
+    const mod = ((gy % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+    if (mod === 0) {
+      const py = y * pixelSize;
+      pg.line(0, py, bufferSize, py);
+    }
+  }
+
+  // Center player/origin marker
+  const markerX = previewAtOrigin ? (bufferSize / 2) : (bufferSize / 2);
+  const markerY = previewAtOrigin ? (bufferSize / 2) : (bufferSize / 2);
+  pg.noStroke();
+  pg.fill(255, 255, 255, 230);
+  pg.ellipse(markerX, markerY, 7, 7);
+  pg.stroke(255, 60, 60);
+  pg.strokeWeight(1.5);
+  pg.line(markerX - 5, markerY, markerX + 5, markerY);
+  pg.line(markerX, markerY - 5, markerX, markerY + 5);
+
   state.worldPreviewNeedsUpdate = false;
 }
 
@@ -158,125 +150,288 @@ export function drawWorldGenPreview() {
     updateWorldPreviewBuffer();
   }
 
+  setUILayer(150);
+
   push();
-  fill(0, 0, 0, 200);
+  rectMode(CORNER);
+  imageMode(CORNER);
+
+  // Backdrop
+  fill(5, 7, 15, 220);
+  noStroke();
   rect(0, 0, width, height);
-  
+
   // Responsive modal sizing
-  const modalW = Math.min(850, width - 40);
-  const modalH = Math.min(600, height - 40);
-  const mx = (width - modalW) / 2;
-  const my = (height - modalH) / 2;
-  
-  fill(20, 20, 35);
-  stroke(100, 100, 255);
+  const modalW = Math.min(1000, width - 30);
+  const modalH = Math.min(680, height - 30);
+  const mx = Math.floor((width - modalW) / 2);
+  const my = Math.floor((height - modalH) / 2);
+
+  // Modal Container
+  fill(16, 20, 34);
+  stroke(54, 62, 114);
   strokeWeight(2);
-  rect(mx, my, modalW, modalH, 12);
+  rect(mx, my, modalW, modalH, 14);
 
-  const closeX = mx + modalW - 40;
-  const closeY = my + 10;
-  fill(255, 50, 50); noStroke();
-  ellipse(closeX + 15, closeY + 15, 25);
-  fill(255); textAlign(CENTER, CENTER); textSize(12); text("X", closeX + 15, closeY + 15);
-  if (mouseIsPressed && dist(mouseX, mouseY, closeX + 15, closeY + 15) < 15) {
-    state.showWorldGenPreview = false;
-    (window as any).mouseIsPressed = false;
-  }
+  // Header Title
+  fill(0, 231, 226);
+  noStroke();
+  textAlign(LEFT, CENTER);
+  textSize(16);
+  text("CELLULAR WORLD GENERATION & REGION PREVIEW", mx + 24, my + 26);
 
-  const sideW = Math.min(260, modalW * 0.35);
-  const sideX = mx + modalW - sideW - 20;
-  const sideY = my + 50;
-  
-  textAlign(LEFT, TOP); fill(255, 255, 100); textSize(14);
-  text("WORLD GEN TWEAK", sideX, sideY - 30);
-
-  let sy = sideY;
-  const sliders = [
-    {l: "Liq Scale", k: "liquidNoiseScale", min: 0.001, max: 0.1},
-    {l: "River Scale", k: "riverNoiseScale", min: 0.001, max: 0.1},
-    {l: "Lake Thresh", k: "lakeThreshold", min: 0.1, max: 0.95},
-    {l: "River Thresh", k: "riverThreshold", min: 0.01, max: 0.2},
-    {l: "Block Scale", k: "blockNoiseScale", min: 0.01, max: 0.5},
-    {l: "Block Thresh", k: "blockThreshold", min: 0.1, max: 0.9},
-    {l: "Liq Clump", k: "liquidClumpScale", min: 0.001, max: 0.1}
-  ];
-  
-  for(let s of sliders) {
-    drawSlider(sideX, sy, sideW, s.l, (worldGenConfig as any)[s.k], s.min, s.max, s.k);
-    sy += 25;
-  }
-
-  sy += 5;
-  fill(255); textSize(11); text(`Preview Level: ${state.currentChunkLevel}`, sideX, sy);
-  sy += 15;
-  const btnSize = 24;
-  for(let i=0; i<=10; i++) {
-    const bx = sideX + (i % 6) * (btnSize + 5);
-    const by = sy + floor(i / 6) * (btnSize + 5);
-    const hov = mouseX > bx && mouseX < bx + btnSize && mouseY > by && mouseY < by + btnSize;
-    fill(state.currentChunkLevel === i ? [100, 255, 100] : (hov ? 80 : 40));
-    rect(bx, by, btnSize, btnSize, 4);
-    fill(255); textAlign(CENTER, CENTER); textSize(10); text(i, bx + btnSize/2, by + btnSize/2);
-    if (mouseIsPressed && hov) {
-       state.currentChunkLevel = i;
-       state.worldPreviewNeedsUpdate = true;
-       (window as any).mouseIsPressed = false;
+  // Close button using UIComponents (clean onClick, no hover auto-trigger)
+  drawRedButton(mx + modalW - 48, my + 14, 32, 28, "✕", {
+    id: 'btn_worldgen_preview_close',
+    fontSize: 14,
+    radius: 6,
+    onClick: () => {
+      state.showWorldGenPreview = false;
     }
+  });
+
+  // --- TOP BAR: LEVEL BUCKET SELECTOR ---
+  const lvRowX = mx + 24;
+  const lvRowY = my + 48;
+  fill(175, 180, 195);
+  textSize(11);
+  textAlign(LEFT, CENTER);
+  text("Level Bucket:", lvRowX, lvRowY + 12);
+
+  const btnW = 32;
+  const btnH = 24;
+  for (let i = 0; i <= 10; i++) {
+    const bx = lvRowX + 80 + i * (btnW + 4);
+    const isCur = state.currentChunkLevel === i;
+    drawButton(bx, lvRowY, btnW, btnH, `${i}`, {
+      id: `btn_wgen_lv_${i}`,
+      variant: isCur ? 'cyan' : 'dark',
+      fontSize: 11,
+      radius: 6,
+      onClick: () => {
+        state.currentChunkLevel = i;
+        state.worldPreviewNeedsUpdate = true;
+      }
+    });
   }
 
-  // --- ROOM DIRECTOR PREVIEW SECTION ---
-  sy += 65;
-  fill(255, 255, 100); textAlign(LEFT, TOP); textSize(12);
-  text("ROOM DIRECTOR", sideX, sy);
-  sy += 20;
-  
-  const genBtnX = sideX;
-  const genBtnY = sy;
-  const genBtnW = sideW;
-  const genBtnH = 26;
-  const hovGen = mouseX > genBtnX && mouseX < genBtnX + genBtnW && mouseY > genBtnY && mouseY < genBtnY + genBtnH;
-  fill(hovGen ? 100 : 60); stroke(255, 100); rect(genBtnX, genBtnY, genBtnW, genBtnH, 4);
-  fill(255); textAlign(CENTER, CENTER); textSize(10); text("GENERATE CHAIN", genBtnX + genBtnW/2, genBtnH + genBtnH/2);
-  if (mouseIsPressed && hovGen) {
-    state.roomDirectorData = generateRoomDirectorData();
-    state.roomDirectorChain = state.roomDirectorData.split('-');
-    state.roomDirectorScrollY = 0;
-    (window as any).mouseIsPressed = false;
+  // --- LEFT PANEL: CANVAS PREVIEW & LEGEND ---
+  const mapAreaSize = 432;
+  const px = mx + 24;
+  const py = my + 86;
+
+  // Explicitly ensure modes before rendering frame and buffer
+  rectMode(CORNER);
+  imageMode(CORNER);
+
+  // Canvas Frame
+  fill(10, 12, 20);
+  stroke(40, 47, 96);
+  strokeWeight(2);
+  rect(px - 2, py - 2, mapAreaSize + 4, mapAreaSize + 4, 8);
+
+  if (state.worldPreviewBuffer) {
+    image(state.worldPreviewBuffer, px, py, mapAreaSize, mapAreaSize);
   }
+
+  // Legend Box under Preview
+  const legendY = py + mapAreaSize + 10;
+  const legendW = mapAreaSize;
+  const legendH = modalH - (legendY - my) - 16;
+  fill(12, 15, 26);
+  stroke(30, 36, 68);
+  rect(px, legendY, legendW, legendH, 8);
+
+  const legendItems = [
+    { name: 'Tree Cell', color: [34, 139, 34], sub: 'Bush (4-8) Lv0-2' },
+    { name: 'Dirt Batch', color: [40, 180, 80], sub: 'Dirt (6-20) Lv0-4' },
+    { name: 'Clay Batch', color: [220, 120, 60], sub: 'Clay (6-20) Lv1-5' },
+    { name: 'Stone Batch', color: [80, 60, 200], sub: 'Stone (6-20) Lv3-6' },
+    { name: 'Lake Cell', color: [30, 80, 220], sub: 'Water (12-30) Lv3-8' }
+  ];
+
+  const colW = Math.floor(legendW / 5);
+  for (let i = 0; i < legendItems.length; i++) {
+    const item = legendItems[i];
+    const lx = px + i * colW + 6;
+    const ly = legendY + 8;
+    fill(item.color[0], item.color[1], item.color[2]);
+    noStroke();
+    rect(lx, ly, 10, 10, 2);
+    fill(255);
+    textSize(9);
+    textAlign(LEFT, TOP);
+    text(item.name, lx + 14, ly - 1);
+    fill(140, 150, 175);
+    textSize(8);
+    text(item.sub, lx, ly + 13);
+  }
+
+  // --- RIGHT PANEL: TUNING CONTROLS & ROOM DIRECTOR ---
+  const sideX = px + mapAreaSize + 24;
+  const sideW = modalW - (sideX - mx) - 24;
+  let sy = my + 86;
+
+  // Tuning Heading
+  fill(255, 194, 0);
+  noStroke();
+  textSize(12);
+  textAlign(LEFT, TOP);
+  text("WORLD GEN PARAMETERS", sideX, sy);
+  sy += 22;
+
+  // Sparsity / Supergrid Scale
+  fill(200, 210, 230);
+  textSize(10);
+  text(`Cell Scale (Sparsity): ${WORLD_GEN_CELLULAR_CONFIG.superGridMultiplier.toFixed(2)}x`, sideX, sy);
+  drawDarkButton(sideX + sideW - 85, sy - 4, 38, 22, "-0.1x", {
+    id: 'btn_scale_minus', fontSize: 9, radius: 4,
+    onClick: () => {
+      WORLD_GEN_CELLULAR_CONFIG.superGridMultiplier = Math.max(0.5, WORLD_GEN_CELLULAR_CONFIG.superGridMultiplier - 0.1);
+      state.worldPreviewNeedsUpdate = true;
+    }
+  });
+  drawDarkButton(sideX + sideW - 42, sy - 4, 38, 22, "+0.1x", {
+    id: 'btn_scale_plus', fontSize: 9, radius: 4,
+    onClick: () => {
+      WORLD_GEN_CELLULAR_CONFIG.superGridMultiplier = Math.min(3.0, WORLD_GEN_CELLULAR_CONFIG.superGridMultiplier + 0.1);
+      state.worldPreviewNeedsUpdate = true;
+    }
+  });
+  sy += 28;
+
+  // Air Corridor Cutoff (Corridor Width / Cavity density)
+  const lv = floor(constrain(state.currentChunkLevel, 0, 10));
+  const curAirBase = AIR_CUTOFF_PER_LEVEL[lv] ?? 0.35;
+  const curAirEff = Math.max(0.05, Math.min(0.85, curAirBase + WORLD_GEN_CELLULAR_CONFIG.globalAirCutoffOffset));
+  fill(200, 210, 230);
+  text(`Air Cutoff (Corridors): ${curAirEff.toFixed(2)} (Lv${lv})`, sideX, sy);
+  drawDarkButton(sideX + sideW - 85, sy - 4, 38, 22, "-0.03", {
+    id: 'btn_air_minus', fontSize: 9, radius: 4,
+    onClick: () => {
+      WORLD_GEN_CELLULAR_CONFIG.globalAirCutoffOffset = Math.max(-0.25, WORLD_GEN_CELLULAR_CONFIG.globalAirCutoffOffset - 0.03);
+      state.worldPreviewNeedsUpdate = true;
+    }
+  });
+  drawDarkButton(sideX + sideW - 42, sy - 4, 38, 22, "+0.03", {
+    id: 'btn_air_plus', fontSize: 9, radius: 4,
+    onClick: () => {
+      WORLD_GEN_CELLULAR_CONFIG.globalAirCutoffOffset = Math.min(0.25, WORLD_GEN_CELLULAR_CONFIG.globalAirCutoffOffset + 0.03);
+      state.worldPreviewNeedsUpdate = true;
+    }
+  });
+  sy += 28;
+
+  // Core Ore & Feature Frequency Multiplier
+  fill(200, 210, 230);
+  text(`Core Feature Multiplier: ${WORLD_GEN_CELLULAR_CONFIG.oreChanceMultiplier.toFixed(2)}x`, sideX, sy);
+  drawDarkButton(sideX + sideW - 85, sy - 4, 38, 22, "-0.1x", {
+    id: 'btn_ore_minus', fontSize: 9, radius: 4,
+    onClick: () => {
+      WORLD_GEN_CELLULAR_CONFIG.oreChanceMultiplier = Math.max(0.2, WORLD_GEN_CELLULAR_CONFIG.oreChanceMultiplier - 0.1);
+      WORLD_GEN_CELLULAR_CONFIG.spawnerChanceMultiplier = WORLD_GEN_CELLULAR_CONFIG.oreChanceMultiplier;
+      state.worldPreviewNeedsUpdate = true;
+    }
+  });
+  drawDarkButton(sideX + sideW - 42, sy - 4, 38, 22, "+0.1x", {
+    id: 'btn_ore_plus', fontSize: 9, radius: 4,
+    onClick: () => {
+      WORLD_GEN_CELLULAR_CONFIG.oreChanceMultiplier = Math.min(3.0, WORLD_GEN_CELLULAR_CONFIG.oreChanceMultiplier + 0.1);
+      WORLD_GEN_CELLULAR_CONFIG.spawnerChanceMultiplier = WORLD_GEN_CELLULAR_CONFIG.oreChanceMultiplier;
+      state.worldPreviewNeedsUpdate = true;
+    }
+  });
+  sy += 28;
+
+  // Organic Jitter Amplitude
+  fill(200, 210, 230);
+  text(`Boundary Organic Jitter: ${WORLD_GEN_CELLULAR_CONFIG.boundaryJitterAmp.toFixed(2)}`, sideX, sy);
+  drawDarkButton(sideX + sideW - 85, sy - 4, 38, 22, "-0.02", {
+    id: 'btn_jitter_minus', fontSize: 9, radius: 4,
+    onClick: () => {
+      WORLD_GEN_CELLULAR_CONFIG.boundaryJitterAmp = Math.max(0.0, WORLD_GEN_CELLULAR_CONFIG.boundaryJitterAmp - 0.02);
+      state.worldPreviewNeedsUpdate = true;
+    }
+  });
+  drawDarkButton(sideX + sideW - 42, sy - 4, 38, 22, "+0.02", {
+    id: 'btn_jitter_plus', fontSize: 9, radius: 4,
+    onClick: () => {
+      WORLD_GEN_CELLULAR_CONFIG.boundaryJitterAmp = Math.min(0.25, WORLD_GEN_CELLULAR_CONFIG.boundaryJitterAmp + 0.02);
+      state.worldPreviewNeedsUpdate = true;
+    }
+  });
+  sy += 34;
+
+  // Seed & Center View / Re-render Buttons
+  const seedBtnW = Math.floor((sideW - 8) / 2);
+  drawGreenButton(sideX, sy, seedBtnW, 26, `🎲 Seed: ${WORLD_GEN_CELLULAR_CONFIG.worldSeed}`, {
+    id: 'btn_wgen_seed', fontSize: 10, radius: 6,
+    onClick: () => {
+      WORLD_GEN_CELLULAR_CONFIG.worldSeed = Math.floor(Math.random() * 90000) + 1000;
+      state.worldPreviewNeedsUpdate = true;
+    }
+  });
+
+  const previewAtOrigin = (state as any).worldPreviewAtOrigin !== false;
+  drawCyanButton(sideX + seedBtnW + 8, sy, seedBtnW, 26, previewAtOrigin ? "📍 Center: (0,0)" : "🧑 Center: Player", {
+    id: 'btn_wgen_center_toggle', fontSize: 10, radius: 6,
+    onClick: () => {
+      (state as any).worldPreviewAtOrigin = !previewAtOrigin;
+      state.worldPreviewNeedsUpdate = true;
+    }
+  });
+  sy += 38;
+
+  // --- ROOM DIRECTOR SECTION ---
+  fill(255, 194, 0);
+  textSize(12);
+  text("ROOM DIRECTOR CHAIN", sideX, sy);
+  sy += 20;
+
+  const genChainW = sideW - 55;
+  drawDarkButton(sideX, sy, genChainW, 26, "⚡ Generate Room Chain", {
+    id: 'btn_wgen_gen_chain', fontSize: 10, radius: 6,
+    onClick: () => {
+      state.roomDirectorData = generateRoomDirectorData();
+      state.roomDirectorChain = state.roomDirectorData.split('-');
+      state.roomDirectorScrollY = 0;
+    }
+  });
+
+  // Copy Button
+  drawCyanButton(sideX + genChainW + 6, sy, 48, 26, "Copy", {
+    id: 'btn_wgen_copy_chain', fontSize: 10, radius: 6,
+    onClick: () => {
+      if (state.roomDirectorData) {
+        navigator.clipboard.writeText(state.roomDirectorData);
+      }
+    }
+  });
   sy += 32;
 
-  // Text Holder (Wrapped and Scrollable)
+  // Room Director Output Text Box
   const holderH = modalH - (sy - my) - 20;
-  fill(15, 15, 25); noStroke(); rect(sideX, sy, sideW, holderH, 8);
-  
+  fill(12, 15, 26);
+  stroke(30, 36, 68);
+  rect(sideX, sy, sideW, holderH, 8);
+
   if (state.roomDirectorData) {
     const dc = (window as any).drawingContext;
     dc.save();
     dc.beginPath();
-    dc.rect(sideX, sy, sideW, holderH);
+    dc.rect(sideX + 2, sy + 2, sideW - 4, holderH - 4);
     dc.clip();
 
-    // Copy Button
-    const copyW = 40;
-    const copyH = 18;
-    const copyX = sideX + sideW - copyW - 10;
-    const copyY = sy + 10;
-    const hovCopy = mouseX > copyX && mouseX < copyX + copyW && mouseY > copyY && mouseY < copyY + copyH;
-    
-    // Calculate height once or when data changes to prevent lag
     push();
     textSize(9);
     textAlign(LEFT, TOP);
     const wrapW = sideW - 20;
-    
-    // Simple line count estimation to avoid heavy regex match every frame
-    const charPerLine = floor(wrapW / 5.5);
+    const charPerLine = Math.floor(wrapW / 5.5);
     const estimatedLines = Math.ceil(state.roomDirectorData.length / charPerLine) + 4;
     const textHeight = estimatedLines * 11 + 20;
     const maxScroll = Math.min(0, holderH - textHeight);
 
-    // Scroll Logic
-    if (mouseIsPressed && mouseX > sideX && mouseX < sideX + sideW && mouseY > sy && mouseY < sy + holderH && !hovCopy) {
+    if (mouseIsPressed && mouseX > sideX && mouseX < sideX + sideW && mouseY > sy && mouseY < sy + holderH) {
       state.roomDirectorScrollVelocity = (mouseY - (window as any).pmouseY);
     } else {
       state.roomDirectorScrollVelocity *= 0.9;
@@ -288,43 +443,13 @@ export function drawWorldGenPreview() {
     pop();
 
     dc.restore();
-
-    // Draw copy button on top
-    push();
-    fill(hovCopy ? 120 : 80); stroke(255, 50); rect(copyX, copyY, copyW, copyH, 4);
-    fill(255); textAlign(CENTER, CENTER); textSize(8); text("COPY", copyX + copyW/2, copyY + copyH/2);
-    if (mouseIsPressed && hovCopy) {
-       navigator.clipboard.writeText(state.roomDirectorData);
-       (window as any).mouseIsPressed = false;
-    }
-    pop();
-    
-    // Scrollbar for text
-    if (textHeight > holderH) {
-      const barH = holderH - 10;
-      const handleH = (holderH / textHeight) * barH;
-      const barY = sy + 5 + map(state.roomDirectorScrollY, 0, maxScroll, 0, barH - handleH);
-      fill(255, 30); rect(sideX + sideW - 6, sy + 5, 4, barH, 2);
-      fill(100, 255, 100, 150); rect(sideX + sideW - 6, barY, 4, handleH, 2);
-    }
   } else {
-    fill(100); textAlign(CENTER, CENTER); textSize(10);
-    text("No chain generated.", sideX + sideW/2, sy + holderH/2);
+    fill(120, 130, 150);
+    textAlign(CENTER, CENTER);
+    textSize(10);
+    text("Click Generate Room Chain to preview sequence", sideX + sideW / 2, sy + holderH / 2);
   }
 
-  // --- MAIN MAP PREVIEW (Using Buffer) ---
-  const mapAreaSize = Math.min(450, modalW - sideW - 60);
-  const px = mx + 20;
-  const py = my + 50;
-
-  noStroke();
-  fill(0);
-  rect(px - 2, py - 2, mapAreaSize + 4, mapAreaSize + 4, 4);
-  
-  if (state.worldPreviewBuffer) {
-    image(state.worldPreviewBuffer, px, py, mapAreaSize, mapAreaSize);
-  }
-  
   pop();
 }
 

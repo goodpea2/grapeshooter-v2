@@ -6,43 +6,14 @@ import { obstacleTypes, overlayTypes, BLOCK_WEIGHTS } from '../balanceObstacles'
 import { LIQUID_WEIGHTS, LIQUID_KEYS } from '../balanceLiquids';
 import { NPCEntity } from '../entities';
 import { ECONOMY_CONFIG } from '../economy';
-import { worldGenConfig } from '../lvDemo';
+import { worldGenConfig, getWeightsForCurrentTime, ENEMY_KEYS } from '../lvDemo';
+import { enemyTypes } from '../balanceEnemies';
 import { ROOM_PREFABS, RoomPrefab } from '../dictionaryRoomPrefab';
 import { drawAutotile } from '../visualAutotiling';
 import { Block } from './block';
+import { getMultiLayerCellAt, getCellAt, hash2DFloat } from '../worldgen/cellularNoise';
+import { WORLD_GEN_CELLULAR_CONFIG } from '../worldgen/cellTypes';
 
-declare const dist: any;
-declare const floor: any;
-declare const abs: any;
-declare const noise: any;
-declare const random: any;
-declare const constrain: any;
-declare const push: any;
-declare const pop: any;
-declare const translate: any;
-declare const fill: any;
-declare const noFill: any;
-declare const stroke: any;
-declare const rect: any;
-declare const noStroke: any;
-declare const ellipse: any;
-declare const triangle: any;
-declare const map: any;
-declare const sin: any;
-declare const cos: any;
-declare const line: any;
-declare const strokeWeight: any;
-declare const textAlign: any;
-declare const textSize: any;
-declare const CENTER: any;
-declare const text: any;
-declare const TWO_PI: any;
-declare const createGraphics: any;
-declare const image: any;
-declare const imageMode: any;
-declare const CORNER: any;
-declare const width: any;
-declare const height: any;
 
 export const BLOCK_KEYS = ['o_dirt', 'o_clay', 'o_stone', 'o_slate', 'o_black'];
 
@@ -108,62 +79,36 @@ export class Chunk {
 
     const lv = levelOverride !== undefined ? levelOverride : floor(constrain(state.currentChunkLevel, 0, 10));
     this.localChunkLevel = lv;
-    const weights = BLOCK_WEIGHTS[lv];
-    const liquidW = LIQUID_WEIGHTS[lv];
+    const seed = WORLD_GEN_CELLULAR_CONFIG.worldSeed || 4242;
 
-    this.blocks = [];
-    this.blockMap.clear();
-
-    const candidates: {gx: number, gy: number, liquid: string | null, isBlock: boolean}[] = [];
     for (let x = 0; x < CHUNK_SIZE; x++) {
       for (let y = 0; y < CHUNK_SIZE; y++) {
-        let gx = this.cx * CHUNK_SIZE + x; let gy = this.cy * CHUNK_SIZE + y;
-        let ln = noise((gx + worldGenConfig.noiseOffsetLakes) * worldGenConfig.liquidNoiseScale, (gy + worldGenConfig.noiseOffsetLakes) * worldGenConfig.liquidNoiseScale);
-        let rn = noise((gx + worldGenConfig.noiseOffsetRivers) * worldGenConfig.riverNoiseScale, (gy + worldGenConfig.noiseOffsetRivers) * worldGenConfig.riverNoiseScale);
-        let isRiver = Math.abs(rn - 0.5) < worldGenConfig.riverThreshold;
-        let isLake = ln > worldGenConfig.lakeThreshold;
-        
-        if (this.cx === 0 && this.cy === 0 && dist(gx, gy, 8, 8) < worldGenConfig.spawnClearRadius) continue;
+        const gx = this.cx * CHUNK_SIZE + x;
+        const gy = this.cy * CHUNK_SIZE + y;
 
-        let liquid = null;
-        if (isLake || isRiver) {
-          let cln = noise((gx + worldGenConfig.noiseOffsetClumping) * worldGenConfig.liquidClumpScale, (gy + worldGenConfig.noiseOffsetClumping) * worldGenConfig.liquidClumpScale);
-          let totalLW = liquidW.reduce((a, b) => a + b, 0);
-          if (totalLW > 0) {
-            let r = cln * totalLW; let sum = 0;
-            for (let i = 0; i < LIQUID_KEYS.length; i++) { sum += liquidW[i]; if (r <= sum) { liquid = LIQUID_KEYS[i]; break; } }
-          }
+        // Origin spawn clearance radius
+        if (this.cx === 0 && this.cy === 0 && dist(gx, gy, 8, 8) < worldGenConfig.spawnClearRadius) {
+          continue;
         }
-        let isBlock = false;
-        if (!liquid) {
-          let n = noise((gx + worldGenConfig.noiseOffsetBlocks) * worldGenConfig.blockNoiseScale, (gy + worldGenConfig.noiseOffsetBlocks) * worldGenConfig.blockNoiseScale);
-          if (n > worldGenConfig.blockThreshold) isBlock = true;
-        }
-        if (liquid || isBlock) candidates.push({gx, gy, liquid, isBlock});
-      }
-    }
-    if (candidates.length === 0) return;
-    for (const c of candidates) {
-      const b = new Block(c.gx, c.gy, 'o_dirt', null, lv, c.liquid);
-      if (c.liquid) b.isMined = true; else b.isMined = false;
-      this.blocks.push(b); this.blockMap.set(`${c.gx},${c.gy}`, b);
-    }
 
-    const totalWeight = weights.reduce((a, b) => a + b, 0);
-    for (let i = 1; i < BLOCK_KEYS.length; i++) {
-      const typeKey = BLOCK_KEYS[i];
-      const solidBlocks = this.blocks.filter(b => !b.isMined);
-      const targetCount = floor(solidBlocks.length * (weights[i] / totalWeight));
-      if (targetCount <= 0) continue;
-      const matSeed = 200 + i * 85;
-      const candidatesToReplace = solidBlocks.filter(b => b.type === 'o_dirt');
-      candidatesToReplace.sort((a, b) => {
-        let nA = noise((a.gx + worldGenConfig.noiseOffsetBlocks) * 0.25, (a.gy + worldGenConfig.noiseOffsetBlocks) * 0.25, matSeed);
-        let nB = noise((b.gx + worldGenConfig.noiseOffsetBlocks) * 0.25, (b.gy + worldGenConfig.noiseOffsetBlocks) * 0.25, matSeed);
-        return nB - nA;
-      });
-      for (let j = 0; j < Math.min(targetCount, candidatesToReplace.length); j++) {
-        let b = candidatesToReplace[j]; b.type = typeKey; b.config = obstacleTypes[typeKey]; b.health = b.config.health; b.maxHealth = b.health;
+        // Query Multi-Layered Core-and-Shell Cellular Noise Field
+        const cellInfo = getMultiLayerCellAt(gx, gy, lv, seed);
+
+        if (cellInfo.isLiquid && cellInfo.material) {
+          // Lake / Liquid Cell
+          const b = new Block(gx, gy, 'o_dirt', cellInfo.overlay, lv, cellInfo.material);
+          b.isMined = true;
+          if (cellInfo.spawnerBudget) b.spawnerBudget = cellInfo.spawnerBudget;
+          this.blocks.push(b);
+          this.blockMap.set(`${gx},${gy}`, b);
+        } else if (cellInfo.hasSolidTile && cellInfo.material) {
+          // Solid Cell (Tree / Dirt / Clay / Stone)
+          const b = new Block(gx, gy, cellInfo.material, cellInfo.overlay, lv);
+          b.isMined = false;
+          if (cellInfo.spawnerBudget) b.spawnerBudget = cellInfo.spawnerBudget;
+          this.blocks.push(b);
+          this.blockMap.set(`${gx},${gy}`, b);
+        }
       }
     }
 
@@ -327,7 +272,134 @@ export class Chunk {
         }
     }
 
-    const spawnerCount = floor(random(cfg.enemySpawnerCount[0], cfg.enemySpawnerCount[1] + 1));
+    // Monster / Boss room prefabs: spawn distributed l_spawners in circular ring around chunk center
+    const isMonsterOrBoss = prefab.id.startsWith('mon') || prefab.id.startsWith('bos');
+    if (isMonsterOrBoss) {
+      const centerGX = this.cx * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
+      const centerGY = this.cy * CHUNK_SIZE + Math.floor(CHUNK_SIZE / 2);
+      const danger = cfg.enemySpawnerConfig?.danger || (prefab.id.startsWith('bos') ? 3 : 1);
+      
+      const bRange = cfg.enemySpawnerConfig?.enemySpawnConfig?.budget || [prefab.enemyBudget || 60, prefab.enemyBudget || 60];
+      const rolledTotalBudget = floor(random(bRange[0], bRange[1] + 1));
+      const spawnerCount = prefab.id.startsWith('mon') ? floor(random(1, 4)) : floor(random(4, 9));
+      
+      const baseBudget = Math.floor(rolledTotalBudget / spawnerCount);
+      const remainder = rolledTotalBudget % spawnerCount;
+      const seed = WORLD_GEN_CELLULAR_CONFIG.worldSeed || 4242;
+      const baseAngle = hash2DFloat(this.cx, this.cy, seed + 888) * TWO_PI;
+      const ringRadius = spawnerCount <= 3 ? 2.5 : 3.5;
+
+      const dtWeights = getWeightsForCurrentTime();
+      const usedCoords = new Set<string>();
+
+      for (let sIdx = 0; sIdx < spawnerCount; sIdx++) {
+        const spawnerBudget = baseBudget + (sIdx < remainder ? 1 : 0);
+        if (spawnerBudget <= 0) continue;
+
+        let sgx = centerGX;
+        let sgy = centerGY;
+
+        if (spawnerCount > 1) {
+          const ang = baseAngle + (sIdx / spawnerCount) * TWO_PI;
+          sgx = Math.round(centerGX + Math.cos(ang) * ringRadius);
+          sgy = Math.round(centerGY + Math.sin(ang) * ringRadius);
+        }
+
+        // Avoid overlap
+        let coordKey = `${sgx},${sgy}`;
+        if (usedCoords.has(coordKey)) {
+          sgx = centerGX + ((sIdx % 3) - 1) * 2;
+          sgy = centerGY + (Math.floor(sIdx / 3) - 1) * 2;
+          coordKey = `${sgx},${sgy}`;
+        }
+        usedCoords.add(coordKey);
+
+        // Build cached enemy list totaling spawnerBudget
+        const cachedList: string[] = [];
+        let budgetLeft = spawnerBudget;
+        let safety = 500;
+
+        while (budgetLeft > 0 && safety > 0) {
+          safety--;
+          const affordable: { key: string; weight: number; cost: number }[] = [];
+          for (let i = 0; i < ENEMY_KEYS.length; i++) {
+            const k = ENEMY_KEYS[i];
+            const eCfg = enemyTypes[k];
+            const w = dtWeights[i] || 0;
+            if (eCfg && eCfg.cost > 0 && !eCfg.excludeFromSpawnerPool && !eCfg.spawnWithCondition && eCfg.cost <= budgetLeft && w > 0) {
+              affordable.push({ key: k, weight: w, cost: eCfg.cost });
+            }
+          }
+
+          if (affordable.length === 0) {
+            const fallback = Object.keys(enemyTypes).filter(k => 
+              enemyTypes[k] && enemyTypes[k].cost > 0 && !enemyTypes[k].excludeFromSpawnerPool && !enemyTypes[k].spawnWithCondition && enemyTypes[k].cost <= budgetLeft
+            );
+            if (fallback.length === 0) break;
+            const fallbackKey = fallback[floor(random(fallback.length))];
+            cachedList.push(fallbackKey);
+            budgetLeft -= enemyTypes[fallbackKey].cost;
+            continue;
+          }
+
+          const totalWeight = affordable.reduce((s, a) => s + a.weight, 0);
+          let r = random(totalWeight);
+          let chosenKey = affordable[affordable.length - 1].key;
+          let chosenCost = affordable[affordable.length - 1].cost;
+          let sum = 0;
+          for (const a of affordable) {
+            sum += a.weight;
+            if (r <= sum) {
+              chosenKey = a.key;
+              chosenCost = a.cost;
+              break;
+            }
+          }
+
+          cachedList.push(chosenKey);
+          budgetLeft -= chosenCost;
+        }
+
+        const totalCachedBudget = cachedList.reduce((sum, k) => sum + (enemyTypes[k]?.cost || 0), 0);
+
+        let b = this.blockMap.get(`${sgx},${sgy}`);
+        if (!b) {
+          b = new Block(sgx, sgy, 'o_dirt', null, lv, 'l_spawner');
+          this.blocks.push(b);
+          this.blockMap.set(`${sgx},${sgy}`, b);
+        } else {
+          b.isMined = true;
+          b.liquidType = 'l_spawner';
+          b.overlay = null;
+        }
+
+        b.cachedSpawnList = [...cachedList];
+        b.initialCachedSpawnCount = cachedList.length;
+        b.spawnerBudget = totalCachedBudget;
+        b.totalBudgetSpawned = 0;
+        b.lastSpawnTime = state.frames + floor(random(30));
+
+        b.customSpawnerConfig = {
+          name: `${prefab.name} [${sIdx + 1}/${spawnerCount}]`,
+          danger: danger,
+          budget: totalCachedBudget,
+          enemyTypeKey: Array.from(new Set(cachedList)),
+          spawnRadius: 120,
+          spawnTriggerRadius: 240,
+          spawnInterval: 60,
+          spawnIntervalConsumeBudget: true,
+          hourlySpawnConfig: {
+            enabled: false,
+            hourlyDaytimeBudget: [0],
+            hourlyNighttimeBudget: [0],
+            hourlyBudgetMultiplierForFollowingDay: 1.0,
+            selfDestructAfterBudgetSpawned: totalCachedBudget
+          }
+        };
+      }
+    }
+
+    const spawnerCount = isMonsterOrBoss ? 0 : floor(random(cfg.enemySpawnerCount[0], cfg.enemySpawnerCount[1] + 1));
     const danger = cfg.enemySpawnerConfig.danger;
     const spawnerPool = Object.keys(overlayTypes).filter(k => overlayTypes[k].isEnemySpawner && overlayTypes[k].danger === danger);
     
@@ -420,7 +492,7 @@ export class Chunk {
         }
     }
 
-    this.roomEnemyBudget = prefab.enemyBudget;
+    this.roomEnemyBudget = 0;
     this.rebuildOverlayList();
     this.needsRedraw = true;
   }
